@@ -1,6 +1,27 @@
 {
+  "name": "listify-kijiji",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "vitest"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.76.1",
+    "expo": "~51.0.0",
+    "expo-router": "~3.5.0",
+    "expo-status-bar": "~1.12.0",
+    "react": "18.2.0",
+    "react-native": "0.74.0",
     "react-native-css": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.0",
+    "@types/react-native": "~0.73.0",
+    "typescript": "~5.3.0",
+    "vitest": "^1.0.0"
   }
 }
