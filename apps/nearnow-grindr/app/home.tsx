@@ -1,103 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useAuth } from '../src/contexts/AuthContext';
-import { ProtectedRoute } from '../src/components/ProtectedRoute';
+import React, { useEffect } from "react";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { router } from "expo-router";
+import { useAuth } from "../src/contexts/AuthContext";
+import { useProfile } from "../src/hooks/useProfile";
+import { ProtectedRoute } from "../src/components/ProtectedRoute";
 
 function HomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { profile, loading, hasCompletedOnboarding } = useProfile();
+
+  useEffect(() => {
+    if (!loading) {
+      if (!hasCompletedOnboarding) {
+        // Redirect to onboarding if profile is incomplete
+        router.replace("/onboarding/welcome");
+      } else {
+        // Redirect to main tab navigation
+        router.replace("/(tabs)/discover");
+      }
+    }
+  }, [loading, hasCompletedOnboarding]);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>NearNow</Text>
-        <Text style={styles.subtitle}>Connect with people nearby</Text>
-      </View>
-      
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Discover</Text>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Find People Nearby</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>View Matches</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Messages</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.footer}>
-        <Text style={styles.userText}>Logged in as: {user?.email}</Text>
-        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#e84393" />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#e84393',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#e0e0e0',
-  },
-  content: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#2d3436',
-  },
-  button: {
-    backgroundColor: '#e84393',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  footer: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-  },
-  userText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  logoutButton: {
-    backgroundColor: '#e74c3c',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: 'white',
-    fontWeight: '600',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
   },
 });
 

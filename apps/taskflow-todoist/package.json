@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@expo/vector-icons": "^14.0.0",
     "@supabase/supabase-js": "^2.76.1",
     "expo": "~51.0.0",
     "expo-router": "~3.5.0",

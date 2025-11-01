@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../supabase';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { supabase } from "../supabase";
+import { userService } from "../services/userService";
 
 interface AuthContextType {
   user: User | null;
@@ -39,11 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
     if (error) throw error;
+
+    // Create user profile
+    if (data.user) {
+      const username = email.split("@")[0];
+      try {
+        await userService.createUserProfile(data.user.id, username, email);
+      } catch (profileError) {
+        console.error("Failed to create user profile:", profileError);
+      }
+    }
   };
 
   const signIn = async (email: string, password: string) => {
@@ -74,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

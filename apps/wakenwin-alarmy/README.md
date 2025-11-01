@@ -1,70 +1,127 @@
-# WakeNWin - Alarm & Challenge App
+# WakeNWin - Alarmy Clone
 
-A React Native app built with Expo for setting alarms with challenges to help you wake up and start your day right.
-
-## Tech Stack
-
-- **Expo SDK 55** with React Native 0.74
-- **Expo Router v3** for navigation
-- **TypeScript** (strict mode)
-- **Supabase** for authentication and database
-- **React Native StyleSheet** for styling
-
-## Development Setup
-
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-
-2. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-   Fill in your Supabase project URL and anon key.
-
-3. Start the development server:
-   ```bash
-   pnpm expo start
-   ```
-
-4. Run tests:
-   ```bash
-   pnpm test
-   ```
+A feature-rich alarm clock app that makes waking up engaging and effective through various challenges, tracking, and motivational elements.
 
 ## Features
 
-- **Authentication**: Email/password signup and login
-- **Smart Alarms**: Set alarms with customizable wake-up challenges
-- **Challenge Types**: Math problems, shake challenges, photo verification
-- **Progress Tracking**: Monitor your wake-up streak and success rate
-- **Mood Tracking**: Rate your morning mood after waking up
+### 🎯 Wake-Up Challenges
+
+- **Basic**: Simple dismiss button
+- **Math Problems**: Solve arithmetic problems of varying difficulty
+- **Shake Challenge**: Shake your phone a certain number of times
+- **Photo Mission**: Take a photo matching a reference image
+- **Memory Game**: Repeat number sequences
+- **Typing Challenge**: Type motivational phrases
+
+### ⏰ Alarm Management
+
+- Create, edit, and delete multiple alarms
+- Recurring alarms with day selection
+- Custom labels for each alarm
+- Quick enable/disable toggles
+- Snooze limits and penalties
+
+### 😴 Sleep Features
+
+- Sleep tracking with manual start/stop
+- Sleep sounds (Rain, Ocean, White Noise, Forest)
+- Power nap timer (15, 20, 30, 45 minutes)
+- Bedtime reminders
+- Sleep quality tracking
+
+### 📊 Statistics & Progress
+
+- Wake-up streak counter
+- Total challenges completed
+- Weekly wake-up chart
+- Achievement badges
+- Sleep duration tracking
+
+### 👤 Profile & Settings
+
+- User profile management
+- Customizable preferences
+  - Default challenge type
+  - Snooze limit
+  - Gradual volume increase
+  - Bedtime reminders
+- Notification management
+
+## Tech Stack
+
+- **Frontend**: React Native with Expo SDK 51
+- **Navigation**: Expo Router v3
+- **Backend**: Supabase (Auth, Database, Storage)
+- **Notifications**: Expo Notifications
+- **Sensors**: Expo Sensors (Accelerometer)
+- **Audio**: Expo AV
+- **Camera**: Expo Camera
+- **Location**: Expo Location (for weather)
+
+## Setup
+
+1. Install dependencies:
+
+```bash
+pnpm install
+```
+
+2. Set up environment variables:
+   Create a `.env.local` file with:
+
+```
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_WEATHER_API_KEY=your_openweather_api_key # Optional
+```
+
+3. Set up Supabase:
+
+- Run the SQL schema in `supabase/schema.sql`
+- Optionally run `supabase/seed.sql` for sample alarm sounds
+
+4. Add alarm sound:
+
+- Add an MP3 file named `alarm-sound.mp3` to the `assets` directory
+
+5. Run the app:
+
+```bash
+pnpm start
+```
 
 ## Project Structure
 
 ```
-/app
-  - _layout.tsx      # Root layout with auth provider
-  - index.tsx        # Entry point with auth routing
-  - home.tsx         # Main dashboard
-  - login.tsx        # Authentication screen
-  - settings.tsx     # User settings
-
-/src
-  - components/      # Reusable UI components
-  - contexts/        # React contexts (AuthContext)
-  - hooks/          # Custom React hooks
-  - utils/          # Utility functions
-  - supabase.ts     # Supabase client configuration
-
-/supabase
-  - schema.sql      # Database schema
+apps/wakenwin-alarmy/
+├── app/
+│   ├── (tabs)/          # Tab navigation screens
+│   ├── alarm/           # Alarm create/edit screens
+│   ├── challenge/       # Wake-up challenge screens
+│   └── onboarding/      # Onboarding flow
+├── src/
+│   ├── components/      # Reusable components
+│   ├── contexts/        # React contexts
+│   ├── hooks/           # Custom hooks
+│   ├── services/        # Business logic services
+│   └── utils/           # Utility functions
+└── supabase/           # Database schema and seeds
 ```
 
-## Database Schema
+## Permissions Required
 
-- **users**: User profiles and wake-up stats
-- **alarms**: Alarm configurations and settings
-- **challenges**: Individual wake-up challenges
-- **wake_up_sessions**: Daily wake-up session records
+- **Notifications**: For alarm alerts
+- **Camera**: For photo challenges (optional)
+- **Motion**: For shake challenges (optional)
+- **Location**: For weather display (optional)
+
+## Future Enhancements
+
+- [ ] QR/Barcode scan challenge
+- [ ] Step counter challenge
+- [ ] News briefing integration
+- [ ] Social features (compete with friends)
+- [ ] Cloud backup of alarm settings
+- [ ] More alarm sounds and customization
+- [ ] Smart alarm (wake during light sleep phase)
+- [ ] Integration with smart home devices

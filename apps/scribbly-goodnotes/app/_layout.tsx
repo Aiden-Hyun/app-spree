@@ -1,13 +1,36 @@
-import { Stack } from 'expo-router';
-import { AuthProvider } from '../src/contexts/AuthContext';
+import { Stack } from "expo-router";
+import { AuthProvider } from "../src/contexts/AuthContext";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <Stack>
-        <Stack.Screen name="home" options={{ title: 'Scribbly' }} />
-        <Stack.Screen name="login" options={{ title: 'Login' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen
+          name="editor"
+          options={{
+            headerShown: true,
+            title: "Editor",
+            presentation: "modal",
+            headerStyle: {
+              backgroundColor: "#00b894",
+            },
+            headerTintColor: "#fff",
+          }}
+        />
+        <Stack.Screen
+          name="settings"
+          options={{
+            headerShown: true,
+            title: "Settings",
+            headerStyle: {
+              backgroundColor: "#00b894",
+            },
+            headerTintColor: "#fff",
+          }}
+        />
       </Stack>
     </AuthProvider>
   );

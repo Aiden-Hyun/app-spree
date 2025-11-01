@@ -1,30 +1,40 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useAuth } from '../src/contexts/AuthContext';
-import { router } from 'expo-router';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+} from "react-native";
+import { useAuth } from "../src/contexts/AuthContext";
+import { router } from "expo-router";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const { signUp, signIn, loading } = useAuth();
 
   const handleAuth = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     try {
       if (isSignUp) {
         await signUp(email, password);
-        Alert.alert('Success', 'Account created! Please check your email to verify.');
+        Alert.alert(
+          "Success",
+          "Account created! Please check your email to verify."
+        );
       } else {
         await signIn(email, password);
-        router.replace('/home');
+        router.replace("/(tabs)/learn");
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert("Error", error.message);
     }
   };
 
@@ -34,7 +44,7 @@ export default function LoginScreen() {
         <Text style={styles.title}>LingoLite</Text>
         <Text style={styles.subtitle}>Start your language journey</Text>
       </View>
-      
+
       <View style={styles.form}>
         <TextInput
           style={styles.input}
@@ -44,7 +54,7 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -52,23 +62,25 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           secureTextEntry
         />
-        
+
         <TouchableOpacity
           style={styles.authButton}
           onPress={handleAuth}
           disabled={loading}
         >
           <Text style={styles.authButtonText}>
-            {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+            {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.switchButton}
           onPress={() => setIsSignUp(!isSignUp)}
         >
           <Text style={styles.switchText}>
-            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+            {isSignUp
+              ? "Already have an account? Sign In"
+              : "Don't have an account? Sign Up"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -79,54 +91,54 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
   },
   header: {
     padding: 40,
-    alignItems: 'center',
-    backgroundColor: '#00b894',
+    alignItems: "center",
+    backgroundColor: "#00b894",
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#e0e0e0',
+    color: "#e0e0e0",
   },
   form: {
     flex: 1,
     padding: 20,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
   },
   authButton: {
-    backgroundColor: '#00b894',
+    backgroundColor: "#00b894",
     padding: 16,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 16,
   },
   authButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   switchButton: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   switchText: {
-    color: '#00b894',
+    color: "#00b894",
     fontSize: 14,
   },
 });

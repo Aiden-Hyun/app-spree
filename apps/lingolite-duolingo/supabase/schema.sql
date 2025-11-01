@@ -79,6 +79,27 @@ CREATE TABLE IF NOT EXISTS user_vocabulary_progress (
   UNIQUE(user_id, vocabulary_id)
 );
 
+-- Achievements table
+CREATE TABLE IF NOT EXISTS achievements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT UNIQUE NOT NULL,
+  description TEXT,
+  icon TEXT,
+  xp_threshold INTEGER,
+  streak_threshold INTEGER,
+  lesson_threshold INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User achievements table
+CREATE TABLE IF NOT EXISTS user_achievements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  achievement_id UUID REFERENCES achievements(id) ON DELETE CASCADE,
+  earned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, achievement_id)
+);
+
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE languages ENABLE ROW LEVEL SECURITY;
@@ -87,6 +108,8 @@ ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vocabulary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_vocabulary_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 CREATE POLICY "Users can view own data" ON users
@@ -108,4 +131,10 @@ CREATE POLICY "Users can view all active vocabulary" ON vocabulary
   FOR SELECT USING (is_active = true);
 
 CREATE POLICY "Users can manage own vocabulary progress" ON user_vocabulary_progress
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view all achievements" ON achievements
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can manage own achievements" ON user_achievements
   FOR ALL USING (auth.uid() = user_id);

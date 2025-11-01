@@ -1,75 +1,166 @@
-# TaskFlow - Task Management App
+# TaskFlow - Todoist-like Task Management App
 
-A React Native app built with Expo for organizing tasks, projects, and productivity tracking.
+A powerful task management app built with React Native and Expo, inspired by Todoist. Organize your life with projects, smart task organization, and productivity insights.
 
-## Tech Stack
+## 🚀 Features
 
-- **Expo SDK 55** with React Native 0.74
-- **Expo Router v3** for navigation
-- **TypeScript** (strict mode)
-- **Supabase** for authentication and database
+### Core Task Management
+
+- **Smart Views**: Inbox, Today, Upcoming views for task organization
+- **Projects**: Group tasks into color-coded projects
+- **Priority System**: 4-level priority system (Low, Medium, High, Urgent)
+- **Due Dates**: Set deadlines with overdue handling
+- **Task Completion**: Toggle tasks with visual feedback
+- **Quick Add**: Fast task creation with project and date presets
+
+### Organization & Filtering
+
+- **Project Management**: Create, edit, and archive projects
+- **Smart Filtering**: Filter by status, priority, project, or search terms
+- **Task Grouping**: Automatic grouping by date, priority, or project
+- **Subtasks**: Break down complex tasks into smaller steps
+- **Labels**: Tag tasks with custom labels for cross-project organization
+
+### Productivity & Analytics
+
+- **Productivity Stats**: Track completion rates and patterns
+- **Streak Tracking**: Current and longest streak monitoring
+- **Task Analytics**: View tasks by project, priority, and time
+- **Productivity Insights**: Discover your most productive days and hours
+- **Progress Visualization**: See task completion trends over time
+
+## 📱 Screenshots
+
+The app features:
+
+- Tab navigation with Inbox, Today, Upcoming, and Projects views
+- Clean, modern UI with purple accent color (#6c5ce7)
+- Swipeable task items (future feature)
+- Floating action button for quick task creation
+- Modal-based task creation with rich options
+
+## 🛠 Tech Stack
+
+- **Expo SDK 51** with React Native 0.74
+- **Expo Router v3** for file-based navigation
+- **TypeScript** with strict mode
+- **Supabase** for backend (Auth, Database, RLS)
 - **React Native StyleSheet** for styling
+- **@expo/vector-icons** for iconography
 
-## Development Setup
+## 📦 Project Structure
 
-1. Install dependencies:
+```
+/app
+  - _layout.tsx           # Root navigation stack
+  - (tabs)/              # Tab navigation
+    - inbox.tsx          # All unassigned tasks
+    - today.tsx          # Tasks due today
+    - upcoming.tsx       # Next 7 days view
+    - projects.tsx       # Project management
+  - quick-add.tsx        # Task creation modal
+  - stats.tsx            # Productivity analytics
+  - login.tsx            # Authentication
+  - settings.tsx         # User preferences
+
+/src
+  - components/          # UI Components
+    - TaskItem.tsx       # Individual task display
+    - TaskList.tsx       # Task list with grouping
+    - ProjectCard.tsx    # Project summary card
+    - QuickAddModal.tsx  # Task creation modal
+    - EmptyState.tsx     # Empty view component
+  - services/            # Business Logic
+    - taskService.ts     # Task CRUD operations
+    - projectService.ts  # Project management
+    - statsService.ts    # Analytics queries
+  - hooks/               # Custom Hooks
+    - useTasks.ts        # Task state management
+    - useProjects.ts     # Project operations
+    - useTaskFilters.ts  # Smart filtering logic
+  - contexts/            # React Contexts
+    - AuthContext.tsx    # Authentication state
+
+/supabase
+  - schema.sql          # Database schema
+  - seed.sql            # Sample data
+```
+
+## 🚀 Getting Started
+
+1. **Install dependencies**:
+
    ```bash
    pnpm install
    ```
 
-2. Set up environment variables:
+2. **Set up Supabase**:
+
+   - Create a new Supabase project
+   - Run the schema.sql file in SQL editor
+   - (Optional) Run seed.sql for sample data
+   - Copy your project URL and anon key
+
+3. **Configure environment**:
+
    ```bash
    cp .env.example .env
    ```
-   Fill in your Supabase project URL and anon key.
 
-3. Start the development server:
+   Add your Supabase credentials:
+
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=your-project-url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+4. **Start development**:
    ```bash
    pnpm expo start
    ```
 
-4. Run tests:
-   ```bash
-   pnpm test
-   ```
+## 📊 Database Schema
 
-## Features
+### Core Tables
 
-- **Authentication**: Email/password signup and login
-- **Task Management**: Create, edit, and organize tasks
-- **Project Organization**: Group tasks into projects
-- **Priority System**: Set task priorities (low, medium, high, urgent)
-- **Due Dates**: Set and track task deadlines
-- **Subtasks**: Break down complex tasks
-- **Labels**: Categorize tasks with custom labels
-- **Progress Tracking**: Monitor completion streaks and statistics
+- **users**: User profiles with productivity stats
+- **projects**: Task containers with colors and descriptions
+- **tasks**: Main task records with all metadata
+- **subtasks**: Checklist items within tasks
+- **task_labels**: User-defined tags
+- **task_label_assignments**: Many-to-many relationships
 
-## Project Structure
+### Row Level Security
 
+All tables have RLS enabled, ensuring users can only access their own data.
+
+## 🔮 Future Enhancements
+
+- [ ] Swipe gestures for quick actions
+- [ ] Natural language task input
+- [ ] Recurring tasks
+- [ ] Task comments and attachments
+- [ ] Team collaboration features
+- [ ] Push notifications
+- [ ] Calendar integration
+- [ ] Voice input
+- [ ] Dark mode
+- [ ] Data export
+
+## 📝 Development Notes
+
+- Uses pnpm workspace for monorepo management
+- Follows Expo Router best practices
+- Implements proper TypeScript types throughout
+- Uses Supabase RLS for security
+- Optimized for performance with React hooks
+
+## 🧪 Testing
+
+Run tests with:
+
+```bash
+pnpm test
 ```
-/app
-  - _layout.tsx      # Root layout with auth provider
-  - index.tsx        # Entry point with auth routing
-  - home.tsx         # Main dashboard
-  - login.tsx        # Authentication screen
-  - settings.tsx     # User settings
 
-/src
-  - components/      # Reusable UI components
-  - contexts/        # React contexts (AuthContext)
-  - hooks/          # Custom React hooks
-  - utils/          # Utility functions
-  - supabase.ts     # Supabase client configuration
-
-/supabase
-  - schema.sql      # Database schema
-```
-
-## Database Schema
-
-- **users**: User accounts and productivity stats
-- **projects**: Task organization containers
-- **tasks**: Individual task items
-- **subtasks**: Task breakdown items
-- **task_labels**: Custom categorization labels
-- **task_label_assignments**: Many-to-many task-label relationships
+The app includes unit tests for components and services using Vitest.

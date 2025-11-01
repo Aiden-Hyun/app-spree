@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
-import { useAuth } from '../src/contexts/AuthContext';
-import { ProtectedRoute } from '../src/components/ProtectedRoute';
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Switch } from "react-native";
+import { useAuth } from "../src/contexts/AuthContext";
+import { ProtectedRoute } from "../src/components/ProtectedRoute";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 function SettingsScreen() {
   const { user, logout } = useAuth();
@@ -13,7 +15,7 @@ function SettingsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
       </View>
-      
+
       <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
@@ -22,7 +24,7 @@ function SettingsScreen() {
             <Text style={styles.settingValue}>{user?.email}</Text>
           </View>
         </View>
-        
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           <View style={styles.settingItem}>
@@ -34,15 +36,23 @@ function SettingsScreen() {
           </View>
           <View style={styles.settingItem}>
             <Text style={styles.settingLabel}>Dark Mode</Text>
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-            />
+            <Switch value={darkMode} onValueChange={setDarkMode} />
           </View>
         </View>
-        
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Actions</Text>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push("/stats")}
+          >
+            <View style={styles.actionButtonContent}>
+              <Ionicons name="stats-chart" size={20} color="#6c5ce7" />
+              <Text style={styles.actionButtonText}>
+                View Productivity Stats
+              </Text>
+            </View>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
             <Text style={styles.actionButtonText}>Export Tasks</Text>
           </TouchableOpacity>
@@ -61,16 +71,16 @@ function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
   },
   header: {
     padding: 20,
-    backgroundColor: '#6c5ce7',
+    backgroundColor: "#6c5ce7",
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
   },
   content: {
     flex: 1,
@@ -81,49 +91,54 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
-    color: '#2d3436',
+    color: "#2d3436",
   },
   settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   settingLabel: {
     fontSize: 16,
-    color: '#2d3436',
+    color: "#2d3436",
   },
   settingValue: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   actionButton: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 16,
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
   },
   actionButtonText: {
     fontSize: 16,
-    color: '#2d3436',
+    color: "#2d3436",
+  },
+  actionButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   dangerButton: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: "#e74c3c",
     padding: 16,
     borderRadius: 8,
     marginTop: 8,
   },
   dangerButtonText: {
     fontSize: 16,
-    color: 'white',
-    fontWeight: '600',
-    textAlign: 'center',
+    color: "white",
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
 

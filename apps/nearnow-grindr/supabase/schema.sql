@@ -63,12 +63,34 @@ CREATE TABLE IF NOT EXISTS swipes (
   UNIQUE(swiper_id, swiped_id)
 );
 
+-- Push tokens table
+CREATE TABLE IF NOT EXISTS push_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT NOT NULL,
+  platform TEXT NOT NULL, -- 'ios' or 'android'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, token)
+);
+
+-- Blocked users table
+CREATE TABLE IF NOT EXISTS blocked_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  blocker_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  blocked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(blocker_id, blocked_id)
+);
+
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE swipes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blocked_users ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 CREATE POLICY "Users can view own data" ON users
@@ -91,3 +113,9 @@ CREATE POLICY "Users can view messages in their matches" ON messages
 
 CREATE POLICY "Users can manage their own swipes" ON swipes
   FOR ALL USING (auth.uid() = swiper_id);
+
+CREATE POLICY "Users can manage their own push tokens" ON push_tokens
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage their own blocks" ON blocked_users
+  FOR ALL USING (auth.uid() = blocker_id);

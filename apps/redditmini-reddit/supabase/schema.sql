@@ -81,6 +81,18 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   UNIQUE(user_id, subreddit_id)
 );
 
+-- Saved items table
+CREATE TABLE IF NOT EXISTS saved_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+  comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+  saved_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, post_id),
+  UNIQUE(user_id, comment_id),
+  CHECK ((post_id IS NOT NULL)::INTEGER + (comment_id IS NOT NULL)::INTEGER = 1)
+);
+
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subreddits ENABLE ROW LEVEL SECURITY;
@@ -88,6 +100,7 @@ ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE saved_items ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 CREATE POLICY "Users can view own data" ON users
@@ -112,4 +125,7 @@ CREATE POLICY "Users can manage own votes" ON votes
   FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can manage own subscriptions" ON subscriptions
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own saved items" ON saved_items
   FOR ALL USING (auth.uid() = user_id);

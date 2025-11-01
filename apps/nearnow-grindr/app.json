@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "NearNow",
+    "slug": "nearnow-grindr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#e84393"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nearnow.app",
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "NearNow uses your location to show you people nearby and keep your profile visible to others.",
+        "NSLocationWhenInUseUsageDescription": "NearNow uses your location to show you people nearby.",
+        "NSLocationAlwaysUsageDescription": "NearNow uses your location to keep your profile visible to others even when the app is in the background.",
+        "NSCameraUsageDescription": "NearNow needs access to your camera to take profile photos.",
+        "NSPhotoLibraryUsageDescription": "NearNow needs access to your photo library to upload profile photos.",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#e84393"
+      },
+      "package": "com.nearnow.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "NearNow uses your location to show you people nearby and keep your profile visible to others.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NearNow needs access to your photos to let you upload profile pictures.",
+          "cameraPermission": "NearNow needs access to your camera to let you take profile photos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#e84393"
+        }
+      ]
+    ]
+  }
+}
