@@ -12,3 +12,5 @@ ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
   flag_emoji = EXCLUDED.flag_emoji,
   is_active = EXCLUDED.is_active;
+
+

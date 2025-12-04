@@ -164,3 +164,5 @@ SET
     ELSE 0 
   END
 WHERE id = auth.uid();
+
+

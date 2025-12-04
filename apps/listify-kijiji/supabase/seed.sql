@@ -73,3 +73,5 @@ INSERT INTO listings (
     ARRAY['https://via.placeholder.com/400x300']
   )
 ON CONFLICT DO NOTHING;
+
+

@@ -285,3 +285,5 @@ INSERT INTO templates (id, user_id, title, description, category, content, icon,
 
 -- Update the sequence to ensure new templates get unique IDs
 SELECT setval('templates_id_seq', (SELECT MAX(id) FROM templates WHERE id !~ '^00000000'), true);
+
+

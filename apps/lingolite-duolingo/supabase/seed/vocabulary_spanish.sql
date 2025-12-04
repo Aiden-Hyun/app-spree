@@ -104,3 +104,5 @@ FROM (VALUES
   ('información', 'information', 'een-for-mah-see-OHN')
 ) AS t(word, translation, pronunciation)
 ON CONFLICT DO NOTHING;
+
+

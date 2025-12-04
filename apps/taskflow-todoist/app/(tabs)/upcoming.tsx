@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,12 +11,36 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
 import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
-import { useUpcomingTasks, useTasks } from "../../src/hooks/useTasks";
-import { router } from "expo-router";
+import { useTasks } from "../../src/hooks/useTasks";
+import { router, useFocusEffect } from "expo-router";
+import { taskService } from "../../src/services/taskService";
 
 function UpcomingScreen() {
-  const { tasks, loading, error } = useUpcomingTasks();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toggleTaskComplete } = useTasks();
+
+  const loadUpcomingTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await taskService.getUpcomingTasks();
+      setTasks(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load upcoming tasks");
+      console.error("Error loading upcoming tasks:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Reload tasks when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadUpcomingTasks();
+    }, [loadUpcomingTasks])
+  );
 
   // Generate next 7 days for calendar view
   const getDaysOfWeek = () => {

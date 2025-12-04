@@ -172,3 +172,5 @@ export interface UpdateNoteInput {
   is_locked?: boolean;
   tags?: string[];
 }
+
+

@@ -152,3 +152,5 @@ export const languageService = {
     return data;
   },
 };
+
+

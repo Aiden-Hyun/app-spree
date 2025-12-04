@@ -96,3 +96,5 @@ CREATE TRIGGER password_delete_trigger
   AFTER DELETE ON passwords
   FOR EACH ROW
   EXECUTE FUNCTION log_password_changes();
+
+

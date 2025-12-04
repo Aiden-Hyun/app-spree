@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "TaskFlow",
+    "slug": "taskflow-todoist",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "taskflow",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6c5ce7"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.appspree.taskflow",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "This allows us to provide you with personalized productivity insights and improve your task management experience."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6c5ce7"
+      },
+      "package": "com.appspree.taskflow",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-eas-project-id-here"
+      },
+      "supabaseUrl": "https://dfsahhgpcdqxeijigxei.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmc2FoaGdwY2RxeGVpamlneGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzAzNjEsImV4cCI6MjA4MDQwNjM2MX0.D5K3nL8oS7vkJlvrbGBLrQfRWuYfDXubQ6oCGgwgxMw"
+    },
+    "owner": "your-expo-username",
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/your-project-id"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
+  }
+}
+

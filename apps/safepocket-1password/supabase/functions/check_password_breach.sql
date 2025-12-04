@@ -32,3 +32,5 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION check_password_breach(TEXT) TO authenticated;
+
+

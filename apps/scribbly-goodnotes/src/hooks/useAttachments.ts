@@ -140,3 +140,5 @@ export function useAttachments(noteId?: string) {
     loadAttachments,
   };
 }
+
+

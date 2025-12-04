@@ -120,3 +120,5 @@ CREATE TRIGGER update_subreddit_subscriber_count_trigger
 AFTER INSERT OR DELETE ON subscriptions
 FOR EACH ROW
 EXECUTE FUNCTION update_subreddit_subscriber_count();
+
+

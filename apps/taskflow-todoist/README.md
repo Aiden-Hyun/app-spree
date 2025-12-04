@@ -88,36 +88,44 @@ The app features:
 
 ## 🚀 Getting Started
 
+### Quick Start
+
 1. **Install dependencies**:
 
    ```bash
    pnpm install
    ```
 
-2. **Set up Supabase**:
+2. **Set up environment**:
 
-   - Create a new Supabase project
-   - Run the schema.sql file in SQL editor
-   - (Optional) Run seed.sql for sample data
-   - Copy your project URL and anon key
-
-3. **Configure environment**:
+   Create a `.env` file in this directory:
 
    ```bash
-   cp .env.example .env
+   EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+   EXPO_PUBLIC_ENV=development
    ```
 
-   Add your Supabase credentials:
+3. **Set up Supabase**:
 
-   ```
-   EXPO_PUBLIC_SUPABASE_URL=your-project-url
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
+   - Create a Supabase project at [supabase.com](https://supabase.com)
+   - Run `supabase/schema.sql` in the SQL editor
+   - Copy credentials to `.env`
 
 4. **Start development**:
+
    ```bash
    pnpm expo start
    ```
+
+### 📱 Building for Production
+
+See **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** for complete instructions on:
+- Creating app assets (icons, splash screens)
+- Building with EAS
+- Play Store submission
+- Privacy policy requirements
+- Post-launch checklist
 
 ## 📊 Database Schema
 

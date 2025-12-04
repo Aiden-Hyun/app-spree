@@ -250,3 +250,5 @@ export class NotebookService {
     return { total_notes, total_words, last_updated };
   }
 }
+
+

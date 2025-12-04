@@ -265,3 +265,5 @@ export class ChallengeService {
     return phrases[Math.floor(Math.random() * phrases.length)];
   }
 }
+
+

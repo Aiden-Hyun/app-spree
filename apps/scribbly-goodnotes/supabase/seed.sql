@@ -70,3 +70,5 @@ WHERE NOT EXISTS (
   WHERE tags.user_id = users.id 
   AND tags.name = default_tags.tag_name
 );
+
+

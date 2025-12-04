@@ -55,3 +55,5 @@ INSERT INTO messages (match_id, sender_id, content, sent_at) VALUES
    '22222222-2222-2222-2222-222222222222', 'Hey! Thanks for the tap! How''s your day going?', NOW() - INTERVAL '50 minutes'),
   ((SELECT id FROM matches WHERE (user1_id = '11111111-1111-1111-1111-111111111111' AND user2_id = '22222222-2222-2222-2222-222222222222') OR (user1_id = '22222222-2222-2222-2222-222222222222' AND user2_id = '11111111-1111-1111-1111-111111111111')), 
    '11111111-1111-1111-1111-111111111111', 'Pretty good! Just finished a hike. You mentioned you like tacos - know any good spots nearby?', NOW() - INTERVAL '45 minutes');
+
+

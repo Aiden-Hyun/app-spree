@@ -157,3 +157,5 @@ export async function clearSecureStorage(): Promise<void> {
   await SecureStore.deleteItemAsync(MASTER_HASH_KEY);
   clearSessionEncryptionKey();
 }
+
+

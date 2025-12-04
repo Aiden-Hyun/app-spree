@@ -24,3 +24,5 @@ ON CONFLICT DO NOTHING;
 --   'wake_goal_minute', 30
 -- )
 -- WHERE email = 'user@example.com';
+
+

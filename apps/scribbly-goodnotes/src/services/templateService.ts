@@ -170,3 +170,5 @@ export class TemplateService {
     return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
   }
 }
+
+

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,12 +10,36 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
 import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
-import { useTodayTasks, useTasks } from "../../src/hooks/useTasks";
-import { router } from "expo-router";
+import { useTasks } from "../../src/hooks/useTasks";
+import { router, useFocusEffect } from "expo-router";
+import { taskService } from "../../src/services/taskService";
 
 function TodayScreen() {
-  const { tasks, loading, error } = useTodayTasks();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toggleTaskComplete } = useTasks();
+
+  const loadTodayTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await taskService.getTodayTasks();
+      setTasks(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load today tasks");
+      console.error("Error loading today tasks:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Reload tasks when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadTodayTasks();
+    }, [loadTodayTasks])
+  );
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",

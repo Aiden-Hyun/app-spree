@@ -195,3 +195,5 @@ export function useFavorites(userLat: number | null, userLon: number | null) {
     isFavorite,
   };
 }
+
+

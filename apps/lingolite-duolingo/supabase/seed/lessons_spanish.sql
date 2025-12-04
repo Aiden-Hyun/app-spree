@@ -106,3 +106,5 @@ FROM (VALUES
   ('Academic Discussions', 'Participate in academic conversations', 'conversation', 3, 30)
 ) AS t(title, description, lesson_type, difficulty_level, xp_reward)
 ON CONFLICT DO NOTHING;
+
+
