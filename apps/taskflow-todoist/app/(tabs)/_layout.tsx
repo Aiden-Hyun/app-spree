@@ -34,7 +34,7 @@ export default function TabLayout() {
           title: "Inbox",
           tabBarLabel: "Inbox",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="inbox-outline" size={size} color={color} />
+            <Ionicons name="mail-outline" size={size} color={color} />
           ),
         }}
       />

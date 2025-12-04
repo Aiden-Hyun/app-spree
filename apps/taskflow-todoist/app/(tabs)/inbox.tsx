@@ -10,7 +10,6 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
 import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
-import { useTasks } from "../../src/hooks/useTasks";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
 
@@ -18,7 +17,6 @@ function InboxScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toggleTaskComplete } = useTasks();
 
   const loadInboxTasks = useCallback(async () => {
     try {
@@ -43,9 +41,25 @@ function InboxScreen() {
 
   const handleToggleComplete = async (id: string) => {
     try {
-      await toggleTaskComplete(id);
+      // Optimistically update the UI
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === id
+            ? {
+                ...task,
+                status: task.status === "completed" ? "todo" : "completed",
+                completedAt: task.status === "completed" ? null : new Date().toISOString(),
+              }
+            : task
+        )
+      );
+      
+      // Then update the database
+      await taskService.toggleTaskComplete(id);
     } catch (error) {
       console.error("Failed to toggle task:", error);
+      // Revert on error
+      loadInboxTasks();
     }
   };
 
@@ -87,7 +101,7 @@ function InboxScreen() {
 
       {tasks.length === 0 ? (
         <EmptyState
-          icon="inbox-outline"
+          icon="mail-outline"
           title="Your inbox is empty"
           subtitle="Tasks without a project will appear here"
         />

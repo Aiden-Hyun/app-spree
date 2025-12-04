@@ -10,7 +10,6 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
 import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
-import { useTasks } from "../../src/hooks/useTasks";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
 
@@ -18,7 +17,6 @@ function TodayScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toggleTaskComplete } = useTasks();
 
   const loadTodayTasks = useCallback(async () => {
     try {
@@ -49,9 +47,25 @@ function TodayScreen() {
 
   const handleToggleComplete = async (id: string) => {
     try {
-      await toggleTaskComplete(id);
+      // Optimistically update the UI
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === id
+            ? {
+                ...task,
+                status: task.status === "completed" ? "todo" : "completed",
+                completedAt: task.status === "completed" ? null : new Date().toISOString(),
+              }
+            : task
+        )
+      );
+      
+      // Then update the database
+      await taskService.toggleTaskComplete(id);
     } catch (error) {
       console.error("Failed to toggle task:", error);
+      // Revert on error
+      loadTodayTasks();
     }
   };
 
