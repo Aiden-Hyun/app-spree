@@ -13,6 +13,7 @@ interface TaskItemProps {
   projectColor?: string;
   onToggleComplete: (id: string) => void;
   onPress: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export function TaskItem({
@@ -26,6 +27,7 @@ export function TaskItem({
   projectColor = "#6c5ce7",
   onToggleComplete,
   onPress,
+  onDelete,
 }: TaskItemProps) {
   const isCompleted = status === "completed";
   const isOverdue = dueDate && new Date(dueDate) < new Date() && !isCompleted;
@@ -75,6 +77,8 @@ export function TaskItem({
     <TouchableOpacity
       style={styles.container}
       onPress={() => onPress(id)}
+      onLongPress={onDelete ? () => onDelete(id) : undefined}
+      delayLongPress={250}
       activeOpacity={0.7}
     >
       <TouchableOpacity
@@ -149,14 +153,25 @@ export function TaskItem({
         </View>
       </View>
 
-      {priority !== "low" && !isCompleted && (
-        <Ionicons
-          name={priorityIcons[priority]}
-          size={18}
-          color={priorityColors[priority]}
-          style={styles.priorityIcon}
-        />
-      )}
+      <View style={styles.trailing}>
+        {priority !== "low" && !isCompleted && (
+          <Ionicons
+            name={priorityIcons[priority]}
+            size={18}
+            color={priorityColors[priority]}
+            style={styles.priorityIcon}
+          />
+        )}
+        {onDelete && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => onDelete(id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+          </TouchableOpacity>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -248,8 +263,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
+  trailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
   priorityIcon: {
     marginLeft: 8,
+  },
+  deleteButton: {
+    marginLeft: 12,
   },
 });
 

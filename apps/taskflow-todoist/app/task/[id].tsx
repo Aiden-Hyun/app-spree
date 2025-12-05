@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -109,23 +108,14 @@ function TaskDetailScreen() {
     }
   };
 
-  const handleDelete = () => {
-    Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteTask(taskId);
-            toast.success("Task deleted");
-            router.back();
-          } catch (error) {
-            toast.error("Failed to delete task");
-          }
-        },
-      },
-    ]);
+  const handleDelete = async () => {
+    try {
+      await deleteTask(taskId);
+      toast.success("Task deleted");
+      router.back();
+    } catch (error) {
+      toast.error("Failed to delete task");
+    }
   };
 
   if (loading) {
@@ -179,12 +169,20 @@ function TaskDetailScreen() {
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => setEditing(true)}
-            >
-              <Ionicons name="create-outline" size={24} color="#6c5ce7" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => setEditing(true)}
+              >
+                <Ionicons name="create-outline" size={24} color="#6c5ce7" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={handleDelete}
+              >
+                <Ionicons name="trash-outline" size={24} color="#e74c3c" />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </View>
@@ -364,7 +362,7 @@ function TaskDetailScreen() {
             <TouchableOpacity
               style={styles.dueDateButton}
               onPress={() => {
-                Alert.alert("Date Picker", "Date picker would open here");
+                toast.info("Date picker coming soon!");
               }}
             >
               <Ionicons name="calendar-outline" size={20} color="#666" />
@@ -474,6 +472,10 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerActions: {
     flexDirection: "row",
     alignItems: "center",
   },

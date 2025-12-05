@@ -96,6 +96,19 @@ function UpcomingScreen() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const previous = tasks;
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await taskService.deleteTask(id);
+      toast.success("Task deleted");
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast.error("Failed to delete task");
+      setTasks(previous);
+    }
+  };
+
   const handleTaskPress = (id: string) => {
     router.push(`/task/${id}`);
   };
@@ -197,6 +210,7 @@ function UpcomingScreen() {
                       projectColor={task.project?.color}
                       onToggleComplete={handleToggleComplete}
                       onPress={handleTaskPress}
+                  onDelete={handleDelete}
                     />
                   ))}
                 </View>

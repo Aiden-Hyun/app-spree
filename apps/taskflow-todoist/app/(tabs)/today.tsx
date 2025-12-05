@@ -80,6 +80,19 @@ function TodayScreen() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const previous = tasks;
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await taskService.deleteTask(id);
+      toast.success("Task deleted");
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast.error("Failed to delete task");
+      setTasks(previous);
+    }
+  };
+
   const handleTaskPress = (id: string) => {
     router.push(`/task/${id}`);
   };
@@ -137,6 +150,7 @@ function TodayScreen() {
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
+          onDelete={handleDelete}
           emptyMessage="No tasks for today"
           showCompletedSeparator={true}
         />

@@ -74,6 +74,20 @@ function InboxScreen() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    // Optimistically remove
+    const previous = tasks;
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await taskService.deleteTask(id);
+      toast.success("Task deleted");
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast.error("Failed to delete task");
+      setTasks(previous);
+    }
+  };
+
   const handleTaskPress = (id: string) => {
     router.push(`/task/${id}`);
   };
@@ -121,6 +135,7 @@ function InboxScreen() {
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
+          onDelete={handleDelete}
           emptyMessage="No tasks in your inbox"
         />
       )}
