@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 
 interface TaskItemProps {
@@ -31,6 +32,7 @@ export function TaskItem({
 }: TaskItemProps) {
   const isCompleted = status === "completed";
   const isOverdue = dueDate && new Date(dueDate) < new Date() && !isCompleted;
+  const swipeableRef = useRef<Swipeable | null>(null);
 
   const priorityColors = {
     low: "#95a5a6",
@@ -73,14 +75,37 @@ export function TaskItem({
     }
   };
 
+  const renderRightActions = () => (
+    <View style={styles.rightActionContainer}>
+      <View style={styles.deleteAction}>
+        <Ionicons name="trash-outline" size={20} color="white" />
+        <Text style={styles.deleteActionText}>Delete</Text>
+      </View>
+    </View>
+  );
+
+  const handleSwipeOpen = () => {
+    if (onDelete) {
+      onDelete(id);
+    }
+    // Close after triggering delete to avoid lingering UI
+    swipeableRef.current?.close();
+  };
+
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={() => onPress(id)}
-      onLongPress={onDelete ? () => onDelete(id) : undefined}
-      delayLongPress={250}
-      activeOpacity={0.7}
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={onDelete ? renderRightActions : undefined}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      onSwipeableOpen={handleSwipeOpen}
     >
+      <TouchableOpacity
+        style={styles.container}
+        onPress={() => onPress(id)}
+        activeOpacity={0.7}
+      >
       <TouchableOpacity
         style={styles.checkbox}
         onPress={() => onToggleComplete(id)}
@@ -97,16 +122,16 @@ export function TaskItem({
         </View>
       </TouchableOpacity>
 
-      <View style={styles.content}>
-        <Text
-          style={[
-            styles.title,
-            isCompleted && styles.titleCompleted,
-            isOverdue && styles.titleOverdue,
-          ]}
-        >
-          {title}
-        </Text>
+        <View style={styles.content}>
+          <Text
+            style={[
+              styles.title,
+              isCompleted && styles.titleCompleted,
+              isOverdue && styles.titleOverdue,
+            ]}
+          >
+            {title}
+          </Text>
 
         {description && !isCompleted && (
           <Text style={styles.description} numberOfLines={1}>
@@ -153,26 +178,25 @@ export function TaskItem({
         </View>
       </View>
 
-      <View style={styles.trailing}>
-        {priority !== "low" && !isCompleted && (
-          <Ionicons
-            name={priorityIcons[priority]}
-            size={18}
-            color={priorityColors[priority]}
-            style={styles.priorityIcon}
-          />
-        )}
-        {onDelete && (
+        <View style={styles.trailing}>
+          {priority !== "low" && !isCompleted && (
+            <Ionicons
+              name={priorityIcons[priority]}
+              size={18}
+              color={priorityColors[priority]}
+              style={styles.priorityIcon}
+            />
+          )}
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => onDelete(id)}
+            style={styles.detailsButton}
+            onPress={() => onPress(id)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <Ionicons name="information-circle-outline" size={20} color="#6c5ce7" />
           </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
   );
 }
 
@@ -271,8 +295,25 @@ const styles = StyleSheet.create({
   priorityIcon: {
     marginLeft: 8,
   },
-  deleteButton: {
+  detailsButton: {
     marginLeft: 12,
+  },
+  rightActionContainer: {
+    justifyContent: "center",
+  },
+  deleteAction: {
+    backgroundColor: "#ef4444",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 96,
+    height: "100%",
+    flexDirection: "column",
+  },
+  deleteActionText: {
+    color: "white",
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "600",
   },
 });
 
