@@ -12,11 +12,13 @@ import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
+import { useToast } from "../../src/hooks/useToast";
 
 function InboxScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const loadInboxTasks = useCallback(async () => {
     try {
@@ -41,6 +43,10 @@ function InboxScreen() {
 
   const handleToggleComplete = async (id: string) => {
     try {
+      // Find the task to check its current status
+      const task = tasks.find((t) => t.id === id);
+      const isCompleting = task?.status !== "completed";
+      
       // Optimistically update the UI
       setTasks((prevTasks) =>
         prevTasks.map((task) =>
@@ -56,6 +62,11 @@ function InboxScreen() {
       
       // Then update the database
       await taskService.toggleTaskComplete(id);
+      
+      // Show success toast when completing a task
+      if (isCompleting) {
+        toast.success("Completed!");
+      }
     } catch (error) {
       console.error("Failed to toggle task:", error);
       // Revert on error
@@ -130,20 +141,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-  },
-  demoBanner: {
-    backgroundColor: "#10b981",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  demoBannerText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
   },
   loadingContainer: {
     flex: 1,

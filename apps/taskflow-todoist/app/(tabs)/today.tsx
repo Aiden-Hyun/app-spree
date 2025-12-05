@@ -12,11 +12,13 @@ import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
+import { useToast } from "../../src/hooks/useToast";
 
 function TodayScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const loadTodayTasks = useCallback(async () => {
     try {
@@ -47,6 +49,10 @@ function TodayScreen() {
 
   const handleToggleComplete = async (id: string) => {
     try {
+      // Find the task to check its current status
+      const task = tasks.find((t) => t.id === id);
+      const isCompleting = task?.status !== "completed";
+      
       // Optimistically update the UI
       setTasks((prevTasks) =>
         prevTasks.map((task) =>
@@ -62,6 +68,11 @@ function TodayScreen() {
       
       // Then update the database
       await taskService.toggleTaskComplete(id);
+      
+      // Show success toast when completing a task
+      if (isCompleting) {
+        toast.success("Completed!");
+      }
     } catch (error) {
       console.error("Failed to toggle task:", error);
       // Revert on error
