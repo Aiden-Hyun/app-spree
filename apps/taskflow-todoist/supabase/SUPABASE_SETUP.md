@@ -23,16 +23,14 @@ Follow these steps to set up your Supabase backend in **10 minutes**.
 
 1. **Navigate to SQL Editor**:
    - In your Supabase dashboard, click **"SQL Editor"** in left sidebar
-   
 2. **Create new query**:
    - Click **"New Query"** button
-   
 3. **Copy & paste schema**:
    - Open `schema-complete.sql` in this folder
    - Copy ALL the contents
    - Paste into the SQL editor
-   
 4. **Run the query**:
+
    - Click **"Run"** button (or press Cmd/Ctrl + Enter)
    - ✅ You should see: "Success. No rows returned"
 
@@ -63,17 +61,20 @@ If you want to test with some sample data:
 ## Step 4: Get Your API Credentials (1 min)
 
 1. **Go to Project Settings**:
+
    - Click the ⚙️ (gear icon) at bottom of left sidebar
    - Or go to: **Settings** → **API**
 
 2. **Copy these two values**:
 
    **Project URL** (looks like):
+
    ```
    https://abcdefghijklmnop.supabase.co
    ```
 
    **anon/public key** (looks like):
+
    ```
    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJl...
    ```
@@ -85,22 +86,26 @@ If you want to test with some sample data:
 ## Step 5: Create .env File (2 min)
 
 1. **In your terminal**, navigate to the taskflow-todoist directory:
+
    ```bash
    cd apps/taskflow-todoist
    ```
 
 2. **Create .env file** (copy from example):
+
    ```bash
    cp .env.example .env
    ```
 
 3. **Edit .env file**:
+
    ```bash
    # Use your preferred editor (nano, vim, vscode, etc.)
    nano .env
    ```
 
 4. **Paste your credentials**:
+
    ```env
    EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -114,25 +119,30 @@ If you want to test with some sample data:
 ## Step 6: Test the Connection (2 min)
 
 1. **Start the app**:
+
    ```bash
    pnpm expo start
    ```
 
 2. **Open on your device/emulator**:
+
    - Press `a` for Android or `i` for iOS
    - Or scan QR code with Expo Go app
 
 3. **Test sign up**:
+
    - On the login screen, click "Don't have an account? Sign Up"
    - Enter email: `test@example.com`
    - Enter password: `password123`
    - Click "Sign Up"
 
 4. **Check your email** (if using real email):
+
    - You should get a confirmation email from Supabase
    - Click the link to verify (or you can skip this by disabling email confirmation)
 
 5. **Or skip email verification** (for testing):
+
    - Go to Supabase Dashboard → **Authentication** → **Settings**
    - Scroll to "Email Auth"
    - Toggle OFF "Enable email confirmations"
@@ -167,12 +177,14 @@ If you want to test with some sample data:
 ### "Failed to connect to Supabase"
 
 **Check**:
+
 - [ ] `.env` file exists in `apps/taskflow-todoist/`
 - [ ] Environment variables are correctly named (`EXPO_PUBLIC_` prefix)
 - [ ] No extra spaces in the `.env` file
 - [ ] Restart the Expo dev server after creating `.env`
 
-**Fix**: 
+**Fix**:
+
 ```bash
 # Stop the server (Ctrl+C)
 # Restart it
@@ -182,6 +194,7 @@ pnpm expo start --clear
 ### "User already registered" error
 
 **Fix**: Use a different email or reset the password in Supabase dashboard:
+
 - Go to **Authentication** → **Users**
 - Find your user
 - Click "..." → "Send password recovery email"
@@ -189,22 +202,25 @@ pnpm expo start --clear
 ### "Row Level Security policy violation"
 
 **Check**:
+
 - [ ] You ran `schema-complete.sql` (not just `schema.sql`)
 - [ ] RLS policies were created (check SQL Editor for errors)
 - [ ] User is authenticated (check auth token)
 
 **Fix**: Re-run the schema:
+
 ```sql
 -- In SQL Editor, run each section separately
 -- 1. Tables
--- 2. Functions & Triggers  
+-- 2. Functions & Triggers
 -- 3. RLS Policies
 -- 4. Grants
 ```
 
 ### Can't see tables in Table Editor
 
-**Fix**: 
+**Fix**:
+
 - Make sure schema ran successfully (check for errors in SQL Editor)
 - Refresh the page
 - Check you're looking at the `public` schema (not `auth` schema)
@@ -216,6 +232,7 @@ pnpm expo start --clear
 ✅ **Supabase is ready!**
 
 Now you can:
+
 1. **Create app assets** (icons, splash screen) - see `assets/ASSETS_README.md`
 2. **Test all features** thoroughly
 3. **Build for Android** - see `SETUP_GUIDE.md`
@@ -226,12 +243,14 @@ Now you can:
 ## Security Notes
 
 🔒 **Keep your credentials safe**:
+
 - ✅ `.env` is in `.gitignore` (never commit it!)
 - ✅ Use `anon` key in the app (NOT `service_role` key)
 - ✅ Row Level Security (RLS) protects user data
 - ✅ Each user can only see/edit their own tasks
 
 📊 **Monitor your usage**:
+
 - Free tier includes:
   - 500MB database space
   - 1GB file storage
@@ -241,9 +260,9 @@ Now you can:
 
 ---
 
-**Need help?** 
+**Need help?**
+
 - Supabase Docs: https://supabase.com/docs
 - Discord: https://discord.supabase.com
 
 🎉 **Happy building!**
-

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -14,9 +13,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { ProtectedRoute } from "../src/components/ProtectedRoute";
 import { useProjects } from "../src/hooks/useProjects";
+import { useToast } from "../src/hooks/useToast";
 
 function CreateProjectScreen() {
   const { createProject } = useProjects();
+  const toast = useToast();
 
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -44,7 +45,7 @@ function CreateProjectScreen() {
 
   const handleSubmit = async () => {
     if (!projectName.trim()) {
-      Alert.alert("Error", "Please enter a project name");
+      toast.error("Please enter a project name");
       return;
     }
 
@@ -56,9 +57,10 @@ function CreateProjectScreen() {
         color: projectColor,
       });
 
+      toast.success("Project created successfully!");
       router.back();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to create project");
+      toast.error(error.message || "Failed to create project");
     } finally {
       setSaving(false);
     }

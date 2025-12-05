@@ -131,6 +131,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+  demoBanner: {
+    backgroundColor: "#10b981",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  demoBannerText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",

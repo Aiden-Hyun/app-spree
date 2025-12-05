@@ -5,36 +5,35 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { useAuth } from "../src/contexts/AuthContext";
 import { router } from "expo-router";
+import { useToast } from "../src/hooks/useToast";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const { signUp, signIn, loading } = useAuth();
+  const toast = useToast();
 
   const handleAuth = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
+      toast.error("Please fill in all fields");
       return;
     }
 
     try {
       if (isSignUp) {
         await signUp(email, password);
-        Alert.alert(
-          "Success",
-          "Account created! Please check your email to verify."
-        );
+        toast.success("Account created! Please check your email to verify.");
       } else {
         await signIn(email, password);
+        toast.success("Login successful!");
         router.replace("/(tabs)/inbox");
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      toast.error(error.message || "Authentication failed");
     }
   };
 

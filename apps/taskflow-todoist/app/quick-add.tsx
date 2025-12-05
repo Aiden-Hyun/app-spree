@@ -8,7 +8,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -16,6 +15,7 @@ import { ProtectedRoute } from "../src/components/ProtectedRoute";
 import { useProjects } from "../src/hooks/useProjects";
 import { useTasks } from "../src/hooks/useTasks";
 import { TaskInput } from "../src/services/taskService";
+import { useToast } from "../src/hooks/useToast";
 
 function QuickAddScreen() {
   const params = useLocalSearchParams();
@@ -26,6 +26,7 @@ function QuickAddScreen() {
 
   const { projects } = useProjects();
   const { createTask } = useTasks();
+  const toast = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,7 +56,7 @@ function QuickAddScreen() {
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      Alert.alert("Error", "Please enter a task name");
+      toast.error("Please enter a task name");
       return;
     }
 
@@ -69,9 +70,10 @@ function QuickAddScreen() {
         dueDate,
       });
 
+      toast.success("Task created successfully!");
       router.back();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to create task");
+      toast.error(error.message || "Failed to create task");
     } finally {
       setLoading(false);
     }
@@ -261,7 +263,7 @@ function QuickAddScreen() {
               ]}
               onPress={() => {
                 // This would open a date picker in a real app
-                Alert.alert("Date Picker", "Date picker would open here");
+                toast.info("Date picker coming soon!");
               }}
             >
               <Ionicons name="calendar-outline" size={20} color="#6c5ce7" />

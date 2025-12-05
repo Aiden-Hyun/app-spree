@@ -17,6 +17,7 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { useTasks } from "../../src/hooks/useTasks";
 import { useProjects } from "../../src/hooks/useProjects";
 import { taskService, Task, TaskInput } from "../../src/services/taskService";
+import { useToast } from "../../src/hooks/useToast";
 
 function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -24,6 +25,7 @@ function TaskDetailScreen() {
 
   const { updateTask, deleteTask } = useTasks();
   const { projects } = useProjects();
+  const toast = useToast();
 
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,12 +73,12 @@ function TaskDetailScreen() {
         setSelectedProjectId(foundTask.projectId || "");
         setDueDate(foundTask.dueDate ? new Date(foundTask.dueDate) : undefined);
       } else {
-        Alert.alert("Error", "Task not found");
+        toast.error("Task not found");
         router.back();
       }
     } catch (error) {
       console.error("Failed to load task:", error);
-      Alert.alert("Error", "Failed to load task");
+      toast.error("Failed to load task");
     } finally {
       setLoading(false);
     }
@@ -84,7 +86,7 @@ function TaskDetailScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert("Error", "Task title is required");
+      toast.error("Task title is required");
       return;
     }
 
@@ -99,9 +101,9 @@ function TaskDetailScreen() {
       });
 
       setEditing(false);
-      Alert.alert("Success", "Task updated successfully");
+      toast.success("Task updated successfully");
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update task");
+      toast.error(error.message || "Failed to update task");
     } finally {
       setSaving(false);
     }
@@ -116,9 +118,10 @@ function TaskDetailScreen() {
         onPress: async () => {
           try {
             await deleteTask(taskId);
+            toast.success("Task deleted");
             router.back();
           } catch (error) {
-            Alert.alert("Error", "Failed to delete task");
+            toast.error("Failed to delete task");
           }
         },
       },

@@ -17,6 +17,7 @@ import { TaskList } from "../../src/components/TaskList";
 import { EmptyState } from "../../src/components/EmptyState";
 import { useTasks } from "../../src/hooks/useTasks";
 import { useProject, useProjects } from "../../src/hooks/useProjects";
+import { useToast } from "../../src/hooks/useToast";
 
 function ProjectDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -34,6 +35,7 @@ function ProjectDetailScreen() {
     toggleTaskComplete,
   } = useTasks({ projectId });
   const { updateProject, deleteProject, toggleProjectArchive } = useProjects();
+  const toast = useToast();
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -85,7 +87,7 @@ function ProjectDetailScreen() {
 
   const handleSaveProject = async () => {
     if (!projectName.trim()) {
-      Alert.alert("Error", "Project name is required");
+      toast.error("Project name is required");
       return;
     }
 
@@ -98,9 +100,9 @@ function ProjectDetailScreen() {
       });
 
       setEditModalVisible(false);
-      Alert.alert("Success", "Project updated successfully");
+      toast.success("Project updated successfully");
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update project");
+      toast.error(error.message || "Failed to update project");
     } finally {
       setSaving(false);
     }
@@ -119,11 +121,12 @@ function ProjectDetailScreen() {
           onPress: async () => {
             try {
               await toggleProjectArchive(projectId);
+              toast.success(project?.isArchived ? "Project unarchived" : "Project archived");
               if (!project?.isArchived) {
                 router.back();
               }
             } catch (error) {
-              Alert.alert("Error", "Failed to update project");
+              toast.error("Failed to update project");
             }
           },
         },
@@ -143,9 +146,10 @@ function ProjectDetailScreen() {
           onPress: async () => {
             try {
               await deleteProject(projectId);
+              toast.success("Project deleted");
               router.back();
             } catch (error) {
-              Alert.alert("Error", "Failed to delete project");
+              toast.error("Failed to delete project");
             }
           },
         },

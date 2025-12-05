@@ -1,10 +1,13 @@
 import { Stack } from "expo-router";
 import { AuthProvider } from "../src/contexts/AuthContext";
+import { ToastProvider } from "../src/contexts/ToastContext";
+import { Toast } from "../src/components/Toast";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <Stack>
+      <ToastProvider>
+        <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="home" options={{ title: "TaskFlow" }} />
@@ -50,6 +53,8 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      <Toast />
+      </ToastProvider>
     </AuthProvider>
   );
 }
