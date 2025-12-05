@@ -29,7 +29,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       duration: toast.duration || 3000,
     };
 
-    setToasts((prev) => [...prev, newToast]);
+    // Add new toast to the beginning (so it appears above existing ones)
+    setToasts((prev) => [newToast, ...prev]);
 
     // Auto-dismiss after duration
     setTimeout(() => {

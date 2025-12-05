@@ -9,10 +9,11 @@ import {
   PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useToastContext, ToastType } from '../contexts/ToastContext';
+import { useToastContext, Toast as ToastType } from '../contexts/ToastContext';
 
 const { width } = Dimensions.get('window');
 const TOAST_WIDTH = Math.min(width - 32, 400);
+const BASE_BOTTOM = 80; // Distance from bottom for toast stack
 
 const toastConfig = {
   success: {
@@ -33,51 +34,52 @@ const toastConfig = {
   },
 };
 
-export function Toast() {
-  const { toasts, hideToast } = useToastContext();
-  const currentToast = toasts[0]; // Show one toast at a time
-
-  const translateY = useRef(new Animated.Value(100)).current;
+function ToastItem({
+  toast,
+  bottomOffset,
+  zIndex,
+  onDismiss,
+}: {
+  toast: ToastType;
+  bottomOffset: number;
+  zIndex: number;
+  onDismiss: (id: string) => void;
+}) {
+  const translateY = useRef(new Animated.Value(30)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (currentToast) {
-      // Slide up and fade in
-      Animated.parallel([
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 80,
-          friction: 10,
-        }),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Reset animation values
-      translateY.setValue(100);
-      opacity.setValue(0);
-    }
-  }, [currentToast]);
+    // Slide up and fade in
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+          tension: 70,
+          friction: 12,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+          duration: 160,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
-  const dismissToast = (id: string) => {
+  const dismissToast = () => {
     // Slide down and fade out
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: 100,
-        duration: 200,
+        toValue: 40,
+        duration: 180,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      hideToast(id);
+      onDismiss(toast.id);
     });
   };
 
@@ -94,9 +96,9 @@ export function Toast() {
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 50 && currentToast) {
+        if (gestureState.dy > 50) {
           // Swiped down enough to dismiss
-          dismissToast(currentToast.id);
+          dismissToast();
         } else {
           // Snap back
           Animated.spring(translateY, {
@@ -108,19 +110,17 @@ export function Toast() {
     })
   ).current;
 
-  if (!currentToast) {
-    return null;
-  }
-
-  const config = toastConfig[currentToast.type];
+  const config = toastConfig[toast.type];
 
   return (
     <Animated.View
       style={[
         styles.container,
         {
+          bottom: bottomOffset,
           opacity,
           transform: [{ translateY }],
+          zIndex,
         },
       ]}
       {...panResponder.panHandlers}
@@ -130,10 +130,10 @@ export function Toast() {
           <Ionicons name={config.icon} size={24} color={config.color} />
         </View>
         
-        <Text style={styles.message}>{currentToast.message}</Text>
+        <Text style={styles.message}>{toast.message}</Text>
         
         <TouchableOpacity
-          onPress={() => dismissToast(currentToast.id)}
+          onPress={dismissToast}
           style={styles.closeButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
@@ -144,14 +144,44 @@ export function Toast() {
   );
 }
 
+export function Toast() {
+  const { toasts, hideToast } = useToastContext();
+
+  if (toasts.length === 0) {
+    return null;
+  }
+
+  // toasts array is newest-first (we prepend in context). Render in that order,
+  // and overlap all toasts at the same bottom offset. zIndex ensures newest is on top.
+
+  return (
+    <>
+      {toasts.map((toast, index) => {
+        const bottomOffset = BASE_BOTTOM;
+        const zIndex = 10000 + (toasts.length - index); // newest (index 0) highest
+
+        return (
+          <ToastItem
+            key={toast.id}
+            toast={toast}
+            bottomOffset={bottomOffset}
+            zIndex={zIndex}
+            onDismiss={hideToast}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 80,
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 9999,
+    pointerEvents: 'box-none',
   },
   toast: {
     width: TOAST_WIDTH,

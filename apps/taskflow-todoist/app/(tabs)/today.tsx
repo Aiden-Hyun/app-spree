@@ -66,13 +66,13 @@ function TodayScreen() {
         )
       );
       
-      // Then update the database
-      await taskService.toggleTaskComplete(id);
-      
-      // Show success toast when completing a task
+      // Show success toast immediately for completing
       if (isCompleting) {
         toast.success("Completed!");
       }
+
+      // Then update the database
+      await taskService.toggleTaskComplete(id);
     } catch (error) {
       console.error("Failed to toggle task:", error);
       // Revert on error
