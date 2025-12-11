@@ -13,10 +13,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { ProjectCard } from "../../src/components/ProjectCard";
 import { EmptyState } from "../../src/components/EmptyState";
 import { useProjects } from "../../src/hooks/useProjects";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 function ProjectsScreen() {
   const { projects, loading, error, refresh, refreshing } = useProjects();
+
+  // Refresh projects whenever the tab/screen gains focus (ensures newly created projects appear)
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   // Sample project colors for new projects
   const projectColors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6"];

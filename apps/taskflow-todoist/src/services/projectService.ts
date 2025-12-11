@@ -151,6 +151,13 @@ export const projectService = {
 
   // Delete a project (and all its tasks)
   async deleteProject(id: string): Promise<void> {
+    // Delete all tasks under the project first to avoid FK constraint issues
+    const { error: taskError } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("project_id", id);
+    if (taskError) throw taskError;
+
     const { error } = await supabase.from("projects").delete().eq("id", id);
 
     if (error) throw error;

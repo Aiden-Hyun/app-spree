@@ -624,5 +624,3 @@ export default function TaskDetail() {
     </ProtectedRoute>
   );
 }
-
-

@@ -52,7 +52,7 @@ function TodayScreen() {
       // Find the task to check its current status
       const task = tasks.find((t) => t.id === id);
       const isCompleting = task?.status !== "completed";
-      
+
       // Optimistically update the UI
       setTasks((prevTasks) =>
         prevTasks.map((task) =>
@@ -60,12 +60,13 @@ function TodayScreen() {
             ? {
                 ...task,
                 status: task.status === "completed" ? "todo" : "completed",
-                completedAt: task.status === "completed" ? null : new Date().toISOString(),
+                completedAt:
+                  task.status === "completed" ? null : new Date().toISOString(),
               }
             : task
         )
       );
-      
+
       // Show success toast immediately for completing
       if (isCompleting) {
         toast.success("Completed!");
