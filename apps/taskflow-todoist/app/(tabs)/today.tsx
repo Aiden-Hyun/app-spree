@@ -98,6 +98,13 @@ function TodayScreen() {
     router.push(`/task/${id}`);
   };
 
+  const handleTaskDetails = (id: string) => {
+    router.push({
+      pathname: `/task/${id}`,
+      params: { edit: "true" },
+    });
+  };
+
   const handleAddTask = () => {
     // Navigate to task creation screen with today as default due date
     console.log("Add task for today");
@@ -151,6 +158,7 @@ function TodayScreen() {
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
+          onTaskDetails={handleTaskDetails}
           onDelete={handleDelete}
           emptyMessage="No tasks for today"
           showCompletedSeparator={true}

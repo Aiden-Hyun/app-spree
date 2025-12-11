@@ -14,6 +14,7 @@ interface TaskItemProps {
   projectColor?: string;
   onToggleComplete: (id: string) => void;
   onPress: (id: string) => void;
+  onDetails?: (id: string) => void;
   onDelete?: (id: string) => void;
 }
 
@@ -28,6 +29,7 @@ export function TaskItem({
   projectColor = "#6c5ce7",
   onToggleComplete,
   onPress,
+  onDetails,
   onDelete,
 }: TaskItemProps) {
   const isCompleted = status === "completed";
@@ -189,7 +191,7 @@ export function TaskItem({
           )}
           <TouchableOpacity
             style={styles.detailsButton}
-            onPress={() => onPress(id)}
+            onPress={() => (onDetails ? onDetails(id) : onPress(id))}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="information-circle-outline" size={20} color="#6c5ce7" />

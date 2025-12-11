@@ -114,6 +114,13 @@ function UpcomingScreen() {
     router.push(`/task/${id}`);
   };
 
+  const handleTaskDetails = (id: string) => {
+    router.push({
+      pathname: `/task/${id}`,
+      params: { edit: "true" },
+    });
+  };
+
   const handleAddTask = () => {
     router.push("/quick-add");
   };
@@ -210,7 +217,8 @@ function UpcomingScreen() {
                       projectName={task.project?.name}
                       projectColor={task.project?.color}
                       onToggleComplete={handleToggleComplete}
-                      onPress={handleTaskPress}
+                    onPress={handleTaskPress}
+                    onDetails={handleTaskDetails}
                       onDelete={handleDelete}
                     />
                   ))}

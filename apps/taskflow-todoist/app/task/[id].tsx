@@ -21,6 +21,7 @@ import { useToast } from "../../src/hooks/useToast";
 function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
   const taskId = id as string;
+  const initialEditing = true; // always open in edit mode per new UX
 
   const { updateTask, deleteTask } = useTasks();
   const { projects } = useProjects();
@@ -29,7 +30,7 @@ function TaskDetailScreen() {
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditing);
 
   // Form fields
   const [title, setTitle] = useState("");
@@ -99,8 +100,8 @@ function TaskDetailScreen() {
         dueDate,
       });
 
-      setEditing(false);
       toast.success("Task updated successfully");
+      router.back();
     } catch (error: any) {
       toast.error(error.message || "Failed to update task");
     } finally {

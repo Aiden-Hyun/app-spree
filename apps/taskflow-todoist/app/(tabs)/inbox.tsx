@@ -90,7 +90,14 @@ function InboxScreen() {
   };
 
   const handleTaskPress = (id: string) => {
-    router.push(`/task/${id}`);
+    router.push({ pathname: "/task/[id]", params: { id } });
+  };
+
+  const handleTaskDetails = (id: string) => {
+    router.push({
+      pathname: "/task/[id]",
+      params: { id, edit: "true" },
+    });
   };
 
   const handleAddTask = () => {
@@ -136,6 +143,7 @@ function InboxScreen() {
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
+          onTaskDetails={handleTaskDetails}
           onDelete={handleDelete}
           emptyMessage="No tasks in your inbox"
         />

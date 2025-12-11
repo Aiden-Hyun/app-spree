@@ -20,6 +20,7 @@ interface TaskListProps {
   tasks: Task[];
   onToggleComplete: (id: string) => void;
   onTaskPress: (id: string) => void;
+  onTaskDetails?: (id: string) => void;
   onDelete?: (id: string) => void;
   refreshing?: boolean;
   onRefresh?: () => void;
@@ -31,6 +32,7 @@ export function TaskList({
   tasks,
   onToggleComplete,
   onTaskPress,
+  onTaskDetails,
   onDelete,
   refreshing = false,
   onRefresh,
@@ -74,6 +76,7 @@ export function TaskList({
         projectColor={item.projectColor}
         onToggleComplete={onToggleComplete}
         onPress={onTaskPress}
+        onDetails={onTaskDetails}
         onDelete={onDelete}
       />
     );
