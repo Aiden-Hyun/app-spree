@@ -6,7 +6,7 @@ export interface TaskInput {
   priority?: "low" | "medium" | "high" | "urgent";
   status?: "todo" | "in_progress" | "completed" | "cancelled";
   dueDate?: Date | string;
-  projectId?: string;
+  projectId?: string | null;
 }
 
 export interface Task extends TaskInput {
@@ -180,7 +180,7 @@ export const taskService = {
         : null;
     }
     if (updates.projectId !== undefined)
-      updateData.project_id = updates.projectId;
+      updateData.project_id = updates.projectId ?? null;
 
     updateData.updated_at = new Date().toISOString();
 

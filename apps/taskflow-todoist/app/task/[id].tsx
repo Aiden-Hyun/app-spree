@@ -96,7 +96,7 @@ function TaskDetailScreen() {
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
-        projectId: selectedProjectId || undefined,
+        projectId: selectedProjectId ? selectedProjectId : null, // null clears to Inbox
         dueDate,
       });
 
