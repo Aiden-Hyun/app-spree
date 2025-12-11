@@ -58,7 +58,7 @@ function CreateProjectScreen() {
       });
 
       toast.success("Project created successfully!");
-      router.back();
+      router.replace("/(tabs)/projects");
     } catch (error: any) {
       toast.error(error.message || "Failed to create project");
     } finally {
