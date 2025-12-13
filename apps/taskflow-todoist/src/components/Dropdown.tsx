@@ -12,6 +12,7 @@ export interface DropdownOption {
   label: string;
   value: string | null;
   color?: string;
+  icon?: any;
 }
 
 interface DropdownProps {
@@ -59,11 +60,18 @@ export function Dropdown({
         activeOpacity={0.7}
         disabled={disabled}
       >
-        {selectedOption?.color && (
+        {selectedOption?.icon ? (
+          <Ionicons
+            name={selectedOption.icon}
+            size={20}
+            color={selectedOption.color || "#666"}
+            style={{ marginRight: 10 }}
+          />
+        ) : selectedOption?.color ? (
           <View
             style={[styles.colorDot, { backgroundColor: selectedOption.color }]}
           />
-        )}
+        ) : null}
         <Text
           style={[
             styles.triggerText,
@@ -101,14 +109,21 @@ export function Dropdown({
                   onPress={() => handleSelect(option.value)}
                   activeOpacity={0.7}
                 >
-                  {option.color && (
+                  {option.icon ? (
+                    <Ionicons
+                      name={option.icon}
+                      size={20}
+                      color={option.color || "#666"}
+                      style={{ marginRight: 10 }}
+                    />
+                  ) : option.color ? (
                     <View
                       style={[
                         styles.colorDot,
                         { backgroundColor: option.color },
                       ]}
                     />
-                  )}
+                  ) : null}
                   <Text
                     style={[
                       styles.menuItemText,

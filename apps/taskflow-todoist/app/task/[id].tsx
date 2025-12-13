@@ -50,6 +50,7 @@ function TaskDetailScreen() {
   // Form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<TaskInput["priority"]>("medium");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [dueTime, setDueTime] = useState<TimeValue | null>(null);
@@ -61,6 +62,22 @@ function TaskDetailScreen() {
   const calendarAnim = useRef(
     new Animated.Value(isDueDateEnabled ? 1 : 0)
   ).current;
+
+  const priorities: Array<{
+    value: TaskInput["priority"];
+    label: string;
+    color: string;
+    icon: any;
+  }> = [
+    { value: "medium", label: "Normal", color: "#666", icon: null },
+    {
+      value: "urgent",
+      label: "Urgent",
+      color: "#e74c3c",
+      icon: "alert-circle",
+    },
+    { value: "high", label: "Important", color: "#f39c12", icon: "flag" },
+  ];
 
   useEffect(() => {
     loadTask();
@@ -75,6 +92,7 @@ function TaskDetailScreen() {
         setTask(foundTask);
         setTitle(foundTask.title);
         setDescription(foundTask.description || "");
+        setPriority(foundTask.priority);
         setSelectedProjectId(foundTask.projectId || "");
         const parsedDate = foundTask.dueDate
           ? new Date(foundTask.dueDate)
@@ -118,6 +136,7 @@ function TaskDetailScreen() {
       await updateTask(taskId, {
         title: title.trim(),
         description: description.trim() || undefined,
+        priority,
         projectId: selectedProjectId ? selectedProjectId : null, // null clears to Inbox
         dueDate: isDueDateEnabled ? dueDate : null,
       });
@@ -381,6 +400,56 @@ function TaskDetailScreen() {
           )}
         </View>
 
+        {/* Priority */}
+        <View style={styles.section}>
+          {editing ? (
+            <Dropdown
+              label="Priority"
+              value={priority}
+              placeholder="Normal"
+              options={priorities.map((p) => ({
+                label: p.label,
+                value: p.value,
+                color: p.color,
+                icon: p.icon,
+              }))}
+              onSelect={(value) =>
+                setPriority((value as TaskInput["priority"]) || "medium")
+              }
+              disabled={saving}
+            />
+          ) : (
+            <View style={styles.priorityDisplay}>
+              <Text style={styles.label}>Priority</Text>
+              <View style={styles.priorityValueRow}>
+                {priorities.find((p) => p.value === task.priority)?.icon && (
+                  <Ionicons
+                    name={
+                      priorities.find((p) => p.value === task.priority)?.icon
+                    }
+                    size={20}
+                    color={
+                      priorities.find((p) => p.value === task.priority)?.color
+                    }
+                    style={{ marginRight: 8 }}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.value,
+                    {
+                      color: priorities.find((p) => p.value === task.priority)
+                        ?.color,
+                    },
+                  ]}
+                >
+                  {priorities.find((p) => p.value === task.priority)?.label}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
         {/* Due Date */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -627,6 +696,14 @@ const styles = StyleSheet.create({
   },
   projectChipTextSelected: {
     color: "white",
+  },
+  priorityDisplay: {
+    marginBottom: 8,
+  },
+  priorityValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
   },
   priorityGrid: {
     flexDirection: "row",

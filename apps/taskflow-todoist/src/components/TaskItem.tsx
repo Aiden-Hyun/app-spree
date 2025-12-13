@@ -41,17 +41,17 @@ export function TaskItem({
   const [isEditing, setIsEditing] = useState(false);
 
   const priorityColors = {
-    low: "#95a5a6",
-    medium: "#3498db",
+    low: "#666",
+    medium: "#666",
     high: "#f39c12",
     urgent: "#e74c3c",
   };
 
   const priorityIcons = {
-    low: "flag-outline",
-    medium: "flag-outline",
+    low: null,
+    medium: null,
     high: "flag",
-    urgent: "flag",
+    urgent: "alert-circle",
   };
 
   const formatDueDate = (date: Date | string) => {
@@ -231,7 +231,7 @@ export function TaskItem({
         </View>
 
         <View style={styles.trailing}>
-          {priority !== "low" && !isCompleted && (
+          {priorityIcons[priority] && !isCompleted && (
             <Ionicons
               name={priorityIcons[priority]}
               size={18}
