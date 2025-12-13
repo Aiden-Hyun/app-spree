@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Animated,
+  Easing,
+  LayoutChangeEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,6 +22,8 @@ import { useProjects } from "../../src/hooks/useProjects";
 import { taskService, Task, TaskInput } from "../../src/services/taskService";
 import { useToast } from "../../src/hooks/useToast";
 import { InlineCalendar } from "../../src/components/InlineCalendar";
+
+const DEFAULT_CALENDAR_HEIGHT = 360;
 
 function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -41,6 +46,12 @@ function TaskDetailScreen() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [isDueDateEnabled, setIsDueDateEnabled] = useState(false);
+  const [calendarContentHeight, setCalendarContentHeight] = useState(
+    DEFAULT_CALENDAR_HEIGHT
+  );
+  const calendarAnim = useRef(
+    new Animated.Value(isDueDateEnabled ? 1 : 0)
+  ).current;
 
   const priorities: Array<{
     value: TaskInput["priority"];
@@ -87,6 +98,15 @@ function TaskDetailScreen() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Animated.timing(calendarAnim, {
+      toValue: isDueDateEnabled ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [calendarAnim, isDueDateEnabled]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -149,6 +169,17 @@ function TaskDetailScreen() {
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const calendarHeight = calendarAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, calendarContentHeight || DEFAULT_CALENDAR_HEIGHT],
+  });
+
+  const handleCalendarLayout = (event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    if (height && Math.abs(height - calendarContentHeight) > 1) {
+      setCalendarContentHeight(height);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -411,14 +442,22 @@ function TaskDetailScreen() {
                     : "No due date"}
                 </Text>
               </View>
-              {isDueDateEnabled && (
-                <InlineCalendar
-                  value={dueDate || new Date()}
-                  onChange={(date) => setDueDate(date)}
-                  minimumDate={new Date(2000, 0, 1)}
-                  maximumDate={new Date(2100, 11, 31)}
-                />
-              )}
+              <Animated.View
+                style={[
+                  styles.calendarWrapper,
+                  { height: calendarHeight, opacity: calendarAnim },
+                ]}
+                pointerEvents={isDueDateEnabled ? "auto" : "none"}
+              >
+                <View onLayout={handleCalendarLayout}>
+                  <InlineCalendar
+                    value={dueDate || new Date()}
+                    onChange={(date) => setDueDate(date)}
+                    minimumDate={new Date(2000, 0, 1)}
+                    maximumDate={new Date(2100, 11, 31)}
+                  />
+                </View>
+              </Animated.View>
             </>
           ) : (
             <Text style={styles.value}>
@@ -655,6 +694,9 @@ const styles = StyleSheet.create({
   },
   dueDateTextDisabled: {
     color: "#999",
+  },
+  calendarWrapper: {
+    overflow: "hidden",
   },
   deleteButton: {
     flexDirection: "row",
