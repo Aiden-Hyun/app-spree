@@ -17,6 +17,9 @@ import { useTasks } from "../../src/hooks/useTasks";
 import { useProjects } from "../../src/hooks/useProjects";
 import { taskService, Task, TaskInput } from "../../src/services/taskService";
 import { useToast } from "../../src/hooks/useToast";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 
 function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -38,6 +41,7 @@ function TaskDetailScreen() {
   const [priority, setPriority] = useState<TaskInput["priority"]>("medium");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const priorities: Array<{
     value: TaskInput["priority"];
@@ -107,6 +111,14 @@ function TaskDetailScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+    if (event.type === "dismissed") return;
+    if (date) setDueDate(date);
   };
 
   const handleDelete = async () => {
@@ -360,23 +372,44 @@ function TaskDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.label}>Due Date</Text>
           {editing ? (
-            <TouchableOpacity
-              style={styles.dueDateButton}
-              onPress={() => {
-                toast.info("Date picker coming soon!");
-              }}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-              <Text style={styles.dueDateText}>
-                {dueDate
-                  ? dueDate.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : "Set due date"}
-              </Text>
-            </TouchableOpacity>
+            <>
+              <View style={styles.dueDateRow}>
+                <TouchableOpacity
+                  style={styles.dueDateButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#666" />
+                  <Text style={styles.dueDateText}>
+                    {dueDate
+                      ? dueDate.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "Set due date"}
+                  </Text>
+                </TouchableOpacity>
+                {dueDate && (
+                  <TouchableOpacity
+                    style={styles.clearDateButton}
+                    onPress={() => setDueDate(undefined)}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#e74c3c" />
+                    <Text style={styles.clearDateText}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={dueDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={handleDateChange}
+                  minimumDate={new Date(2000, 0, 1)}
+                  maximumDate={new Date(2100, 11, 31)}
+                />
+              )}
+            </>
           ) : (
             <Text style={styles.value}>
               {task.dueDate
