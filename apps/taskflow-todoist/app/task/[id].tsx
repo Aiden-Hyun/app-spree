@@ -100,7 +100,7 @@ function TaskDetailScreen() {
         description: description.trim() || undefined,
         priority,
         projectId: selectedProjectId ? selectedProjectId : null, // null clears to Inbox
-        dueDate: isDueDateEnabled ? dueDate : undefined,
+        dueDate: isDueDateEnabled ? dueDate : null,
       });
 
       toast.success("Task updated successfully");
@@ -113,13 +113,13 @@ function TaskDetailScreen() {
   };
 
   const handleDelete = async () => {
-          try {
-            await deleteTask(taskId);
+    try {
+      await deleteTask(taskId);
       toast.success("Task deleted");
-            router.back();
-          } catch (error) {
+      router.back();
+    } catch (error) {
       toast.error("Failed to delete task");
-          }
+    }
   };
 
   if (loading) {
@@ -174,12 +174,12 @@ function TaskDetailScreen() {
             </>
           ) : (
             <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={() => setEditing(true)}
-            >
-              <Ionicons name="create-outline" size={24} color="#6c5ce7" />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => setEditing(true)}
+              >
+                <Ionicons name="create-outline" size={24} color="#6c5ce7" />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerButton}
                 onPress={handleDelete}
@@ -380,10 +380,10 @@ function TaskDetailScreen() {
                   }
                 }}
               >
-                <Ionicons 
-                  name="toggle-outline" 
-                  size={28} 
-                  color={isDueDateEnabled ? "#6c5ce7" : "#999"} 
+                <Ionicons
+                  name="toggle-outline"
+                  size={28}
+                  color={isDueDateEnabled ? "#6c5ce7" : "#999"}
                 />
               </TouchableOpacity>
             )}
@@ -396,12 +396,12 @@ function TaskDetailScreen() {
                   !isDueDateEnabled && styles.dueDateButtonDisabled,
                 ]}
               >
-                <Ionicons 
-                  name="calendar-outline" 
-                  size={20} 
-                  color={isDueDateEnabled ? "#666" : "#999"} 
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={isDueDateEnabled ? "#666" : "#999"}
                 />
-                <Text 
+                <Text
                   style={[
                     styles.dueDateText,
                     !isDueDateEnabled && styles.dueDateTextDisabled,

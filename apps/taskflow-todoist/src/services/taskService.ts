@@ -5,7 +5,7 @@ export interface TaskInput {
   description?: string;
   priority?: "low" | "medium" | "high" | "urgent";
   status?: "todo" | "in_progress" | "completed" | "cancelled";
-  dueDate?: Date | string;
+  dueDate?: Date | string | null;
   projectId?: string | null;
 }
 
@@ -293,5 +293,3 @@ export const taskService = {
     };
   },
 };
-
-
