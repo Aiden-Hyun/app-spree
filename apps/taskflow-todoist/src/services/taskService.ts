@@ -22,6 +22,12 @@ export interface Task extends TaskInput {
   };
 }
 
+const normalizeDueDate = (value?: Date | string | null): string | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 export const taskService = {
   // Create a new task
   async createTask(input: TaskInput): Promise<Task> {
@@ -34,7 +40,7 @@ export const taskService = {
       description: input.description || null,
       priority: input.priority || "medium",
       status: input.status || "todo",
-      due_date: input.dueDate ? new Date(input.dueDate).toISOString() : null,
+      due_date: normalizeDueDate(input.dueDate),
       project_id: input.projectId || null,
     };
 
@@ -175,9 +181,7 @@ export const taskService = {
       }
     }
     if (updates.dueDate !== undefined) {
-      updateData.due_date = updates.dueDate
-        ? new Date(updates.dueDate).toISOString()
-        : null;
+      updateData.due_date = normalizeDueDate(updates.dueDate);
     }
     if (updates.projectId !== undefined)
       updateData.project_id = updates.projectId ?? null;

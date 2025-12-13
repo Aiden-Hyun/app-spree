@@ -22,6 +22,13 @@ import { useProjects } from "../../src/hooks/useProjects";
 import { taskService, Task, TaskInput } from "../../src/services/taskService";
 import { useToast } from "../../src/hooks/useToast";
 import { InlineCalendar } from "../../src/components/InlineCalendar";
+import { InlineTimePicker } from "../../src/components/InlineTimePicker";
+import {
+  TimeValue,
+  dateToTimeValue,
+  getDefaultTimeValue,
+  mergeDateAndTime,
+} from "../../src/utils/dateTime";
 
 const DEFAULT_CALENDAR_HEIGHT = 360;
 
@@ -45,7 +52,9 @@ function TaskDetailScreen() {
   const [priority, setPriority] = useState<TaskInput["priority"]>("medium");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [dueTime, setDueTime] = useState<TimeValue | null>(null);
   const [isDueDateEnabled, setIsDueDateEnabled] = useState(false);
+  const [isDueTimeEnabled, setIsDueTimeEnabled] = useState(false);
   const [calendarContentHeight, setCalendarContentHeight] = useState(
     DEFAULT_CALENDAR_HEIGHT
   );
@@ -85,8 +94,16 @@ function TaskDetailScreen() {
         setDescription(foundTask.description || "");
         setPriority(foundTask.priority);
         setSelectedProjectId(foundTask.projectId || "");
-        setDueDate(foundTask.dueDate ? new Date(foundTask.dueDate) : undefined);
-        setIsDueDateEnabled(!!foundTask.dueDate);
+        const parsedDate = foundTask.dueDate
+          ? new Date(foundTask.dueDate)
+          : undefined;
+        setDueDate(parsedDate);
+        const hasTime =
+          parsedDate &&
+          (parsedDate.getHours() !== 0 || parsedDate.getMinutes() !== 0);
+        setIsDueTimeEnabled(!!hasTime);
+        setDueTime(parsedDate && hasTime ? dateToTimeValue(parsedDate) : null);
+        setIsDueDateEnabled(!!parsedDate);
       } else {
         toast.error("Task not found");
         router.back();
@@ -146,10 +163,62 @@ function TaskDetailScreen() {
   const handleDueDateToggle = (value: boolean) => {
     setIsDueDateEnabled(value);
     if (value) {
-      setDueDate((prev) => prev || new Date());
+      setDueDate((prev) => {
+        const base = prev || new Date();
+        const nextTime = isDueTimeEnabled
+          ? dueTime || getDefaultTimeValue()
+          : null;
+        if (isDueTimeEnabled && !dueTime) {
+          setDueTime(nextTime);
+        }
+        return mergeDateAndTime(base, nextTime);
+      });
     } else {
       setDueDate(undefined);
+      setDueTime(null);
+      setIsDueTimeEnabled(false);
     }
+  };
+
+  const handleDueTimeToggle = (value: boolean) => {
+    setIsDueTimeEnabled(value);
+    if (value) {
+      const nextTime = dueTime || getDefaultTimeValue();
+      setDueTime(nextTime);
+      setDueDate((prev) => {
+        const base = prev || new Date();
+        return mergeDateAndTime(base, nextTime);
+      });
+    } else {
+      setDueTime(null);
+      setDueDate((prev) => {
+        if (!prev) return prev;
+        return mergeDateAndTime(prev, null);
+      });
+    }
+  };
+
+  const handleDateChange = (selectedDate: Date) => {
+    if (!isDueDateEnabled) return;
+    const nextTime =
+      isDueTimeEnabled && dueTime
+        ? dueTime
+        : isDueTimeEnabled
+        ? getDefaultTimeValue()
+        : null;
+    if (isDueTimeEnabled && !dueTime) {
+      setDueTime(nextTime);
+    }
+    setDueDate(mergeDateAndTime(selectedDate, nextTime));
+  };
+
+  const handleTimeChange = (nextTime: TimeValue) => {
+    if (!isDueDateEnabled || !isDueTimeEnabled) return;
+    setDueTime(nextTime);
+    setDueDate((prev) => {
+      const base = prev || new Date();
+      return mergeDateAndTime(base, nextTime);
+    });
   };
 
   if (loading) {
@@ -169,6 +238,25 @@ function TaskDetailScreen() {
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const storedDueDate = task.dueDate ? new Date(task.dueDate) : null;
+  const hasStoredTime =
+    storedDueDate &&
+    (storedDueDate.getHours() !== 0 || storedDueDate.getMinutes() !== 0);
+  const taskDueDateDisplay = storedDueDate
+    ? storedDueDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "No due date";
+  const taskDueTimeDisplay =
+    storedDueDate && hasStoredTime
+      ? storedDueDate.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null;
   const calendarHeight = calendarAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, calendarContentHeight || DEFAULT_CALENDAR_HEIGHT],
@@ -452,23 +540,36 @@ function TaskDetailScreen() {
                 <View onLayout={handleCalendarLayout}>
                   <InlineCalendar
                     value={dueDate || new Date()}
-                    onChange={(date) => setDueDate(date)}
+                    onChange={handleDateChange}
                     minimumDate={new Date(2000, 0, 1)}
                     maximumDate={new Date(2100, 11, 31)}
                   />
                 </View>
               </Animated.View>
+              {isDueDateEnabled && (
+                <View style={styles.timeToggleRow}>
+                  <Text style={styles.subLabel}>Due Time</Text>
+                  <Switch
+                    value={isDueTimeEnabled}
+                    onValueChange={handleDueTimeToggle}
+                    trackColor={{ false: "#d1d5db", true: "#cbb5ff" }}
+                    thumbColor={isDueTimeEnabled ? "#6c5ce7" : "#f4f4f5"}
+                    ios_backgroundColor="#d1d5db"
+                  />
+                </View>
+              )}
+
+              {isDueDateEnabled && isDueTimeEnabled && (
+                <InlineTimePicker
+                  value={dueTime || getDefaultTimeValue()}
+                  onChange={handleTimeChange}
+                />
+              )}
             </>
           ) : (
             <Text style={styles.value}>
-              {task.dueDate
-                ? new Date(task.dueDate).toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "No due date"}
+              {taskDueDateDisplay}
+              {taskDueTimeDisplay ? ` · ${taskDueTimeDisplay}` : ""}
             </Text>
           )}
         </View>
@@ -596,6 +697,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#666",
+  },
+  subLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  timeToggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
   },
   value: {
     fontSize: 16,
