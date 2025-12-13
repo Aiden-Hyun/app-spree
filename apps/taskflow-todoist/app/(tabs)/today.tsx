@@ -94,6 +94,25 @@ function TodayScreen() {
     }
   };
 
+  const handleTitleChange = async (id: string, newTitle: string) => {
+    // Optimistically update the UI
+    const previous = tasks;
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === id ? { ...task, title: newTitle } : task
+      )
+    );
+
+    try {
+      await taskService.updateTask(id, { title: newTitle });
+    } catch (error) {
+      console.error("Failed to update task title:", error);
+      toast.error("Failed to update task");
+      // Revert on error
+      setTasks(previous);
+    }
+  };
+
   const handleTaskPress = (id: string) => {
     router.push(`/task/${id}`);
   };
@@ -160,6 +179,7 @@ function TodayScreen() {
           onTaskPress={handleTaskPress}
           onTaskDetails={handleTaskDetails}
           onDelete={handleDelete}
+          onTitleChange={handleTitleChange}
           emptyMessage="No tasks for today"
           showCompletedSeparator={true}
         />

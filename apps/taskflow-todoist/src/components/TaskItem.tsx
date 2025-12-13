@@ -1,5 +1,5 @@
-import React, { useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useRef, useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -16,6 +16,7 @@ interface TaskItemProps {
   onPress: (id: string) => void;
   onDetails?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onTitleChange?: (id: string, newTitle: string) => void;
 }
 
 export function TaskItem({
@@ -31,10 +32,13 @@ export function TaskItem({
   onPress,
   onDetails,
   onDelete,
+  onTitleChange,
 }: TaskItemProps) {
   const isCompleted = status === "completed";
   const isOverdue = dueDate && new Date(dueDate) < new Date() && !isCompleted;
   const swipeableRef = useRef<Swipeable | null>(null);
+  const [editedTitle, setEditedTitle] = useState(title);
+  const [isEditing, setIsEditing] = useState(false);
 
   const priorityColors = {
     low: "#95a5a6",
@@ -50,7 +54,7 @@ export function TaskItem({
     urgent: "flag",
   };
 
-  const formatDueDate = (date: Date) => {
+  const formatDueDate = (date: Date | string) => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -77,6 +81,15 @@ export function TaskItem({
     }
   };
 
+  const formatDueTime = (date: Date | string) => {
+    const d = new Date(date);
+    if (d.getHours() === 0 && d.getMinutes() === 0) return "";
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
   const renderRightActions = () => (
     <View style={styles.rightActionContainer}>
       <View style={styles.deleteAction}>
@@ -94,6 +107,22 @@ export function TaskItem({
     swipeableRef.current?.close();
   };
 
+  const handleTitleBlur = () => {
+    setIsEditing(false);
+    if (editedTitle.trim() && editedTitle !== title && onTitleChange) {
+      onTitleChange(id, editedTitle.trim());
+    } else {
+      setEditedTitle(title); // Reset if empty or unchanged
+    }
+  };
+
+  const handleTitleSubmit = () => {
+    if (editedTitle.trim() && onTitleChange) {
+      onTitleChange(id, editedTitle.trim());
+    }
+    setIsEditing(false);
+  };
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -103,82 +132,103 @@ export function TaskItem({
       overshootRight={false}
       onSwipeableOpen={handleSwipeOpen}
     >
-      <TouchableOpacity
-        style={styles.container}
-        onPress={() => onPress(id)}
-        activeOpacity={0.7}
-      >
-      <TouchableOpacity
-        style={styles.checkbox}
-        onPress={() => onToggleComplete(id)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <View
-          style={[
-            styles.checkboxInner,
-            isCompleted && styles.checkboxCompleted,
-            { borderColor: isCompleted ? priorityColors[priority] : "#ddd" },
-          ]}
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.checkbox}
+          onPress={() => onToggleComplete(id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          {isCompleted && <Ionicons name="checkmark" size={16} color="white" />}
-        </View>
-      </TouchableOpacity>
-
-        <View style={styles.content}>
-          <Text
+          <View
             style={[
-              styles.title,
-              isCompleted && styles.titleCompleted,
-              isOverdue && styles.titleOverdue,
+              styles.checkboxInner,
+              isCompleted && styles.checkboxCompleted,
+              { borderColor: isCompleted ? priorityColors[priority] : "#ddd" },
             ]}
           >
-            {title}
-          </Text>
+            {isCompleted && (
+              <Ionicons name="checkmark" size={16} color="white" />
+            )}
+          </View>
+        </TouchableOpacity>
 
-        {description && !isCompleted && (
-          <Text style={styles.description} numberOfLines={1}>
-            {description}
-          </Text>
-        )}
-
-        <View style={styles.metadata}>
-          {dueDate && (
-            <View
-              style={[styles.dueDateBadge, isOverdue && styles.dueDateOverdue]}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={12}
-                color={isOverdue ? "#e74c3c" : "#666"}
-              />
-              <Text
-                style={[
-                  styles.dueDateText,
-                  isOverdue && styles.dueDateTextOverdue,
-                ]}
-              >
-                {formatDueDate(dueDate)}
-              </Text>
-            </View>
-          )}
-
-          {projectName && (
-            <View
+        <View style={styles.content}>
+          {isCompleted ? (
+            <Text
               style={[
-                styles.projectBadge,
-                { backgroundColor: projectColor + "20" },
+                styles.title,
+                styles.titleCompleted,
               ]}
             >
-              <View
-                style={[styles.projectDot, { backgroundColor: projectColor }]}
-              />
-              <Text style={[styles.projectText, { color: projectColor }]}>
-                {projectName}
-              </Text>
-            </View>
+              {title}
+            </Text>
+          ) : (
+            <TextInput
+              style={[
+                styles.title,
+                styles.titleInput,
+                isOverdue && styles.titleOverdue,
+                isEditing && styles.titleInputActive,
+              ]}
+              value={editedTitle}
+              onChangeText={setEditedTitle}
+              onFocus={() => setIsEditing(true)}
+              onBlur={handleTitleBlur}
+              onSubmitEditing={handleTitleSubmit}
+              editable={!isCompleted}
+              multiline
+              blurOnSubmit
+            />
           )}
+
+          {description && !isCompleted && (
+            <Text style={styles.description} numberOfLines={1}>
+              {description}
+            </Text>
+          )}
+
+          <View style={styles.metadata}>
+            {dueDate && (
+              <View
+                style={[
+                  styles.dueDateBadge,
+                  isOverdue && styles.dueDateOverdue,
+                ]}
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={12}
+                  color={isOverdue ? "#e74c3c" : "#666"}
+                />
+                <Text
+                  style={[
+                    styles.dueDateText,
+                    isOverdue && styles.dueDateTextOverdue,
+                  ]}
+                >
+                  {`${formatDueDate(dueDate)}${
+                    formatDueTime(dueDate) ? ` · ${formatDueTime(dueDate)}` : ""
+                  }`}
+                </Text>
+              </View>
+            )}
+
+            {projectName && (
+              <View
+                style={[
+                  styles.projectBadge,
+                  { backgroundColor: projectColor + "20" },
+                ]}
+              >
+                <View
+                  style={[styles.projectDot, { backgroundColor: projectColor }]}
+                />
+                <Text style={[styles.projectText, { color: projectColor }]}>
+                  {projectName}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
 
         <View style={styles.trailing}>
           {priority !== "low" && !isCompleted && (
@@ -194,10 +244,14 @@ export function TaskItem({
             onPress={() => (onDetails ? onDetails(id) : onPress(id))}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="information-circle-outline" size={20} color="#6c5ce7" />
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color="#6c5ce7"
+            />
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     </Swipeable>
   );
 }
@@ -234,6 +288,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginBottom: 2,
+  },
+  titleInput: {
+    padding: 0,
+    margin: 0,
+    textAlignVertical: "top",
+  },
+  titleInputActive: {
+    backgroundColor: "#f9fafb",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   titleCompleted: {
     color: "#999",
@@ -318,5 +383,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
-

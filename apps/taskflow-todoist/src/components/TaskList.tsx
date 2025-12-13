@@ -22,6 +22,7 @@ interface TaskListProps {
   onTaskPress: (id: string) => void;
   onTaskDetails?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onTitleChange?: (id: string, newTitle: string) => void;
   refreshing?: boolean;
   onRefresh?: () => void;
   emptyMessage?: string;
@@ -34,6 +35,7 @@ export function TaskList({
   onTaskPress,
   onTaskDetails,
   onDelete,
+  onTitleChange,
   refreshing = false,
   onRefresh,
   emptyMessage = "No tasks yet",
@@ -78,6 +80,7 @@ export function TaskList({
         onPress={onTaskPress}
         onDetails={onTaskDetails}
         onDelete={onDelete}
+        onTitleChange={onTitleChange}
       />
     );
   };

@@ -23,6 +23,7 @@ import { taskService, Task, TaskInput } from "../../src/services/taskService";
 import { useToast } from "../../src/hooks/useToast";
 import { InlineCalendar } from "../../src/components/InlineCalendar";
 import { InlineTimePicker } from "../../src/components/InlineTimePicker";
+import { Dropdown, DropdownOption } from "../../src/components/Dropdown";
 import {
   TimeValue,
   dateToTimeValue,
@@ -49,7 +50,6 @@ function TaskDetailScreen() {
   // Form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<TaskInput["priority"]>("medium");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [dueTime, setDueTime] = useState<TimeValue | null>(null);
@@ -61,23 +61,6 @@ function TaskDetailScreen() {
   const calendarAnim = useRef(
     new Animated.Value(isDueDateEnabled ? 1 : 0)
   ).current;
-
-  const priorities: Array<{
-    value: TaskInput["priority"];
-    label: string;
-    color: string;
-    icon: string;
-  }> = [
-    { value: "low", label: "Low", color: "#95a5a6", icon: "flag-outline" },
-    {
-      value: "medium",
-      label: "Medium",
-      color: "#3498db",
-      icon: "flag-outline",
-    },
-    { value: "high", label: "High", color: "#f39c12", icon: "flag" },
-    { value: "urgent", label: "Urgent", color: "#e74c3c", icon: "flag" },
-  ];
 
   useEffect(() => {
     loadTask();
@@ -92,7 +75,6 @@ function TaskDetailScreen() {
         setTask(foundTask);
         setTitle(foundTask.title);
         setDescription(foundTask.description || "");
-        setPriority(foundTask.priority);
         setSelectedProjectId(foundTask.projectId || "");
         const parsedDate = foundTask.dueDate
           ? new Date(foundTask.dueDate)
@@ -136,7 +118,6 @@ function TaskDetailScreen() {
       await updateTask(taskId, {
         title: title.trim(),
         description: description.trim() || undefined,
-        priority,
         projectId: selectedProjectId ? selectedProjectId : null, // null clears to Inbox
         dueDate: isDueDateEnabled ? dueDate : null,
       });
@@ -360,59 +341,26 @@ function TaskDetailScreen() {
 
         {/* Project */}
         <View style={styles.section}>
-          <Text style={styles.label}>Project</Text>
           {editing ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <TouchableOpacity
-                style={[
-                  styles.projectChip,
-                  !selectedProjectId && styles.projectChipSelected,
+            <>
+              <Dropdown
+                label="Project"
+                value={selectedProjectId || null}
+                placeholder="Inbox"
+                options={[
+                  { label: "Inbox", value: null, color: "#6c5ce7" },
+                  ...projects
+                    .filter((p) => !p.isArchived)
+                    .map((p) => ({
+                      label: p.name,
+                      value: p.id,
+                      color: p.color,
+                    })),
                 ]}
-                onPress={() => setSelectedProjectId("")}
-              >
-                <View
-                  style={[styles.projectDot, { backgroundColor: "#6c5ce7" }]}
-                />
-                <Text
-                  style={[
-                    styles.projectChipText,
-                    !selectedProjectId && styles.projectChipTextSelected,
-                  ]}
-                >
-                  Inbox
-                </Text>
-              </TouchableOpacity>
-
-              {projects
-                .filter((p) => !p.isArchived)
-                .map((project) => (
-                  <TouchableOpacity
-                    key={project.id}
-                    style={[
-                      styles.projectChip,
-                      selectedProjectId === project.id &&
-                        styles.projectChipSelected,
-                    ]}
-                    onPress={() => setSelectedProjectId(project.id)}
-                  >
-                    <View
-                      style={[
-                        styles.projectDot,
-                        { backgroundColor: project.color },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.projectChipText,
-                        selectedProjectId === project.id &&
-                          styles.projectChipTextSelected,
-                      ]}
-                    >
-                      {project.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
+                onSelect={(value) => setSelectedProjectId(value || "")}
+                disabled={saving}
+              />
+            </>
           ) : (
             <View style={styles.projectDisplay}>
               <View
@@ -428,61 +376,6 @@ function TaskDetailScreen() {
               />
               <Text style={styles.value}>
                 {task.project?.name || selectedProject?.name || "Inbox"}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Priority */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Priority</Text>
-          {editing ? (
-            <View style={styles.priorityGrid}>
-              {priorities.map((p) => (
-                <TouchableOpacity
-                  key={p.value}
-                  style={[
-                    styles.priorityButton,
-                    priority === p.value && styles.priorityButtonSelected,
-                    { borderColor: priority === p.value ? p.color : "#ddd" },
-                  ]}
-                  onPress={() => setPriority(p.value)}
-                >
-                  <Ionicons
-                    name={p.icon as any}
-                    size={20}
-                    color={priority === p.value ? p.color : "#999"}
-                  />
-                  <Text
-                    style={[
-                      styles.priorityText,
-                      priority === p.value && { color: p.color },
-                    ]}
-                  >
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.priorityDisplay}>
-              <Ionicons
-                name={
-                  priorities.find((p) => p.value === task.priority)?.icon as any
-                }
-                size={20}
-                color={priorities.find((p) => p.value === task.priority)?.color}
-              />
-              <Text
-                style={[
-                  styles.value,
-                  {
-                    color: priorities.find((p) => p.value === task.priority)
-                      ?.color,
-                  },
-                ]}
-              >
-                {priorities.find((p) => p.value === task.priority)?.label}
               </Text>
             </View>
           )}
@@ -572,29 +465,6 @@ function TaskDetailScreen() {
               {taskDueTimeDisplay ? ` · ${taskDueTimeDisplay}` : ""}
             </Text>
           )}
-        </View>
-
-        {/* Status */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Status</Text>
-          <Text style={styles.value}>
-            {task.status.charAt(0).toUpperCase() +
-              task.status.slice(1).replace("_", " ")}
-          </Text>
-        </View>
-
-        {/* Timestamps */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Created</Text>
-          <Text style={styles.value}>
-            {new Date(task.createdAt).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-              hour: "numeric",
-              minute: "numeric",
-            })}
-          </Text>
         </View>
 
         {/* Delete button */}

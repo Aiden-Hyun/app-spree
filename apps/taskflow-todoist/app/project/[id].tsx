@@ -18,6 +18,7 @@ import { EmptyState } from "../../src/components/EmptyState";
 import { useTasks } from "../../src/hooks/useTasks";
 import { useProject, useProjects } from "../../src/hooks/useProjects";
 import { useToast } from "../../src/hooks/useToast";
+import { taskService } from "../../src/services/taskService";
 
 function ProjectDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -71,6 +72,15 @@ function ProjectDetailScreen() {
       await toggleTaskComplete(id);
     } catch (error) {
       console.error("Failed to toggle task:", error);
+    }
+  };
+
+  const handleTitleChange = async (id: string, newTitle: string) => {
+    try {
+      await taskService.updateTask(id, { title: newTitle });
+    } catch (error) {
+      console.error("Failed to update task title:", error);
+      toast.error("Failed to update task");
     }
   };
 
@@ -238,6 +248,7 @@ function ProjectDetailScreen() {
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
+          onTitleChange={handleTitleChange}
           emptyMessage="No tasks in this project"
           showCompletedSeparator={true}
         />

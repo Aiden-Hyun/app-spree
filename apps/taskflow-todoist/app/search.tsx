@@ -15,6 +15,8 @@ import { TaskList } from "../src/components/TaskList";
 import { EmptyState } from "../src/components/EmptyState";
 import { useTasks } from "../src/hooks/useTasks";
 import { useProjects } from "../src/hooks/useProjects";
+import { useToast } from "../src/hooks/useToast";
+import { taskService } from "../src/services/taskService";
 import {
   useTaskFilters,
   FilterOptions,
@@ -32,6 +34,7 @@ function SearchScreen() {
 
   const { tasks: allTasks, loading, error, toggleTaskComplete } = useTasks();
   const { projects } = useProjects();
+  const toast = useToast();
 
   // Apply search filter
   const searchFilterOptions: FilterOptions = {
@@ -55,6 +58,15 @@ function SearchScreen() {
 
   const handleTaskPress = (id: string) => {
     router.push(`/task/${id}`);
+  };
+
+  const handleTitleChange = async (id: string, newTitle: string) => {
+    try {
+      await taskService.updateTask(id, { title: newTitle });
+    } catch (error) {
+      console.error("Failed to update task title:", error);
+      toast.error("Failed to update task");
+    }
   };
 
   const priorities = [
@@ -369,6 +381,7 @@ function SearchScreen() {
               tasks={filteredTasks}
               onToggleComplete={handleToggleComplete}
               onTaskPress={handleTaskPress}
+              onTitleChange={handleTitleChange}
               showCompletedSeparator={true}
             />
           </>
