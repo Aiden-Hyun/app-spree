@@ -27,8 +27,9 @@ export function InlineTimePicker({
   disabled = false,
 }: InlineTimePickerProps) {
   const ITEM_HEIGHT = 40;
-  const VISIBLE_COUNT = 5;
-  const spacerHeight = ((VISIBLE_COUNT - 1) / 2) * ITEM_HEIGHT;
+  const VISIBLE_COUNT = 4;
+  const SELECTED_INDEX = 2; // 3rd position (0-indexed)
+  const spacerHeight = SELECTED_INDEX * ITEM_HEIGHT;
 
   const hourRef = useRef<ScrollView>(null);
   const minuteRef = useRef<ScrollView>(null);
@@ -81,6 +82,7 @@ export function InlineTimePicker({
           { height: ITEM_HEIGHT * VISIBLE_COUNT },
         ]}
       >
+        <View style={styles.highlightBox} pointerEvents="none" />
         <ScrollView
           ref={ref}
           showsVerticalScrollIndicator={false}
@@ -91,6 +93,7 @@ export function InlineTimePicker({
           keyboardShouldPersistTaps="handled"
           onMomentumScrollEnd={handleScrollEnd(data, selected, onSelect, ref)}
           scrollEventThrottle={16}
+          style={styles.scrollView}
         >
           <View style={{ height: spacerHeight }} />
           {data.map((item, idx) => {
@@ -122,14 +125,12 @@ export function InlineTimePicker({
           })}
           <View style={{ height: spacerHeight }} />
         </ScrollView>
-        <View style={styles.highlightBox} pointerEvents="none" />
       </View>
     </View>
   );
 
   return (
     <View style={[styles.container, disabled && styles.containerDisabled]}>
-      <Text style={styles.label}>Time</Text>
       <View style={styles.pickerRow}>
         {renderColumn(
           "Hours",
@@ -194,32 +195,41 @@ const styles = StyleSheet.create({
   pickerContainer: {
     position: "relative",
   },
+  scrollView: {
+    zIndex: 10,
+  },
   pickerItem: {
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 10,
+  },
+  pickerItemSelected: {
+    // Optional: add background highlight if desired
   },
   pickerText: {
     fontSize: 18,
-    color: "#333",
-    fontWeight: "600",
+    color: "#bbb",
+    fontWeight: "400",
   },
   pickerTextSelected: {
     color: "#6c5ce7",
+    fontWeight: "700",
+    fontSize: 20,
   },
   optionTextDisabled: {
-    color: "#999",
+    color: "#ddd",
   },
   highlightBox: {
     position: "absolute",
-    top: "50%",
+    top: 80, // ITEM_HEIGHT * 2 to position at 3rd item
     left: 0,
     right: 0,
-    marginTop: -20,
     height: 40,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e0e0e0",
     backgroundColor: "#f8f9fa80",
     pointerEvents: "none",
+    zIndex: 1,
   },
 });
