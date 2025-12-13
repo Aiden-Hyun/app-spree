@@ -1,12 +1,10 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   ScrollView,
-  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -34,34 +32,18 @@ export function Dropdown({
   disabled = false,
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const selectedOption = options.find((opt) => opt.value === value);
   const displayText = selectedOption?.label || placeholder;
 
-  const handleOpen = () => {
+  const handleToggle = () => {
     if (disabled) return;
-    setIsOpen(true);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleClose = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsOpen(false);
-    });
+    setIsOpen(!isOpen);
   };
 
   const handleSelect = (optionValue: string | null) => {
     onSelect(optionValue);
-    handleClose();
+    setIsOpen(false);
   };
 
   return (
@@ -73,7 +55,7 @@ export function Dropdown({
           disabled && styles.triggerDisabled,
           isOpen && styles.triggerOpen,
         ]}
-        onPress={handleOpen}
+        onPress={handleToggle}
         activeOpacity={0.7}
         disabled={disabled}
       >
@@ -98,63 +80,57 @@ export function Dropdown({
         />
       </TouchableOpacity>
 
-      <Modal visible={isOpen} transparent animationType="none" onRequestClose={handleClose}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={handleClose}
-        >
-          <Animated.View
-            style={[styles.menuContainer, { opacity: fadeAnim }]}
+      {isOpen && (
+        <View style={styles.menu}>
+          <ScrollView 
+            style={styles.menuScroll} 
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={true}
           >
-            <TouchableOpacity activeOpacity={1}>
-              <View style={styles.menu}>
-                <ScrollView style={styles.menuScroll} nestedScrollEnabled>
-                  {options.map((option, index) => {
-                    const isSelected = option.value === value;
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.menuItem,
-                          isSelected && styles.menuItemSelected,
-                        ]}
-                        onPress={() => handleSelect(option.value)}
-                        activeOpacity={0.7}
-                      >
-                        {option.color && (
-                          <View
-                            style={[
-                              styles.colorDot,
-                              { backgroundColor: option.color },
-                            ]}
-                          />
-                        )}
-                        <Text
-                          style={[
-                            styles.menuItemText,
-                            isSelected && styles.menuItemTextSelected,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                        {isSelected && (
-                          <Ionicons
-                            name="checkmark"
-                            size={20}
-                            color="#6c5ce7"
-                            style={styles.checkmark}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
+            {options.map((option, index) => {
+              const isSelected = option.value === value;
+              const isLastItem = index === options.length - 1;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.menuItem,
+                    isSelected && styles.menuItemSelected,
+                    isLastItem && styles.menuItemLast,
+                  ]}
+                  onPress={() => handleSelect(option.value)}
+                  activeOpacity={0.7}
+                >
+                  {option.color && (
+                    <View
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: option.color },
+                      ]}
+                    />
+                  )}
+                  <Text
+                    style={[
+                      styles.menuItemText,
+                      isSelected && styles.menuItemTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color="#6c5ce7"
+                      style={styles.checkmark}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 }
@@ -162,6 +138,7 @@ export function Dropdown({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
+    zIndex: 1000,
   },
   label: {
     fontSize: 14,
@@ -180,6 +157,8 @@ const styles = StyleSheet.create({
   },
   triggerOpen: {
     borderColor: "#6c5ce7",
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   triggerDisabled: {
     backgroundColor: "#f5f5f5",
@@ -202,27 +181,23 @@ const styles = StyleSheet.create({
   triggerTextDisabled: {
     color: "#999",
   },
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuContainer: {
-    width: "85%",
-    maxHeight: "70%",
-  },
   menu: {
     backgroundColor: "white",
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#6c5ce7",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
+    marginTop: -1,
+    overflow: "hidden",
   },
   menuScroll: {
-    maxHeight: 400,
+    maxHeight: 300,
   },
   menuItem: {
     flexDirection: "row",
@@ -230,6 +205,10 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
+    backgroundColor: "white",
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   menuItemSelected: {
     backgroundColor: "#f8f9fa",
