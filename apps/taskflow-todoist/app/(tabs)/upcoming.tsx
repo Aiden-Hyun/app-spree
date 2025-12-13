@@ -216,11 +216,11 @@ function UpcomingScreen() {
                       dueDate={task.dueDate}
                       projectName={task.project?.name}
                       projectColor={task.project?.color}
-                      onToggleComplete={handleToggleComplete}
+                    onToggleComplete={handleToggleComplete}
                     onPress={handleTaskPress}
                     onDetails={handleTaskDetails}
                       onDelete={handleDelete}
-                    />
+                  />
                   ))}
                 </View>
               );

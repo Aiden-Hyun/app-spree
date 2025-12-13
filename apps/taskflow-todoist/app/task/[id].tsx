@@ -17,9 +17,7 @@ import { useTasks } from "../../src/hooks/useTasks";
 import { useProjects } from "../../src/hooks/useProjects";
 import { taskService, Task, TaskInput } from "../../src/services/taskService";
 import { useToast } from "../../src/hooks/useToast";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
+import { InlineCalendar } from "../../src/components/InlineCalendar";
 
 function TaskDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -41,7 +39,7 @@ function TaskDetailScreen() {
   const [priority, setPriority] = useState<TaskInput["priority"]>("medium");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [dueDate, setDueDate] = useState<Date | undefined>();
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isDueDateEnabled, setIsDueDateEnabled] = useState(false);
 
   const priorities: Array<{
     value: TaskInput["priority"];
@@ -76,6 +74,7 @@ function TaskDetailScreen() {
         setPriority(foundTask.priority);
         setSelectedProjectId(foundTask.projectId || "");
         setDueDate(foundTask.dueDate ? new Date(foundTask.dueDate) : undefined);
+        setIsDueDateEnabled(!!foundTask.dueDate);
       } else {
         toast.error("Task not found");
         router.back();
@@ -101,7 +100,7 @@ function TaskDetailScreen() {
         description: description.trim() || undefined,
         priority,
         projectId: selectedProjectId ? selectedProjectId : null, // null clears to Inbox
-        dueDate,
+        dueDate: isDueDateEnabled ? dueDate : undefined,
       });
 
       toast.success("Task updated successfully");
@@ -113,22 +112,14 @@ function TaskDetailScreen() {
     }
   };
 
-  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === "android") {
-      setShowDatePicker(false);
-    }
-    if (event.type === "dismissed") return;
-    if (date) setDueDate(date);
-  };
-
   const handleDelete = async () => {
-    try {
-      await deleteTask(taskId);
+          try {
+            await deleteTask(taskId);
       toast.success("Task deleted");
-      router.back();
-    } catch (error) {
+            router.back();
+          } catch (error) {
       toast.error("Failed to delete task");
-    }
+          }
   };
 
   if (loading) {
@@ -183,12 +174,12 @@ function TaskDetailScreen() {
             </>
           ) : (
             <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => setEditing(true)}
-              >
-                <Ionicons name="create-outline" size={24} color="#6c5ce7" />
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setEditing(true)}
+            >
+              <Ionicons name="create-outline" size={24} color="#6c5ce7" />
+            </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerButton}
                 onPress={handleDelete}
@@ -370,41 +361,65 @@ function TaskDetailScreen() {
 
         {/* Due Date */}
         <View style={styles.section}>
-          <Text style={styles.label}>Due Date</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.label}>Due Date</Text>
+            {editing && (
+              <TouchableOpacity
+                style={styles.toggleButton}
+                onPress={() => {
+                  if (isDueDateEnabled) {
+                    // Turning OFF: clear date
+                    setIsDueDateEnabled(false);
+                    setDueDate(undefined);
+                  } else {
+                    // Turning ON: set today's date if no date exists
+                    setIsDueDateEnabled(true);
+                    if (!dueDate) {
+                      setDueDate(new Date());
+                    }
+                  }
+                }}
+              >
+                <Ionicons 
+                  name="toggle-outline" 
+                  size={28} 
+                  color={isDueDateEnabled ? "#6c5ce7" : "#999"} 
+                />
+              </TouchableOpacity>
+            )}
+          </View>
           {editing ? (
             <>
-              <View style={styles.dueDateRow}>
-                <TouchableOpacity
-                  style={styles.dueDateButton}
-                  onPress={() => setShowDatePicker(true)}
+              <View
+                style={[
+                  styles.dueDateButton,
+                  !isDueDateEnabled && styles.dueDateButtonDisabled,
+                ]}
+              >
+                <Ionicons 
+                  name="calendar-outline" 
+                  size={20} 
+                  color={isDueDateEnabled ? "#666" : "#999"} 
+                />
+                <Text 
+                  style={[
+                    styles.dueDateText,
+                    !isDueDateEnabled && styles.dueDateTextDisabled,
+                  ]}
                 >
-                  <Ionicons name="calendar-outline" size={20} color="#666" />
-                  <Text style={styles.dueDateText}>
-                    {dueDate
-                      ? dueDate.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "Set due date"}
-                  </Text>
-                </TouchableOpacity>
-                {dueDate && (
-                  <TouchableOpacity
-                    style={styles.clearDateButton}
-                    onPress={() => setDueDate(undefined)}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#e74c3c" />
-                    <Text style={styles.clearDateText}>Clear</Text>
-                  </TouchableOpacity>
-                )}
+                  {isDueDateEnabled && dueDate
+                    ? dueDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "No due date"}
+                </Text>
               </View>
-              {showDatePicker && (
-                <DateTimePicker
+              {isDueDateEnabled && (
+                <InlineCalendar
                   value={dueDate || new Date()}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={handleDateChange}
+                  onChange={(date) => setDueDate(date)}
                   minimumDate={new Date(2000, 0, 1)}
                   maximumDate={new Date(2100, 11, 31)}
                 />
@@ -537,11 +552,19 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",
     color: "#666",
-    marginBottom: 8,
+  },
+  toggleButton: {
+    padding: 4,
   },
   value: {
     fontSize: 16,
@@ -628,10 +651,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0",
   },
+  dueDateButtonDisabled: {
+    backgroundColor: "#f5f5f5",
+    borderColor: "#e0e0e0",
+  },
   dueDateText: {
     fontSize: 16,
     color: "#333",
     marginLeft: 12,
+    flex: 1,
+  },
+  dueDateTextDisabled: {
+    color: "#999",
   },
   deleteButton: {
     flexDirection: "row",
