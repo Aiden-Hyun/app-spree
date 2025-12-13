@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -119,6 +120,15 @@ function TaskDetailScreen() {
       router.back();
     } catch (error) {
       toast.error("Failed to delete task");
+    }
+  };
+
+  const handleDueDateToggle = (value: boolean) => {
+    setIsDueDateEnabled(value);
+    if (value) {
+      setDueDate((prev) => prev || new Date());
+    } else {
+      setDueDate(undefined);
     }
   };
 
@@ -364,28 +374,13 @@ function TaskDetailScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.label}>Due Date</Text>
             {editing && (
-              <TouchableOpacity
-                style={styles.toggleButton}
-                onPress={() => {
-                  if (isDueDateEnabled) {
-                    // Turning OFF: clear date
-                    setIsDueDateEnabled(false);
-                    setDueDate(undefined);
-                  } else {
-                    // Turning ON: set today's date if no date exists
-                    setIsDueDateEnabled(true);
-                    if (!dueDate) {
-                      setDueDate(new Date());
-                    }
-                  }
-                }}
-              >
-                <Ionicons
-                  name="toggle-outline"
-                  size={28}
-                  color={isDueDateEnabled ? "#6c5ce7" : "#999"}
-                />
-              </TouchableOpacity>
+              <Switch
+                value={isDueDateEnabled}
+                onValueChange={handleDueDateToggle}
+                trackColor={{ false: "#d1d5db", true: "#cbb5ff" }}
+                thumbColor={isDueDateEnabled ? "#6c5ce7" : "#f4f4f5"}
+                ios_backgroundColor="#d1d5db"
+              />
             )}
           </View>
           {editing ? (
@@ -562,9 +557,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#666",
-  },
-  toggleButton: {
-    padding: 4,
   },
   value: {
     fontSize: 16,
