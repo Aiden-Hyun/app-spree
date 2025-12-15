@@ -18,6 +18,7 @@ function InboxScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showInlineAdd, setShowInlineAdd] = useState(false);
   const toast = useToast();
 
   const loadInboxTasks = useCallback(async () => {
@@ -120,7 +121,29 @@ function InboxScreen() {
   };
 
   const handleAddTask = () => {
-    router.push("/quick-add");
+    setShowInlineAdd(true);
+  };
+
+  const handleCreateTask = async (title: string) => {
+    try {
+      const newTask = await taskService.createTask({
+        title,
+        priority: "medium",
+        status: "todo",
+      });
+
+      // Optimistically add the task to the list without refreshing
+      setTasks((prevTasks) => [...prevTasks, newTask]);
+      toast.success("Task created!");
+      setShowInlineAdd(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create task");
+      throw error; // Re-throw so InlineTaskInput knows to stay visible
+    }
+  };
+
+  const handleCancelAdd = () => {
+    setShowInlineAdd(false);
   };
 
   if (loading) {
@@ -151,7 +174,7 @@ function InboxScreen() {
         </TouchableOpacity>
       </View>
 
-      {tasks.length === 0 ? (
+      {tasks.length === 0 && !showInlineAdd ? (
         <EmptyState
           icon="mail-outline"
           title="Your inbox is empty"
@@ -166,6 +189,9 @@ function InboxScreen() {
           onDelete={handleDelete}
           onTitleChange={handleTitleChange}
           emptyMessage="No tasks in your inbox"
+          showInlineAdd={showInlineAdd}
+          onCreateTask={handleCreateTask}
+          onCancelAdd={handleCancelAdd}
         />
       )}
 
@@ -174,6 +200,7 @@ function InboxScreen() {
         style={styles.fab}
         activeOpacity={0.8}
         onPress={handleAddTask}
+        disabled={showInlineAdd}
       >
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>

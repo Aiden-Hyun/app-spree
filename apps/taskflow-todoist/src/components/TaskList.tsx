@@ -1,6 +1,7 @@
 import React from "react";
 import { View, FlatList, Text, StyleSheet, RefreshControl } from "react-native";
 import { TaskItem } from "./TaskItem";
+import { InlineTaskInput } from "./InlineTaskInput";
 
 export interface Task {
   id: string;
@@ -27,6 +28,9 @@ interface TaskListProps {
   onRefresh?: () => void;
   emptyMessage?: string;
   showCompletedSeparator?: boolean;
+  showInlineAdd?: boolean;
+  onCreateTask?: (title: string) => Promise<void>;
+  onCancelAdd?: () => void;
 }
 
 export function TaskList({
@@ -40,20 +44,30 @@ export function TaskList({
   onRefresh,
   emptyMessage = "No tasks yet",
   showCompletedSeparator = true,
+  showInlineAdd = false,
+  onCreateTask,
+  onCancelAdd,
 }: TaskListProps) {
   // Separate completed and active tasks
   const activeTasks = tasks.filter((task) => task.status !== "completed");
   const completedTasks = tasks.filter((task) => task.status === "completed");
 
-  // Combine with separator if needed
-  const displayTasks =
-    showCompletedSeparator && completedTasks.length > 0
-      ? [
-          ...activeTasks,
-          { id: "separator", type: "separator" },
-          ...completedTasks,
-        ]
-      : tasks;
+  // Combine with inline add input, separator, and completed tasks
+  let displayTasks: any[] = [...activeTasks];
+  
+  // Add inline input after active tasks
+  if (showInlineAdd && onCreateTask && onCancelAdd) {
+    displayTasks.push({ id: "inline-add", type: "inline-add" });
+  }
+  
+  // Add separator and completed tasks if needed
+  if (showCompletedSeparator && completedTasks.length > 0) {
+    displayTasks.push({ id: "separator", type: "separator" });
+    displayTasks = [...displayTasks, ...completedTasks];
+  } else if (!showInlineAdd) {
+    // If not showing inline add and no separator, just show all tasks
+    displayTasks = tasks;
+  }
 
   const renderItem = ({ item }: { item: any }) => {
     if (item.type === "separator") {
@@ -63,6 +77,15 @@ export function TaskList({
             Completed ({completedTasks.length})
           </Text>
         </View>
+      );
+    }
+
+    if (item.type === "inline-add" && onCreateTask && onCancelAdd) {
+      return (
+        <InlineTaskInput
+          onSubmit={onCreateTask}
+          onCancel={onCancelAdd}
+        />
       );
     }
 
@@ -85,7 +108,8 @@ export function TaskList({
     );
   };
 
-  if (tasks.length === 0) {
+  // Only show empty state if there are no tasks AND no inline add is showing
+  if (tasks.length === 0 && !showInlineAdd) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>{emptyMessage}</Text>

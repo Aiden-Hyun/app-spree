@@ -37,7 +37,8 @@ export function useTasks(options: UseTasksOptions = {}) {
   const createTask = useCallback(async (input: TaskInput) => {
     try {
       const newTask = await taskService.createTask(input);
-      setTasks((prev) => [newTask, ...prev]);
+      // Add new task at the end (oldest to newest ordering)
+      setTasks((prev) => [...prev, newTask]);
       return newTask;
     } catch (err: any) {
       setError(err.message || "Failed to create task");

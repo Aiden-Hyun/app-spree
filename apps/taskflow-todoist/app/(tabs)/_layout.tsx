@@ -1,5 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { TouchableOpacity } from "react-native";
+import { router } from "expo-router";
 
 export default function TabLayout() {
   return (
@@ -35,6 +37,14 @@ export default function TabLayout() {
           tabBarLabel: "Inbox",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="mail-outline" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push("/settings")}
+              style={{ marginRight: 16 }}
+            >
+              <Ionicons name="settings-outline" size={24} color="white" />
+            </TouchableOpacity>
           ),
         }}
       />

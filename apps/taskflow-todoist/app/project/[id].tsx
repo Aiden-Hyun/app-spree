@@ -34,6 +34,7 @@ function ProjectDetailScreen() {
     loading: tasksLoading,
     error: tasksError,
     toggleTaskComplete,
+    createTask,
   } = useTasks({ projectId });
   const { updateProject, deleteProject, toggleProjectArchive } = useProjects();
   const toast = useToast();
@@ -43,6 +44,7 @@ function ProjectDetailScreen() {
   const [projectDescription, setProjectDescription] = useState("");
   const [projectColor, setProjectColor] = useState("#6c5ce7");
   const [saving, setSaving] = useState(false);
+  const [showInlineAdd, setShowInlineAdd] = useState(false);
 
   const colors = [
     "#e74c3c",
@@ -89,10 +91,28 @@ function ProjectDetailScreen() {
   };
 
   const handleAddTask = () => {
-    router.push({
-      pathname: "/quick-add",
-      params: { projectId },
-    });
+    setShowInlineAdd(true);
+  };
+
+  const handleCreateTask = async (title: string) => {
+    try {
+      await createTask({
+        title,
+        priority: "medium",
+        status: "todo",
+        projectId,
+      });
+      
+      toast.success("Task created!");
+      setShowInlineAdd(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create task");
+      throw error; // Re-throw so InlineTaskInput knows to stay visible
+    }
+  };
+
+  const handleCancelAdd = () => {
+    setShowInlineAdd(false);
   };
 
   const handleSaveProject = async () => {
@@ -235,7 +255,7 @@ function ProjectDetailScreen() {
       </View>
 
       {/* Task list */}
-      {tasks.length === 0 ? (
+      {tasks.length === 0 && !showInlineAdd ? (
         <View style={styles.emptyContainer}>
           <EmptyState
             icon="folder-open-outline"
@@ -251,6 +271,9 @@ function ProjectDetailScreen() {
           onTitleChange={handleTitleChange}
           emptyMessage="No tasks in this project"
           showCompletedSeparator={true}
+          showInlineAdd={showInlineAdd}
+          onCreateTask={handleCreateTask}
+          onCancelAdd={handleCancelAdd}
         />
       )}
 
@@ -259,6 +282,7 @@ function ProjectDetailScreen() {
         style={[styles.fab, { backgroundColor: project.color }]}
         activeOpacity={0.8}
         onPress={handleAddTask}
+        disabled={showInlineAdd}
       >
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>

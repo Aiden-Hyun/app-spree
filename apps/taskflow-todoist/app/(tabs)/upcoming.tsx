@@ -10,6 +10,7 @@ import {
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
 import { TaskItem } from "../../src/components/TaskItem";
+import { InlineTaskInput } from "../../src/components/InlineTaskInput";
 import { EmptyState } from "../../src/components/EmptyState";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
@@ -19,6 +20,7 @@ function UpcomingScreen() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showInlineAdd, setShowInlineAdd] = useState(false);
   const toast = useToast();
 
   const loadUpcomingTasks = useCallback(async () => {
@@ -122,7 +124,48 @@ function UpcomingScreen() {
   };
 
   const handleAddTask = () => {
-    router.push("/quick-add");
+    setShowInlineAdd(true);
+  };
+
+  const handleCreateTask = async (title: string) => {
+    try {
+      // Create task without due date (goes to inbox)
+      await taskService.createTask({
+        title,
+        priority: "medium",
+        status: "todo",
+      });
+      
+      toast.success("Task created in inbox!");
+      setShowInlineAdd(false);
+      // Don't add to local state since this task won't appear in upcoming (no due date)
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create task");
+      throw error; // Re-throw so InlineTaskInput knows to stay visible
+    }
+  };
+
+  const handleCancelAdd = () => {
+    setShowInlineAdd(false);
+  };
+
+  const handleTitleChange = async (id: string, newTitle: string) => {
+    // Optimistically update the UI
+    const previous = tasks;
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === id ? { ...task, title: newTitle } : task
+      )
+    );
+
+    try {
+      await taskService.updateTask(id, { title: newTitle });
+    } catch (error) {
+      console.error("Failed to update task title:", error);
+      toast.error("Failed to update task");
+      // Revert on error
+      setTasks(previous);
+    }
   };
 
   if (loading) {
@@ -186,7 +229,7 @@ function UpcomingScreen() {
         </View>
 
         {/* Task list or empty state */}
-        {tasks.length === 0 ? (
+        {tasks.length === 0 && !showInlineAdd ? (
           <EmptyState
             icon="calendar-outline"
             title="No upcoming tasks"
@@ -194,6 +237,15 @@ function UpcomingScreen() {
           />
         ) : (
           <View style={styles.taskSection}>
+            {showInlineAdd && (
+              <View style={styles.inlineAddContainer}>
+                <InlineTaskInput
+                  onSubmit={handleCreateTask}
+                  onCancel={handleCancelAdd}
+                  placeholder="New Task (will be added to Inbox)"
+                />
+              </View>
+            )}
             {Object.entries(tasksByDate).map(([dateString, dateTasks]) => {
               const date = new Date(dateString);
               const dateLabel = date.toLocaleDateString("en-US", {
@@ -220,6 +272,7 @@ function UpcomingScreen() {
                     onPress={handleTaskPress}
                     onDetails={handleTaskDetails}
                       onDelete={handleDelete}
+                      onTitleChange={handleTitleChange}
                   />
                   ))}
                 </View>
@@ -233,6 +286,7 @@ function UpcomingScreen() {
           style={styles.fab}
           activeOpacity={0.8}
           onPress={handleAddTask}
+          disabled={showInlineAdd}
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
@@ -314,6 +368,12 @@ const styles = StyleSheet.create({
   },
   taskSection: {
     marginTop: 20,
+  },
+  inlineAddContainer: {
+    backgroundColor: "white",
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: "hidden",
   },
   dateSection: {
     marginBottom: 24,

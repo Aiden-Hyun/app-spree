@@ -78,7 +78,7 @@ export const taskService = {
       `
       )
       .eq("user_id", userData.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     // Apply filters
     if (filters?.projectId) {
@@ -158,7 +158,7 @@ export const taskService = {
       .select("*")
       .eq("user_id", userData.user.id)
       .is("project_id", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
     return data.map(this.formatTask);
