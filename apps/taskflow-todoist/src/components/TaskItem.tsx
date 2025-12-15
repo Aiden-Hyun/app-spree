@@ -102,9 +102,10 @@ export function TaskItem({
   const handleSwipeOpen = () => {
     if (onDelete) {
       onDelete(id);
+    } else {
+      // If no delete handler is provided, just reset the swipeable
+      swipeableRef.current?.close();
     }
-    // Close after triggering delete to avoid lingering UI
-    swipeableRef.current?.close();
   };
 
   const handleTitleBlur = () => {
