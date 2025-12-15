@@ -15,7 +15,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="home" options={{ title: "TaskFlow" }} />
         <Stack.Screen name="login" options={{ title: "Login" }} />
-        <Stack.Screen name="settings" options={{ title: "Settings" }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen
           name="quick-add"
           options={{
