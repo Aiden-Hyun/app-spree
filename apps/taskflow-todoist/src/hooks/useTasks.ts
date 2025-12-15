@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { taskService, Task, TaskInput } from "../services/taskService";
+import { animateListChanges } from "../utils/layoutAnimation";
 
 interface UseTasksOptions {
   projectId?: string;
@@ -78,6 +79,7 @@ export function useTasks(options: UseTasksOptions = {}) {
   const deleteTask = useCallback(async (id: string) => {
     try {
       await taskService.deleteTask(id);
+      animateListChanges();
       setTasks((prev) => prev.filter((task) => task.id !== id));
     } catch (err: any) {
       setError(err.message || "Failed to delete task");

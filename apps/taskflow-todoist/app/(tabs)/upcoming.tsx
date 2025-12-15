@@ -14,6 +14,7 @@ import { InlineTaskInput } from "../../src/components/InlineTaskInput";
 import { EmptyState } from "../../src/components/EmptyState";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
+import { animateListChanges } from "../../src/utils/layoutAnimation";
 import { useToast } from "../../src/hooks/useToast";
 
 function UpcomingScreen() {
@@ -101,6 +102,7 @@ function UpcomingScreen() {
 
   const handleDelete = async (id: string) => {
     const previous = tasks;
+    animateListChanges();
     setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
       await taskService.deleteTask(id);
