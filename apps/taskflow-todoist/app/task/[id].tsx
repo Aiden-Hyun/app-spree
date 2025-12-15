@@ -135,7 +135,7 @@ function TaskDetailScreen() {
     try {
       await updateTask(taskId, {
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() ? description.trim() : null,
         priority,
         projectId: selectedProjectId ? selectedProjectId : null, // null clears to Inbox
         dueDate: isDueDateEnabled ? dueDate : null,
