@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Keyboard } from "react-native";
 import DraggableFlatList, {
   ScaleDecorator,
   RenderItemParams,
@@ -165,6 +165,9 @@ export function DraggableTaskList({
         onDragEnd={handleDragEnd}
         contentContainerStyle={styles.listContent}
         activationDistance={isDragEnabled ? 10 : 1000}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => Keyboard.dismiss()}
       />
     </GestureHandlerRootView>
   );

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Pressable } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Pressable, Keyboard } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -149,15 +149,14 @@ export function TaskItem({
       onSwipeableOpen={handleSwipeOpen}
       enabled={!isActive}
     >
-      <TouchableOpacity
+      <Pressable
         style={[
           styles.container,
           isActive && styles.containerActive,
         ]}
         onLongPress={drag}
         delayLongPress={200}
-        activeOpacity={drag ? 0.9 : 1}
-        disabled={!drag}
+        onPress={() => Keyboard.dismiss()}
       >
         <TouchableOpacity
           style={styles.checkbox}
@@ -288,7 +287,7 @@ export function TaskItem({
             />
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Swipeable>
   );
 }

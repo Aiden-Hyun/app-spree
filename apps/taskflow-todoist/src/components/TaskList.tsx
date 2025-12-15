@@ -1,5 +1,5 @@
 import React from "react";
-import { View, FlatList, Text, StyleSheet, RefreshControl } from "react-native";
+import { View, FlatList, Text, StyleSheet, RefreshControl, Keyboard } from "react-native";
 import { TaskItem } from "./TaskItem";
 import { InlineTaskInput } from "./InlineTaskInput";
 
@@ -132,6 +132,9 @@ export function TaskList({
         ) : undefined
       }
       contentContainerStyle={styles.listContent}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={() => Keyboard.dismiss()}
     />
   );
 }

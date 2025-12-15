@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Keyboard,
+  Pressable,
 } from "react-native";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
@@ -205,7 +207,7 @@ function TodayScreen() {
   const completedTasks = tasks.filter((task) => task.status === "completed");
 
   return (
-    <View style={styles.container}>
+    <Pressable style={styles.container} onPress={() => Keyboard.dismiss()}>
       {/* Drop zones - appear when dragging */}
       <DropZoneDateStrip visible={isDragging} onDateSelected={handleReschedule} />
       <DropZoneProjectList
@@ -262,7 +264,7 @@ function TodayScreen() {
       >
         <Ionicons name="add" size={24} color="white" />
       </TouchableOpacity>
-    </View>
+    </Pressable>
   );
 }
 

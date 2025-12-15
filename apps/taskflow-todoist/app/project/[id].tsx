@@ -8,6 +8,8 @@ import {
   Alert,
   TextInput,
   Modal,
+  Keyboard,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -262,7 +264,7 @@ function ProjectDetailScreen() {
       : 0;
 
   return (
-    <View style={styles.container}>
+    <Pressable style={styles.container} onPress={() => Keyboard.dismiss()}>
       <View style={[styles.header, { backgroundColor: project.color }]}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -449,7 +451,7 @@ function ProjectDetailScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </Pressable>
   );
 }
 
