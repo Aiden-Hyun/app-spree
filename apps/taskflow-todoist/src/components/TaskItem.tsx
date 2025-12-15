@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Pressable } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -41,8 +41,19 @@ export function TaskItem({
   const isCompleted = status === "completed";
   const isOverdue = dueDate && new Date(dueDate) < new Date() && !isCompleted;
   const swipeableRef = useRef<Swipeable | null>(null);
+  const titleInputRef = useRef<TextInput | null>(null);
   const [editedTitle, setEditedTitle] = useState(title);
   const [isEditing, setIsEditing] = useState(false);
+
+  const handleTitlePress = () => {
+    if (!isCompleted) {
+      setIsEditing(true);
+      // Focus the input after a short delay to allow state update
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 50);
+    }
+  };
 
   const priorityColors = {
     low: "#666",
@@ -176,23 +187,34 @@ export function TaskItem({
             >
               {title}
             </Text>
-          ) : (
+          ) : isEditing ? (
             <TextInput
+              ref={titleInputRef}
               style={[
                 styles.title,
                 styles.titleInput,
                 isOverdue && styles.titleOverdue,
-                isEditing && styles.titleInputActive,
+                styles.titleInputActive,
               ]}
               value={editedTitle}
               onChangeText={setEditedTitle}
-              onFocus={() => setIsEditing(true)}
               onBlur={handleTitleBlur}
               onSubmitEditing={handleTitleSubmit}
-              editable={!isCompleted}
+              autoFocus
               multiline
               blurOnSubmit
             />
+          ) : (
+            <Pressable onPress={handleTitlePress} style={styles.titlePressable}>
+              <Text
+                style={[
+                  styles.title,
+                  isOverdue && styles.titleOverdue,
+                ]}
+              >
+                {editedTitle || title}
+              </Text>
+            </Pressable>
           )}
 
           {description && !isCompleted && (
@@ -312,6 +334,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginBottom: 2,
+  },
+  titlePressable: {
+    alignSelf: "flex-start",
+    paddingRight: 40,
+    paddingVertical: 4,
+    marginVertical: -4,
   },
   titleInput: {
     padding: 0,
