@@ -19,6 +19,7 @@ import { useProject, useProjects } from "../../src/hooks/useProjects";
 import { useToast } from "../../src/hooks/useToast";
 import { taskService, Task } from "../../src/services/taskService";
 import { DropZoneDateStrip, DropZoneProjectList } from "../../src/components/DragDrop";
+import { animateListChanges } from "../../src/utils/layoutAnimation";
 
 function ProjectDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -35,6 +36,7 @@ function ProjectDetailScreen() {
     error: tasksError,
     toggleTaskComplete,
     createTask,
+    deleteTask,
   } = useTasks({ projectId });
   const { updateProject, deleteProject, toggleProjectArchive } = useProjects();
   const toast = useToast();
@@ -90,6 +92,21 @@ function ProjectDetailScreen() {
     } catch (error) {
       console.error("Failed to update task title:", error);
       toast.error("Failed to update task");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const previous = localTasks;
+    // Animate before state change
+    animateListChanges();
+    setLocalTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await deleteTask(id);
+      toast.success("Task deleted");
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast.error("Failed to delete task");
+      setLocalTasks(previous);
     }
   };
 
@@ -308,6 +325,7 @@ function ProjectDetailScreen() {
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
           onTitleChange={handleTitleChange}
+          onDelete={handleDelete}
           onReorder={handleReorder}
           emptyMessage="No tasks in this project"
           showCompletedSeparator={true}
