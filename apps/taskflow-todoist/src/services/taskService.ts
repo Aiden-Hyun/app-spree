@@ -15,6 +15,7 @@ export interface Task extends TaskInput {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  position?: number;
   project?: {
     id: string;
     name: string;
@@ -78,6 +79,7 @@ export const taskService = {
       `
       )
       .eq("user_id", userData.user.id)
+      .order("position", { ascending: true })
       .order("created_at", { ascending: true });
 
     // Apply filters
@@ -158,6 +160,7 @@ export const taskService = {
       .select("*")
       .eq("user_id", userData.user.id)
       .is("project_id", null)
+      .order("position", { ascending: true })
       .order("created_at", { ascending: true });
 
     if (error) throw error;
@@ -273,6 +276,46 @@ export const taskService = {
     if (updateError) throw updateError;
   },
 
+  // Update task position
+  async updateTaskPosition(
+    taskId: string,
+    newPosition: number
+  ): Promise<Task> {
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({ position: newPosition, updated_at: new Date().toISOString() })
+      .eq("id", taskId)
+      .select(
+        `
+        *,
+        project:projects(id, name, color)
+      `
+      )
+      .single();
+
+    if (error) throw error;
+    return this.formatTask(data);
+  },
+
+  // Batch update task positions (for reordering)
+  async reorderTasks(
+    taskIds: string[]
+  ): Promise<void> {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) throw new Error("User not authenticated");
+
+    // Update each task's position based on its index in the array
+    const updates = taskIds.map((id, index) =>
+      supabase
+        .from("tasks")
+        .update({ position: index, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", userData.user!.id)
+    );
+
+    await Promise.all(updates);
+  },
+
   // Helper to format task data
   formatTask(data: any): Task {
     return {
@@ -287,6 +330,7 @@ export const taskService = {
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       completedAt: data.completed_at,
+      position: data.position,
       project: data.project
         ? {
             id: data.project.id,

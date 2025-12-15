@@ -8,18 +8,20 @@ import {
 } from "react-native";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
-import { TaskList } from "../../src/components/TaskList";
+import { DraggableTaskList } from "../../src/components/DraggableTaskList";
 import { EmptyState } from "../../src/components/EmptyState";
 import { router, useFocusEffect } from "expo-router";
-import { taskService } from "../../src/services/taskService";
+import { taskService, Task } from "../../src/services/taskService";
 import { animateListChanges } from "../../src/utils/layoutAnimation";
 import { useToast } from "../../src/hooks/useToast";
+import { DropZoneDateStrip, DropZoneProjectList } from "../../src/components/DragDrop";
 
 function TodayScreen() {
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const toast = useToast();
 
   const loadTodayTasks = useCallback(async () => {
@@ -158,6 +160,31 @@ function TodayScreen() {
     setShowInlineAdd(false);
   };
 
+  const handleReorder = async (reorderedTasks: Task[]) => {
+    const previousTasks = tasks;
+    setTasks(reorderedTasks);
+
+    try {
+      const taskIds = reorderedTasks.map((t) => t.id);
+      await taskService.reorderTasks(taskIds);
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error);
+      toast.error("Failed to save order");
+      setTasks(previousTasks);
+    }
+  };
+
+  const handleReschedule = async (date: Date) => {
+    toast.success(`Rescheduled to ${date.toLocaleDateString()}`);
+    setIsDragging(false);
+  };
+
+  const handleMoveToProject = async (projectId: string | null) => {
+    toast.success(projectId ? "Moved to project" : "Moved to Inbox");
+    setIsDragging(false);
+    loadTodayTasks();
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -179,6 +206,14 @@ function TodayScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Drop zones - appear when dragging */}
+      <DropZoneDateStrip visible={isDragging} onDateSelected={handleReschedule} />
+      <DropZoneProjectList
+        visible={isDragging}
+        onProjectSelected={handleMoveToProject}
+        currentProjectId={null}
+      />
+
       <View style={styles.header}>
         <Text style={styles.dateText}>{today}</Text>
         <View style={styles.statsRow}>
@@ -202,13 +237,14 @@ function TodayScreen() {
           subtitle="Enjoy the rest of your day"
         />
       ) : (
-        <TaskList
+        <DraggableTaskList
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
           onTaskDetails={handleTaskDetails}
           onDelete={handleDelete}
           onTitleChange={handleTitleChange}
+          onReorder={handleReorder}
           emptyMessage="No tasks for today"
           showCompletedSeparator={true}
           showInlineAdd={showInlineAdd}

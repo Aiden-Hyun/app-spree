@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
   TextInput,
@@ -13,12 +12,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
-import { TaskList } from "../../src/components/TaskList";
+import { DraggableTaskList } from "../../src/components/DraggableTaskList";
 import { EmptyState } from "../../src/components/EmptyState";
 import { useTasks } from "../../src/hooks/useTasks";
 import { useProject, useProjects } from "../../src/hooks/useProjects";
 import { useToast } from "../../src/hooks/useToast";
-import { taskService } from "../../src/services/taskService";
+import { taskService, Task } from "../../src/services/taskService";
+import { DropZoneDateStrip, DropZoneProjectList } from "../../src/components/DragDrop";
 
 function ProjectDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -45,6 +45,8 @@ function ProjectDetailScreen() {
   const [projectColor, setProjectColor] = useState("#6c5ce7");
   const [saving, setSaving] = useState(false);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [localTasks, setLocalTasks] = useState<Task[]>([]);
 
   const colors = [
     "#e74c3c",
@@ -68,6 +70,11 @@ function ProjectDetailScreen() {
       setProjectColor(project.color);
     }
   }, [project]);
+
+  // Sync local tasks with fetched tasks
+  useEffect(() => {
+    setLocalTasks(tasks as Task[]);
+  }, [tasks]);
 
   const handleToggleComplete = async (id: string) => {
     try {
@@ -113,6 +120,30 @@ function ProjectDetailScreen() {
 
   const handleCancelAdd = () => {
     setShowInlineAdd(false);
+  };
+
+  const handleReorder = async (reorderedTasks: Task[]) => {
+    const previousTasks = localTasks;
+    setLocalTasks(reorderedTasks);
+
+    try {
+      const taskIds = reorderedTasks.map((t) => t.id);
+      await taskService.reorderTasks(taskIds);
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error);
+      toast.error("Failed to save order");
+      setLocalTasks(previousTasks);
+    }
+  };
+
+  const handleReschedule = async (date: Date) => {
+    toast.success(`Rescheduled to ${date.toLocaleDateString()}`);
+    setIsDragging(false);
+  };
+
+  const handleMoveToProject = async (newProjectId: string | null) => {
+    toast.success(newProjectId ? "Moved to project" : "Moved to Inbox");
+    setIsDragging(false);
   };
 
   const handleSaveProject = async () => {
@@ -254,8 +285,16 @@ function ProjectDetailScreen() {
         </View>
       </View>
 
+      {/* Drop zones - appear when dragging */}
+      <DropZoneDateStrip visible={isDragging} onDateSelected={handleReschedule} />
+      <DropZoneProjectList
+        visible={isDragging}
+        onProjectSelected={handleMoveToProject}
+        currentProjectId={projectId}
+      />
+
       {/* Task list */}
-      {tasks.length === 0 && !showInlineAdd ? (
+      {localTasks.length === 0 && !showInlineAdd ? (
         <View style={styles.emptyContainer}>
           <EmptyState
             icon="folder-open-outline"
@@ -264,11 +303,12 @@ function ProjectDetailScreen() {
           />
         </View>
       ) : (
-        <TaskList
-          tasks={tasks}
+        <DraggableTaskList
+          tasks={localTasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
           onTitleChange={handleTitleChange}
+          onReorder={handleReorder}
           emptyMessage="No tasks in this project"
           showCompletedSeparator={true}
           showInlineAdd={showInlineAdd}

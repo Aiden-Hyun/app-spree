@@ -17,6 +17,8 @@ interface TaskItemProps {
   onDetails?: (id: string) => void;
   onDelete?: (id: string) => void;
   onTitleChange?: (id: string, newTitle: string) => void;
+  drag?: () => void;
+  isActive?: boolean;
 }
 
 export function TaskItem({
@@ -33,6 +35,8 @@ export function TaskItem({
   onDetails,
   onDelete,
   onTitleChange,
+  drag,
+  isActive = false,
 }: TaskItemProps) {
   const isCompleted = status === "completed";
   const isOverdue = dueDate && new Date(dueDate) < new Date() && !isCompleted;
@@ -132,8 +136,18 @@ export function TaskItem({
       rightThreshold={40}
       overshootRight={false}
       onSwipeableOpen={handleSwipeOpen}
+      enabled={!isActive}
     >
-      <View style={styles.container}>
+      <TouchableOpacity
+        style={[
+          styles.container,
+          isActive && styles.containerActive,
+        ]}
+        onLongPress={drag}
+        delayLongPress={200}
+        activeOpacity={drag ? 0.9 : 1}
+        disabled={!drag}
+      >
         <TouchableOpacity
           style={styles.checkbox}
           onPress={() => onToggleComplete(id)}
@@ -252,7 +266,7 @@ export function TaskItem({
             />
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     </Swipeable>
   );
 }
@@ -266,6 +280,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
+  },
+  containerActive: {
+    backgroundColor: "#f5f3ff",
+    shadowColor: "#6c5ce7",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    transform: [{ scale: 1.02 }],
   },
   checkbox: {
     marginRight: 12,

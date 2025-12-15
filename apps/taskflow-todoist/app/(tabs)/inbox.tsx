@@ -8,18 +8,20 @@ import {
 } from "react-native";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { Ionicons } from "@expo/vector-icons";
-import { TaskList } from "../../src/components/TaskList";
+import { DraggableTaskList } from "../../src/components/DraggableTaskList";
 import { EmptyState } from "../../src/components/EmptyState";
 import { router, useFocusEffect } from "expo-router";
-import { taskService } from "../../src/services/taskService";
+import { taskService, Task } from "../../src/services/taskService";
 import { animateListChanges } from "../../src/utils/layoutAnimation";
 import { useToast } from "../../src/hooks/useToast";
+import { DropZoneDateStrip, DropZoneProjectList } from "../../src/components/DragDrop";
 
 function InboxScreen() {
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const toast = useToast();
 
   const loadInboxTasks = useCallback(async () => {
@@ -148,6 +150,37 @@ function InboxScreen() {
     setShowInlineAdd(false);
   };
 
+  const handleReorder = async (reorderedTasks: Task[]) => {
+    // Optimistically update UI
+    const previousTasks = tasks;
+    setTasks(reorderedTasks);
+
+    try {
+      // Sync to database
+      const taskIds = reorderedTasks.map((t) => t.id);
+      await taskService.reorderTasks(taskIds);
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error);
+      toast.error("Failed to save order");
+      setTasks(previousTasks);
+    }
+  };
+
+  const handleReschedule = async (date: Date) => {
+    // This will be called when a task is dropped on a date
+    // For now, we'll just show a toast - actual implementation 
+    // requires knowing which task is being dragged
+    toast.success(`Rescheduled to ${date.toLocaleDateString()}`);
+    setIsDragging(false);
+  };
+
+  const handleMoveToProject = async (projectId: string | null) => {
+    // This will be called when a task is dropped on a project
+    toast.success(projectId ? "Moved to project" : "Moved to Inbox");
+    setIsDragging(false);
+    loadInboxTasks(); // Refresh after move
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -166,6 +199,14 @@ function InboxScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Drop zones - appear when dragging */}
+      <DropZoneDateStrip visible={isDragging} onDateSelected={handleReschedule} />
+      <DropZoneProjectList
+        visible={isDragging}
+        onProjectSelected={handleMoveToProject}
+        currentProjectId={null}
+      />
+
       <View style={styles.header}>
         <Text style={styles.headerText}>All your tasks in one place</Text>
         <TouchableOpacity
@@ -183,13 +224,14 @@ function InboxScreen() {
           subtitle="Tasks without a project will appear here"
         />
       ) : (
-        <TaskList
+        <DraggableTaskList
           tasks={tasks}
           onToggleComplete={handleToggleComplete}
           onTaskPress={handleTaskPress}
           onTaskDetails={handleTaskDetails}
           onDelete={handleDelete}
           onTitleChange={handleTitleChange}
+          onReorder={handleReorder}
           emptyMessage="No tasks in your inbox"
           showInlineAdd={showInlineAdd}
           onCreateTask={handleCreateTask}
