@@ -163,16 +163,16 @@ function TodayScreen() {
   };
 
   const handleReorder = async (reorderedTasks: Task[]) => {
-    const previousTasks = tasks;
-    setTasks(reorderedTasks);
-
+    // Don't update local state immediately - DraggableTaskList handles display
     try {
       const taskIds = reorderedTasks.map((t) => t.id);
       await taskService.reorderTasks(taskIds);
+      // Update state after DB sync (won't cause flash due to timing)
+      setTasks(reorderedTasks);
     } catch (error) {
       console.error("Failed to reorder tasks:", error);
       toast.error("Failed to save order");
-      setTasks(previousTasks);
+      loadTodayTasks();
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, StyleSheet, Keyboard } from "react-native";
 import DraggableFlatList, {
   ScaleDecorator,
@@ -31,6 +31,11 @@ interface DraggableTaskListProps {
   isDragEnabled?: boolean;
 }
 
+type DisplayItem =
+  | Task
+  | { id: string; type: "inline-add" }
+  | { id: string; type: "separator" };
+
 export function DraggableTaskList({
   tasks,
   onToggleComplete,
@@ -46,28 +51,55 @@ export function DraggableTaskList({
   onCancelAdd,
   isDragEnabled = true,
 }: DraggableTaskListProps) {
+  // Track the last drag time to skip prop updates briefly after drag
+  const lastDragTime = useRef(0);
+  
+  // Local state for display items to prevent flash on reorder
+  const [localDisplayItems, setLocalDisplayItems] = useState<DisplayItem[]>([]);
+
   // Separate completed and active tasks
-  const activeTasks = tasks.filter((task) => task.status !== "completed");
-  const completedTasks = tasks.filter((task) => task.status === "completed");
+  const activeTasks = useMemo(
+    () => tasks.filter((task) => task.status !== "completed"),
+    [tasks]
+  );
+  const completedTasks = useMemo(
+    () => tasks.filter((task) => task.status === "completed"),
+    [tasks]
+  );
 
-  // Build display list with special items
-  type DisplayItem =
-    | Task
-    | { id: string; type: "inline-add" }
-    | { id: string; type: "separator" };
+  // Build display items from tasks
+  const buildDisplayItems = useCallback(() => {
+    let items: DisplayItem[] = [...activeTasks];
 
-  let displayItems: DisplayItem[] = [...activeTasks];
+    if (showInlineAdd && onCreateTask && onCancelAdd) {
+      items.push({ id: "inline-add", type: "inline-add" });
+    }
 
-  // Add inline input after active tasks
-  if (showInlineAdd && onCreateTask && onCancelAdd) {
-    displayItems.push({ id: "inline-add", type: "inline-add" });
-  }
+    if (showCompletedSeparator && completedTasks.length > 0) {
+      items.push({ id: "separator", type: "separator" });
+      items = [...items, ...completedTasks];
+    }
 
-  // Add separator and completed tasks if needed
-  if (showCompletedSeparator && completedTasks.length > 0) {
-    displayItems.push({ id: "separator", type: "separator" });
-    displayItems = [...displayItems, ...completedTasks];
-  }
+    return items;
+  }, [activeTasks, completedTasks, showInlineAdd, showCompletedSeparator, onCreateTask, onCancelAdd]);
+
+  // Sync local state with props, but skip briefly after drag
+  useEffect(() => {
+    // Skip updates for 500ms after a drag to prevent flash
+    const timeSinceDrag = Date.now() - lastDragTime.current;
+    if (timeSinceDrag < 500) {
+      return;
+    }
+
+    setLocalDisplayItems(buildDisplayItems());
+  }, [buildDisplayItems]);
+
+  // Initial load
+  useEffect(() => {
+    if (localDisplayItems.length === 0) {
+      setLocalDisplayItems(buildDisplayItems());
+    }
+  }, []);
 
   const handleDragBegin = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -75,6 +107,9 @@ export function DraggableTaskList({
 
   const handleDragEnd = useCallback(
     ({ data }: DragEndParams<DisplayItem>) => {
+      // Mark the drag time to skip upcoming prop updates
+      lastDragTime.current = Date.now();
+
       if (!onReorder) return;
 
       // Extract only actual tasks (not separators or inline-add)
@@ -82,6 +117,8 @@ export function DraggableTaskList({
         (item): item is Task => !("type" in item)
       );
 
+      // Sync to parent (for database persistence) - don't update local state
+      // since the DraggableFlatList already shows the correct order
       onReorder(reorderedTasks);
     },
     [onReorder]
@@ -158,7 +195,7 @@ export function DraggableTaskList({
   return (
     <GestureHandlerRootView style={styles.container}>
       <DraggableFlatList
-        data={displayItems}
+        data={localDisplayItems}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         onDragBegin={handleDragBegin}
