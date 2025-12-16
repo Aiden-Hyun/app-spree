@@ -152,14 +152,17 @@ function InboxScreen() {
     setShowInlineAdd(false);
   };
 
-  const handleReorder = async (reorderedTasks: Task[]) => {
-    // Don't update local state - DraggableTaskList handles its own display
-    // Just sync to database in background
+  const handleReorder = async (activeTasks: Task[], completedTasks: Task[]) => {
+    // Merge active and completed tasks back together
+    const allTasks = [...activeTasks, ...completedTasks];
+    
+    // Update local state immediately for responsiveness
+    setTasks(allTasks);
+    
+    // Sync to database in background (only reorder active tasks - completed stay in place)
     try {
-      const taskIds = reorderedTasks.map((t) => t.id);
-      await taskService.reorderTasks(taskIds);
-      // Silently update local state for consistency (won't cause flash due to timing)
-      setTasks(reorderedTasks);
+      const activeIds = activeTasks.map((t) => t.id);
+      await taskService.reorderTasks(activeIds);
     } catch (error) {
       console.error("Failed to reorder tasks:", error);
       toast.error("Failed to save order");

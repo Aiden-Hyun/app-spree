@@ -20,7 +20,7 @@ interface DraggableTaskListProps {
   onTaskDetails?: (id: string) => void;
   onDelete?: (id: string) => void;
   onTitleChange?: (id: string, newTitle: string) => void;
-  onReorder?: (tasks: Task[]) => void;
+  onReorder?: (activeTasks: Task[], completedTasks: Task[]) => void;
   refreshing?: boolean;
   onRefresh?: () => void;
   emptyMessage?: string;
@@ -31,10 +31,25 @@ interface DraggableTaskListProps {
   isDragEnabled?: boolean;
 }
 
-type DisplayItem =
-  | Task
-  | { id: string; type: "inline-add" }
-  | { id: string; type: "separator" };
+// Use branded types to distinguish display items
+type ActiveTaskItem = Task & { __section: "active" };
+type CompletedTaskItem = Task & { __section: "completed" };
+type SeparatorItem = { id: string; type: "separator" };
+type InlineAddItem = { id: string; type: "inline-add" };
+
+type DisplayItem = ActiveTaskItem | CompletedTaskItem | SeparatorItem | InlineAddItem;
+
+function isTask(item: DisplayItem): item is ActiveTaskItem | CompletedTaskItem {
+  return !("type" in item);
+}
+
+function isActiveTask(item: DisplayItem): item is ActiveTaskItem {
+  return isTask(item) && item.__section === "active";
+}
+
+function isCompletedTask(item: DisplayItem): item is CompletedTaskItem {
+  return isTask(item) && item.__section === "completed";
+}
 
 export function DraggableTaskList({
   tasks,
@@ -51,13 +66,11 @@ export function DraggableTaskList({
   onCancelAdd,
   isDragEnabled = true,
 }: DraggableTaskListProps) {
-  // Track the last drag time to skip prop updates briefly after drag
-  const lastDragTime = useRef(0);
+  // Ref to track if we're in a post-drag state to prevent prop sync
+  const isDraggingRef = useRef(false);
+  const postDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Local state for display items to prevent flash on reorder
-  const [localDisplayItems, setLocalDisplayItems] = useState<DisplayItem[]>([]);
-
-  // Separate completed and active tasks
+  // Separate completed and active tasks from props
   const activeTasks = useMemo(
     () => tasks.filter((task) => task.status !== "completed"),
     [tasks]
@@ -67,77 +80,123 @@ export function DraggableTaskList({
     [tasks]
   );
 
-  // Build display items from tasks
-  const buildDisplayItems = useCallback(() => {
-    let items: DisplayItem[] = [...activeTasks];
+  // Build display items with section markers
+  const buildDisplayItems = useCallback((): DisplayItem[] => {
+    const items: DisplayItem[] = [];
 
+    // Add active tasks with section marker
+    activeTasks.forEach((task) => {
+      items.push({ ...task, __section: "active" } as ActiveTaskItem);
+    });
+
+    // Add inline add input if enabled
     if (showInlineAdd && onCreateTask && onCancelAdd) {
       items.push({ id: "inline-add", type: "inline-add" });
     }
 
+    // Add separator and completed tasks
     if (showCompletedSeparator && completedTasks.length > 0) {
       items.push({ id: "separator", type: "separator" });
-      items = [...items, ...completedTasks];
+      completedTasks.forEach((task) => {
+        items.push({ ...task, __section: "completed" } as CompletedTaskItem);
+      });
     }
 
     return items;
   }, [activeTasks, completedTasks, showInlineAdd, showCompletedSeparator, onCreateTask, onCancelAdd]);
 
-  // Sync local state with props, but skip briefly after drag
-  useEffect(() => {
-    // Skip updates for 500ms after a drag to prevent flash
-    const timeSinceDrag = Date.now() - lastDragTime.current;
-    if (timeSinceDrag < 500) {
-      return;
-    }
+  // Local state for display items
+  const [displayItems, setDisplayItems] = useState<DisplayItem[]>(() => buildDisplayItems());
 
-    setLocalDisplayItems(buildDisplayItems());
+  // Sync display items with props, but not during/after drag
+  useEffect(() => {
+    if (isDraggingRef.current) return;
+    setDisplayItems(buildDisplayItems());
   }, [buildDisplayItems]);
 
-  // Initial load
+  // Cleanup timeout on unmount
   useEffect(() => {
-    if (localDisplayItems.length === 0) {
-      setLocalDisplayItems(buildDisplayItems());
-    }
+    return () => {
+      if (postDragTimeoutRef.current) {
+        clearTimeout(postDragTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleDragBegin = useCallback(() => {
+    isDraggingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, []);
 
   const handleDragEnd = useCallback(
     ({ data }: DragEndParams<DisplayItem>) => {
-      // Mark the drag time to skip upcoming prop updates
-      lastDragTime.current = Date.now();
-
-      if (!onReorder) return;
-
-      // Extract only actual tasks (not separators or inline-add)
-      const reorderedTasks = data.filter(
-        (item): item is Task => !("type" in item)
+      // Find separator index to split active and completed
+      const separatorIndex = data.findIndex(
+        (item) => "type" in item && item.type === "separator"
       );
 
-      // Sync to parent (for database persistence) - don't update local state
-      // since the DraggableFlatList already shows the correct order
-      onReorder(reorderedTasks);
+      let reorderedActive: Task[];
+      let reorderedCompleted: Task[];
+
+      if (separatorIndex === -1) {
+        // No separator - all tasks are either active or there are no completed
+        reorderedActive = data
+          .filter((item): item is ActiveTaskItem | CompletedTaskItem => isTask(item))
+          .map(({ __section, ...task }) => task as Task);
+        reorderedCompleted = [];
+      } else {
+        // Split at separator - tasks before separator are active, after are completed
+        const beforeSeparator = data.slice(0, separatorIndex);
+        const afterSeparator = data.slice(separatorIndex + 1);
+
+        reorderedActive = beforeSeparator
+          .filter((item): item is ActiveTaskItem | CompletedTaskItem => isTask(item))
+          .map(({ __section, ...task }) => task as Task);
+
+        reorderedCompleted = afterSeparator
+          .filter((item): item is ActiveTaskItem | CompletedTaskItem => isTask(item))
+          .map(({ __section, ...task }) => task as Task);
+      }
+
+      // Update local display immediately with the new order
+      setDisplayItems(data);
+
+      // Notify parent with separated lists
+      if (onReorder) {
+        onReorder(reorderedActive, reorderedCompleted);
+      }
+
+      // Clear dragging state after a short delay to allow parent state to settle
+      if (postDragTimeoutRef.current) {
+        clearTimeout(postDragTimeoutRef.current);
+      }
+      postDragTimeoutRef.current = setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 300);
     },
     [onReorder]
   );
 
+  // Count completed tasks for separator display
+  const completedCount = useMemo(
+    () => displayItems.filter((item) => isCompletedTask(item)).length,
+    [displayItems]
+  );
+
   const renderItem = useCallback(
     ({ item, drag, isActive }: RenderItemParams<DisplayItem>) => {
-      // Handle separator
+      // Handle separator - not draggable
       if ("type" in item && item.type === "separator") {
         return (
           <View style={styles.separator}>
             <Text style={styles.separatorText}>
-              Completed ({completedTasks.length})
+              Completed ({completedCount})
             </Text>
           </View>
         );
       }
 
-      // Handle inline add
+      // Handle inline add - not draggable
       if ("type" in item && item.type === "inline-add" && onCreateTask && onCancelAdd) {
         return (
           <InlineTaskInput onSubmit={onCreateTask} onCancel={onCancelAdd} />
@@ -145,7 +204,9 @@ export function DraggableTaskList({
       }
 
       // Handle regular task
-      const task = item as Task;
+      if (!isTask(item)) return null;
+      
+      const task = item;
       const isCompleted = task.status === "completed";
 
       return (
@@ -171,7 +232,7 @@ export function DraggableTaskList({
       );
     },
     [
-      completedTasks.length,
+      completedCount,
       isDragEnabled,
       onCancelAdd,
       onCreateTask,
@@ -195,7 +256,7 @@ export function DraggableTaskList({
   return (
     <GestureHandlerRootView style={styles.container}>
       <DraggableFlatList
-        data={localDisplayItems}
+        data={displayItems}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         onDragBegin={handleDragBegin}
