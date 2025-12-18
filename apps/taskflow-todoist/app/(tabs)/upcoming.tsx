@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { TaskItem } from "../../src/components/TaskItem";
 import { InlineTaskInput } from "../../src/components/InlineTaskInput";
 import { EmptyState } from "../../src/components/EmptyState";
+import { ExpandableCalendar } from "../../src/components/ExpandableCalendar";
 import { router, useFocusEffect } from "expo-router";
 import { taskService } from "../../src/services/taskService";
 import { animateListChanges } from "../../src/utils/layoutAnimation";
@@ -22,7 +23,13 @@ function UpcomingScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const toast = useToast();
+
+  // Refs for scroll-to-date functionality
+  const scrollViewRef = useRef<ScrollView>(null);
+  const sectionPositions = useRef<Map<string, number>>(new Map());
+  const calendarHeight = useRef<number>(0);
 
   const loadUpcomingTasks = useCallback(async () => {
     try {
@@ -45,26 +52,37 @@ function UpcomingScreen() {
     }, [loadUpcomingTasks])
   );
 
-  // Generate next 7 days for calendar view
-  const getDaysOfWeek = () => {
-    const days = [];
-    const today = new Date();
+  // Create a Set of date strings that have tasks for calendar dots
+  const taskDates = useMemo(() => {
+    const dates = new Set<string>();
+    tasks.forEach((task) => {
+      if (task.dueDate) {
+        const date = new Date(task.dueDate);
+        dates.add(date.toDateString());
+      }
+    });
+    return dates;
+  }, [tasks]);
 
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      days.push({
-        day: date.toLocaleDateString("en-US", { weekday: "short" }),
-        date: date.getDate(),
-        month: date.toLocaleDateString("en-US", { month: "short" }),
-        isToday: i === 0,
-        fullDate: date,
+  // Handle date selection from calendar
+  const handleDateSelect = useCallback((date: Date) => {
+    setSelectedDate(date);
+    const dateKey = date.toDateString();
+    const yOffset = sectionPositions.current.get(dateKey);
+    
+    if (yOffset !== undefined) {
+      // Scroll to the section, accounting for calendar height + some padding
+      scrollViewRef.current?.scrollTo({
+        y: yOffset - 10,
+        animated: true,
       });
     }
-    return days;
-  };
+  }, []);
 
-  const days = getDaysOfWeek();
+  // Track section positions for scroll-to-date
+  const handleSectionLayout = useCallback((dateString: string, y: number) => {
+    sectionPositions.current.set(dateString, y);
+  }, []);
 
   const handleToggleComplete = async (id: string) => {
     try {
@@ -199,101 +217,94 @@ function UpcomingScreen() {
   });
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        {/* Week view */}
-        <View style={styles.weekContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {days.map((day, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.dayCard, day.isToday && styles.todayCard]}
-              >
-                <Text style={[styles.dayText, day.isToday && styles.todayText]}>
-                  {day.day}
-                </Text>
-                <Text
-                  style={[styles.dateText, day.isToday && styles.todayDateText]}
-                >
-                  {day.date}
-                </Text>
-                <Text
-                  style={[
-                    styles.monthText,
-                    day.isToday && styles.todayMonthText,
-                  ]}
-                >
-                  {day.month}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Task list or empty state */}
-        {tasks.length === 0 && !showInlineAdd ? (
-          <EmptyState
-            icon="calendar-outline"
-            title="No upcoming tasks"
-            subtitle="Tasks with due dates will appear here"
-          />
-        ) : (
-          <View style={styles.taskSection}>
-            {showInlineAdd && (
-              <View style={styles.inlineAddContainer}>
-                <InlineTaskInput
-                  onSubmit={handleCreateTask}
-                  onCancel={handleCancelAdd}
-                  placeholder="New Task (will be added to Inbox)"
-                />
-              </View>
-            )}
-            {Object.entries(tasksByDate).map(([dateString, dateTasks]) => {
-              const date = new Date(dateString);
-              const dateLabel = date.toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              });
-
-              return (
-                <View key={dateString} style={styles.dateSection}>
-                  <Text style={styles.dateSectionHeader}>{dateLabel}</Text>
-                  {dateTasks.map((task) => (
-                    <TaskItem
-                      key={task.id}
-                      id={task.id}
-                      title={task.title}
-                      description={task.description}
-                      priority={task.priority}
-                      status={task.status}
-                      dueDate={task.dueDate}
-                      projectName={task.project?.name}
-                      projectColor={task.project?.color}
-                    onToggleComplete={handleToggleComplete}
-                    onPress={handleTaskPress}
-                    onDetails={handleTaskDetails}
-                      onDelete={handleDelete}
-                      onTitleChange={handleTitleChange}
-                  />
-                  ))}
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Quick add button */}
-        <TouchableOpacity
-          style={styles.fab}
-          activeOpacity={0.8}
-          onPress={handleAddTask}
-          disabled={showInlineAdd}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      {/* Expandable Calendar */}
+      <View style={styles.calendarContainer}>
+        <ExpandableCalendar
+          selectedDate={selectedDate}
+          onDateSelect={handleDateSelect}
+          taskDates={taskDates}
+        />
       </View>
-    </ScrollView>
+
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          {/* Task list or empty state */}
+          {tasks.length === 0 && !showInlineAdd ? (
+            <EmptyState
+              icon="calendar-outline"
+              title="No upcoming tasks"
+              subtitle="Tasks with due dates will appear here"
+            />
+          ) : (
+            <View style={styles.taskSection}>
+              {showInlineAdd && (
+                <View style={styles.inlineAddContainer}>
+                  <InlineTaskInput
+                    onSubmit={handleCreateTask}
+                    onCancel={handleCancelAdd}
+                    placeholder="New Task (will be added to Inbox)"
+                  />
+                </View>
+              )}
+              {Object.entries(tasksByDate).map(([dateString, dateTasks]) => {
+                const date = new Date(dateString);
+                const dateLabel = date.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                });
+
+                return (
+                  <View
+                    key={dateString}
+                    style={styles.dateSection}
+                    onLayout={(event) => {
+                      const { y } = event.nativeEvent.layout;
+                      handleSectionLayout(dateString, y);
+                    }}
+                  >
+                    <Text style={styles.dateSectionHeader}>{dateLabel}</Text>
+                    {dateTasks.map((task) => (
+                      <TaskItem
+                        key={task.id}
+                        id={task.id}
+                        title={task.title}
+                        description={task.description}
+                        priority={task.priority}
+                        status={task.status}
+                        dueDate={task.dueDate}
+                        projectName={task.project?.name}
+                        projectColor={task.project?.color}
+                        onToggleComplete={handleToggleComplete}
+                        onPress={handleTaskPress}
+                        onDetails={handleTaskDetails}
+                        onDelete={handleDelete}
+                        onTitleChange={handleTitleChange}
+                      />
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Quick add button */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={handleAddTask}
+        disabled={showInlineAdd}
+      >
+        <Ionicons name="add" size={24} color="white" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -320,56 +331,20 @@ const styles = StyleSheet.create({
     color: "#e74c3c",
     textAlign: "center",
   },
+  calendarContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
   content: {
     flex: 1,
     padding: 16,
-  },
-  weekContainer: {
-    marginBottom: 24,
-  },
-  dayCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
-    alignItems: "center",
-    minWidth: 80,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  todayCard: {
-    backgroundColor: "#6c5ce7",
-  },
-  dayText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 4,
-  },
-  todayText: {
-    color: "white",
-    fontWeight: "600",
-  },
-  dateText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 4,
-  },
-  todayDateText: {
-    color: "white",
-  },
-  monthText: {
-    fontSize: 12,
-    color: "#999",
-  },
-  todayMonthText: {
-    color: "#e0e0ff",
+    paddingTop: 8,
   },
   taskSection: {
-    marginTop: 20,
+    marginTop: 8,
   },
   inlineAddContainer: {
     backgroundColor: "white",
@@ -385,7 +360,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
     marginBottom: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 4,
   },
   fab: {
     position: "absolute",
