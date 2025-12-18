@@ -350,6 +350,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
   },
   todayCircle: {
     borderWidth: 2,
@@ -357,6 +358,7 @@ const styles = StyleSheet.create({
   },
   selectedCircle: {
     backgroundColor: "#6c5ce7",
+    borderRadius: 18,
   },
   dayNumber: {
     fontSize: 15,

@@ -149,16 +149,23 @@ function UpcomingScreen() {
 
   const handleCreateTask = async (title: string) => {
     try {
-      // Create task without due date (goes to inbox)
-      await taskService.createTask({
+      // Create task with selected date as due date
+      const newTask = await taskService.createTask({
         title,
         priority: "medium",
         status: "todo",
+        dueDate: selectedDate,
       });
       
-      toast.success("Task created in inbox!");
+      // Add to local state so it appears immediately
+      setTasks((prev) => [...prev, newTask]);
+      
+      const dateLabel = selectedDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      toast.success(`Task scheduled for ${dateLabel}`);
       setShowInlineAdd(false);
-      // Don't add to local state since this task won't appear in upcoming (no due date)
     } catch (error: any) {
       toast.error(error.message || "Failed to create task");
       throw error; // Re-throw so InlineTaskInput knows to stay visible
@@ -247,7 +254,7 @@ function UpcomingScreen() {
                   <InlineTaskInput
                     onSubmit={handleCreateTask}
                     onCancel={handleCancelAdd}
-                    placeholder="New Task (will be added to Inbox)"
+                    placeholder={`New task for ${selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                   />
                 </View>
               )}

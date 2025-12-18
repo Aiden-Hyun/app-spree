@@ -120,17 +120,13 @@ export const taskService = {
     return this.getTasks({ dueDate: today });
   },
 
-  // Get upcoming tasks (next 7 days)
+  // Get upcoming tasks (all future tasks with due dates)
   async getUpcomingTasks(): Promise<Task[]> {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) throw new Error("User not authenticated");
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    nextWeek.setHours(23, 59, 59, 999);
 
     const { data, error } = await supabase
       .from("tasks")
@@ -142,7 +138,6 @@ export const taskService = {
       )
       .eq("user_id", userData.user.id)
       .gte("due_date", today.toISOString())
-      .lte("due_date", nextWeek.toISOString())
       .neq("status", "completed")
       .order("due_date", { ascending: true });
 
