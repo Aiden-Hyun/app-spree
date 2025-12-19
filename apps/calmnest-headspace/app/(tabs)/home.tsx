@@ -241,13 +241,14 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.md,
   },
   greeting: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 15,
     color: theme.colors.textLight,
     marginBottom: 4,
   },
   userName: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 26,
-    fontWeight: '600',
     color: theme.colors.text,
     letterSpacing: -0.3,
   },
@@ -278,22 +279,22 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   intentionLabel: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 12,
-    fontWeight: '500',
     color: theme.colors.textLight,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: theme.spacing.sm,
   },
   intentionText: {
+    fontFamily: theme.fonts.body.italic,
     fontSize: 18,
-    fontWeight: '500',
     color: theme.colors.text,
     textAlign: 'center',
     lineHeight: 26,
-    fontStyle: 'italic',
   },
   intentionAuthor: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 14,
     color: theme.colors.textLight,
     marginTop: theme.spacing.sm,
@@ -303,8 +304,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 18,
-    fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
@@ -333,12 +334,13 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.md,
   },
   featuredTitle: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 18,
-    fontWeight: '600',
     color: 'white',
     marginBottom: 4,
   },
   featuredMeta: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     textTransform: 'capitalize',
@@ -382,11 +384,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   streakNumber: {
+    fontFamily: theme.fonts.display.bold,
     fontSize: 28,
-    fontWeight: '700',
     color: theme.colors.primary,
   },
   streakLabel: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 12,
     color: theme.colors.textLight,
   },
@@ -402,11 +405,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   journeyStatValue: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 22,
-    fontWeight: '600',
     color: theme.colors.text,
   },
   journeyStatLabel: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 13,
     color: theme.colors.textLight,
     marginTop: 2,
@@ -428,8 +432,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   quickLabel: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 14,
-    fontWeight: '500',
     color: theme.colors.text,
   },
   seeAllButton: {
@@ -440,8 +444,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   seeAllText: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 14,
-    fontWeight: '500',
     color: theme.colors.primary,
   },
 });

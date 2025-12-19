@@ -83,61 +83,99 @@ export const theme = {
     full: 9999,
   },
   
-  typography: {
-    // Display - for hero text
+  // Font families
+  fonts: {
+    // Display/Headlines - Fraunces (warm, editorial serif)
     display: {
+      regular: 'Fraunces-Regular',
+      medium: 'Fraunces-Medium',
+      semiBold: 'Fraunces-SemiBold',
+      bold: 'Fraunces-Bold',
+    },
+    // Body text - Lora (readable serif)
+    body: {
+      regular: 'Lora-Regular',
+      medium: 'Lora-Medium',
+      semiBold: 'Lora-SemiBold',
+      bold: 'Lora-Bold',
+      italic: 'Lora-Italic',
+    },
+    // UI/Labels - DM Sans (friendly sans-serif)
+    ui: {
+      regular: 'DMSans-Regular',
+      medium: 'DMSans-Medium',
+      semiBold: 'DMSans-SemiBold',
+      bold: 'DMSans-Bold',
+    },
+  },
+  
+  typography: {
+    // Display - for hero text (Fraunces)
+    display: {
+      fontFamily: 'Fraunces-Bold',
       fontSize: 36,
-      fontWeight: '700' as const,
       lineHeight: 44,
       letterSpacing: -0.5,
     },
     h1: {
+      fontFamily: 'Fraunces-SemiBold',
       fontSize: 28,
-      fontWeight: '600' as const,
       lineHeight: 36,
       letterSpacing: -0.3,
     },
     h2: {
+      fontFamily: 'Fraunces-SemiBold',
       fontSize: 24,
-      fontWeight: '600' as const,
       lineHeight: 32,
       letterSpacing: -0.2,
     },
     h3: {
+      fontFamily: 'DMSans-SemiBold',
       fontSize: 20,
-      fontWeight: '600' as const,
       lineHeight: 28,
     },
     h4: {
+      fontFamily: 'DMSans-SemiBold',
       fontSize: 17,
-      fontWeight: '600' as const,
       lineHeight: 24,
     },
     body: {
+      fontFamily: 'Lora-Regular',
       fontSize: 16,
-      fontWeight: '400' as const,
       lineHeight: 24,
     },
     bodyMedium: {
+      fontFamily: 'Lora-Medium',
       fontSize: 16,
-      fontWeight: '500' as const,
       lineHeight: 24,
     },
     bodySmall: {
+      fontFamily: 'DMSans-Regular',
       fontSize: 14,
-      fontWeight: '400' as const,
       lineHeight: 20,
     },
     caption: {
+      fontFamily: 'DMSans-Regular',
       fontSize: 12,
-      fontWeight: '400' as const,
       lineHeight: 16,
     },
     label: {
+      fontFamily: 'DMSans-Medium',
       fontSize: 13,
-      fontWeight: '500' as const,
       lineHeight: 18,
       letterSpacing: 0.3,
+    },
+    // Quote/intention text (italic serif)
+    quote: {
+      fontFamily: 'Lora-Italic',
+      fontSize: 18,
+      lineHeight: 28,
+    },
+    // Button text
+    button: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 16,
+      lineHeight: 24,
     },
   },
   

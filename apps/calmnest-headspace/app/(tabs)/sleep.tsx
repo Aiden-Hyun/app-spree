@@ -248,12 +248,13 @@ const styles = StyleSheet.create({
     fontSize: 56,
   },
   title: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 28,
-    fontWeight: '600',
     color: theme.colors.sleepText,
     letterSpacing: -0.3,
   },
   subtitle: {
+    fontFamily: theme.fonts.body.italic,
     fontSize: 15,
     color: theme.colors.sleepTextMuted,
     marginTop: 4,
@@ -263,8 +264,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 17,
-    fontWeight: '600',
     color: theme.colors.sleepText,
     marginBottom: theme.spacing.md,
   },
@@ -282,12 +283,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   featuredTitle: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 22,
-    fontWeight: '600',
     color: theme.colors.sleepText,
     marginBottom: theme.spacing.xs,
   },
   featuredDescription: {
+    fontFamily: theme.fonts.body.regular,
     fontSize: 15,
     color: theme.colors.sleepTextMuted,
     lineHeight: 22,
@@ -304,6 +306,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metaText: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 13,
     color: theme.colors.sleepTextMuted,
   },
@@ -317,8 +320,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playButtonText: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 16,
-    fontWeight: '600',
     color: theme.colors.sleepBackground,
   },
   soundsGrid: {
@@ -344,8 +347,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   soundLabel: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 12,
-    fontWeight: '500',
     color: theme.colors.sleepTextMuted,
   },
   soundLabelSelected: {
@@ -382,12 +385,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   storyTitle: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 14,
-    fontWeight: '500',
     color: theme.colors.sleepText,
     marginBottom: 4,
   },
   storyMeta: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 12,
     color: theme.colors.sleepTextMuted,
   },
@@ -408,11 +412,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tipTitle: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 15,
-    fontWeight: '500',
     color: theme.colors.sleepText,
   },
   tipText: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 13,
     color: theme.colors.sleepTextMuted,
     marginTop: 2,

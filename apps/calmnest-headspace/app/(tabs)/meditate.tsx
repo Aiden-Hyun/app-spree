@@ -263,12 +263,13 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.md,
   },
   title: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 28,
-    fontWeight: '600',
     color: theme.colors.text,
     letterSpacing: -0.3,
   },
   subtitle: {
+    fontFamily: theme.fonts.body.italic,
     fontSize: 15,
     color: theme.colors.textLight,
     marginTop: 4,
@@ -278,8 +279,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 17,
-    fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
@@ -306,8 +307,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   moodLabel: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 13,
-    fontWeight: '500',
     color: theme.colors.textLight,
   },
   moodLabelSelected: {
@@ -333,17 +334,18 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   recommendedBadgeText: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 12,
-    fontWeight: '500',
     color: 'white',
   },
   recommendedTitle: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 22,
-    fontWeight: '600',
     color: 'white',
     marginBottom: theme.spacing.xs,
   },
   recommendedDescription: {
+    fontFamily: theme.fonts.body.regular,
     fontSize: 15,
     color: 'rgba(255,255,255,0.85)',
     lineHeight: 22,
@@ -360,6 +362,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   recommendedMetaText: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
   },
@@ -373,8 +376,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   beginButtonText: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 16,
-    fontWeight: '600',
     color: theme.colors.primary,
   },
   themeGrid: {
@@ -400,8 +403,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   themeLabel: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 12,
-    fontWeight: '500',
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -418,11 +421,12 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   emptyText: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 16,
-    fontWeight: '600',
     color: theme.colors.text,
   },
   emptySubtext: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 14,
     color: theme.colors.textLight,
     marginTop: 4,
@@ -451,12 +455,13 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.md,
   },
   sessionTitle: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 16,
-    fontWeight: '500',
     color: theme.colors.text,
     marginBottom: 2,
   },
   sessionMeta: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 13,
     color: theme.colors.textLight,
     textTransform: 'capitalize',

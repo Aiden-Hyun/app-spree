@@ -265,17 +265,18 @@ const styles = StyleSheet.create({
     ...theme.shadows.md,
   },
   avatarText: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 36,
-    fontWeight: '600',
     color: 'white',
   },
   userName: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 24,
-    fontWeight: '600',
     color: theme.colors.text,
     marginBottom: 4,
   },
   memberSince: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 14,
     color: theme.colors.textLight,
   },
@@ -287,8 +288,8 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   sanctuaryTitle: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 18,
-    fontWeight: '600',
     color: theme.colors.text,
     textAlign: 'center',
   },
@@ -312,11 +313,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sanctuaryStatValue: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 22,
-    fontWeight: '600',
     color: theme.colors.text,
   },
   sanctuaryStatLabel: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 12,
     color: theme.colors.textLight,
     marginTop: 2,
@@ -326,8 +328,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
     fontSize: 17,
-    fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
@@ -355,14 +357,15 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   milestoneLabel: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 14,
-    fontWeight: '500',
     color: theme.colors.textMuted,
   },
   milestoneLabelAchieved: {
     color: theme.colors.text,
   },
   milestoneDescription: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 12,
     color: theme.colors.primary,
     marginTop: 4,
@@ -375,9 +378,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nextMilestoneText: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 14,
     color: theme.colors.primary,
-    fontWeight: '500',
   },
   preferencesCard: {
     backgroundColor: theme.colors.surface,
@@ -398,6 +401,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   preferenceLabel: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 15,
     color: theme.colors.text,
   },
@@ -407,6 +411,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   preferenceValue: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 14,
     color: theme.colors.textLight,
   },
@@ -431,8 +436,8 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   quickLinkText: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 13,
-    fontWeight: '500',
     color: theme.colors.text,
   },
   logoutButton: {
@@ -448,8 +453,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   logoutText: {
+    fontFamily: theme.fonts.ui.medium,
     fontSize: 15,
-    fontWeight: '500',
     color: theme.colors.error,
   },
   footer: {
@@ -458,10 +463,12 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.lg,
   },
   footerText: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 12,
     color: theme.colors.textMuted,
   },
   footerSubtext: {
+    fontFamily: theme.fonts.ui.regular,
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: 4,
