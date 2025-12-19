@@ -1,143 +1,237 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useStats } from '../../src/hooks/useStats';
-import { StatsCard } from '../../src/components/StatsCard';
-import { ProgressRing } from '../../src/components/ProgressRing';
 import { theme } from '../../src/theme';
+
+const milestones = [
+  { id: 'week', emoji: '🌱', label: 'First Week', days: 7, description: 'Planted the seed' },
+  { id: 'month', emoji: '🌿', label: 'One Month', days: 30, description: 'Growing strong' },
+  { id: 'quarter', emoji: '🌳', label: '3 Months', days: 90, description: 'Deep roots' },
+  { id: 'year', emoji: '🏔️', label: 'One Year', days: 365, description: 'Mountain climber' },
+];
 
 function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { stats } = useStats();
 
-  const menuItems = [
-    { id: 'stats', label: 'Detailed Statistics', icon: 'stats-chart', route: '/stats' },
-    { id: 'settings', label: 'Settings', icon: 'settings', route: '/settings' },
-    { id: 'reminders', label: 'Reminders', icon: 'notifications', route: '/settings' },
-    { id: 'favorites', label: 'Favorites', icon: 'heart', route: '/favorites' },
-    { id: 'about', label: 'About', icon: 'information-circle', route: '/about' },
-  ];
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h ${mins}m`;
+  };
+
+  const getMemberSince = () => {
+    // For now, show current month/year
+    const now = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[now.getMonth()]} ${now.getFullYear()}`;
+  };
+
+  const getAchievedMilestones = () => {
+    const longestStreak = stats?.longest_streak || 0;
+    return milestones.filter(m => longestStreak >= m.days);
+  };
+
+  const getNextMilestone = () => {
+    const longestStreak = stats?.longest_streak || 0;
+    return milestones.find(m => longestStreak < m.days);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Profile Header */}
         <View style={styles.header}>
-          <View style={styles.profileInfo}>
-            <View style={styles.avatar}>
+          <View style={styles.avatarContainer}>
+            <LinearGradient
+              colors={['#A8B89F', '#8B9F82']}
+              style={styles.avatar}
+            >
               <Text style={styles.avatarText}>
                 {user?.email?.charAt(0).toUpperCase() || 'U'}
               </Text>
+            </LinearGradient>
+          </View>
+          <Text style={styles.userName}>
+            {user?.email?.split('@')[0] || 'Friend'}
+          </Text>
+          <Text style={styles.memberSince}>
+            Meditating since {getMemberSince()}
+          </Text>
+        </View>
+
+        {/* Your Sanctuary Card */}
+        <View style={styles.sanctuaryCard}>
+          <Text style={styles.sanctuaryTitle}>Your Sanctuary</Text>
+          <View style={styles.sanctuaryDivider} />
+          
+          <View style={styles.sanctuaryStats}>
+            <View style={styles.sanctuaryStat}>
+              <Text style={styles.sanctuaryEmoji}>🕯️</Text>
+              <View style={styles.sanctuaryStatInfo}>
+                <Text style={styles.sanctuaryStatValue}>{stats?.total_sessions || 0}</Text>
+                <Text style={styles.sanctuaryStatLabel}>sessions</Text>
+              </View>
             </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>
-                {user?.email?.split('@')[0] || 'User'}
-              </Text>
-              <Text style={styles.userEmail}>{user?.email}</Text>
+            
+            <View style={styles.sanctuaryStat}>
+              <Text style={styles.sanctuaryEmoji}>⏱️</Text>
+              <View style={styles.sanctuaryStatInfo}>
+                <Text style={styles.sanctuaryStatValue}>
+                  {formatTime(stats?.total_minutes || 0)}
+                </Text>
+                <Text style={styles.sanctuaryStatLabel}>mindful</Text>
+              </View>
+            </View>
+            
+            <View style={styles.sanctuaryStat}>
+              <Text style={styles.sanctuaryEmoji}>🔥</Text>
+              <View style={styles.sanctuaryStatInfo}>
+                <Text style={styles.sanctuaryStatValue}>{stats?.current_streak || 0}</Text>
+                <Text style={styles.sanctuaryStatLabel}>day streak</Text>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Quick Stats */}
-        <View style={styles.quickStats}>
-          <View style={styles.statItem}>
-            <ProgressRing
-              progress={100}
-              size={80}
-              strokeWidth={6}
-              centerText={stats?.current_streak.toString() || '0'}
-              centerSubtext="days"
-            />
-            <Text style={styles.statLabel}>Current Streak</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {stats?.total_sessions || 0}
-            </Text>
-            <Text style={styles.statLabel}>Total Sessions</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {Math.floor((stats?.total_minutes || 0) / 60)}h
-            </Text>
-            <Text style={styles.statLabel}>Total Time</Text>
-          </View>
-        </View>
-
-        {/* Achievements */}
+        {/* Milestones */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.achievementsContainer}
-          >
-            <View style={styles.achievement}>
-              <View style={[styles.achievementIcon, { backgroundColor: '#fdcb6e20' }]}>
-                <Text style={styles.achievementEmoji}>🔥</Text>
-              </View>
-              <Text style={styles.achievementLabel}>First Week</Text>
-            </View>
-            <View style={styles.achievement}>
-              <View style={[styles.achievementIcon, { backgroundColor: '#74b9ff20' }]}>
-                <Text style={styles.achievementEmoji}>🧘</Text>
-              </View>
-              <Text style={styles.achievementLabel}>10 Sessions</Text>
-            </View>
-            <View style={styles.achievement}>
-              <View style={[styles.achievementIcon, { backgroundColor: '#6c5ce720' }]}>
-                <Text style={styles.achievementEmoji}>⏰</Text>
-              </View>
-              <Text style={styles.achievementLabel}>Early Bird</Text>
-            </View>
-            <View style={styles.achievement}>
-              <View style={[styles.achievementIcon, { backgroundColor: '#00b89420' }]}>
-                <Text style={styles.achievementEmoji}>🌙</Text>
-              </View>
-              <Text style={styles.achievementLabel}>Night Owl</Text>
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* Menu */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Menu</Text>
-          <View style={styles.menu}>
-            {menuItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.menuItem}
-                onPress={() => router.push(item.route as any)}
-              >
-                <View style={styles.menuItemLeft}>
-                  <Ionicons
-                    name={item.icon as any}
-                    size={24}
-                    color={theme.colors.text}
-                  />
-                  <Text style={styles.menuItemText}>{item.label}</Text>
+          <Text style={styles.sectionTitle}>Milestones</Text>
+          <View style={styles.milestonesGrid}>
+            {milestones.map((milestone) => {
+              const isAchieved = (stats?.longest_streak || 0) >= milestone.days;
+              return (
+                <View 
+                  key={milestone.id}
+                  style={[
+                    styles.milestoneCard,
+                    isAchieved && styles.milestoneCardAchieved
+                  ]}
+                >
+                  <Text style={[
+                    styles.milestoneEmoji,
+                    !isAchieved && styles.milestoneEmojiLocked
+                  ]}>
+                    {isAchieved ? milestone.emoji : '🔒'}
+                  </Text>
+                  <Text style={[
+                    styles.milestoneLabel,
+                    isAchieved && styles.milestoneLabelAchieved
+                  ]}>
+                    {milestone.label}
+                  </Text>
+                  {isAchieved && (
+                    <Text style={styles.milestoneDescription}>
+                      {milestone.description}
+                    </Text>
+                  )}
                 </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={theme.colors.textLight}
-                />
-              </TouchableOpacity>
-            ))}
+              );
+            })}
+          </View>
+          
+          {getNextMilestone() && (
+            <View style={styles.nextMilestone}>
+              <Text style={styles.nextMilestoneText}>
+                {getNextMilestone()!.days - (stats?.longest_streak || 0)} days until {getNextMilestone()!.label.toLowerCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.preferencesCard}>
+            <TouchableOpacity style={styles.preferenceRow}>
+              <View style={styles.preferenceLeft}>
+                <Ionicons name="notifications-outline" size={22} color={theme.colors.text} />
+                <Text style={styles.preferenceLabel}>Reminder Time</Text>
+              </View>
+              <View style={styles.preferenceRight}>
+                <Text style={styles.preferenceValue}>8:00 PM</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+              </View>
+            </TouchableOpacity>
+            
+            <View style={styles.preferenceDivider} />
+            
+            <TouchableOpacity style={styles.preferenceRow}>
+              <View style={styles.preferenceLeft}>
+                <Ionicons name="time-outline" size={22} color={theme.colors.text} />
+                <Text style={styles.preferenceLabel}>Session Length</Text>
+              </View>
+              <View style={styles.preferenceRight}>
+                <Text style={styles.preferenceValue}>10 min</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+              </View>
+            </TouchableOpacity>
+            
+            <View style={styles.preferenceDivider} />
+            
+            <View style={styles.preferenceRow}>
+              <View style={styles.preferenceLeft}>
+                <Ionicons name="volume-medium-outline" size={22} color={theme.colors.text} />
+                <Text style={styles.preferenceLabel}>Background Sounds</Text>
+              </View>
+              <Switch
+                value={true}
+                trackColor={{ false: theme.colors.gray[300], true: theme.colors.primary }}
+                thumbColor="white"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Links */}
+        <View style={styles.section}>
+          <View style={styles.quickLinks}>
+            <TouchableOpacity 
+              style={styles.quickLink}
+              onPress={() => router.push('/stats')}
+            >
+              <Ionicons name="stats-chart-outline" size={20} color={theme.colors.text} />
+              <Text style={styles.quickLinkText}>Statistics</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.quickLink}
+              onPress={() => router.push('/settings')}
+            >
+              <Ionicons name="settings-outline" size={20} color={theme.colors.text} />
+              <Text style={styles.quickLinkText}>Settings</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.quickLink}>
+              <Ionicons name="help-circle-outline" size={20} color={theme.colors.text} />
+              <Text style={styles.quickLinkText}>Help</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={24} color={theme.colors.error} />
+          <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>CalmNest v1.0.0</Text>
+          <Text style={styles.footerSubtext}>Made with 🤍 for your peace</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -151,143 +245,226 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
   },
-  profileInfo: {
-    flexDirection: 'row',
+  header: {
     alignItems: 'center',
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+  },
+  avatarContainer: {
+    marginBottom: theme.spacing.md,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.colors.primary,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.lg,
+    ...theme.shadows.md,
   },
   avatarText: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 36,
+    fontWeight: '600',
     color: 'white',
-  },
-  userInfo: {
-    flex: 1,
   },
   userName: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '600',
     color: theme.colors.text,
+    marginBottom: 4,
   },
-  userEmail: {
-    fontSize: 16,
+  memberSince: {
+    fontSize: 14,
     color: theme.colors.textLight,
-    marginTop: 4,
   },
-  quickStats: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
+  sanctuaryCard: {
     marginHorizontal: theme.spacing.lg,
-    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    padding: theme.spacing.xl,
     ...theme.shadows.sm,
   },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
+  sanctuaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text,
+    textAlign: 'center',
   },
-  statValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: theme.colors.primary,
+  sanctuaryDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
+    marginVertical: theme.spacing.lg,
+  },
+  sanctuaryStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  sanctuaryStat: {
+    alignItems: 'center',
+  },
+  sanctuaryEmoji: {
+    fontSize: 28,
     marginBottom: theme.spacing.xs,
   },
-  statLabel: {
+  sanctuaryStatInfo: {
+    alignItems: 'center',
+  },
+  sanctuaryStatValue: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  sanctuaryStatLabel: {
     fontSize: 12,
     color: theme.colors.textLight,
-    marginTop: theme.spacing.xs,
-  },
-  statDivider: {
-    width: 1,
-    height: 60,
-    backgroundColor: theme.colors.gray[300],
+    marginTop: 2,
   },
   section: {
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
-  achievementsContainer: {
-    gap: theme.spacing.md,
+  milestonesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
   },
-  achievement: {
-    alignItems: 'center',
-  },
-  achievementIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  achievementEmoji: {
-    fontSize: 32,
-  },
-  achievementLabel: {
-    fontSize: 12,
-    color: theme.colors.textLight,
-  },
-  menu: {
-    backgroundColor: theme.colors.surface,
+  milestoneCard: {
+    width: '48%',
+    backgroundColor: theme.colors.gray[100],
     borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
+    padding: theme.spacing.md,
+    alignItems: 'center',
+  },
+  milestoneCardAchieved: {
+    backgroundColor: theme.colors.surface,
     ...theme.shadows.sm,
   },
-  menuItem: {
+  milestoneEmoji: {
+    fontSize: 32,
+    marginBottom: theme.spacing.xs,
+  },
+  milestoneEmojiLocked: {
+    opacity: 0.5,
+  },
+  milestoneLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.textMuted,
+  },
+  milestoneLabelAchieved: {
+    color: theme.colors.text,
+  },
+  milestoneDescription: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    marginTop: 4,
+  },
+  nextMilestone: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    backgroundColor: 'rgba(139, 159, 130, 0.1)',
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+  },
+  nextMilestoneText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '500',
+  },
+  preferencesCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.md,
+    ...theme.shadows.sm,
+  },
+  preferenceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.gray[200],
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
   },
-  menuItemLeft: {
+  preferenceLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
   },
-  menuItemText: {
-    fontSize: 16,
+  preferenceLabel: {
+    fontSize: 15,
+    color: theme.colors.text,
+  },
+  preferenceRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  preferenceValue: {
+    fontSize: 14,
+    color: theme.colors.textLight,
+  },
+  preferenceDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
+    marginHorizontal: theme.spacing.sm,
+  },
+  quickLinks: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  quickLink: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.xs,
+    ...theme.shadows.sm,
+  },
+  quickLinkText: {
+    fontSize: 13,
+    fontWeight: '500',
     color: theme.colors.text,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
     marginHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.xl,
-    marginBottom: theme.spacing.xxl,
-    padding: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.lg,
-    gap: theme.spacing.sm,
-    ...theme.shadows.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.error,
+    gap: theme.spacing.xs,
   },
   logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     color: theme.colors.error,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+  },
+  footerText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  footerSubtext: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    marginTop: 4,
   },
 });
 

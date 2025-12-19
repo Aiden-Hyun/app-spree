@@ -1,146 +1,221 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
-import { StatsCard } from '../../src/components/StatsCard';
-import { ProgressRing } from '../../src/components/ProgressRing';
 import { useStats } from '../../src/hooks/useStats';
+import { getTodayQuote, getMeditations } from '../../src/services/firestoreService';
 import { theme } from '../../src/theme';
+import { DailyQuote, GuidedMeditation } from '../../src/types';
 
 function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const { stats, loading, refreshStats } = useStats();
+  const { stats } = useStats();
+  const [quote, setQuote] = useState<DailyQuote | null>(null);
+  const [featuredSession, setFeaturedSession] = useState<GuidedMeditation | null>(null);
+
+  useEffect(() => {
+    loadHomeData();
+  }, []);
+
+  const loadHomeData = async () => {
+    try {
+      const [quoteData, meditations] = await Promise.all([
+        getTodayQuote(),
+        getMeditations()
+      ]);
+      setQuote(quoteData);
+      if (meditations.length > 0) {
+        // Pick a random featured session
+        const randomIndex = Math.floor(Math.random() * Math.min(meditations.length, 5));
+        setFeaturedSession(meditations[randomIndex]);
+      }
+    } catch (error) {
+      console.error('Error loading home data:', error);
+    }
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 17) return 'Good afternoon';
+    if (hour < 21) return 'Good evening';
+    return 'Time to rest';
+  };
+
+  const getGreetingEmoji = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return '🌅';
+    if (hour < 17) return '☀️';
+    if (hour < 21) return '🌿';
+    return '🌙';
   };
 
   const quickActions = [
-    {
-      id: 'meditate',
-      title: 'Meditate',
-      subtitle: 'Find your calm',
-      icon: 'leaf' as const,
-      route: '/(tabs)/meditate',
-      gradient: ['#6c5ce7', '#a29bfe'],
-    },
-    {
-      id: 'breathe',
-      title: 'Breathe',
-      subtitle: 'Quick exercise',
-      icon: 'water' as const,
-      route: '/breathing',
-      gradient: ['#74b9ff', '#a0d2ff'],
-    },
-    {
-      id: 'sleep',
-      title: 'Sleep',
-      subtitle: 'Wind down',
-      icon: 'moon' as const,
-      route: '/(tabs)/sleep',
-      gradient: ['#5f3dc4', '#7c5cdb'],
-    },
+    { id: 'breathe', label: 'Breathe', icon: '🌬️', route: '/breathing' },
+    { id: 'sleep', label: 'Sleep', icon: '🌙', route: '/(tabs)/sleep' },
+    { id: 'focus', label: 'Focus', icon: '🎯', route: '/(tabs)/meditate' },
   ];
+
+  // Create streak dots
+  const renderStreakDots = () => {
+    const currentStreak = stats?.current_streak || 0;
+    const dots = [];
+    for (let i = 0; i < 7; i++) {
+      dots.push(
+        <View
+          key={i}
+          style={[
+            styles.streakDot,
+            i < currentStreak ? styles.streakDotFilled : styles.streakDotEmpty
+          ]}
+        />
+      );
+    }
+    return dots;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.email?.split('@')[0] || 'Friend'}</Text>
+            <Text style={styles.greeting}>
+              {getGreeting()} {getGreetingEmoji()}
+            </Text>
+            <Text style={styles.userName}>
+              {user?.email?.split('@')[0] || 'Friend'}
+            </Text>
           </View>
-          <TouchableOpacity onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => router.push('/settings')}
+          >
+            <Ionicons name="settings-outline" size={22} color={theme.colors.textLight} />
           </TouchableOpacity>
         </View>
 
-        {/* Daily Progress */}
-        <View style={styles.progressSection}>
-          <Text style={styles.sectionTitle}>Today's Progress</Text>
-          <View style={styles.progressContainer}>
-            <ProgressRing
-              progress={stats ? (stats.total_sessions > 0 ? 100 : 0) : 0}
-              size={120}
-              centerText={stats?.current_streak.toString() || '0'}
-              centerSubtext="day streak"
-            />
-            <View style={styles.dailyStats}>
-              <View style={styles.dailyStat}>
-                <Text style={styles.dailyStatValue}>
-                  {stats?.weekly_minutes[6] || 0}
-                </Text>
-                <Text style={styles.dailyStatLabel}>minutes today</Text>
+        {/* Daily Intention Card */}
+        <View style={styles.intentionCard}>
+          <LinearGradient
+            colors={['#F5EDE3', '#FAF8F5']}
+            style={styles.intentionGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.intentionIcon}>
+              <Text style={styles.intentionEmoji}>🕊️</Text>
+            </View>
+            <Text style={styles.intentionLabel}>Today's Intention</Text>
+            <Text style={styles.intentionText}>
+              {quote?.text || "Take a breath. You're exactly where you need to be."}
+            </Text>
+            {quote?.author && (
+              <Text style={styles.intentionAuthor}>— {quote.author}</Text>
+            )}
+          </LinearGradient>
+        </View>
+
+        {/* Featured Session */}
+        {featuredSession && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recommended for you</Text>
+            <TouchableOpacity 
+              style={styles.featuredCard}
+              activeOpacity={0.9}
+              onPress={() => router.push({
+                pathname: '/meditation/[id]',
+                params: { id: featuredSession.id }
+              })}
+            >
+              <LinearGradient
+                colors={['#A8B89F', '#8B9F82']}
+                style={styles.featuredGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.featuredContent}>
+                  <View style={styles.featuredIcon}>
+                    <Ionicons name="leaf" size={28} color="white" />
+                  </View>
+                  <View style={styles.featuredInfo}>
+                    <Text style={styles.featuredTitle}>{featuredSession.title}</Text>
+                    <Text style={styles.featuredMeta}>
+                      {featuredSession.duration_minutes} min · {featuredSession.category}
+                    </Text>
+                  </View>
+                  <View style={styles.playButton}>
+                    <Ionicons name="play" size={20} color={theme.colors.primary} />
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Your Journey */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Journey</Text>
+          <View style={styles.journeyCard}>
+            <View style={styles.streakRow}>
+              <View style={styles.streakDots}>
+                {renderStreakDots()}
               </View>
-              <View style={styles.dailyStat}>
-                <Text style={styles.dailyStatValue}>
-                  {stats ? (stats.weekly_minutes[6] > 0 ? 1 : 0) : 0}
+              <View style={styles.streakInfo}>
+                <Text style={styles.streakNumber}>{stats?.current_streak || 0}</Text>
+                <Text style={styles.streakLabel}>day streak</Text>
+              </View>
+            </View>
+            <View style={styles.journeyDivider} />
+            <View style={styles.journeyStats}>
+              <View style={styles.journeyStat}>
+                <Text style={styles.journeyStatValue}>
+                  {stats?.weekly_minutes?.reduce((a, b) => a + b, 0) || 0}
                 </Text>
-                <Text style={styles.dailyStatLabel}>sessions today</Text>
+                <Text style={styles.journeyStatLabel}>min this week</Text>
+              </View>
+              <View style={styles.journeyStat}>
+                <Text style={styles.journeyStatValue}>{stats?.total_sessions || 0}</Text>
+                <Text style={styles.journeyStatLabel}>total sessions</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Quick Start</Text>
-          <View style={styles.actionGrid}>
+        {/* Quick Access */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Access</Text>
+          <View style={styles.quickGrid}>
             {quickActions.map((action) => (
               <TouchableOpacity
                 key={action.id}
-                style={styles.actionCard}
+                style={styles.quickCard}
+                activeOpacity={0.8}
                 onPress={() => router.push(action.route as any)}
-                activeOpacity={0.9}
               >
-                <LinearGradient
-                  colors={action.gradient}
-                  style={styles.actionGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Ionicons name={action.icon} size={32} color="white" />
-                  <Text style={styles.actionTitle}>{action.title}</Text>
-                  <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
-                </LinearGradient>
+                <Text style={styles.quickEmoji}>{action.icon}</Text>
+                <Text style={styles.quickLabel}>{action.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Stats Overview */}
-        <View style={styles.statsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Stats</Text>
-            <TouchableOpacity onPress={() => router.push('/stats')}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.statsGrid}>
-            <StatsCard
-              icon="time"
-              label="Total Time"
-              value={stats?.total_minutes || 0}
-              unit="min"
-              color={theme.colors.primary}
-            />
-            <StatsCard
-              icon="flame"
-              label="Longest Streak"
-              value={stats?.longest_streak || 0}
-              unit="days"
-              color={theme.colors.error}
-            />
-          </View>
-        </View>
+        {/* See all stats link */}
+        <TouchableOpacity 
+          style={styles.seeAllButton}
+          onPress={() => router.push('/stats')}
+        >
+          <Text style={styles.seeAllText}>View detailed statistics</Text>
+          <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -154,108 +229,220 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
   },
   greeting: {
-    fontSize: 16,
+    fontSize: 15,
     color: theme.colors.textLight,
+    marginBottom: 4,
   },
   userName: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '600',
     color: theme.colors.text,
-    marginTop: 2,
+    letterSpacing: -0.3,
   },
-  progressSection: {
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.sm,
+  },
+  intentionCard: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+    ...theme.shadows.sm,
+  },
+  intentionGradient: {
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+  },
+  intentionIcon: {
+    marginBottom: theme.spacing.sm,
+  },
+  intentionEmoji: {
+    fontSize: 32,
+  },
+  intentionLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: theme.colors.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.sm,
+  },
+  intentionText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: theme.colors.text,
+    textAlign: 'center',
+    lineHeight: 26,
+    fontStyle: 'italic',
+  },
+  intentionAuthor: {
+    fontSize: 14,
+    color: theme.colors.textLight,
+    marginTop: theme.spacing.sm,
+  },
+  section: {
+    marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
-  progressContainer: {
+  featuredCard: {
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+    ...theme.shadows.md,
+  },
+  featuredGradient: {
+    padding: theme.spacing.lg,
+  },
+  featuredContent: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  featuredIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featuredInfo: {
+    flex: 1,
+    marginLeft: theme.spacing.md,
+  },
+  featuredTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+    marginBottom: 4,
+  },
+  featuredMeta: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textTransform: 'capitalize',
+  },
+  playButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.sm,
+  },
+  journeyCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.lg,
     ...theme.shadows.sm,
   },
-  dailyStats: {
-    flex: 1,
-    marginLeft: theme.spacing.xl,
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  dailyStat: {
-    marginBottom: theme.spacing.md,
+  streakDots: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  dailyStatValue: {
+  streakDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  streakDotFilled: {
+    backgroundColor: theme.colors.primary,
+  },
+  streakDotEmpty: {
+    backgroundColor: theme.colors.gray[200],
+  },
+  streakInfo: {
+    alignItems: 'flex-end',
+  },
+  streakNumber: {
     fontSize: 28,
     fontWeight: '700',
     color: theme.colors.primary,
   },
-  dailyStatLabel: {
-    fontSize: 14,
+  streakLabel: {
+    fontSize: 12,
+    color: theme.colors.textLight,
+  },
+  journeyDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
+    marginVertical: theme.spacing.md,
+  },
+  journeyStats: {
+    flexDirection: 'row',
+  },
+  journeyStat: {
+    flex: 1,
+  },
+  journeyStatValue: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  journeyStatLabel: {
+    fontSize: 13,
     color: theme.colors.textLight,
     marginTop: 2,
   },
-  quickActions: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  actionGrid: {
+  quickGrid: {
     flexDirection: 'row',
     gap: theme.spacing.md,
   },
-  actionCard: {
+  quickCard: {
     flex: 1,
-    height: 140,
-    borderRadius: theme.borderRadius.xl,
-    overflow: 'hidden',
-    ...theme.shadows.md,
-  },
-  actionGradient: {
-    flex: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
-    justifyContent: 'space-between',
-  },
-  actionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'white',
-    marginTop: theme.spacing.sm,
-  },
-  actionSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  statsSection: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    ...theme.shadows.sm,
+  },
+  quickEmoji: {
+    fontSize: 28,
+    marginBottom: theme.spacing.sm,
+  },
+  quickLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.xl,
+    gap: theme.spacing.xs,
   },
   seeAllText: {
     fontSize: 14,
+    fontWeight: '500',
     color: theme.colors.primary,
-    fontWeight: '600',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
   },
 });
 

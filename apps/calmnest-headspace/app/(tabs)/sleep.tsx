@@ -8,356 +8,419 @@ import { getSleepStories } from '../../src/services/firestoreService';
 import { theme } from '../../src/theme';
 import { SleepStory } from '../../src/types';
 
+const ambientSounds = [
+  { id: 'rain', emoji: '🌧️', label: 'Rain' },
+  { id: 'waves', emoji: '🌊', label: 'Waves' },
+  { id: 'fire', emoji: '🔥', label: 'Fire' },
+  { id: 'wind', emoji: '🍃', label: 'Wind' },
+  { id: 'birds', emoji: '🐦', label: 'Birds' },
+  { id: 'thunder', emoji: '⛈️', label: 'Thunder' },
+];
+
 function SleepScreen() {
   const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sleepStories, setSleepStories] = useState<SleepStory[]>([]);
+  const [featuredStory, setFeaturedStory] = useState<SleepStory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSound, setSelectedSound] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSleepStories();
+    loadSleepContent();
   }, []);
 
-  const loadSleepStories = async () => {
+  const loadSleepContent = async () => {
     try {
       setLoading(true);
-      const data = await getSleepStories();
-      setSleepStories(data);
+      const stories = await getSleepStories();
+      setSleepStories(stories);
+      if (stories.length > 0) {
+        setFeaturedStory(stories[0]);
+      }
     } catch (error) {
-      console.error('Failed to load sleep stories:', error);
+      console.error('Failed to load sleep content:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const categories = [
-    { id: null, label: 'All', icon: 'apps' },
-    { id: 'nature', label: 'Nature', icon: 'leaf' },
-    { id: 'fantasy', label: 'Fantasy', icon: 'sparkles' },
-    { id: 'travel', label: 'Travel', icon: 'airplane' },
-    { id: 'fiction', label: 'Fiction', icon: 'book' },
-  ];
-
-  const filteredStories = selectedCategory
-    ? sleepStories.filter(story => story.category === selectedCategory)
-    : sleepStories;
-
-  const getCategoryGradient = (category: string) => {
-    switch (category) {
-      case 'nature':
-        return ['#00b894', '#55a88b'];
-      case 'fantasy':
-        return ['#6c5ce7', '#a29bfe'];
-      case 'travel':
-        return ['#0984e3', '#74b9ff'];
-      case 'fiction':
-        return ['#5f3dc4', '#7c5cdb'];
-      default:
-        return ['#5f3dc4', '#7c5cdb'];
-    }
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 21 || hour < 5) return 'Sweet dreams await';
+    if (hour >= 17) return 'Wind down and relax';
+    return 'Rest when you need it';
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Sleep</Text>
-          <Text style={styles.subtitle}>Drift into peaceful dreams</Text>
-        </View>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#1A1D29', '#252A3A']}
+        style={styles.gradient}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.moonContainer}>
+                <Text style={styles.moonEmoji}>🌙</Text>
+              </View>
+              <Text style={styles.title}>Ready for Rest</Text>
+              <Text style={styles.subtitle}>{getTimeGreeting()}</Text>
+            </View>
 
-        {/* Category Filter */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterContainer}
-          contentContainerStyle={styles.filterContent}
-        >
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id ?? 'all'}
-              style={[
-                styles.filterChip,
-                selectedCategory === cat.id && styles.filterChipActive,
-              ]}
-              onPress={() => setSelectedCategory(cat.id)}
-            >
-              <Ionicons
-                name={cat.icon as any}
-                size={16}
-                color={selectedCategory === cat.id ? 'white' : theme.colors.text}
-              />
-              <Text style={[
-                styles.filterText,
-                selectedCategory === cat.id && styles.filterTextActive,
-              ]}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+            {/* Featured Story */}
+            {featuredStory && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Tonight's Story</Text>
+                <TouchableOpacity
+                  style={styles.featuredCard}
+                  activeOpacity={0.9}
+                  onPress={() => {
+                    // TODO: Navigate to story player
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#3D4158', '#2A2D3E']}
+                    style={styles.featuredGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={styles.featuredStars}>
+                      <Text style={styles.starsEmoji}>✨</Text>
+                    </View>
+                    <Text style={styles.featuredTitle}>{featuredStory.title}</Text>
+                    <Text style={styles.featuredDescription} numberOfLines={2}>
+                      {featuredStory.description}
+                    </Text>
+                    <View style={styles.featuredMeta}>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="time-outline" size={14} color={theme.colors.sleepTextMuted} />
+                        <Text style={styles.metaText}>{featuredStory.duration_minutes} min</Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="mic-outline" size={14} color={theme.colors.sleepTextMuted} />
+                        <Text style={styles.metaText}>{featuredStory.narrator}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.playButton}>
+                      <Ionicons name="play" size={24} color={theme.colors.sleepBackground} />
+                      <Text style={styles.playButtonText}>Play Story</Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
 
-        {/* Featured Section */}
-        <View style={styles.featuredSection}>
-          <Text style={styles.sectionTitle}>Tonight's Recommendation</Text>
-          <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9}>
-            <LinearGradient
-              colors={['#2d3436', '#636e72']}
-              style={styles.featuredGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={styles.featuredContent}>
-                <Ionicons name="moon" size={48} color="white" />
-                <View style={styles.featuredInfo}>
-                  <Text style={styles.featuredTitle}>Deep Sleep Collection</Text>
-                  <Text style={styles.featuredSubtitle}>
-                    Curated stories and sounds for restful sleep
-                  </Text>
-                  <View style={styles.featuredMeta}>
-                    <Ionicons name="time-outline" size={16} color="white" />
-                    <Text style={styles.featuredMetaText}>8 hours</Text>
+            {/* Sleep Sounds */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Sleep Sounds</Text>
+              <View style={styles.soundsGrid}>
+                {ambientSounds.map((sound) => (
+                  <TouchableOpacity
+                    key={sound.id}
+                    style={[
+                      styles.soundCard,
+                      selectedSound === sound.id && styles.soundCardSelected
+                    ]}
+                    onPress={() => setSelectedSound(
+                      selectedSound === sound.id ? null : sound.id
+                    )}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.soundEmoji}>{sound.emoji}</Text>
+                    <Text style={[
+                      styles.soundLabel,
+                      selectedSound === sound.id && styles.soundLabelSelected
+                    ]}>
+                      {sound.label}
+                    </Text>
+                    {selectedSound === sound.id && (
+                      <View style={styles.soundPlaying}>
+                        <Ionicons name="volume-high" size={12} color={theme.colors.sleepAccent} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Bedtime Stories */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bedtime Stories</Text>
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.colors.sleepAccent} />
+                </View>
+              ) : (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.storiesScroll}
+                >
+                  {sleepStories.map((story) => (
+                    <TouchableOpacity
+                      key={story.id}
+                      style={styles.storyCard}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        // TODO: Navigate to story player
+                      }}
+                    >
+                      <View style={styles.storyIcon}>
+                        <Text style={styles.storyEmoji}>
+                          {story.category === 'nature' ? '🌲' :
+                           story.category === 'fantasy' ? '🏰' :
+                           story.category === 'travel' ? '✈️' : '📖'}
+                        </Text>
+                      </View>
+                      <Text style={styles.storyTitle} numberOfLines={2}>
+                        {story.title}
+                      </Text>
+                      <Text style={styles.storyMeta}>
+                        {story.duration_minutes} min
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
+            {/* Sleep Tips */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Sleep Better</Text>
+              <View style={styles.tipsCard}>
+                <View style={styles.tipItem}>
+                  <Text style={styles.tipEmoji}>🌡️</Text>
+                  <View style={styles.tipContent}>
+                    <Text style={styles.tipTitle}>Cool room</Text>
+                    <Text style={styles.tipText}>65-68°F is ideal for sleep</Text>
+                  </View>
+                </View>
+                <View style={styles.tipDivider} />
+                <View style={styles.tipItem}>
+                  <Text style={styles.tipEmoji}>📱</Text>
+                  <View style={styles.tipContent}>
+                    <Text style={styles.tipTitle}>Screen-free</Text>
+                    <Text style={styles.tipText}>30 min before bed</Text>
+                  </View>
+                </View>
+                <View style={styles.tipDivider} />
+                <View style={styles.tipItem}>
+                  <Text style={styles.tipEmoji}>🕐</Text>
+                  <View style={styles.tipContent}>
+                    <Text style={styles.tipTitle}>Consistent schedule</Text>
+                    <Text style={styles.tipText}>Same time each night</Text>
                   </View>
                 </View>
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Content List */}
-        <View style={styles.contentSection}>
-          <Text style={styles.sectionTitle}>Sleep Library</Text>
-          
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
-              <Text style={styles.loadingText}>Loading stories...</Text>
             </View>
-          ) : filteredStories.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No stories found</Text>
-            </View>
-          ) : (
-            filteredStories.map((story) => (
-              <TouchableOpacity
-                key={story.id}
-                style={styles.contentCard}
-                onPress={() => {
-                  // TODO: Navigate to player with story.id
-                }}
-              >
-                <LinearGradient
-                  colors={getCategoryGradient(story.category)}
-                  style={styles.contentThumbnail}
-                >
-                  <Ionicons
-                    name={
-                      story.category === 'nature' ? 'leaf' :
-                      story.category === 'fantasy' ? 'sparkles' :
-                      story.category === 'travel' ? 'airplane' : 'book'
-                    }
-                    size={24}
-                    color="white"
-                  />
-                </LinearGradient>
-                
-                <View style={styles.contentInfo}>
-                  <Text style={styles.contentTitle}>{story.title}</Text>
-                  <Text style={styles.contentNarrator}>{story.narrator}</Text>
-                  <View style={styles.contentMeta}>
-                    <Ionicons name="time-outline" size={14} color={theme.colors.textLight} />
-                    <Text style={styles.contentDuration}>{story.duration_minutes} min</Text>
-                    {story.is_premium && (
-                      <View style={styles.premiumBadge}>
-                        <Ionicons name="star" size={12} color={theme.colors.primary} />
-                        <Text style={styles.premiumText}>PRO</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                
-                <Ionicons name="play-circle" size={32} color={theme.colors.primary} />
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
   container: {
     flex: 1,
   },
+  gradient: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
   header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
+    alignItems: 'center',
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+  },
+  moonContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  moonEmoji: {
+    fontSize: 56,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: theme.colors.text,
+    fontSize: 28,
+    fontWeight: '600',
+    color: theme.colors.sleepText,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 16,
-    color: theme.colors.textLight,
-    marginTop: theme.spacing.xs,
+    fontSize: 15,
+    color: theme.colors.sleepTextMuted,
+    marginTop: 4,
   },
-  filterContainer: {
-    maxHeight: 50,
-    marginBottom: theme.spacing.lg,
-  },
-  filterContent: {
+  section: {
+    marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.gray[200],
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.full,
-    marginRight: theme.spacing.sm,
-    gap: theme.spacing.xs,
-  },
-  filterChipActive: {
-    backgroundColor: theme.colors.sleep || '#5f3dc4',
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.text,
-  },
-  filterTextActive: {
-    color: 'white',
-  },
-  featuredSection: {
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '600',
-    color: theme.colors.text,
+    color: theme.colors.sleepText,
     marginBottom: theme.spacing.md,
   },
   featuredCard: {
     borderRadius: theme.borderRadius.xl,
     overflow: 'hidden',
-    ...theme.shadows.lg,
   },
   featuredGradient: {
     padding: theme.spacing.xl,
   },
-  featuredContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
+  featuredStars: {
+    marginBottom: theme.spacing.sm,
   },
-  featuredInfo: {
-    flex: 1,
+  starsEmoji: {
+    fontSize: 28,
   },
   featuredTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: 'white',
+    fontWeight: '600',
+    color: theme.colors.sleepText,
     marginBottom: theme.spacing.xs,
   },
-  featuredSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: theme.spacing.sm,
+  featuredDescription: {
+    fontSize: 15,
+    color: theme.colors.sleepTextMuted,
+    lineHeight: 22,
+    marginBottom: theme.spacing.md,
   },
   featuredMeta: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
   },
-  featuredMetaText: {
-    fontSize: 14,
-    color: 'white',
-  },
-  contentSection: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
-  },
-  contentCard: {
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    ...theme.shadows.sm,
+    gap: 6,
   },
-  contentThumbnail: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.borderRadius.md,
+  metaText: {
+    fontSize: 13,
+    color: theme.colors.sleepTextMuted,
+  },
+  playButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.colors.sleepAccent,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    gap: 8,
   },
-  contentInfo: {
-    flex: 1,
-    marginHorizontal: theme.spacing.md,
-  },
-  contentTitle: {
+  playButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: 2,
+    color: theme.colors.sleepBackground,
   },
-  contentNarrator: {
-    fontSize: 14,
-    color: theme.colors.textLight,
-    marginBottom: theme.spacing.xs,
-  },
-  contentMeta: {
+  soundsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
   },
-  contentDuration: {
+  soundCard: {
+    width: '31%',
+    backgroundColor: theme.colors.sleepSurface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  soundCardSelected: {
+    borderColor: theme.colors.sleepAccent,
+    backgroundColor: 'rgba(201, 184, 150, 0.1)',
+  },
+  soundEmoji: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  soundLabel: {
     fontSize: 12,
-    color: theme.colors.textLight,
+    fontWeight: '500',
+    color: theme.colors.sleepTextMuted,
   },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.gray[100],
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: theme.borderRadius.sm,
-    marginLeft: theme.spacing.sm,
-    gap: 2,
+  soundLabelSelected: {
+    color: theme.colors.sleepAccent,
   },
-  premiumText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.primary,
+  soundPlaying: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
   loadingContainer: {
     paddingVertical: theme.spacing.xl,
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    fontSize: 16,
-    color: theme.colors.textLight,
+  storiesScroll: {
+    gap: theme.spacing.md,
   },
-  emptyContainer: {
-    paddingVertical: theme.spacing.xl,
+  storyCard: {
+    width: 140,
+    backgroundColor: theme.colors.sleepSurface,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+  },
+  storyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(201, 184, 150, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  storyEmoji: {
+    fontSize: 24,
+  },
+  storyTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.sleepText,
+    marginBottom: 4,
+  },
+  storyMeta: {
+    fontSize: 12,
+    color: theme.colors.sleepTextMuted,
+  },
+  tipsCard: {
+    backgroundColor: theme.colors.sleepSurface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+  },
+  tipItem: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  emptyText: {
-    fontSize: 16,
-    color: theme.colors.textLight,
+  tipEmoji: {
+    fontSize: 28,
+    marginRight: theme.spacing.md,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.colors.sleepText,
+  },
+  tipText: {
+    fontSize: 13,
+    color: theme.colors.sleepTextMuted,
+    marginTop: 2,
+  },
+  tipDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: theme.spacing.md,
   },
 });
 
