@@ -1,0 +1,46 @@
+# Dependencies - EAS will install these during build
+node_modules/
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+__tests__/
+__mocks__/
+coverage/
+
+# Development files
+*.log
+.DS_Store
+*.local
+
+# Documentation
+*.md
+docs/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+build/
+.expo/
+
+# Lock files (EAS uses package.json)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Git
+.git/
+.gitignore
+
+# Other unnecessary files
+.env.local
+.env.development
+*.bak
+

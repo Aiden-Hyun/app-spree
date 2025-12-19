@@ -12,31 +12,28 @@ const { width } = Dimensions.get('window');
 
 function StatsScreen() {
   const router = useRouter();
-  const { stats, loading, getWeeklyStats, getMonthlyStats } = useStats();
+  const { stats, loading } = useStats();
   const [timeRange, setTimeRange] = useState<'week' | 'month'>('week');
   const [chartData, setChartData] = useState<any>(null);
 
   useEffect(() => {
     loadChartData();
-  }, [timeRange]);
+  }, [timeRange, stats]);
 
-  const loadChartData = async () => {
+  const loadChartData = () => {
     if (timeRange === 'week') {
-      const weeklyData = await getWeeklyStats();
-      if (weeklyData) {
-        const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const data = stats?.weekly_minutes || Array(7).fill(0);
-        
-        setChartData({
-          labels,
-          datasets: [{
-            data,
-            strokeWidth: 2,
-          }],
-        });
-      }
+      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const data = stats?.weekly_minutes || Array(7).fill(0);
+      
+      setChartData({
+        labels,
+        datasets: [{
+          data,
+          strokeWidth: 2,
+        }],
+      });
     } else {
-      // TODO: Implement monthly chart
+      // TODO: Implement monthly chart from Firestore
       const labels = Array(30).fill(0).map((_, i) => `${i + 1}`);
       const data = Array(30).fill(0).map(() => Math.floor(Math.random() * 30));
       

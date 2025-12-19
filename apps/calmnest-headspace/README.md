@@ -33,6 +33,17 @@ A React Native app built with Expo for meditation, breathing exercises, and slee
    pnpm test
    ```
 
+### Firestore indexes
+
+All composite indexes live in [`firestore.indexes.json`](./firestore.indexes.json). After editing that file, deploy the indexes to Firebase:
+
+```bash
+firebase login          # first time only
+firebase deploy --only firestore:indexes
+```
+
+Alternatively, copy the field definitions into the Firestore Console → Database → Indexes UI.
+
 ## Features
 
 - **Authentication**: Email/password signup and login

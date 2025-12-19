@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { meditationService } from '../services/meditationService';
+import { createSession } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { MeditationSession } from '../types';
 
 interface UseMeditationOptions {
   duration: number; // in minutes
   sessionType: 'meditation' | 'breathing' | 'sleep_story';
-  onComplete?: (session: MeditationSession) => void;
+  onComplete?: (sessionId: string) => void;
 }
 
 export function useMeditation({ duration, sessionType, onComplete }: UseMeditationOptions) {
@@ -117,14 +117,14 @@ export function useMeditation({ duration, sessionType, onComplete }: UseMeditati
     const actualDuration = Math.ceil((duration * 60 - timeRemaining) / 60);
     
     try {
-      const session = await meditationService.createSession({
-        user_id: user.id,
+      const sessionId = await createSession({
+        user_id: user.uid,
         duration_minutes: actualDuration,
         session_type: sessionType,
       });
 
       if (onComplete) {
-        onComplete(session);
+        onComplete(sessionId);
       }
     } catch (error) {
       console.error('Failed to save meditation session:', error);

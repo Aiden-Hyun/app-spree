@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { statsService } from '../services/statsService';
+import { getUserStats } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { UserStats } from '../types';
 
@@ -19,7 +19,7 @@ export function useStats() {
     try {
       setLoading(true);
       setError(null);
-      const userStats = await statsService.getUserStats(user.id);
+      const userStats = await getUserStats(user.uid);
       setStats(userStats);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch stats');
@@ -37,34 +37,10 @@ export function useStats() {
     await fetchStats();
   }, [fetchStats]);
 
-  const getWeeklyStats = useCallback(async () => {
-    if (!user) return null;
-
-    try {
-      return await statsService.getWeeklyStats(user.id);
-    } catch (err) {
-      console.error('Failed to fetch weekly stats:', err);
-      return null;
-    }
-  }, [user]);
-
-  const getMonthlyStats = useCallback(async () => {
-    if (!user) return null;
-
-    try {
-      return await statsService.getMonthlyStats(user.id);
-    } catch (err) {
-      console.error('Failed to fetch monthly stats:', err);
-      return null;
-    }
-  }, [user]);
-
   return {
     stats,
     loading,
     error,
     refreshStats,
-    getWeeklyStats,
-    getMonthlyStats,
   };
 }

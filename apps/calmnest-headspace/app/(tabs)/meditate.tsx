@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { MeditationCard } from '../../src/components/MeditationCard';
-import { meditationService } from '../../src/services/meditationService';
+import { getMeditations, isFavorite, toggleFavorite } from '../../src/services/firestoreService';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { theme } from '../../src/theme';
 import { GuidedMeditation, MeditationCategory } from '../../src/types';
 
@@ -17,86 +18,27 @@ const categories: { id: MeditationCategory; label: string; icon: string }[] = [
 
 function MeditateScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<MeditationCategory | null>(null);
   const [meditations, setMeditations] = useState<GuidedMeditation[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadMeditations();
   }, [selectedCategory]);
 
+  useEffect(() => {
+    if (user && meditations.length > 0) {
+      loadFavorites();
+    }
+  }, [user, meditations]);
+
   const loadMeditations = async () => {
     try {
       setLoading(true);
-      // For now, we'll use dummy data until we have real content
-      const dummyMeditations: GuidedMeditation[] = [
-        {
-          id: '1',
-          title: 'Morning Mindfulness',
-          description: 'Start your day with clarity and purpose',
-          duration_minutes: 10,
-          audio_url: '',
-          category: 'focus',
-          difficulty_level: 'beginner',
-          instructor: 'Sarah Chen',
-          is_premium: false,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          title: 'Stress Relief',
-          description: 'Release tension and find your calm',
-          duration_minutes: 15,
-          audio_url: '',
-          category: 'stress',
-          difficulty_level: 'beginner',
-          instructor: 'Michael Rivers',
-          is_premium: false,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '3',
-          title: 'Deep Sleep Journey',
-          description: 'Drift into peaceful slumber',
-          duration_minutes: 20,
-          audio_url: '',
-          category: 'sleep',
-          difficulty_level: 'intermediate',
-          instructor: 'Emma Thompson',
-          is_premium: true,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '4',
-          title: 'Anxiety Relief',
-          description: 'Find peace in the present moment',
-          duration_minutes: 12,
-          audio_url: '',
-          category: 'anxiety',
-          difficulty_level: 'beginner',
-          instructor: 'David Kim',
-          is_premium: false,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: '5',
-          title: 'Gratitude Practice',
-          description: 'Cultivate appreciation and joy',
-          duration_minutes: 8,
-          audio_url: '',
-          category: 'gratitude',
-          difficulty_level: 'beginner',
-          instructor: 'Lisa Martinez',
-          is_premium: false,
-          created_at: new Date().toISOString(),
-        },
-      ];
-
-      const filtered = selectedCategory
-        ? dummyMeditations.filter(m => m.category === selectedCategory)
-        : dummyMeditations;
-      
-      setMeditations(filtered);
+      const data = await getMeditations(selectedCategory || undefined);
+      setMeditations(data);
     } catch (error) {
       console.error('Failed to load meditations:', error);
     } finally {
@@ -104,10 +46,36 @@ function MeditateScreen() {
     }
   };
 
+  const loadFavorites = async () => {
+    if (!user) return;
+    
+    const favSet = new Set<string>();
+    for (const meditation of meditations) {
+      const isFav = await isFavorite(user.uid, meditation.id);
+      if (isFav) favSet.add(meditation.id);
+    }
+    setFavorites(favSet);
+  };
+
   const handleMeditationPress = (meditation: GuidedMeditation) => {
     router.push({
       pathname: '/meditation/[id]',
       params: { id: meditation.id },
+    });
+  };
+
+  const handleToggleFavorite = async (meditationId: string) => {
+    if (!user) return;
+    
+    const isFav = await toggleFavorite(user.uid, meditationId, 'meditation');
+    setFavorites(prev => {
+      const newSet = new Set(prev);
+      if (isFav) {
+        newSet.add(meditationId);
+      } else {
+        newSet.delete(meditationId);
+      }
+      return newSet;
     });
   };
 
@@ -162,22 +130,32 @@ function MeditateScreen() {
         </ScrollView>
 
         {/* Meditation List */}
-        <FlatList
-          data={meditations}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MeditationCard
-              meditation={item}
-              onPress={() => handleMeditationPress(item)}
-              isFavorite={false}
-              onToggleFavorite={() => {
-                // TODO: Implement favorites
-              }}
-            />
-          )}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.loadingText}>Loading meditations...</Text>
+          </View>
+        ) : meditations.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No meditations found</Text>
+            <Text style={styles.emptySubtext}>Check back soon for new content!</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={meditations}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <MeditationCard
+                meditation={item}
+                onPress={() => handleMeditationPress(item)}
+                isFavorite={favorites.has(item.id)}
+                onToggleFavorite={() => handleToggleFavorite(item.id)}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -240,6 +218,33 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: theme.spacing.xxl,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: theme.spacing.md,
+    fontSize: 16,
+    color: theme.colors.textLight,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: theme.colors.textLight,
+    marginTop: theme.spacing.sm,
+    textAlign: 'center',
   },
 });
 

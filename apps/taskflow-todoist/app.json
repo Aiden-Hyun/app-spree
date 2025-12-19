@@ -40,7 +40,16 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -49,20 +58,18 @@
       "router": {
         "origin": false
       },
-      "eas": {
-        "projectId": "your-eas-project-id-here"
-      },
       "supabaseUrl": "https://dfsahhgpcdqxeijigxei.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmc2FoaGdwY2RxeGVpamlneGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzAzNjEsImV4cCI6MjA4MDQwNjM2MX0.D5K3nL8oS7vkJlvrbGBLrQfRWuYfDXubQ6oCGgwgxMw"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmc2FoaGdwY2RxeGVpamlneGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzAzNjEsImV4cCI6MjA4MDQwNjM2MX0.D5K3nL8oS7vkJlvrbGBLrQfRWuYfDXubQ6oCGgwgxMw",
+      "eas": {
+        "projectId": "bf96e485-d2b1-43c6-a54b-fe8b784cc288"
+      }
     },
-    "owner": "your-expo-username",
+    "owner": "aidenhyun",
     "updates": {
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/your-project-id"
+      "url": "https://u.expo.dev/bf96e485-d2b1-43c6-a54b-fe8b784cc288"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
     }
   }
 }
-

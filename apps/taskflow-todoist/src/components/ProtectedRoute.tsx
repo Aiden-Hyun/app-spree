@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { router } from 'expo-router';
@@ -10,6 +10,12 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading]);
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -19,8 +25,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    router.replace('/login');
-    return null;
+    // Return loading state while redirect happens
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Redirecting...</Text>
+      </View>
+    );
   }
 
   return <>{children}</>;
