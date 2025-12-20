@@ -11,6 +11,8 @@ export interface AudioState {
 export class AudioService {
   private sound: Audio.Sound | null = null;
   private updateCallback: ((state: AudioState) => void) | null = null;
+  private isAudioModeConfigured: boolean = false;
+  private audioModePromise: Promise<void> | null = null;
   private currentState: AudioState = {
     isPlaying: false,
     isLoading: false,
@@ -20,10 +22,12 @@ export class AudioService {
   };
 
   constructor() {
-    this.configureAudioMode();
+    this.audioModePromise = this.configureAudioMode();
   }
 
-  private async configureAudioMode() {
+  private async configureAudioMode(): Promise<void> {
+    if (this.isAudioModeConfigured) return;
+    
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -31,8 +35,16 @@ export class AudioService {
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
       });
+      this.isAudioModeConfigured = true;
     } catch (error) {
-      console.error('Failed to configure audio mode:', error);
+      console.warn('Failed to configure audio mode:', error);
+      // Don't throw - audio may still work with default settings
+    }
+  }
+  
+  private async ensureAudioModeConfigured(): Promise<void> {
+    if (this.audioModePromise) {
+      await this.audioModePromise;
     }
   }
 
@@ -55,9 +67,9 @@ export class AudioService {
         position: status.positionMillis ? status.positionMillis / 1000 : 0,
         error: null,
       });
-    } else if (status.error) {
+    } else if ('error' in status && status.error) {
       this.updateState({
-        error: status.error,
+        error: String(status.error),
         isLoading: false,
       });
     }
@@ -71,6 +83,9 @@ export class AudioService {
     try {
       this.updateState({ isLoading: true, error: null });
 
+      // Ensure audio mode is configured before loading
+      await this.ensureAudioModeConfigured();
+
       // Unload previous sound if exists
       if (this.sound) {
         await this.unloadAudio();
@@ -81,21 +96,33 @@ export class AudioService {
         ? source  // Local asset from require()
         : { uri: source };  // Remote URI
 
-      // Create and load new sound
-      const { sound } = await Audio.Sound.createAsync(
-        audioSource,
-        { shouldPlay: false },
-        this.onPlaybackStatusUpdate
-      );
+      // Create and load new sound with error handling
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          audioSource,
+          { shouldPlay: false },
+          this.onPlaybackStatusUpdate
+        );
 
-      this.sound = sound;
-      this.updateState({ isLoading: false });
+        this.sound = sound;
+        this.updateState({ isLoading: false });
+      } catch (loadError) {
+        // Handle Android-specific audio decoding errors gracefully
+        const errorMessage = loadError instanceof Error ? loadError.message : 'Unknown audio error';
+        console.warn('Audio loading error (may be unsupported format):', errorMessage);
+        
+        this.updateState({
+          error: 'Audio unavailable for this session',
+          isLoading: false,
+        });
+        // Don't rethrow - allow the app to continue without audio
+      }
     } catch (error) {
       this.updateState({
         error: error instanceof Error ? error.message : 'Failed to load audio',
         isLoading: false,
       });
-      throw error;
+      // Don't rethrow - allow the app to continue
     }
   }
 
