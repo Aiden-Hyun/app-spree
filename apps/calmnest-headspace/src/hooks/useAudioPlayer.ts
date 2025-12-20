@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useAudioPlayer as useExpoAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { useAudioPlayer as useExpoAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, AudioSource } from 'expo-audio';
 import { getAudioFile } from '../constants/audioFiles';
 
 export interface AudioPlayerState {
@@ -14,12 +14,29 @@ export interface AudioPlayerState {
 }
 
 /**
+ * Resolve a source (string key, URL, or require() result) to an AudioSource
+ */
+function resolveAudioSource(source: string | number | null): AudioSource | null {
+  if (!source) return null;
+  
+  // If it's a string that matches an audio file key, resolve it
+  if (typeof source === 'string') {
+    const localFile = getAudioFile(source);
+    if (localFile) return localFile;
+    // Otherwise treat as URL
+    return { uri: source };
+  }
+  
+  // Already a require() result (number)
+  return source;
+}
+
+/**
  * Custom hook that wraps expo-audio's useAudioPlayer with additional utilities
  */
 export function useAudioPlayer(initialSource?: string | number | null) {
-  const [currentSource, setCurrentSource] = useState<string | number | null>(initialSource ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [isAudioConfigured, setIsAudioConfigured] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   // Configure audio mode on mount
   useEffect(() => {
@@ -30,33 +47,21 @@ export function useAudioPlayer(initialSource?: string | number | null) {
           shouldPlayInBackground: true,
           shouldRouteThroughEarpiece: false,
         });
-        setIsAudioConfigured(true);
       } catch (err) {
         console.warn('Failed to configure audio mode:', err);
-        setIsAudioConfigured(true); // Continue anyway
       }
     }
     configureAudio();
   }, []);
 
-  // Resolve the audio source
-  const resolvedSource = useMemo(() => {
-    if (!currentSource) return null;
-    
-    // If it's a string that matches an audio file key, resolve it
-    if (typeof currentSource === 'string') {
-      const localFile = getAudioFile(currentSource);
-      if (localFile) return localFile;
-      // Otherwise treat as URL
-      return { uri: currentSource };
-    }
-    
-    // Already a require() result (number)
-    return currentSource;
-  }, [currentSource]);
+  // Resolve initial source
+  const initialResolvedSource = useMemo(() => 
+    resolveAudioSource(initialSource ?? null), 
+    [] // Only compute once
+  );
 
-  // Use expo-audio's hook
-  const player = useExpoAudioPlayer(resolvedSource, {
+  // Use expo-audio's hook with initial source
+  const player = useExpoAudioPlayer(initialResolvedSource, {
     updateInterval: 250,
   });
 
@@ -83,17 +88,21 @@ export function useAudioPlayer(initialSource?: string | number | null) {
     error,
   }), [status, error, formatTime]);
 
-  // Load a new audio source
+  // Load a new audio source using player.replace()
   const loadAudio = useCallback(async (source: string | number) => {
     try {
       setError(null);
-      setCurrentSource(source);
+      const resolved = resolveAudioSource(source);
+      if (resolved) {
+        player.replace(resolved);
+        hasLoadedRef.current = true;
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load audio';
       setError(errorMessage);
       console.warn('Audio loading error:', errorMessage);
     }
-  }, []);
+  }, [player]);
 
   // Playback controls
   const play = useCallback(async () => {
