@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "firebase-admin": "^13.6.0",
     "typescript": "~5.9.2",
     "vitest": "^1.0.0"
   }

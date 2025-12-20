@@ -1,94 +1,59 @@
 /**
  * Audio file mapping for meditation content
  * 
- * Maps audio_file identifiers (used in Firestore) to verified working audio URLs
+ * Maps audio_file identifiers (used in Firestore) to Firebase Storage URLs
  * 
- * Sources:
- * - Internet Archive (archive.org) - Guided meditation content (CC licensed)
- * - SoundHelix - Ambient/background music (free for use)
+ * Audio files are stored in Firebase Storage bucket: calmnest-e910e.firebasestorage.app
  * 
- * All URLs have been verified with curl to return HTTP 200 with audio/mpeg content-type
+ * Content Sources:
+ * - Guided Meditation by Swami Guruparananda (archive.org, Public Domain)
+ * - Body Scan Meditation (archive.org)
+ * - Loving Kindness Meditation led by Ellie (archive.org)
+ * - Forest Sound Effects (archive.org)
  */
+
+const STORAGE_BASE = 'https://storage.googleapis.com/calmnest-e910e.firebasestorage.app/audio';
 
 export const audioFiles: Record<string, string> = {
-  // ========== GUIDED MEDITATION AUDIO (Internet Archive) ==========
-  // These are actual guided meditation recordings with voice narration
-  // Source: https://archive.org/details/GuidedMeditation by Swami Guruparananda
-  // License: Public domain
+  // ========== GUIDED MEDITATION AUDIO ==========
+  // Real guided meditation content with voice narration
   
-  // Gratitude - Guided meditation with voice
-  meditation_gratitude: 'https://archive.org/download/GuidedMeditation/MD_001_Meditation.mp3',
+  // Gratitude meditation
+  meditation_gratitude: `${STORAGE_BASE}/meditation/gratitude.mp3`,
   
-  // Stress Relief - Guided meditation with voice  
-  meditation_stress: 'https://archive.org/download/GuidedMeditation/MD_002_Meditation.mp3',
+  // Stress relief meditation
+  meditation_stress: `${STORAGE_BASE}/meditation/stress.mp3`,
   
-  // Focus - Guided meditation with voice
-  meditation_focus: 'https://archive.org/download/GuidedMeditation/MD_003_Meditation.mp3',
+  // Focus meditation
+  meditation_focus: `${STORAGE_BASE}/meditation/focus.mp3`,
   
-  // Anxiety - Guided meditation (using variation for different feel)
-  meditation_anxiety: 'https://archive.org/download/GuidedMeditation/MD_001_Meditation.mp3',
+  // Anxiety relief meditation
+  meditation_anxiety: `${STORAGE_BASE}/meditation/anxiety.mp3`,
   
-  // Sleep - Guided meditation for sleep
-  meditation_sleep: 'https://archive.org/download/GuidedMeditation/MD_002_Meditation.mp3',
+  // Self esteem meditation
+  meditation_selfesteem: `${STORAGE_BASE}/meditation/selfesteem.mp3`,
   
-  // Body Scan - Guided body awareness meditation
-  meditation_bodyscan: 'https://archive.org/download/GuidedMeditation/MD_003_Meditation.mp3',
+  // Body scan meditation (19MB, detailed guided session)
+  meditation_bodyscan: `${STORAGE_BASE}/meditation/bodyscan.mp3`,
   
-  // Self-Esteem - Guided self-compassion meditation
-  meditation_selfesteem: 'https://archive.org/download/GuidedMeditation/MD_001_Meditation.mp3',
+  // Loving kindness meditation (15MB, compassion-focused)
+  meditation_lovingkindness: `${STORAGE_BASE}/meditation/lovingkindness.mp3`,
   
-  // Loving Kindness - Guided metta meditation
-  meditation_lovingkindness: 'https://archive.org/download/GuidedMeditation/MD_002_Meditation.mp3',
+  // ========== SLEEP STORY AUDIO ==========
+  // Calming audio for sleep
   
-  // ========== SLEEP STORY AMBIENT AUDIO (SoundHelix) ==========
-  // Ambient music for sleep stories - different tracks for different themes
-  // Source: https://www.soundhelix.com - Free sample music
+  sleep_nature: `${STORAGE_BASE}/sleep/nature.mp3`,
+  sleep_ocean: `${STORAGE_BASE}/sleep/ocean.mp3`,
+  sleep_rain: `${STORAGE_BASE}/sleep/rain.mp3`,
+  sleep_fantasy: `${STORAGE_BASE}/sleep/fantasy.mp3`,
   
-  // Nature theme - Calm ambient
-  sleep_nature: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  // ========== BREATHING EXERCISE AUDIO ==========
+  // Background sounds for breathing exercises
   
-  // Ocean theme - Flowing ambient
-  sleep_ocean: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  
-  // Rain theme - Gentle ambient
-  sleep_rain: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  
-  // Fantasy/Travel theme - Dreamy ambient
-  sleep_fantasy: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-  
-  // ========== BREATHING EXERCISE AUDIO (SoundHelix) ==========
-  // Minimal ambient background for breathing exercises
-  
-  // Calm breathing - Soft, minimal
-  breathing_calm: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-  
-  // Energizing breathing - Slightly uplifting
-  breathing_energy: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
+  breathing_calm: `${STORAGE_BASE}/breathing/calm.mp3`,
+  breathing_energy: `${STORAGE_BASE}/breathing/energy.mp3`,
   
   // ========== LEGACY KEYS (for backward compatibility) ==========
-  meditation_calm: 'https://archive.org/download/GuidedMeditation/MD_001_Meditation.mp3',
+  meditation_calm: `${STORAGE_BASE}/meditation/stress.mp3`,
+  meditation_sleep: `${STORAGE_BASE}/sleep/nature.mp3`,
 };
-
-// Type for valid audio file keys
-export type AudioFileKey = keyof typeof audioFiles;
-
-// Helper to get audio file by key - returns URL string
-export function getAudioFile(key: string): string | null {
-  return audioFiles[key] || null;
-}
-
-// List of all available audio file keys
-export const audioFileKeys = Object.keys(audioFiles) as AudioFileKey[];
-
-/**
- * Attribution (required for some content):
- * 
- * Guided Meditation Audio:
- * - "Guided Meditation" by Swami Guruparananda
- * - Source: Internet Archive (https://archive.org/details/GuidedMeditation)
- * - License: Public Domain
- * 
- * Ambient Music:
- * - SoundHelix Sample Music (https://www.soundhelix.com)
- * - Free for use
- */

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Your Firebase config from google-services.json
@@ -23,6 +24,9 @@ export const auth = initializeAuth(app, {
 
 // Initialize Firestore
 export const db = getFirestore(app);
+
+// Initialize Storage
+export const storage = getStorage(app);
 
 // Helper to get current user ID
 export const getCurrentUserId = (): string | null => {

@@ -44,6 +44,39 @@ firebase deploy --only firestore:indexes
 
 Alternatively, copy the field definitions into the Firestore Console → Database → Indexes UI.
 
+### Firebase Storage Setup (Audio Files)
+
+The app uses Firebase Storage for meditation audio files. To upload the audio:
+
+1. **Authenticate Firebase CLI:**
+   ```bash
+   firebase login --reauth
+   ```
+
+2. **Generate a service account key:**
+   - Go to Firebase Console → Project Settings → Service Accounts
+   - Click "Generate new private key"
+   - Save as `serviceAccountKey.json` in the project root (this file is git-ignored)
+
+3. **Upload audio files:**
+   ```bash
+   node scripts/uploadAudioToStorage.js
+   ```
+
+4. **Or use Google Cloud Console:**
+   - Go to [Google Cloud Storage](https://console.cloud.google.com/storage)
+   - Navigate to bucket: `calmnest-e910e.firebasestorage.app`
+   - Create folder: `audio/`
+   - Upload files from `assets/audio/` maintaining the folder structure
+
+Audio files are organized as:
+```
+audio/
+  meditation/   # Guided meditation content
+  sleep/        # Sleep story ambient sounds
+  breathing/    # Breathing exercise backgrounds
+```
+
 ## Features
 
 - **Authentication**: Email/password signup and login
