@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "../supabase";
+import {
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { encryptionService } from "../services/encryptionService";
 import { useAuth } from "./AuthContext";
 
@@ -81,29 +92,30 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("password_categories")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("name");
-
-      if (categoriesError) throw categoriesError;
+      const categoriesRef = collection(db, "users", user.uid, "password_categories");
+      const categoriesQuery = query(categoriesRef, orderBy("name"));
+      const categoriesSnapshot = await getDocs(categoriesQuery);
+      const categoriesData = categoriesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+      })) as Category[];
 
       // Fetch passwords
-      const { data: passwordsData, error: passwordsError } = await supabase
-        .from("passwords")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("title");
-
-      if (passwordsError) throw passwordsError;
+      const passwordsRef = collection(db, "users", user.uid, "passwords");
+      const passwordsQuery = query(passwordsRef, orderBy("title"));
+      const passwordsSnapshot = await getDocs(passwordsQuery);
+      const passwordsData = passwordsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
       // Decrypt passwords
       const decryptedPasswords = await Promise.all(
-        passwordsData.map(async (pwd) => {
+        passwordsData.map(async (pwd: any) => {
           try {
             const decryptedPassword = await encryptionService.decryptPassword(
-              pwd.password_encrypted
+              pwd.passwordEncrypted
             );
             const decryptedNotes = pwd.notes
               ? await encryptionService.decryptPassword(pwd.notes)
@@ -111,16 +123,16 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
             return {
               id: pwd.id,
-              categoryId: pwd.category_id,
+              categoryId: pwd.categoryId,
               title: pwd.title,
               username: pwd.username,
               password: decryptedPassword,
               website: pwd.website,
               notes: decryptedNotes,
-              isFavorite: pwd.is_favorite,
-              createdAt: pwd.created_at,
-              updatedAt: pwd.updated_at,
-              lastUsed: pwd.last_used,
+              isFavorite: pwd.isFavorite || false,
+              createdAt: pwd.createdAt?.toDate?.()?.toISOString() || pwd.createdAt,
+              updatedAt: pwd.updatedAt?.toDate?.()?.toISOString() || pwd.updatedAt,
+              lastUsed: pwd.lastUsed?.toDate?.()?.toISOString() || pwd.lastUsed,
             };
           } catch (err) {
             console.error("Failed to decrypt password:", pwd.id, err);
@@ -129,7 +141,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
         })
       );
 
-      setCategories(categoriesData || []);
+      setCategories(categoriesData);
       setPasswords(decryptedPasswords.filter(Boolean) as PasswordEntry[]);
     } catch (err: any) {
       console.error("Failed to load vault:", err);
@@ -152,35 +164,34 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       ? await encryptionService.encryptPassword(entry.notes)
       : null;
 
-    const { data, error } = await supabase
-      .from("passwords")
-      .insert({
-        user_id: user.id,
-        category_id: entry.categoryId,
-        title: entry.title,
-        username: entry.username,
-        password_encrypted: encryptedPassword,
-        website: entry.website,
-        notes: encryptedNotes,
-        is_favorite: entry.isFavorite || false,
-      })
-      .select()
-      .single();
+    const now = Timestamp.now();
+    const passwordData = {
+      categoryId: entry.categoryId || null,
+      title: entry.title,
+      username: entry.username || null,
+      passwordEncrypted: encryptedPassword,
+      website: entry.website || null,
+      notes: encryptedNotes,
+      isFavorite: entry.isFavorite || false,
+      createdAt: now,
+      updatedAt: now,
+      lastUsed: null,
+    };
 
-    if (error) throw error;
+    const passwordsRef = collection(db, "users", user.uid, "passwords");
+    const docRef = await addDoc(passwordsRef, passwordData);
 
     const newEntry: PasswordEntry = {
-      id: data.id,
-      categoryId: data.category_id,
-      title: data.title,
-      username: data.username,
+      id: docRef.id,
+      categoryId: entry.categoryId,
+      title: entry.title,
+      username: entry.username,
       password: entry.password,
-      website: data.website,
+      website: entry.website,
       notes: entry.notes,
-      isFavorite: data.is_favorite,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      lastUsed: data.last_used,
+      isFavorite: entry.isFavorite || false,
+      createdAt: now.toDate().toISOString(),
+      updatedAt: now.toDate().toISOString(),
     };
 
     setPasswords([...passwords, newEntry]);
@@ -194,18 +205,18 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     if (!user) throw new Error("Not authenticated");
     if (!isVaultUnlocked) throw new Error("Vault is locked");
 
-    const updateData: any = {};
+    const updateData: any = {
+      updatedAt: Timestamp.now(),
+    };
 
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.username !== undefined) updateData.username = updates.username;
     if (updates.website !== undefined) updateData.website = updates.website;
-    if (updates.categoryId !== undefined)
-      updateData.category_id = updates.categoryId;
-    if (updates.isFavorite !== undefined)
-      updateData.is_favorite = updates.isFavorite;
+    if (updates.categoryId !== undefined) updateData.categoryId = updates.categoryId;
+    if (updates.isFavorite !== undefined) updateData.isFavorite = updates.isFavorite;
 
     if (updates.password !== undefined) {
-      updateData.password_encrypted = await encryptionService.encryptPassword(
+      updateData.passwordEncrypted = await encryptionService.encryptPassword(
         updates.password
       );
     }
@@ -216,20 +227,13 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
         : null;
     }
 
-    updateData.updated_at = new Date().toISOString();
-
-    const { error } = await supabase
-      .from("passwords")
-      .update(updateData)
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) throw error;
+    const passwordRef = doc(db, "users", user.uid, "passwords", id);
+    await updateDoc(passwordRef, updateData);
 
     setPasswords(
       passwords.map((pwd) =>
         pwd.id === id
-          ? { ...pwd, ...updates, updatedAt: updateData.updated_at }
+          ? { ...pwd, ...updates, updatedAt: new Date().toISOString() }
           : pwd
       )
     );
@@ -238,13 +242,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const deletePassword = async (id: string) => {
     if (!user) throw new Error("Not authenticated");
 
-    const { error } = await supabase
-      .from("passwords")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) throw error;
+    const passwordRef = doc(db, "users", user.uid, "passwords", id);
+    await deleteDoc(passwordRef);
 
     setPasswords(passwords.filter((pwd) => pwd.id !== id));
   };
@@ -261,25 +260,23 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   ): Promise<Category> => {
     if (!user) throw new Error("Not authenticated");
 
-    const { data, error } = await supabase
-      .from("password_categories")
-      .insert({
-        user_id: user.id,
-        name: category.name,
-        color: category.color,
-        icon: category.icon,
-      })
-      .select()
-      .single();
+    const now = Timestamp.now();
+    const categoryData = {
+      name: category.name,
+      color: category.color,
+      icon: category.icon || null,
+      createdAt: now,
+    };
 
-    if (error) throw error;
+    const categoriesRef = collection(db, "users", user.uid, "password_categories");
+    const docRef = await addDoc(categoriesRef, categoryData);
 
     const newCategory: Category = {
-      id: data.id,
-      name: data.name,
-      color: data.color,
-      icon: data.icon,
-      createdAt: data.created_at,
+      id: docRef.id,
+      name: category.name,
+      color: category.color,
+      icon: category.icon,
+      createdAt: now.toDate().toISOString(),
     };
 
     setCategories([...categories, newCategory]);
@@ -289,13 +286,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const updateCategory = async (id: string, updates: Partial<Category>) => {
     if (!user) throw new Error("Not authenticated");
 
-    const { error } = await supabase
-      .from("password_categories")
-      .update(updates)
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) throw error;
+    const categoryRef = doc(db, "users", user.uid, "password_categories", id);
+    await updateDoc(categoryRef, updates);
 
     setCategories(
       categories.map((cat) => (cat.id === id ? { ...cat, ...updates } : cat))
@@ -305,13 +297,8 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const deleteCategory = async (id: string) => {
     if (!user) throw new Error("Not authenticated");
 
-    const { error } = await supabase
-      .from("password_categories")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    if (error) throw error;
+    const categoryRef = doc(db, "users", user.uid, "password_categories", id);
+    await deleteDoc(categoryRef);
 
     setCategories(categories.filter((cat) => cat.id !== id));
   };
@@ -365,5 +352,3 @@ export function useVault() {
   }
   return context;
 }
-
-

@@ -1,4 +1,13 @@
-import { supabase } from "../supabase";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  query,
+  orderBy,
+  limit,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { calculatePasswordStrength } from "../utils/passwordStrength";
 
 export interface SecurityEvent {
@@ -27,12 +36,13 @@ export class SecurityService {
     userAgent?: string
   ): Promise<void> {
     try {
-      await supabase.from("security_events").insert({
-        user_id: userId,
-        event_type: eventType,
+      const eventsRef = collection(db, "users", userId, "security_events");
+      await addDoc(eventsRef, {
+        eventType,
         description,
-        ip_address: ipAddress,
-        user_agent: userAgent,
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        createdAt: Timestamp.now(),
       });
     } catch (error) {
       console.error("Failed to log security event:", error);
@@ -42,18 +52,26 @@ export class SecurityService {
   // Get security events for user
   async getSecurityEvents(
     userId: string,
-    limit: number = 50
+    limitCount: number = 50
   ): Promise<SecurityEvent[]> {
     try {
-      const { data, error } = await supabase
-        .from("security_events")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
+      const eventsRef = collection(db, "users", userId, "security_events");
+      const eventsQuery = query(
+        eventsRef,
+        orderBy("createdAt", "desc"),
+        limit(limitCount)
+      );
+      const snapshot = await getDocs(eventsQuery);
 
-      if (error) throw error;
-      return data || [];
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        userId,
+        eventType: doc.data().eventType,
+        description: doc.data().description,
+        ipAddress: doc.data().ipAddress,
+        userAgent: doc.data().userAgent,
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString(),
+      }));
     } catch (error) {
       console.error("Failed to fetch security events:", error);
       return [];
@@ -172,10 +190,12 @@ export class SecurityService {
     stats: any;
   }> {
     try {
-      const { data: passwords } = await supabase
-        .from("passwords")
-        .select("*")
-        .eq("user_id", userId);
+      const passwordsRef = collection(db, "users", userId, "passwords");
+      const snapshot = await getDocs(passwordsRef);
+      const passwords = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
       if (!passwords || passwords.length === 0) {
         return {
@@ -292,5 +312,3 @@ export class SecurityService {
 }
 
 export const securityService = new SecurityService();
-
-

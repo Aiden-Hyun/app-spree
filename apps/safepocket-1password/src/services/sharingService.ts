@@ -1,4 +1,16 @@
-import { supabase } from "../supabase";
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { passwordService } from "./passwordService";
 
 export interface SharedPassword {
@@ -19,29 +31,30 @@ export class SharingService {
     permissionLevel: "read" | "write" = "read"
   ): Promise<{ success: boolean; message: string }> {
     try {
-      // Check if user exists
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", sharedWithEmail)
-        .single();
+      // Find user by email - search through users collection
+      const usersRef = collection(db, "users");
+      const userQuery = query(usersRef, where("email", "==", sharedWithEmail));
+      const userSnapshot = await getDocs(userQuery);
 
-      if (userError || !userData) {
+      if (userSnapshot.empty) {
         return {
           success: false,
           message: "User not found. Make sure they have a SafePocket account.",
         };
       }
 
-      // Check if already shared
-      const { data: existingShare } = await supabase
-        .from("shared_passwords")
-        .select("id")
-        .eq("password_id", passwordId)
-        .eq("shared_with_user_id", userData.id)
-        .single();
+      const sharedWithUserId = userSnapshot.docs[0].id;
 
-      if (existingShare) {
+      // Check if already shared
+      const sharesRef = collection(db, "shared_passwords");
+      const existingQuery = query(
+        sharesRef,
+        where("passwordId", "==", passwordId),
+        where("sharedWithUserId", "==", sharedWithUserId)
+      );
+      const existingSnapshot = await getDocs(existingQuery);
+
+      if (!existingSnapshot.empty) {
         return {
           success: false,
           message: "Password is already shared with this user.",
@@ -49,13 +62,14 @@ export class SharingService {
       }
 
       // Create share
-      const { error } = await supabase.from("shared_passwords").insert({
-        password_id: passwordId,
-        shared_with_user_id: userData.id,
-        permission_level: permissionLevel,
+      await addDoc(sharesRef, {
+        passwordId,
+        ownerId,
+        sharedWithUserId,
+        sharedWithEmail,
+        permissionLevel,
+        sharedAt: Timestamp.now(),
       });
-
-      if (error) throw error;
 
       // Log security event
       await passwordService.logSecurityEvent(
@@ -80,35 +94,53 @@ export class SharingService {
   // Get all passwords shared with the current user
   async getSharedWithMe(userId: string): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from("shared_passwords")
-        .select(
-          `
-          *,
-          passwords (
-            id,
-            title,
-            username,
-            password_encrypted,
-            website,
-            notes,
-            is_favorite,
-            category_id,
-            created_at,
-            updated_at,
-            last_used,
-            users (
-              email,
-              full_name
-            )
-          )
-        `
-        )
-        .eq("shared_with_user_id", userId);
+      const sharesRef = collection(db, "shared_passwords");
+      const sharesQuery = query(
+        sharesRef,
+        where("sharedWithUserId", "==", userId)
+      );
+      const sharesSnapshot = await getDocs(sharesQuery);
 
-      if (error) throw error;
+      const sharedPasswords = await Promise.all(
+        sharesSnapshot.docs.map(async (shareDoc) => {
+          const shareData = shareDoc.data();
+          
+          // Get the password document
+          const passwordRef = doc(
+            db,
+            "users",
+            shareData.ownerId,
+            "passwords",
+            shareData.passwordId
+          );
+          const passwordDoc = await getDoc(passwordRef);
 
-      return data || [];
+          if (!passwordDoc.exists()) {
+            return null;
+          }
+
+          // Get owner info
+          const ownerRef = doc(db, "users", shareData.ownerId);
+          const ownerDoc = await getDoc(ownerRef);
+          const ownerData = ownerDoc.data();
+
+          return {
+            shareId: shareDoc.id,
+            permissionLevel: shareData.permissionLevel,
+            sharedAt: shareData.sharedAt?.toDate?.()?.toISOString(),
+            password: {
+              id: passwordDoc.id,
+              ...passwordDoc.data(),
+              owner: {
+                email: ownerData?.email,
+                fullName: ownerData?.fullName,
+              },
+            },
+          };
+        })
+      );
+
+      return sharedPasswords.filter(Boolean);
     } catch (error) {
       console.error("Failed to get shared passwords:", error);
       return [];
@@ -118,31 +150,49 @@ export class SharingService {
   // Get all passwords shared by the current user
   async getSharedByMe(userId: string): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from("passwords")
-        .select(
-          `
-          id,
-          title,
-          shared_passwords (
-            id,
-            shared_with_user_id,
-            permission_level,
-            shared_at,
-            users (
-              email,
-              full_name
-            )
-          )
-        `
-        )
-        .eq("user_id", userId)
-        .not("shared_passwords", "is", null);
+      const sharesRef = collection(db, "shared_passwords");
+      const sharesQuery = query(sharesRef, where("ownerId", "==", userId));
+      const sharesSnapshot = await getDocs(sharesQuery);
 
-      if (error) throw error;
+      const sharedPasswords = await Promise.all(
+        sharesSnapshot.docs.map(async (shareDoc) => {
+          const shareData = shareDoc.data();
 
-      // Filter out passwords with no shares
-      return (data || []).filter((pwd) => pwd.shared_passwords?.length > 0);
+          // Get the password document
+          const passwordRef = doc(
+            db,
+            "users",
+            userId,
+            "passwords",
+            shareData.passwordId
+          );
+          const passwordDoc = await getDoc(passwordRef);
+
+          if (!passwordDoc.exists()) {
+            return null;
+          }
+
+          // Get shared with user info
+          const sharedWithRef = doc(db, "users", shareData.sharedWithUserId);
+          const sharedWithDoc = await getDoc(sharedWithRef);
+          const sharedWithData = sharedWithDoc.data();
+
+          return {
+            shareId: shareDoc.id,
+            permissionLevel: shareData.permissionLevel,
+            sharedAt: shareData.sharedAt?.toDate?.()?.toISOString(),
+            passwordId: shareData.passwordId,
+            passwordTitle: passwordDoc.data()?.title,
+            sharedWith: {
+              userId: shareData.sharedWithUserId,
+              email: sharedWithData?.email,
+              fullName: sharedWithData?.fullName,
+            },
+          };
+        })
+      );
+
+      return sharedPasswords.filter(Boolean);
     } catch (error) {
       console.error("Failed to get shared passwords:", error);
       return [];
@@ -156,12 +206,8 @@ export class SharingService {
     permissionLevel: "read" | "write"
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from("shared_passwords")
-        .update({ permission_level: permissionLevel })
-        .eq("id", shareId);
-
-      if (error) throw error;
+      const shareRef = doc(db, "shared_passwords", shareId);
+      await updateDoc(shareRef, { permissionLevel });
 
       await passwordService.logSecurityEvent(
         ownerId,
@@ -183,13 +229,17 @@ export class SharingService {
     ownerId: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from("shared_passwords")
-        .delete()
-        .eq("password_id", passwordId)
-        .eq("shared_with_user_id", sharedWithUserId);
+      const sharesRef = collection(db, "shared_passwords");
+      const shareQuery = query(
+        sharesRef,
+        where("passwordId", "==", passwordId),
+        where("sharedWithUserId", "==", sharedWithUserId)
+      );
+      const snapshot = await getDocs(shareQuery);
 
-      if (error) throw error;
+      if (!snapshot.empty) {
+        await deleteDoc(snapshot.docs[0].ref);
+      }
 
       await passwordService.logSecurityEvent(
         ownerId,
@@ -206,7 +256,7 @@ export class SharingService {
 
   // Check if user has permission to edit a shared password
   hasWritePermission(share: any): boolean {
-    return share.permission_level === "write";
+    return share.permissionLevel === "write";
   }
 
   // Get sharing statistics
@@ -235,5 +285,3 @@ export class SharingService {
 }
 
 export const sharingService = new SharingService();
-
-

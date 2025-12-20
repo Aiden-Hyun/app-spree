@@ -1,11 +1,17 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "../supabase";
+import {
+  User,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
 import { encryptionService } from "../services/encryptionService";
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   isVaultUnlocked: boolean;
   hasMasterPassword: boolean;
@@ -21,37 +27,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isVaultUnlocked, setIsVaultUnlocked] = useState(false);
   const [hasMasterPassword, setHasMasterPassword] = useState(false);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
 
-      // Check if user has master password set
-      if (session?.user) {
+      if (firebaseUser) {
+        // Check if user has master password set
         const hasPassword = await encryptionService.hasMasterPassword();
         setHasMasterPassword(hasPassword);
-      }
 
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      // Check if user has master password set
-      if (session?.user) {
-        const hasPassword = await encryptionService.hasMasterPassword();
-        setHasMasterPassword(hasPassword);
+        // Create user document if it doesn't exist
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+          await setDoc(userRef, {
+            email: firebaseUser.email,
+            createdAt: new Date().toISOString(),
+            twoFactorEnabled: false,
+            biometricEnabled: false,
+            autoLockMinutes: 15,
+            preferences: {},
+          });
+        }
       } else {
         // User logged out, lock vault
         encryptionService.lockVault();
@@ -62,23 +64,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { user: newUser } = await createUserWithEmailAndPassword(
+      auth,
       email,
-      password,
+      password
+    );
+
+    // Create user document in Firestore
+    await setDoc(doc(db, "users", newUser.uid), {
+      email: newUser.email,
+      createdAt: new Date().toISOString(),
+      twoFactorEnabled: false,
+      biometricEnabled: false,
+      autoLockMinutes: 15,
+      preferences: {},
     });
-    if (error) throw error;
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
@@ -86,8 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     encryptionService.lockVault();
     setIsVaultUnlocked(false);
 
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await signOut(auth);
   };
 
   const initializeMasterPassword = async (masterPassword: string) => {
@@ -109,7 +116,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    session,
     loading,
     isVaultUnlocked,
     hasMasterPassword,

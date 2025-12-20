@@ -1,4 +1,15 @@
-import { supabase } from "../supabase";
+import {
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { encryptionService } from "./encryptionService";
 
 export interface PasswordData {
@@ -20,11 +31,10 @@ export class PasswordService {
   // Log password usage
   async logPasswordUsage(passwordId: string, userId: string): Promise<void> {
     try {
-      await supabase
-        .from("passwords")
-        .update({ last_used: new Date().toISOString() })
-        .eq("id", passwordId)
-        .eq("user_id", userId);
+      const passwordRef = doc(db, "users", userId, "passwords", passwordId);
+      await updateDoc(passwordRef, {
+        lastUsed: Timestamp.now(),
+      });
 
       // Log security event
       await this.logSecurityEvent(
@@ -46,12 +56,13 @@ export class PasswordService {
     userAgent?: string
   ): Promise<void> {
     try {
-      await supabase.from("security_events").insert({
-        user_id: userId,
-        event_type: eventType,
+      const eventsRef = collection(db, "users", userId, "security_events");
+      await addDoc(eventsRef, {
+        eventType,
         description,
-        ip_address: ipAddress,
-        user_agent: userAgent,
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        createdAt: Timestamp.now(),
       });
     } catch (error) {
       console.error("Failed to log security event:", error);
@@ -60,13 +71,16 @@ export class PasswordService {
 
   // Add password to history when changed
   async addPasswordToHistory(
+    userId: string,
     passwordId: string,
     oldPasswordEncrypted: string
   ): Promise<void> {
     try {
-      await supabase.from("password_history").insert({
-        password_id: passwordId,
-        old_password_encrypted: oldPasswordEncrypted,
+      const historyRef = collection(db, "users", userId, "password_history");
+      await addDoc(historyRef, {
+        passwordId,
+        oldPasswordEncrypted,
+        changedAt: Timestamp.now(),
       });
     } catch (error) {
       console.error("Failed to add password to history:", error);
@@ -74,16 +88,21 @@ export class PasswordService {
   }
 
   // Get password history
-  async getPasswordHistory(passwordId: string): Promise<any[]> {
+  async getPasswordHistory(userId: string, passwordId: string): Promise<any[]> {
     try {
-      const { data, error } = await supabase
-        .from("password_history")
-        .select("*")
-        .eq("password_id", passwordId)
-        .order("changed_at", { ascending: false });
+      const historyRef = collection(db, "users", userId, "password_history");
+      const historyQuery = query(
+        historyRef,
+        where("passwordId", "==", passwordId),
+        orderBy("changedAt", "desc")
+      );
+      const snapshot = await getDocs(historyQuery);
 
-      if (error) throw error;
-      return data || [];
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        changedAt: doc.data().changedAt?.toDate?.()?.toISOString(),
+      }));
     } catch (error) {
       console.error("Failed to get password history:", error);
       return [];
@@ -96,14 +115,14 @@ export class PasswordService {
     encryptedPassword: string
   ): Promise<string[]> {
     try {
-      const { data, error } = await supabase
-        .from("passwords")
-        .select("id, title")
-        .eq("user_id", userId)
-        .eq("password_encrypted", encryptedPassword);
+      const passwordsRef = collection(db, "users", userId, "passwords");
+      const passwordsQuery = query(
+        passwordsRef,
+        where("passwordEncrypted", "==", encryptedPassword)
+      );
+      const snapshot = await getDocs(passwordsQuery);
 
-      if (error) throw error;
-      return data?.map((p) => p.title) || [];
+      return snapshot.docs.map((doc) => doc.data().title);
     } catch (error) {
       console.error("Failed to check duplicate passwords:", error);
       return [];
@@ -118,15 +137,12 @@ export class PasswordService {
     old: number;
   }> {
     try {
-      const { data, error } = await supabase
-        .from("passwords")
-        .select("*")
-        .eq("user_id", userId);
-
-      if (error) throw error;
+      const passwordsRef = collection(db, "users", userId, "passwords");
+      const snapshot = await getDocs(passwordsRef);
+      const passwords = snapshot.docs.map((doc) => doc.data());
 
       const stats = {
-        total: data?.length || 0,
+        total: passwords.length,
         weak: 0,
         reused: 0,
         old: 0,
@@ -136,17 +152,18 @@ export class PasswordService {
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-      data?.forEach((pwd) => {
-        if (new Date(pwd.updated_at) < ninetyDaysAgo) {
+      passwords.forEach((pwd) => {
+        const updatedAt = pwd.updatedAt?.toDate?.() || new Date(pwd.updatedAt);
+        if (updatedAt < ninetyDaysAgo) {
           stats.old++;
         }
       });
 
       // Check for reused passwords
       const passwordMap = new Map<string, number>();
-      data?.forEach((pwd) => {
-        const count = passwordMap.get(pwd.password_encrypted) || 0;
-        passwordMap.set(pwd.password_encrypted, count + 1);
+      passwords.forEach((pwd) => {
+        const count = passwordMap.get(pwd.passwordEncrypted) || 0;
+        passwordMap.set(pwd.passwordEncrypted, count + 1);
       });
 
       passwordMap.forEach((count) => {
@@ -161,96 +178,6 @@ export class PasswordService {
       return { total: 0, weak: 0, reused: 0, old: 0 };
     }
   }
-
-  // Share password with another user
-  async sharePassword(
-    passwordId: string,
-    ownerId: string,
-    sharedWithEmail: string,
-    permissionLevel: "read" | "write" = "read"
-  ): Promise<void> {
-    try {
-      // Get user ID from email
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", sharedWithEmail)
-        .single();
-
-      if (userError || !userData) {
-        throw new Error("User not found");
-      }
-
-      // Create shared password entry
-      const { error } = await supabase.from("shared_passwords").insert({
-        password_id: passwordId,
-        shared_with_user_id: userData.id,
-        permission_level: permissionLevel,
-      });
-
-      if (error) throw error;
-
-      // Log security event
-      await this.logSecurityEvent(
-        ownerId,
-        "password_shared",
-        `Password shared with ${sharedWithEmail}`
-      );
-    } catch (error) {
-      console.error("Failed to share password:", error);
-      throw error;
-    }
-  }
-
-  // Get shared passwords
-  async getSharedPasswords(userId: string): Promise<any[]> {
-    try {
-      const { data, error } = await supabase
-        .from("shared_passwords")
-        .select(
-          `
-          *,
-          passwords (
-            id,
-            title,
-            username,
-            password_encrypted,
-            website,
-            notes,
-            user_id
-          )
-        `
-        )
-        .eq("shared_with_user_id", userId);
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error("Failed to get shared passwords:", error);
-      return [];
-    }
-  }
-
-  // Remove password sharing
-  async unsharePassword(
-    passwordId: string,
-    sharedWithUserId: string
-  ): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from("shared_passwords")
-        .delete()
-        .eq("password_id", passwordId)
-        .eq("shared_with_user_id", sharedWithUserId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error("Failed to unshare password:", error);
-      throw error;
-    }
-  }
 }
 
 export const passwordService = new PasswordService();
-
-

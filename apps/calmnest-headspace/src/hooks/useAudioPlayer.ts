@@ -90,9 +90,15 @@ export function useAudioPlayer(initialSource?: string | number | null) {
 
   // Load a new audio source using player.replace()
   const loadAudio = useCallback(async (source: string | number) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAudioPlayer.ts:94',message:'loadAudio called',data:{source:String(source)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     try {
       setError(null);
       const resolved = resolveAudioSource(source);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useAudioPlayer.ts:100',message:'resolved AudioSource',data:{resolved:JSON.stringify(resolved)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       if (resolved) {
         player.replace(resolved);
         hasLoadedRef.current = true;
