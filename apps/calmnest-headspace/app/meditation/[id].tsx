@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,8 @@ import { MeditationTimer } from '../../src/components/MeditationTimer';
 import { AudioPlayer } from '../../src/components/AudioPlayer';
 import { useMeditation } from '../../src/hooks/useMeditation';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
+import { getMeditationById } from '../../src/services/firestoreService';
+import { getAudioFile } from '../../src/constants/audioFiles';
 import { theme } from '../../src/theme';
 import { GuidedMeditation } from '../../src/types';
 
@@ -15,6 +17,7 @@ function MeditationPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [meditation, setMeditation] = useState<GuidedMeditation | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showTimer, setShowTimer] = useState(false);
 
   const audioPlayer = useAudioPlayer();
@@ -27,27 +30,46 @@ function MeditationPlayerScreen() {
     },
   });
 
+  // Load meditation data from Firestore
   useEffect(() => {
-    // Load meditation data (dummy data for now)
-    const dummyMeditation: GuidedMeditation = {
-      id: id as string,
-      title: 'Morning Mindfulness',
-      description: 'Start your day with clarity and purpose. This guided meditation will help you set positive intentions and cultivate awareness.',
-      duration_minutes: 10,
-      audio_url: '', // TODO: Add real audio URL
-      category: 'focus',
-      difficulty_level: 'beginner',
-      instructor: 'Sarah Chen',
-      is_premium: false,
-      created_at: new Date().toISOString(),
-    };
-    setMeditation(dummyMeditation);
+    async function loadMeditation() {
+      try {
+        setLoading(true);
+        const data = await getMeditationById(id as string);
+        setMeditation(data);
+      } catch (error) {
+        console.error('Failed to load meditation:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    if (id) {
+      loadMeditation();
+    }
   }, [id]);
 
+  // Load audio when meditation data is available
   useEffect(() => {
-    if (meditation?.audio_url) {
-      audioPlayer.loadAudio(meditation.audio_url);
+    if (meditation) {
+      // Try to load local audio file first, fall back to remote URL
+      const audioFile = meditation.audio_file 
+        ? getAudioFile(meditation.audio_file)
+        : null;
+      
+      if (audioFile) {
+        // Load local audio asset
+        audioPlayer.loadAudio(audioFile);
+      } else if (meditation.audio_url) {
+        // Fall back to remote URL
+        audioPlayer.loadAudio(meditation.audio_url);
+      }
     }
+    
+    // Cleanup audio on unmount
+    return () => {
+      audioPlayer.cleanup();
+    };
   }, [meditation]);
 
   const handlePlayPause = () => {
@@ -66,12 +88,50 @@ function MeditationPlayerScreen() {
     }
   };
 
+  // Get gradient colors based on category
+  const getGradientColors = (): [string, string, string] => {
+    const category = meditation?.category || 'focus';
+    switch (category) {
+      case 'sleep':
+        return ['#1A1D29', '#2A2D3E', '#3D4158'];
+      case 'stress':
+      case 'anxiety':
+        return ['#8B9F82', '#A8B89F', '#C4D4BC'];
+      case 'focus':
+        return ['#7B8FA1', '#9AABB8', '#B8C7D1'];
+      case 'gratitude':
+      case 'loving-kindness':
+        return ['#C4A77D', '#D4BFA0', '#E4D7C0'];
+      default:
+        return ['#8B9F82', '#A8B89F', '#D4D9D2'];
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <LinearGradient colors={['#8B9F82', '#A8B89F', '#D4D9D2']} style={styles.gradient}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="white" />
+            <Text style={styles.loadingText}>Loading meditation...</Text>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
+
   if (!meditation) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <Text>Loading...</Text>
-        </View>
+        <LinearGradient colors={['#8B9F82', '#A8B89F', '#D4D9D2']} style={styles.gradient}>
+          <View style={styles.loadingContainer}>
+            <Ionicons name="alert-circle-outline" size={64} color="white" />
+            <Text style={styles.errorText}>Meditation not found</Text>
+            <TouchableOpacity style={styles.backButtonLarge} onPress={() => router.back()}>
+              <Text style={styles.backButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
@@ -79,7 +139,7 @@ function MeditationPlayerScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={['#6c5ce7', '#a29bfe', '#dfe6e9']}
+        colors={getGradientColors()}
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -90,16 +150,29 @@ function MeditationPlayerScreen() {
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="white" />
+            <Ionicons name="heart-outline" size={24} color="white" />
           </TouchableOpacity>
         </View>
 
         {/* Content */}
         <View style={styles.content}>
           <View style={styles.infoContainer}>
+            <Text style={styles.category}>{meditation.category?.replace('-', ' ')}</Text>
             <Text style={styles.title}>{meditation.title}</Text>
-            <Text style={styles.instructor}>with {meditation.instructor}</Text>
-            <Text style={styles.description}>{meditation.description}</Text>
+            <Text style={styles.instructor}>with {meditation.instructor || 'Guide'}</Text>
+            <Text style={styles.description} numberOfLines={3}>
+              {meditation.description}
+            </Text>
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <Ionicons name="time-outline" size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.metaText}>{meditation.duration_minutes} min</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Ionicons name="fitness-outline" size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.metaText}>{meditation.difficulty_level}</Text>
+              </View>
+            </View>
           </View>
 
           {/* Toggle between Timer and Audio Player */}
@@ -142,7 +215,7 @@ function MeditationPlayerScreen() {
                   colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
                   style={styles.artwork}
                 >
-                  <Ionicons name="leaf" size={120} color="white" />
+                  <Ionicons name="leaf" size={100} color="white" />
                 </LinearGradient>
               </View>
               
@@ -178,6 +251,30 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 16,
+    color: 'white',
+  },
+  errorText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 18,
+    color: 'white',
+    marginTop: 16,
+  },
+  backButtonLarge: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: theme.borderRadius.lg,
+  },
+  backButtonText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 16,
+    color: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -188,17 +285,17 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.lg,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   moreButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -211,24 +308,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
   },
+  category: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.xs,
+  },
   title: {
+    fontFamily: theme.fonts.display.semiBold,
     fontSize: 28,
-    fontWeight: '700',
     color: 'white',
     textAlign: 'center',
     marginBottom: theme.spacing.sm,
   },
   instructor: {
-    fontSize: 16,
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 15,
     color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: theme.spacing.md,
   },
   description: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontFamily: theme.fonts.body.regular,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.85)',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: theme.spacing.xl,
+    lineHeight: 22,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textTransform: 'capitalize',
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -247,8 +370,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   toggleText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 15,
     color: 'rgba(255, 255, 255, 0.8)',
   },
   toggleTextActive: {
@@ -263,9 +386,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xxl,
   },
   artwork: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
   },

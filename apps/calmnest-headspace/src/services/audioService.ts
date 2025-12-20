@@ -63,7 +63,11 @@ export class AudioService {
     }
   };
 
-  async loadAudio(uri: string) {
+  /**
+   * Load audio from a URI string or a local asset (require())
+   * @param source - Either a URI string or a require() asset number
+   */
+  async loadAudio(source: string | number) {
     try {
       this.updateState({ isLoading: true, error: null });
 
@@ -72,9 +76,14 @@ export class AudioService {
         await this.unloadAudio();
       }
 
+      // Determine if source is a local asset (number) or remote URI (string)
+      const audioSource = typeof source === 'number' 
+        ? source  // Local asset from require()
+        : { uri: source };  // Remote URI
+
       // Create and load new sound
       const { sound } = await Audio.Sound.createAsync(
-        { uri },
+        audioSource,
         { shouldPlay: false },
         this.onPlaybackStatusUpdate
       );

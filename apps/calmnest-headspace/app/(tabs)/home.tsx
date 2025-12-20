@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -136,16 +136,29 @@ function HomeScreen() {
                 params: { id: featuredSession.id }
               })}
             >
+              {featuredSession.thumbnail_url ? (
+                <Image 
+                  source={{ uri: featuredSession.thumbnail_url }} 
+                  style={styles.featuredImage}
+                />
+              ) : null}
               <LinearGradient
-                colors={['#A8B89F', '#8B9F82']}
-                style={styles.featuredGradient}
+                colors={featuredSession.thumbnail_url 
+                  ? ['transparent', 'rgba(0,0,0,0.6)'] 
+                  : ['#A8B89F', '#8B9F82']}
+                style={[
+                  styles.featuredGradient,
+                  featuredSession.thumbnail_url && styles.featuredGradientOverlay
+                ]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                end={{ x: 0, y: 1 }}
               >
                 <View style={styles.featuredContent}>
-                  <View style={styles.featuredIcon}>
-                    <Ionicons name="leaf" size={28} color="white" />
-                  </View>
+                  {!featuredSession.thumbnail_url && (
+                    <View style={styles.featuredIcon}>
+                      <Ionicons name="leaf" size={28} color="white" />
+                    </View>
+                  )}
                   <View style={styles.featuredInfo}>
                     <Text style={styles.featuredTitle}>{featuredSession.title}</Text>
                     <Text style={styles.featuredMeta}>
@@ -313,9 +326,19 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.xl,
     overflow: 'hidden',
     ...theme.shadows.md,
+    position: 'relative',
+  },
+  featuredImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   featuredGradient: {
     padding: theme.spacing.lg,
+  },
+  featuredGradientOverlay: {
+    paddingTop: 60,
   },
   featuredContent: {
     flexDirection: 'row',

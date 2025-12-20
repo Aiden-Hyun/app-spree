@@ -35,12 +35,14 @@ export interface GuidedMeditation {
   title: string;
   description: string;
   duration_minutes: number;
-  audio_url: string;
+  audio_url?: string;
+  audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
   category: MeditationCategory;
   difficulty_level: 'beginner' | 'intermediate' | 'advanced';
   instructor?: string;
   is_premium: boolean;
+  tags?: string[];
   created_at: string;
 }
 
@@ -102,9 +104,10 @@ export interface SleepStory {
   description: string;
   narrator: string;
   duration_minutes: number;
-  audio_url: string;
+  audio_url?: string;
+  audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
-  category: 'nature' | 'fantasy' | 'travel' | 'fiction';
+  category: 'nature' | 'fantasy' | 'travel' | 'fiction' | 'ocean' | 'rain';
   is_premium: boolean;
   created_at: string;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -139,11 +139,22 @@ function MeditateScreen() {
               activeOpacity={0.9}
               onPress={() => handleMeditationPress(recommendedSession)}
             >
+              {recommendedSession.thumbnail_url ? (
+                <Image 
+                  source={{ uri: recommendedSession.thumbnail_url }} 
+                  style={styles.recommendedImage}
+                />
+              ) : null}
               <LinearGradient
-                colors={['#A8B89F', '#8B9F82']}
-                style={styles.recommendedGradient}
+                colors={recommendedSession.thumbnail_url 
+                  ? ['transparent', 'rgba(0,0,0,0.7)'] 
+                  : ['#A8B89F', '#8B9F82']}
+                style={[
+                  styles.recommendedGradient,
+                  recommendedSession.thumbnail_url && styles.recommendedGradientOverlay
+                ]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                end={{ x: 0, y: 1 }}
               >
                 <View style={styles.recommendedBadge}>
                   <Ionicons name="sparkles" size={14} color="white" />
@@ -226,9 +237,16 @@ function MeditateScreen() {
                   onPress={() => handleMeditationPress(meditation)}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.sessionIcon}>
-                    <Ionicons name="leaf" size={20} color={theme.colors.primary} />
-                  </View>
+                  {meditation.thumbnail_url ? (
+                    <Image 
+                      source={{ uri: meditation.thumbnail_url }} 
+                      style={styles.sessionImage}
+                    />
+                  ) : (
+                    <View style={styles.sessionIcon}>
+                      <Ionicons name="leaf" size={20} color={theme.colors.primary} />
+                    </View>
+                  )}
                   <View style={styles.sessionInfo}>
                     <Text style={styles.sessionTitle}>{meditation.title}</Text>
                     <Text style={styles.sessionMeta}>
@@ -318,9 +336,19 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.xl,
     overflow: 'hidden',
     ...theme.shadows.md,
+    position: 'relative',
+  },
+  recommendedImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   recommendedGradient: {
     padding: theme.spacing.xl,
+  },
+  recommendedGradientOverlay: {
+    paddingTop: 100,
   },
   recommendedBadge: {
     flexDirection: 'row',
@@ -449,6 +477,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.gray[100],
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sessionImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    resizeMode: 'cover',
   },
   sessionInfo: {
     flex: 1,

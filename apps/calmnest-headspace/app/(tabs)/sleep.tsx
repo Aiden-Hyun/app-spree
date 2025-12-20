@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -81,11 +81,22 @@ function SleepScreen() {
                     // TODO: Navigate to story player
                   }}
                 >
+                  {featuredStory.thumbnail_url ? (
+                    <Image 
+                      source={{ uri: featuredStory.thumbnail_url }} 
+                      style={styles.featuredImage}
+                    />
+                  ) : null}
                   <LinearGradient
-                    colors={['#3D4158', '#2A2D3E']}
-                    style={styles.featuredGradient}
+                    colors={featuredStory.thumbnail_url 
+                      ? ['transparent', 'rgba(26, 29, 41, 0.9)'] 
+                      : ['#3D4158', '#2A2D3E']}
+                    style={[
+                      styles.featuredGradient,
+                      featuredStory.thumbnail_url && styles.featuredGradientOverlay
+                    ]}
                     start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
+                    end={{ x: 0, y: 1 }}
                   >
                     <View style={styles.featuredStars}>
                       <Text style={styles.starsEmoji}>✨</Text>
@@ -168,13 +179,20 @@ function SleepScreen() {
                         // TODO: Navigate to story player
                       }}
                     >
-                      <View style={styles.storyIcon}>
-                        <Text style={styles.storyEmoji}>
-                          {story.category === 'nature' ? '🌲' :
-                           story.category === 'fantasy' ? '🏰' :
-                           story.category === 'travel' ? '✈️' : '📖'}
-                        </Text>
-                      </View>
+                      {story.thumbnail_url ? (
+                        <Image 
+                          source={{ uri: story.thumbnail_url }} 
+                          style={styles.storyImage}
+                        />
+                      ) : (
+                        <View style={styles.storyIcon}>
+                          <Text style={styles.storyEmoji}>
+                            {story.category === 'nature' ? '🌲' :
+                             story.category === 'fantasy' ? '🏰' :
+                             story.category === 'travel' ? '✈️' : '📖'}
+                          </Text>
+                        </View>
+                      )}
                       <Text style={styles.storyTitle} numberOfLines={2}>
                         {story.title}
                       </Text>
@@ -272,9 +290,19 @@ const styles = StyleSheet.create({
   featuredCard: {
     borderRadius: theme.borderRadius.xl,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  featuredImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   featuredGradient: {
     padding: theme.spacing.xl,
+  },
+  featuredGradientOverlay: {
+    paddingTop: 100,
   },
   featuredStars: {
     marginBottom: theme.spacing.sm,
@@ -371,6 +399,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.sleepSurface,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
+  },
+  storyImage: {
+    width: '100%',
+    height: 80,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+    resizeMode: 'cover',
   },
   storyIcon: {
     width: 48,

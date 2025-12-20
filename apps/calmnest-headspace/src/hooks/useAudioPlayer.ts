@@ -20,9 +20,13 @@ export function useAudioPlayer() {
     };
   }, []);
 
-  const loadAudio = useCallback(async (uri: string) => {
+  /**
+   * Load audio from a URI string or a local asset (require())
+   * @param source - Either a URI string or a require() asset number
+   */
+  const loadAudio = useCallback(async (source: string | number) => {
     try {
-      await audioService.loadAudio(uri);
+      await audioService.loadAudio(source);
     } catch (error) {
       console.error('Failed to load audio:', error);
     }
