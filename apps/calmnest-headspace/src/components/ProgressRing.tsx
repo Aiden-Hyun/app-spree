@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
-import { theme } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../theme';
 
 interface ProgressRingProps {
   progress: number; // 0-100
@@ -17,11 +18,17 @@ export function ProgressRing({
   progress,
   size = 100,
   strokeWidth = 8,
-  color = theme.colors.primary,
-  backgroundColor = theme.colors.gray[300],
+  color,
+  backgroundColor,
   centerText,
   centerSubtext,
 }: ProgressRingProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  
+  const ringColor = color || theme.colors.primary;
+  const ringBackgroundColor = backgroundColor || theme.colors.gray[300];
+  
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
@@ -35,7 +42,7 @@ export function ProgressRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={backgroundColor}
+            stroke={ringBackgroundColor}
             strokeWidth={strokeWidth}
             fill="none"
           />
@@ -44,7 +51,7 @@ export function ProgressRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={color}
+            stroke={ringColor}
             strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={`${circumference} ${circumference}`}
@@ -63,27 +70,29 @@ export function ProgressRing({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-  },
-  centerContent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  centerSubtext: {
-    fontSize: 14,
-    color: theme.colors.textLight,
-    marginTop: 2,
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      position: 'relative',
+    },
+    centerContent: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    centerText: {
+      fontFamily: theme.fonts.display.bold,
+      fontSize: 24,
+      color: theme.colors.text,
+    },
+    centerSubtext: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textLight,
+      marginTop: 2,
+    },
+  });

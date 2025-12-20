@@ -1,33 +1,36 @@
+import { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, View } from 'react-native';
-import { theme } from '../../src/theme';
+import { Platform } from 'react-native';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
+  const screenOptions = useMemo(() => ({
+    tabBarActiveTintColor: theme.colors.primary,
+    tabBarInactiveTintColor: theme.colors.textMuted,
+    tabBarStyle: {
+      backgroundColor: theme.colors.surface,
+      borderTopWidth: 0,
+      paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+      paddingTop: 8,
+      height: Platform.OS === 'ios' ? 88 : 64,
+      ...theme.shadows.md,
+    },
+    tabBarLabelStyle: {
+      fontSize: 11,
+      fontWeight: '500' as const,
+      marginTop: 2,
+    },
+    tabBarIconStyle: {
+      marginTop: 4,
+    },
+    headerShown: false,
+  }), [theme]);
+
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-          paddingTop: 8,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          ...theme.shadows.md,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-          marginTop: 2,
-        },
-        tabBarIconStyle: {
-          marginTop: 4,
-        },
-        headerShown: false,
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="home"
         options={{

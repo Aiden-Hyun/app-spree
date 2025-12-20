@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { AuthProvider } from '../src/contexts/AuthContext';
+import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { useFonts } from '../src/hooks/useFonts';
-import { theme } from '../src/theme';
+import { lightColors } from '../src/theme';
 
 function LoadingScreen() {
   return (
@@ -12,10 +13,67 @@ function LoadingScreen() {
       <Text style={styles.loadingText}>CalmNest</Text>
       <ActivityIndicator 
         size="small" 
-        color={theme.colors.primary} 
+        color={lightColors.primary} 
         style={styles.loadingSpinner}
       />
     </View>
+  );
+}
+
+function RootNavigator() {
+  const { theme } = useTheme();
+
+  const screenOptions = useMemo(() => ({
+    headerStyle: {
+      backgroundColor: theme.colors.background,
+    },
+    headerTintColor: theme.colors.text,
+    headerTitleStyle: {
+      fontFamily: 'DMSans-SemiBold',
+    },
+    headerShadowVisible: false,
+    contentStyle: {
+      backgroundColor: theme.colors.background,
+    },
+  }), [theme]);
+
+  return (
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="login" 
+        options={{ 
+          title: 'Welcome',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="meditation/[id]" 
+        options={{ 
+          title: '',
+          headerTransparent: true,
+        }} 
+      />
+      <Stack.Screen 
+        name="breathing" 
+        options={{ 
+          title: 'Breathe',
+          presentation: 'modal',
+        }} 
+      />
+      <Stack.Screen 
+        name="stats" 
+        options={{ 
+          title: 'Your Journey',
+        }} 
+      />
+      <Stack.Screen 
+        name="settings" 
+        options={{ 
+          title: 'Settings',
+        }} 
+      />
+    </Stack>
   );
 }
 
@@ -35,65 +93,18 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <Stack
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: theme.colors.background,
-          },
-          headerTintColor: theme.colors.text,
-          headerTitleStyle: {
-            fontFamily: 'DMSans-SemiBold',
-          },
-          headerShadowVisible: false,
-          contentStyle: {
-            backgroundColor: theme.colors.background,
-          },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen 
-          name="login" 
-          options={{ 
-            title: 'Welcome',
-            headerShown: false,
-          }} 
-        />
-        <Stack.Screen 
-          name="meditation/[id]" 
-          options={{ 
-            title: '',
-            headerTransparent: true,
-          }} 
-        />
-        <Stack.Screen 
-          name="breathing" 
-          options={{ 
-            title: 'Breathe',
-            presentation: 'modal',
-          }} 
-        />
-        <Stack.Screen 
-          name="stats" 
-          options={{ 
-            title: 'Your Journey',
-          }} 
-        />
-        <Stack.Screen 
-          name="settings" 
-          options={{ 
-            title: 'Settings',
-          }} 
-        />
-      </Stack>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: lightColors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -104,7 +115,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 28,
     fontWeight: '600',
-    color: theme.colors.primary,
+    color: lightColors.primary,
     letterSpacing: -0.5,
   },
   loadingSpinner: {

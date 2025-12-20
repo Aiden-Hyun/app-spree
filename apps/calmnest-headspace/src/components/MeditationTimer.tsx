@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../theme';
 
 interface MeditationTimerProps {
   progress: number; // 0-100
@@ -30,6 +31,9 @@ export function MeditationTimer({
   onStop,
   size = DEFAULT_SIZE,
 }: MeditationTimerProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  
   const strokeWidth = size * 0.06;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -130,65 +134,67 @@ export function MeditationTimer({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
-  timerContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  svg: {
-    position: 'absolute',
-  },
-  timerContent: {
-    alignItems: 'center',
-  },
-  timeText: {
-    fontSize: 48,
-    fontWeight: '300',
-    color: theme.colors.text,
-    letterSpacing: 2,
-  },
-  statusText: {
-    fontSize: 18,
-    color: theme.colors.textLight,
-    marginTop: theme.spacing.sm,
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.xxl,
-    gap: theme.spacing.lg,
-  },
-  primaryButton: {
-    backgroundColor: theme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.borderRadius.full,
-    gap: theme.spacing.sm,
-    ...theme.shadows.md,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: theme.colors.gray[200],
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-  placeholderButton: {
-    width: 56,
-    height: 56,
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      alignItems: 'center',
+    },
+    timerContainer: {
+      position: 'relative',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    svg: {
+      position: 'absolute',
+    },
+    timerContent: {
+      alignItems: 'center',
+    },
+    timeText: {
+      fontFamily: theme.fonts.display.regular,
+      fontSize: 48,
+      color: theme.colors.text,
+      letterSpacing: 2,
+    },
+    statusText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 18,
+      color: theme.colors.textLight,
+      marginTop: theme.spacing.sm,
+    },
+    controls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: theme.spacing.xxl,
+      gap: theme.spacing.lg,
+    },
+    primaryButton: {
+      backgroundColor: theme.colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.xl,
+      borderRadius: theme.borderRadius.full,
+      gap: theme.spacing.sm,
+      ...theme.shadows.md,
+    },
+    primaryButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      color: 'white',
+      fontSize: 18,
+    },
+    secondaryButton: {
+      backgroundColor: theme.colors.gray[200],
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...theme.shadows.sm,
+    },
+    placeholderButton: {
+      width: 56,
+      height: 56,
+    },
+  });

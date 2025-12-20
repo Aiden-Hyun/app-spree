@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../theme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../theme';
 
 interface BreathingGuideProps {
   isActive: boolean;
@@ -33,13 +34,15 @@ export function BreathingGuide({
   onResume,
   onStop,
 }: BreathingGuideProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0.3)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (currentPhase === 'inhale') {
-      // Expand animation
       Animated.parallel([
         Animated.timing(scaleAnim, {
           toValue: 1.2,
@@ -53,7 +56,6 @@ export function BreathingGuide({
         }),
       ]).start();
     } else if (currentPhase === 'exhale') {
-      // Contract animation
       Animated.parallel([
         Animated.timing(scaleAnim, {
           toValue: 0.8,
@@ -69,7 +71,6 @@ export function BreathingGuide({
     }
   }, [currentPhase, scaleAnim, opacityAnim]);
 
-  // Continuous rotation animation
   useEffect(() => {
     if (isActive && !isPaused) {
       Animated.loop(
@@ -177,111 +178,113 @@ export function BreathingGuide({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  visualContainer: {
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.xxl,
-  },
-  outerCircle: {
-    position: 'absolute',
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-    borderRadius: CIRCLE_SIZE / 2,
-    borderWidth: 1,
-    borderColor: theme.colors.gray[300],
-  },
-  dot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.primary,
-  },
-  dotTop: {
-    top: -4,
-    left: '50%',
-    marginLeft: -4,
-  },
-  dotRight: {
-    right: -4,
-    top: '50%',
-    marginTop: -4,
-  },
-  dotBottom: {
-    bottom: -4,
-    left: '50%',
-    marginLeft: -4,
-  },
-  dotLeft: {
-    left: -4,
-    top: '50%',
-    marginTop: -4,
-  },
-  breathingCircle: {
-    position: 'absolute',
-    width: CIRCLE_SIZE * 0.8,
-    height: CIRCLE_SIZE * 0.8,
-    borderRadius: (CIRCLE_SIZE * 0.8) / 2,
-  },
-  innerCircle: {
-    width: CIRCLE_SIZE * 0.5,
-    height: CIRCLE_SIZE * 0.5,
-    borderRadius: (CIRCLE_SIZE * 0.5) / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...theme.shadows.md,
-  },
-  instructionText: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-  },
-  cycleText: {
-    fontSize: 18,
-    color: theme.colors.textLight,
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.lg,
-  },
-  primaryButton: {
-    backgroundColor: theme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: theme.borderRadius.full,
-    gap: theme.spacing.sm,
-    ...theme.shadows.md,
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: theme.colors.gray[200],
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-  placeholderButton: {
-    width: 56,
-    height: 56,
-  },
-});
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    visualContainer: {
+      width: CIRCLE_SIZE,
+      height: CIRCLE_SIZE,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.xxl,
+    },
+    outerCircle: {
+      position: 'absolute',
+      width: CIRCLE_SIZE,
+      height: CIRCLE_SIZE,
+      borderRadius: CIRCLE_SIZE / 2,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    dot: {
+      position: 'absolute',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.primary,
+    },
+    dotTop: {
+      top: -4,
+      left: '50%',
+      marginLeft: -4,
+    },
+    dotRight: {
+      right: -4,
+      top: '50%',
+      marginTop: -4,
+    },
+    dotBottom: {
+      bottom: -4,
+      left: '50%',
+      marginLeft: -4,
+    },
+    dotLeft: {
+      left: -4,
+      top: '50%',
+      marginTop: -4,
+    },
+    breathingCircle: {
+      position: 'absolute',
+      width: CIRCLE_SIZE * 0.8,
+      height: CIRCLE_SIZE * 0.8,
+      borderRadius: (CIRCLE_SIZE * 0.8) / 2,
+    },
+    innerCircle: {
+      width: CIRCLE_SIZE * 0.5,
+      height: CIRCLE_SIZE * 0.5,
+      borderRadius: (CIRCLE_SIZE * 0.5) / 2,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...theme.shadows.md,
+    },
+    instructionText: {
+      fontFamily: theme.fonts.display.semiBold,
+      fontSize: 28,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm,
+    },
+    cycleText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 18,
+      color: theme.colors.textLight,
+    },
+    controls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.lg,
+    },
+    primaryButton: {
+      backgroundColor: theme.colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.xl,
+      borderRadius: theme.borderRadius.full,
+      gap: theme.spacing.sm,
+      ...theme.shadows.md,
+    },
+    primaryButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      color: 'white',
+      fontSize: 18,
+    },
+    secondaryButton: {
+      backgroundColor: theme.colors.gray[200],
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...theme.shadows.sm,
+    },
+    placeholderButton: {
+      width: 56,
+      height: 56,
+    },
+  });
