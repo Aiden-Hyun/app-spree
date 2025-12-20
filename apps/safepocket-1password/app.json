@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "SafePocket",
+    "slug": "safepocket-1password",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.safepocket.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.safepocket.app",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-local-authentication"],
+    "scheme": "safepocket"
+  }
+}
+
