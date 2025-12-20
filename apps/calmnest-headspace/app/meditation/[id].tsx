@@ -54,27 +54,13 @@ function MeditationPlayerScreen() {
 
   useEffect(() => {
     if (meditation) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'[id].tsx:57',message:'Meditation data from Firestore',data:{id:meditation.id,title:meditation.title,audio_file:meditation.audio_file,audio_url:meditation.audio_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
       const audioFile = meditation.audio_file 
         ? getAudioFile(meditation.audio_file)
         : null;
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'[id].tsx:66',message:'getAudioFile result',data:{inputKey:meditation.audio_file,resolvedUrl:audioFile},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      
       if (audioFile) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'[id].tsx:71',message:'Loading audio via audioFile',data:{urlBeingLoaded:audioFile},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         audioPlayer.loadAudio(audioFile);
       } else if (meditation.audio_url) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'[id].tsx:77',message:'Loading audio via audio_url fallback',data:{urlBeingLoaded:meditation.audio_url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         audioPlayer.loadAudio(meditation.audio_url);
       }
     }

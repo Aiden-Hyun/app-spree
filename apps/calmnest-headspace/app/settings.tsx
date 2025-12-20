@@ -122,6 +122,29 @@ function SettingsScreen() {
           </View>
         </View>
 
+        {/* Audio Attribution */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Audio Credits</Text>
+          <View style={styles.card}>
+            <View style={styles.attributionItem}>
+              <Text style={styles.attributionTitle}>Guided Meditation</Text>
+              <Text style={styles.attributionText}>
+                "Guided Meditation" by Swami Guruparananda{'\n'}
+                Source: Internet Archive{'\n'}
+                License: Public Domain
+              </Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.attributionItem}>
+              <Text style={styles.attributionTitle}>Ambient Music</Text>
+              <Text style={styles.attributionText}>
+                SoundHelix Sample Music{'\n'}
+                Free for use
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* Sign Out */}
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
@@ -252,6 +275,22 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       color: theme.colors.textMuted,
       textAlign: 'center',
       marginBottom: theme.spacing.xxl,
+    },
+    attributionItem: {
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.sm,
+    },
+    attributionTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 14,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.xs,
+    },
+    attributionText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 13,
+      color: theme.colors.textLight,
+      lineHeight: 20,
     },
   });
 
