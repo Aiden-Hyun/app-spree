@@ -1,97 +1,155 @@
-import { useState, useEffect, useCallback } from 'react';
-import { audioService, AudioState } from '../services/audioService';
+import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useAudioPlayer as useExpoAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { getAudioFile } from '../constants/audioFiles';
 
-export function useAudioPlayer() {
-  const [audioState, setAudioState] = useState<AudioState>({
-    isPlaying: false,
-    isLoading: false,
-    duration: 0,
-    position: 0,
-    error: null,
+export interface AudioPlayerState {
+  isPlaying: boolean;
+  isLoading: boolean;
+  duration: number;
+  position: number;
+  progress: number;
+  formattedPosition: string;
+  formattedDuration: string;
+  error: string | null;
+}
+
+/**
+ * Custom hook that wraps expo-audio's useAudioPlayer with additional utilities
+ */
+export function useAudioPlayer(initialSource?: string | number | null) {
+  const [currentSource, setCurrentSource] = useState<string | number | null>(initialSource ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [isAudioConfigured, setIsAudioConfigured] = useState(false);
+
+  // Configure audio mode on mount
+  useEffect(() => {
+    async function configureAudio() {
+      try {
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          shouldRouteThroughEarpiece: false,
+        });
+        setIsAudioConfigured(true);
+      } catch (err) {
+        console.warn('Failed to configure audio mode:', err);
+        setIsAudioConfigured(true); // Continue anyway
+      }
+    }
+    configureAudio();
+  }, []);
+
+  // Resolve the audio source
+  const resolvedSource = useMemo(() => {
+    if (!currentSource) return null;
+    
+    // If it's a string that matches an audio file key, resolve it
+    if (typeof currentSource === 'string') {
+      const localFile = getAudioFile(currentSource);
+      if (localFile) return localFile;
+      // Otherwise treat as URL
+      return { uri: currentSource };
+    }
+    
+    // Already a require() result (number)
+    return currentSource;
+  }, [currentSource]);
+
+  // Use expo-audio's hook
+  const player = useExpoAudioPlayer(resolvedSource, {
+    updateInterval: 250,
   });
 
-  useEffect(() => {
-    // Set up the callback to receive state updates
-    audioService.setUpdateCallback(setAudioState);
+  // Get status from player
+  const status = useAudioPlayerStatus(player);
 
-    // Cleanup
-    return () => {
-      audioService.setUpdateCallback(() => {});
-    };
+  // Format time helper
+  const formatTime = useCallback((seconds: number): string => {
+    if (!isFinite(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  /**
-   * Load audio from a URI string or a local asset (require())
-   * @param source - Either a URI string or a require() asset number
-   */
+  // Compute derived state
+  const audioState: AudioPlayerState = useMemo(() => ({
+    isPlaying: status.playing,
+    isLoading: !status.isLoaded || status.isBuffering,
+    duration: status.duration,
+    position: status.currentTime,
+    progress: status.duration > 0 ? status.currentTime / status.duration : 0,
+    formattedPosition: formatTime(status.currentTime),
+    formattedDuration: formatTime(status.duration),
+    error,
+  }), [status, error, formatTime]);
+
+  // Load a new audio source
   const loadAudio = useCallback(async (source: string | number) => {
-    // Errors are handled gracefully in audioService
-    await audioService.loadAudio(source);
-  }, []);
-
-  const play = useCallback(async () => {
     try {
-      await audioService.play();
-    } catch (error) {
-      console.error('Failed to play audio:', error);
+      setError(null);
+      setCurrentSource(source);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load audio';
+      setError(errorMessage);
+      console.warn('Audio loading error:', errorMessage);
     }
   }, []);
+
+  // Playback controls
+  const play = useCallback(async () => {
+    try {
+      player.play();
+    } catch (err) {
+      console.warn('Failed to play:', err);
+    }
+  }, [player]);
 
   const pause = useCallback(async () => {
     try {
-      await audioService.pause();
-    } catch (error) {
-      console.error('Failed to pause audio:', error);
+      player.pause();
+    } catch (err) {
+      console.warn('Failed to pause:', err);
     }
-  }, []);
+  }, [player]);
 
   const stop = useCallback(async () => {
     try {
-      await audioService.stop();
-    } catch (error) {
-      console.error('Failed to stop audio:', error);
+      player.pause();
+      player.seekTo(0);
+    } catch (err) {
+      console.warn('Failed to stop:', err);
     }
-  }, []);
+  }, [player]);
 
   const seekTo = useCallback(async (position: number) => {
     try {
-      await audioService.seekTo(position);
-    } catch (error) {
-      console.error('Failed to seek audio:', error);
+      player.seekTo(position);
+    } catch (err) {
+      console.warn('Failed to seek:', err);
     }
-  }, []);
+  }, [player]);
 
-  const setVolume = useCallback(async (volume: number) => {
+  const setVolume = useCallback((volume: number) => {
     try {
-      await audioService.setVolume(volume);
-    } catch (error) {
-      console.error('Failed to set volume:', error);
+      player.volume = Math.max(0, Math.min(1, volume));
+    } catch (err) {
+      console.warn('Failed to set volume:', err);
     }
-  }, []);
+  }, [player]);
 
-  const formatTime = useCallback((seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }, []);
-
-  const cleanup = useCallback(async () => {
+  const cleanup = useCallback(() => {
     try {
-      await audioService.unloadAudio();
-    } catch (error) {
-      console.error('Failed to cleanup audio:', error);
+      player.pause();
+    } catch (err) {
+      // Ignore cleanup errors
     }
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
+  }, [player]);
 
   return {
+    // State
     ...audioState,
+    
+    // Actions
     loadAudio,
     play,
     pause,
@@ -99,8 +157,8 @@ export function useAudioPlayer() {
     seekTo,
     setVolume,
     cleanup,
-    formattedPosition: formatTime(audioState.position),
-    formattedDuration: formatTime(audioState.duration),
-    progress: audioState.duration > 0 ? (audioState.position / audioState.duration) * 100 : 0,
+    
+    // Raw player access if needed
+    player,
   };
 }
