@@ -53,15 +53,31 @@ function MeditationPlayerScreen() {
   }, [id]);
 
   useEffect(() => {
+    // #region agent log
+    console.log('[DEBUG-A,E] Audio loading effect:', {hasMeditation:!!meditation,audioFile:meditation?.audio_file,audioUrl:meditation?.audio_url});
+    // #endregion
     if (meditation) {
       const audioFile = meditation.audio_file 
         ? getAudioFile(meditation.audio_file)
         : null;
+      // #region agent log
+      console.log('[DEBUG-B] Audio file resolved:', {audioFileKey:meditation.audio_file,resolvedAudioFile:audioFile,audioUrl:meditation.audio_url});
+      // #endregion
       
       if (audioFile) {
+        // #region agent log
+        console.log('[DEBUG-C] Loading audio file:', {audioFileType:typeof audioFile, audioFile});
+        // #endregion
         audioPlayer.loadAudio(audioFile);
       } else if (meditation.audio_url) {
+        // #region agent log
+        console.log('[DEBUG-C] Loading remote audio URL:', {audioUrl:meditation.audio_url});
+        // #endregion
         audioPlayer.loadAudio(meditation.audio_url);
+      } else {
+        // #region agent log
+        console.log('[DEBUG-A,B] NO AUDIO SOURCE AVAILABLE:', {audioFileKey:meditation.audio_file,audioUrl:meditation.audio_url});
+        // #endregion
       }
     }
     
