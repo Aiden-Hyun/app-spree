@@ -63,9 +63,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
       const stats = await calculateSecurityStats();
       setSecurityStats(stats);
 
-      // Fetch recent security events
-      const events = await passwordService.getPasswordHistory(user.id);
-      setSecurityEvents(events.slice(0, 10)); // Last 10 events
+      // Security events will be fetched separately if needed
+      // For now, we'll just calculate stats from passwords
+      setSecurityEvents([]);
     } catch (error) {
       console.error("Failed to refresh security data:", error);
     } finally {

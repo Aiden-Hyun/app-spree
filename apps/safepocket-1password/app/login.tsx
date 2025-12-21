@@ -31,7 +31,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signIn(email, password);
-      // Navigation will be handled by the root layout
+      // Navigate to index which will handle the redirect flow
+      router.replace("/");
     } catch (error: any) {
       Alert.alert("Login Failed", error.message || "Invalid email or password");
     } finally {

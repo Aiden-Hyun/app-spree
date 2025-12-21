@@ -36,7 +36,7 @@ function PasswordDetailScreen() {
   useEffect(() => {
     if (password && user) {
       // Log password access
-      passwordService.logPasswordUsage(password.id, user.id);
+      passwordService.logPasswordUsage(password.id, user.uid);
     }
   }, [password, user]);
 

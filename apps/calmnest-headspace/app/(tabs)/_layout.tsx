@@ -2,10 +2,16 @@ import { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  // Calculate proper bottom padding based on device safe area
+  const bottomPadding = Platform.OS === 'ios' ? Math.max(insets.bottom, 8) : 8;
+  const tabBarHeight = 56 + bottomPadding;
 
   const screenOptions = useMemo(() => ({
     tabBarActiveTintColor: theme.colors.primary,
@@ -13,9 +19,9 @@ export default function TabLayout() {
     tabBarStyle: {
       backgroundColor: theme.colors.surface,
       borderTopWidth: 0,
-      paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+      paddingBottom: bottomPadding,
       paddingTop: 8,
-      height: Platform.OS === 'ios' ? 88 : 64,
+      height: tabBarHeight,
       ...theme.shadows.md,
     },
     tabBarLabelStyle: {
@@ -27,7 +33,7 @@ export default function TabLayout() {
       marginTop: 4,
     },
     headerShown: false,
-  }), [theme]);
+  }), [theme, bottomPadding, tabBarHeight]);
 
   return (
     <Tabs screenOptions={screenOptions}>

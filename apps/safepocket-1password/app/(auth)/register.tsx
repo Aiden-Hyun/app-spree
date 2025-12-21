@@ -48,11 +48,8 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await signUp(email, password);
-      Alert.alert(
-        "Registration Successful",
-        "Please check your email to verify your account.",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
+      // Navigate to index which will handle the redirect flow
+      router.replace("/");
     } catch (error: any) {
       Alert.alert(
         "Registration Failed",

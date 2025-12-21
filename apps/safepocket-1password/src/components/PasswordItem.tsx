@@ -38,7 +38,7 @@ export function PasswordItem({
 
     // Log usage
     if (user) {
-      passwordService.logPasswordUsage(password.id, user.id);
+      passwordService.logPasswordUsage(password.id, user.uid);
     }
 
     // Auto-clear clipboard after 30 seconds
