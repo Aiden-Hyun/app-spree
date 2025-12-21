@@ -285,6 +285,18 @@ export async function getSleepStories(): Promise<SleepStory[]> {
   }
 }
 
+export async function getSleepStoryById(id: string): Promise<SleepStory | null> {
+  try {
+    const docRef = doc(db, 'sleep_stories', id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+    return { id: docSnap.id, ...docSnap.data() } as SleepStory;
+  } catch (error) {
+    console.error('Error fetching sleep story:', error);
+    return null;
+  }
+}
+
 // ==================== DAILY QUOTES ====================
 
 export async function getTodayQuote(): Promise<DailyQuote | null> {

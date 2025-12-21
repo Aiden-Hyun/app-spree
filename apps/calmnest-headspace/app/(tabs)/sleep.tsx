@@ -95,9 +95,7 @@ function SleepScreen() {
               ) : featuredStory ? (
                 <AnimatedView delay={150} duration={400}>
                   <AnimatedPressable
-                    onPress={() => {
-                      // TODO: Navigate to story player
-                    }}
+                    onPress={() => router.push(`/sleep/${featuredStory.id}`)}
                     style={styles.featuredCard}
                   >
                     {featuredStory.thumbnail_url ? (
@@ -226,9 +224,7 @@ function SleepScreen() {
                     {sleepStories.map((story, index) => (
                       <AnimatedPressable
                         key={story.id}
-                        onPress={() => {
-                          // TODO: Navigate to story player
-                        }}
+                        onPress={() => router.push(`/sleep/${story.id}`)}
                         style={styles.storyCard}
                       >
                         {story.thumbnail_url ? (
