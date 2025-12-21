@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,8 +10,20 @@ import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { Skeleton, SkeletonCard } from '../../src/components/Skeleton';
 import { getSleepStories } from '../../src/services/firestoreService';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
+import { getAudioFile } from '../../src/constants/audioFiles';
 import { Theme } from '../../src/theme';
 import { SleepStory } from '../../src/types';
+
+// Map ambient sound IDs to audio file keys
+const ambientSoundAudioMap: Record<string, string> = {
+  rain: 'sleep_rain',
+  waves: 'sleep_ocean',
+  fire: 'sleep_nature',     // Use nature sounds for fire (crackling campfire vibe)
+  wind: 'sleep_nature',     // Use nature sounds for wind
+  birds: 'sleep_nature',    // Use nature sounds for birds
+  thunder: 'sleep_rain',    // Use rain for thunder (often includes thunder)
+};
 
 const ambientSounds = [
   { id: 'rain', icon: 'rainy-outline' as const, label: 'Rain', color: '#7B9BAE' },
@@ -29,11 +41,50 @@ function SleepScreen() {
   const [featuredStory, setFeaturedStory] = useState<SleepStory | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSound, setSelectedSound] = useState<string | null>(null);
+  
+  // Audio player for ambient sounds
+  const ambientAudio = useAudioPlayer();
+  const prevSelectedSound = useRef<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     loadSleepContent();
+  }, []);
+  
+  // Handle ambient sound playback
+  useEffect(() => {
+    const handleSoundChange = async () => {
+      // If sound was deselected, stop playback
+      if (!selectedSound) {
+        if (ambientAudio.isPlaying) {
+          ambientAudio.pause();
+        }
+        prevSelectedSound.current = null;
+        return;
+      }
+      
+      // If a different sound was selected, load and play it
+      if (selectedSound !== prevSelectedSound.current) {
+        const audioKey = ambientSoundAudioMap[selectedSound];
+        const audioUrl = getAudioFile(audioKey);
+        
+        if (audioUrl) {
+          await ambientAudio.loadAudio(audioUrl);
+          ambientAudio.play();
+        }
+        prevSelectedSound.current = selectedSound;
+      }
+    };
+    
+    handleSoundChange();
+  }, [selectedSound]);
+  
+  // Cleanup ambient audio on unmount
+  useEffect(() => {
+    return () => {
+      ambientAudio.cleanup();
+    };
   }, []);
 
   const loadSleepContent = async () => {
