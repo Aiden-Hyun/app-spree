@@ -54,11 +54,12 @@ function SleepStoryPlayerScreen() {
         audioPlayer.loadAudio(story.audio_url);
       }
     }
-    
-    return () => {
-      audioPlayer.cleanup();
-    };
   }, [story]);
+
+  const handleGoBack = () => {
+    audioPlayer.cleanup();
+    router.back();
+  };
 
   const handlePlayPause = () => {
     if (audioPlayer.isPlaying) {
@@ -105,7 +106,7 @@ function SleepStoryPlayerScreen() {
           <View style={styles.loadingContainer}>
             <Ionicons name="alert-circle-outline" size={64} color={theme.colors.sleepAccent} />
             <Text style={styles.errorText}>Story not found</Text>
-            <TouchableOpacity style={styles.backButtonLarge} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backButtonLarge} onPress={handleGoBack}>
               <Text style={styles.backButtonText}>Go Back</Text>
             </TouchableOpacity>
           </View>
@@ -124,7 +125,7 @@ function SleepStoryPlayerScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.sleepText} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.moreButton}>

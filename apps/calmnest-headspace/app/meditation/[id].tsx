@@ -64,11 +64,12 @@ function MeditationPlayerScreen() {
         audioPlayer.loadAudio(meditation.audio_url);
       }
     }
-    
-    return () => {
-      audioPlayer.cleanup();
-    };
   }, [meditation]);
+
+  const handleGoBack = () => {
+    audioPlayer.cleanup();
+    router.back();
+  };
 
   const handlePlayPause = () => {
     if (audioPlayer.isPlaying) {
@@ -124,7 +125,7 @@ function MeditationPlayerScreen() {
           <View style={styles.loadingContainer}>
             <Ionicons name="alert-circle-outline" size={64} color="white" />
             <Text style={styles.errorText}>Meditation not found</Text>
-            <TouchableOpacity style={styles.backButtonLarge} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backButtonLarge} onPress={handleGoBack}>
               <Text style={styles.backButtonText}>Go Back</Text>
             </TouchableOpacity>
           </View>
@@ -143,7 +144,7 @@ function MeditationPlayerScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.moreButton}>
