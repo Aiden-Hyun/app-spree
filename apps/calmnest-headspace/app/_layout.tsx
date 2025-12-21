@@ -50,8 +50,13 @@ function RootNavigator() {
       <Stack.Screen 
         name="meditation/[id]" 
         options={{ 
-          title: '',
-          headerTransparent: true,
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
+        name="sleep/[id]" 
+        options={{ 
+          headerShown: false,
         }} 
       />
       <Stack.Screen 
@@ -59,6 +64,7 @@ function RootNavigator() {
         options={{ 
           title: 'Breathe',
           presentation: 'modal',
+          headerShown: false,
         }} 
       />
       <Stack.Screen 
