@@ -12,48 +12,52 @@
  * - Forest Sound Effects (archive.org)
  */
 
-const STORAGE_BASE = 'https://storage.googleapis.com/calmnest-e910e.firebasestorage.app/audio';
+const BUCKET = 'calmnest-e910e.firebasestorage.app';
+
+// Helper to generate Firebase Storage URL
+const storageUrl = (path: string) => 
+  `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(path)}?alt=media`;
 
 export const audioFiles: Record<string, string> = {
   // ========== GUIDED MEDITATION AUDIO ==========
   // Real guided meditation content with voice narration
   
   // Gratitude meditation
-  meditation_gratitude: `${STORAGE_BASE}/meditation/gratitude.mp3`,
+  meditation_gratitude: storageUrl('audio/meditation/gratitude.mp3'),
   
   // Stress relief meditation
-  meditation_stress: `${STORAGE_BASE}/meditation/stress.mp3`,
+  meditation_stress: storageUrl('audio/meditation/stress.mp3'),
   
   // Focus meditation
-  meditation_focus: `${STORAGE_BASE}/meditation/focus.mp3`,
+  meditation_focus: storageUrl('audio/meditation/focus.mp3'),
   
   // Anxiety relief meditation
-  meditation_anxiety: `${STORAGE_BASE}/meditation/anxiety.mp3`,
+  meditation_anxiety: storageUrl('audio/meditation/anxiety.mp3'),
   
   // Self esteem meditation
-  meditation_selfesteem: `${STORAGE_BASE}/meditation/selfesteem.mp3`,
+  meditation_selfesteem: storageUrl('audio/meditation/selfesteem.mp3'),
   
   // Body scan meditation (19MB, detailed guided session)
-  meditation_bodyscan: `${STORAGE_BASE}/meditation/bodyscan.mp3`,
+  meditation_bodyscan: storageUrl('audio/meditation/bodyscan.mp3'),
   
   // Loving kindness meditation (15MB, compassion-focused)
-  meditation_lovingkindness: `${STORAGE_BASE}/meditation/lovingkindness.mp3`,
+  meditation_lovingkindness: storageUrl('audio/meditation/lovingkindness.mp3'),
   
   // ========== SLEEP STORY AUDIO ==========
   // Calming audio for sleep
   
-  sleep_nature: `${STORAGE_BASE}/sleep/nature.mp3`,
-  sleep_ocean: `${STORAGE_BASE}/sleep/ocean.mp3`,
-  sleep_rain: `${STORAGE_BASE}/sleep/rain.mp3`,
-  sleep_fantasy: `${STORAGE_BASE}/sleep/fantasy.mp3`,
+  sleep_nature: storageUrl('audio/sleep/nature.mp3'),
+  sleep_ocean: storageUrl('audio/sleep/ocean.mp3'),
+  sleep_rain: storageUrl('audio/sleep/rain.mp3'),
+  sleep_fantasy: storageUrl('audio/sleep/fantasy.mp3'),
   
   // ========== BREATHING EXERCISE AUDIO ==========
   // Background sounds for breathing exercises
   
-  breathing_calm: `${STORAGE_BASE}/breathing/calm.mp3`,
-  breathing_energy: `${STORAGE_BASE}/breathing/energy.mp3`,
+  breathing_calm: storageUrl('audio/breathing/calm.mp3'),
+  breathing_energy: storageUrl('audio/breathing/energy.mp3'),
   
   // ========== LEGACY KEYS (for backward compatibility) ==========
-  meditation_calm: `${STORAGE_BASE}/meditation/stress.mp3`,
-  meditation_sleep: `${STORAGE_BASE}/sleep/nature.mp3`,
+  meditation_calm: storageUrl('audio/meditation/stress.mp3'),
+  meditation_sleep: storageUrl('audio/sleep/nature.mp3'),
 };
