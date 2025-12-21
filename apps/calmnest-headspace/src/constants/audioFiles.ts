@@ -61,3 +61,12 @@ export const audioFiles: Record<string, string> = {
   meditation_calm: storageUrl('audio/meditation/stress.mp3'),
   meditation_sleep: storageUrl('audio/sleep/nature.mp3'),
 };
+
+/**
+ * Get audio URL by file key
+ * @param key - The audio file key (e.g., 'meditation_gratitude')
+ * @returns The Firebase Storage URL or null if not found
+ */
+export const getAudioFile = (key: string): string | null => {
+  return audioFiles[key] || null;
+};
