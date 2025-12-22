@@ -27,7 +27,8 @@ import {
 import { Theme } from '../src/theme';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
+// 2 columns with padding (24 * 2 = 48) and gap between (8)
+const CARD_WIDTH = (width - 48 - 8) / 2;
 
 function SleepSoundsScreen() {
   const router = useRouter();
@@ -257,46 +258,48 @@ const createStyles = (theme: Theme) =>
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'space-between',
+      gap: 8,
     },
     cardWrapper: {
       width: CARD_WIDTH,
-      marginBottom: theme.spacing.md,
     },
     soundCard: {
+      width: '100%',
       backgroundColor: theme.colors.sleepSurface,
       borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.lg,
+      padding: theme.spacing.md,
       borderWidth: 2,
       borderColor: 'transparent',
+      minHeight: 140,
     },
     soundCardPlaying: {
       backgroundColor: 'rgba(201, 184, 150, 0.1)',
     },
     iconContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: theme.spacing.md,
+      marginBottom: theme.spacing.sm,
     },
     soundTitle: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 15,
+      fontSize: 14,
       color: theme.colors.sleepText,
       marginBottom: 4,
     },
     soundDescription: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
+      fontSize: 11,
       color: theme.colors.sleepTextMuted,
-      lineHeight: 16,
+      lineHeight: 15,
+      height: 30,
     },
     playingIndicator: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: theme.spacing.sm,
+      marginTop: theme.spacing.xs,
       gap: 4,
     },
     playingText: {

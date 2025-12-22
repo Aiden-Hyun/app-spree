@@ -18,15 +18,17 @@ import { SleepStory } from "../../src/types";
 
 // Pick 6 featured sounds to show on main sleep page (one from each category)
 const featuredSoundIds = [
-  "rain_window",        // Rain
-  "ocean_waves",        // Water
-  "fireplace_burning",  // Fire
-  "wind_mountains",     // Wind
+  "rain_window", // Rain
+  "ocean_waves", // Water
+  "fireplace_burning", // Fire
+  "wind_mountains", // Wind
   "frogs_crickets_birds", // Nature
-  "thunder_lightning",  // Ambient/Thunder
+  "thunder_lightning", // Ambient/Thunder
 ];
 
-const quickAccessSounds = sleepSoundsData.filter(s => featuredSoundIds.includes(s.id));
+const quickAccessSounds = sleepSoundsData.filter((s) =>
+  featuredSoundIds.includes(s.id)
+);
 
 function SleepScreen() {
   const router = useRouter();
@@ -60,7 +62,7 @@ function SleepScreen() {
 
       // If a different sound was selected, load and play it
       if (selectedSound !== prevSelectedSound.current) {
-        const sound = quickAccessSounds.find(s => s.id === selectedSound);
+        const sound = quickAccessSounds.find((s) => s.id === selectedSound);
         if (sound) {
           const audioUrl = getAudioFile(sound.audioKey);
           if (audioUrl) {
@@ -268,7 +270,9 @@ function SleepScreen() {
                         ]}
                       >
                         <Ionicons
-                          name={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
+                          name={
+                            `${sound.icon}-outline` as keyof typeof Ionicons.glyphMap
+                          }
                           size={28}
                           color={
                             selectedSound === sound.id
