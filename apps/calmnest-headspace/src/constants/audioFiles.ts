@@ -62,8 +62,8 @@ export const audioFiles: Record<string, string> = {
   // Deep sleep visualization (9 min)
   sleep_ocean: fragrantheart('relaxation/deep-sleep'),
   
-  // Creating peaceful sanctuary (13 min) - great for sleep
-  sleep_rain: fragrantheart('relaxation/creating-your-peaceful-sanctuary'),
+  // Rain on tent ambient sound (local upload)
+  sleep_rain: 'https://storage.googleapis.com/calmnest-e910e.firebasestorage.app/audio/sleep/rain_on_tent.mp3',
   
   // Golden cone of light relaxation (5 min)
   sleep_fantasy: fragrantheart('relaxation/golden-cone-of-light'),
