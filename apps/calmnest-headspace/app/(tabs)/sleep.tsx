@@ -12,58 +12,21 @@ import { getSleepStories } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { getAudioFile } from "../../src/constants/audioFiles";
+import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
 import { Theme } from "../../src/theme";
 import { SleepStory } from "../../src/types";
 
-// Map ambient sound IDs to audio file keys
-// Map ambient sound buttons to audio file keys (from Firebase Storage)
-const ambientSoundAudioMap: Record<string, string> = {
-  rain: "sleep_rain_window", // Rain on window (10 min)
-  waves: "sleep_ocean_waves", // Ocean waves (10 min)
-  fire: "sleep_fireplace_burning", // Fireplace crackling (10 min)
-  wind: "sleep_wind_mountains", // Mountain wind (10 min)
-  birds: "sleep_frogs_crickets_birds", // Nature sounds with birds (10 min)
-  thunder: "sleep_thunder_lightning", // Thunder storm (10 min)
-};
-
-const ambientSounds = [
-  {
-    id: "rain",
-    icon: "rainy-outline" as const,
-    label: "Rain",
-    color: "#7B9BAE",
-  },
-  {
-    id: "waves",
-    icon: "water-outline" as const,
-    label: "Waves",
-    color: "#6B8FA1",
-  },
-  {
-    id: "fire",
-    icon: "flame-outline" as const,
-    label: "Fire",
-    color: "#C4A77D",
-  },
-  {
-    id: "wind",
-    icon: "leaf-outline" as const,
-    label: "Wind",
-    color: "#8BA88F",
-  },
-  {
-    id: "birds",
-    icon: "musical-notes-outline" as const,
-    label: "Birds",
-    color: "#A8B4C4",
-  },
-  {
-    id: "thunder",
-    icon: "thunderstorm-outline" as const,
-    label: "Thunder",
-    color: "#9A8FAE",
-  },
+// Pick 6 featured sounds to show on main sleep page (one from each category)
+const featuredSoundIds = [
+  "rain_window",        // Rain
+  "ocean_waves",        // Water
+  "fireplace_burning",  // Fire
+  "wind_mountains",     // Wind
+  "frogs_crickets_birds", // Nature
+  "thunder_lightning",  // Ambient/Thunder
 ];
+
+const quickAccessSounds = sleepSoundsData.filter(s => featuredSoundIds.includes(s.id));
 
 function SleepScreen() {
   const router = useRouter();
@@ -97,12 +60,13 @@ function SleepScreen() {
 
       // If a different sound was selected, load and play it
       if (selectedSound !== prevSelectedSound.current) {
-        const audioKey = ambientSoundAudioMap[selectedSound];
-        const audioUrl = getAudioFile(audioKey);
-
-        if (audioUrl) {
-          await ambientAudio.loadAudio(audioUrl);
-          ambientAudio.play();
+        const sound = quickAccessSounds.find(s => s.id === selectedSound);
+        if (sound) {
+          const audioUrl = getAudioFile(sound.audioKey);
+          if (audioUrl) {
+            await ambientAudio.loadAudio(audioUrl);
+            ambientAudio.play();
+          }
         }
         prevSelectedSound.current = selectedSound;
       }
@@ -279,7 +243,7 @@ function SleepScreen() {
               </AnimatedView>
 
               <View style={styles.soundsGrid}>
-                {ambientSounds.map((sound, index) => (
+                {quickAccessSounds.map((sound, index) => (
                   <AnimatedView
                     key={sound.id}
                     delay={300 + index * 40}
@@ -304,7 +268,7 @@ function SleepScreen() {
                         ]}
                       >
                         <Ionicons
-                          name={sound.icon}
+                          name={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
                           size={28}
                           color={
                             selectedSound === sound.id
@@ -320,7 +284,7 @@ function SleepScreen() {
                             styles.soundLabelSelected,
                         ]}
                       >
-                        {sound.label}
+                        {sound.title}
                       </Text>
                       {selectedSound === sound.id && (
                         <View style={styles.soundPlaying}>
