@@ -38,26 +38,33 @@ const bucket = getStorage().bucket();
 
 const audioDir = path.join(__dirname, '..', 'assets', 'audio');
 
-// Define files to upload
+// Define files to upload - all sleep sounds from Pixabay
 const filesToUpload = [
-  // Meditation files
-  { local: 'meditation/gratitude.mp3', remote: 'audio/meditation/gratitude.mp3' },
-  { local: 'meditation/stress.mp3', remote: 'audio/meditation/stress.mp3' },
-  { local: 'meditation/focus.mp3', remote: 'audio/meditation/focus.mp3' },
-  { local: 'meditation/anxiety.mp3', remote: 'audio/meditation/anxiety.mp3' },
-  { local: 'meditation/selfesteem.mp3', remote: 'audio/meditation/selfesteem.mp3' },
-  { local: 'meditation/bodyscan.mp3', remote: 'audio/meditation/bodyscan.mp3' },
-  { local: 'meditation/lovingkindness.mp3', remote: 'audio/meditation/lovingkindness.mp3' },
-  
-  // Sleep files
-  { local: 'sleep/nature.mp3', remote: 'audio/sleep/nature.mp3' },
-  { local: 'sleep/ocean.mp3', remote: 'audio/sleep/ocean.mp3' },
-  { local: 'sleep/rain.mp3', remote: 'audio/sleep/rain.mp3' },
-  { local: 'sleep/fantasy.mp3', remote: 'audio/sleep/fantasy.mp3' },
-  
-  // Breathing files
-  { local: 'breathing/calm.mp3', remote: 'audio/breathing/calm.mp3' },
-  { local: 'breathing/energy.mp3', remote: 'audio/breathing/energy.mp3' },
+  // Sleep ambient sounds
+  { local: 'sleep/ambient_dreamer.mp3', remote: 'audio/sleep/ambient_dreamer.mp3' },
+  { local: 'sleep/autumn_fire_water.mp3', remote: 'audio/sleep/autumn_fire_water.mp3' },
+  { local: 'sleep/brook_stream.mp3', remote: 'audio/sleep/brook_stream.mp3' },
+  { local: 'sleep/cat_purring.mp3', remote: 'audio/sleep/cat_purring.mp3' },
+  { local: 'sleep/cat_purring_2.mp3', remote: 'audio/sleep/cat_purring_2.mp3' },
+  { local: 'sleep/cave_ambience.mp3', remote: 'audio/sleep/cave_ambience.mp3' },
+  { local: 'sleep/fireplace_burning.mp3', remote: 'audio/sleep/fireplace_burning.mp3' },
+  { local: 'sleep/fireplace_living_room.mp3', remote: 'audio/sleep/fireplace_living_room.mp3' },
+  { local: 'sleep/forest_fire_river.mp3', remote: 'audio/sleep/forest_fire_river.mp3' },
+  { local: 'sleep/forest_fire_river_2.mp3', remote: 'audio/sleep/forest_fire_river_2.mp3' },
+  { local: 'sleep/frogs_crickets_birds.mp3', remote: 'audio/sleep/frogs_crickets_birds.mp3' },
+  { local: 'sleep/ocean_seagulls.mp3', remote: 'audio/sleep/ocean_seagulls.mp3' },
+  { local: 'sleep/ocean_waves.mp3', remote: 'audio/sleep/ocean_waves.mp3' },
+  { local: 'sleep/rain_city_london.mp3', remote: 'audio/sleep/rain_city_london.mp3' },
+  { local: 'sleep/rain_fireplace.mp3', remote: 'audio/sleep/rain_fireplace.mp3' },
+  { local: 'sleep/rain_forest.mp3', remote: 'audio/sleep/rain_forest.mp3' },
+  { local: 'sleep/rain_window.mp3', remote: 'audio/sleep/rain_window.mp3' },
+  { local: 'sleep/snow_crunch.mp3', remote: 'audio/sleep/snow_crunch.mp3' },
+  { local: 'sleep/thunder_lightning.mp3', remote: 'audio/sleep/thunder_lightning.mp3' },
+  { local: 'sleep/train_locomotive.mp3', remote: 'audio/sleep/train_locomotive.mp3' },
+  { local: 'sleep/water_drops.mp3', remote: 'audio/sleep/water_drops.mp3' },
+  { local: 'sleep/water_wisdom.mp3', remote: 'audio/sleep/water_wisdom.mp3' },
+  { local: 'sleep/wind_desert.mp3', remote: 'audio/sleep/wind_desert.mp3' },
+  { local: 'sleep/wind_mountains.mp3', remote: 'audio/sleep/wind_mountains.mp3' },
 ];
 
 async function uploadFiles() {

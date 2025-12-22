@@ -80,7 +80,7 @@ function BreathingScreen() {
   const [selectedTechnique, setSelectedTechnique] = useState<BreathingTechnique | null>(null);
   
   const styles = useMemo(() => createStyles(theme), [theme]);
-
+  
   const breathing = useBreathing({
     pattern: selectedTechnique?.pattern || breathingTechniques[0].pattern,
     onCycleComplete: () => {
@@ -211,129 +211,129 @@ function BreathingScreen() {
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    gradient: {
-      flex: 1,
-    },
-    container: {
-      flex: 1,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.md,
-      paddingBottom: theme.spacing.lg,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    backButtonDark: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.gray[200],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  gradient: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonDark: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.gray[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 20,
-      color: 'white',
-    },
-    title: {
+    fontSize: 20,
+    color: 'white',
+  },
+  title: {
       fontFamily: theme.fonts.display.semiBold,
-      fontSize: 28,
-      color: theme.colors.text,
-    },
-    subtitle: {
+    fontSize: 28,
+    color: theme.colors.text,
+  },
+  subtitle: {
       fontFamily: theme.fonts.body.regular,
-      fontSize: 16,
-      color: theme.colors.textLight,
-      paddingHorizontal: theme.spacing.lg,
-      marginBottom: theme.spacing.xl,
-      lineHeight: 24,
-    },
-    breathingContainer: {
-      flex: 1,
-      paddingHorizontal: theme.spacing.lg,
-    },
-    techniquesContainer: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingBottom: theme.spacing.xxl,
-    },
-    techniqueCard: {
-      marginBottom: theme.spacing.md,
-      borderRadius: theme.borderRadius.xl,
-      overflow: 'hidden',
-      ...theme.shadows.md,
-    },
-    techniqueGradient: {
-      padding: theme.spacing.lg,
-    },
-    techniqueHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: theme.spacing.sm,
-    },
-    techniqueName: {
+    fontSize: 16,
+    color: theme.colors.textLight,
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    lineHeight: 24,
+  },
+  breathingContainer: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  techniquesContainer: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
+  },
+  techniqueCard: {
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+    ...theme.shadows.md,
+  },
+  techniqueGradient: {
+    padding: theme.spacing.lg,
+  },
+  techniqueHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  techniqueName: {
       fontFamily: theme.fonts.display.semiBold,
-      fontSize: 22,
-      color: 'white',
-    },
-    techniqueDescription: {
+    fontSize: 22,
+    color: 'white',
+  },
+  techniqueDescription: {
       fontFamily: theme.fonts.body.regular,
-      fontSize: 16,
-      color: 'rgba(255, 255, 255, 0.9)',
-      marginBottom: theme.spacing.md,
-      lineHeight: 22,
-    },
-    techniqueBenefits: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing.sm,
-      marginBottom: theme.spacing.md,
-    },
-    benefitChip: {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      paddingHorizontal: theme.spacing.sm,
-      paddingVertical: 4,
-      borderRadius: theme.borderRadius.sm,
-    },
-    benefitText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: theme.spacing.md,
+    lineHeight: 22,
+  },
+  techniqueBenefits: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  benefitChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.sm,
+  },
+  benefitText: {
       fontFamily: theme.fonts.ui.medium,
-      fontSize: 12,
-      color: 'white',
-    },
-    techniquePattern: {
-      borderTopWidth: 1,
-      borderTopColor: 'rgba(255, 255, 255, 0.2)',
-      paddingTop: theme.spacing.sm,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    patternText: {
+    fontSize: 12,
+    color: 'white',
+  },
+  techniquePattern: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    paddingTop: theme.spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  patternText: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: 'rgba(255, 255, 255, 0.8)',
-    },
-    cyclesText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  cyclesText: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: 'white',
-    },
-  });
+    fontSize: 14,
+    color: 'white',
+  },
+});
 
 export default function Breathing() {
   return (

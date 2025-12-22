@@ -104,11 +104,11 @@ export default function LoginScreen() {
           </AnimatedView>
           
           <AnimatedView delay={100} duration={600}>
-            <Text style={styles.title}>CalmNest</Text>
+        <Text style={styles.title}>CalmNest</Text>
           </AnimatedView>
           
           <AnimatedView delay={200} duration={600}>
-            <Text style={styles.subtitle}>Find your inner peace</Text>
+        <Text style={styles.subtitle}>Find your inner peace</Text>
           </AnimatedView>
         </LinearGradient>
         
@@ -124,7 +124,7 @@ export default function LoginScreen() {
                   ? 'Start your mindfulness journey today' 
                   : 'Continue your mindfulness journey'}
               </Text>
-            </View>
+      </View>
           </AnimatedView>
           
           <AnimatedView delay={400} duration={500}>
@@ -138,14 +138,14 @@ export default function LoginScreen() {
                 color={emailFocused ? theme.colors.primary : theme.colors.textMuted} 
                 style={styles.inputIcon}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
                 placeholderTextColor={theme.colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
               />
@@ -163,23 +163,23 @@ export default function LoginScreen() {
                 color={passwordFocused ? theme.colors.primary : theme.colors.textMuted} 
                 style={styles.inputIcon}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
                 placeholderTextColor={theme.colors.textMuted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
-              />
+        />
             </View>
           </AnimatedView>
-          
+        
           <AnimatedView delay={600} duration={500}>
             <AnimatedPressable
-              onPress={handleAuth}
-              disabled={loading}
+          onPress={handleAuth}
+          disabled={loading}
               style={styles.authButton}
             >
               <Animated.View style={[
@@ -190,32 +190,32 @@ export default function LoginScreen() {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <>
-                    <Text style={styles.authButtonText}>
+          <Text style={styles.authButtonText}>
                       {isSignUp ? 'Create Account' : 'Sign In'}
-                    </Text>
+          </Text>
                     <Ionicons name="arrow-forward" size={20} color="white" />
                   </>
                 )}
               </Animated.View>
             </AnimatedPressable>
           </AnimatedView>
-          
+        
           <AnimatedView delay={700} duration={500}>
             <AnimatedPressable
               onPress={() => setIsSignUp(!isSignUp)}
-              style={styles.switchButton}
-            >
-              <Text style={styles.switchText}>
+          style={styles.switchButton}
+        >
+          <Text style={styles.switchText}>
                 {isSignUp 
                   ? 'Already have an account? ' 
                   : "Don't have an account? "}
                 <Text style={styles.switchTextHighlight}>
                   {isSignUp ? 'Sign In' : 'Sign Up'}
                 </Text>
-              </Text>
+          </Text>
             </AnimatedPressable>
           </AnimatedView>
-        </View>
+      </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -223,13 +223,13 @@ export default function LoginScreen() {
 
 const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
+  container: {
+    flex: 1,
       backgroundColor: theme.colors.background,
     },
     scrollContent: {
       flexGrow: 1,
-    },
+  },
     hero: {
       paddingTop: 80,
       paddingBottom: 60,
@@ -243,24 +243,24 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       height: 80,
       borderRadius: 40,
       backgroundColor: theme.colors.surface,
-      alignItems: 'center',
+    alignItems: 'center',
       justifyContent: 'center',
       ...theme.shadows.md,
-    },
-    title: {
+  },
+  title: {
       fontFamily: theme.fonts.display.bold,
       fontSize: 36,
       color: theme.colors.text,
       letterSpacing: -0.5,
       marginBottom: theme.spacing.xs,
-    },
-    subtitle: {
+  },
+  subtitle: {
       fontFamily: theme.fonts.body.italic,
-      fontSize: 16,
+    fontSize: 16,
       color: theme.colors.textLight,
-    },
+  },
     formContainer: {
-      flex: 1,
+    flex: 1,
       padding: theme.spacing.xl,
       paddingTop: theme.spacing.lg,
     },
@@ -295,15 +295,15 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     inputIcon: {
       marginRight: theme.spacing.sm,
-    },
-    input: {
+  },
+  input: {
       flex: 1,
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 16,
+    fontSize: 16,
       color: theme.colors.text,
       paddingVertical: theme.spacing.md,
-    },
-    authButton: {
+  },
+  authButton: {
       marginTop: theme.spacing.md,
       marginBottom: theme.spacing.lg,
     },
@@ -313,27 +313,27 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       paddingHorizontal: theme.spacing.xl,
       borderRadius: theme.borderRadius.lg,
       flexDirection: 'row',
-      alignItems: 'center',
+    alignItems: 'center',
       justifyContent: 'center',
       gap: theme.spacing.sm,
       ...theme.shadows.md,
-    },
-    authButtonText: {
+  },
+  authButtonText: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 16,
-      color: 'white',
-    },
-    switchButton: {
-      alignItems: 'center',
+    color: 'white',
+  },
+  switchButton: {
+    alignItems: 'center',
       paddingVertical: theme.spacing.md,
-    },
-    switchText: {
+  },
+  switchText: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
+    fontSize: 14,
       color: theme.colors.textLight,
     },
     switchTextHighlight: {
       fontFamily: theme.fonts.ui.semiBold,
       color: theme.colors.primary,
-    },
-  });
+  },
+});

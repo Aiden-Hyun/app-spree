@@ -26,12 +26,12 @@ function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.card}>
-            <View style={styles.settingItem}>
+          <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
-                <Text style={styles.settingLabel}>Email</Text>
+            <Text style={styles.settingLabel}>Email</Text>
               </View>
-              <Text style={styles.settingValue}>{user?.email}</Text>
+            <Text style={styles.settingValue}>{user?.email}</Text>
             </View>
           </View>
         </View>
@@ -73,18 +73,18 @@ function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           <View style={styles.card}>
-            <View style={styles.settingItem}>
+          <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="notifications-outline" size={20} color={theme.colors.text} />
-                <Text style={styles.settingLabel}>Notifications</Text>
+            <Text style={styles.settingLabel}>Notifications</Text>
               </View>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
                 trackColor={{ false: theme.colors.gray[300], true: theme.colors.primary }}
                 thumbColor="white"
-              />
-            </View>
+            />
+          </View>
           </View>
         </View>
         
@@ -98,7 +98,7 @@ function SettingsScreen() {
                 <Text style={styles.settingLabel}>Export Data</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-            </TouchableOpacity>
+          </TouchableOpacity>
             
             <View style={styles.divider} />
             
@@ -108,7 +108,7 @@ function SettingsScreen() {
                 <Text style={styles.settingLabel}>Privacy Policy</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-            </TouchableOpacity>
+          </TouchableOpacity>
             
             <View style={styles.divider} />
             
@@ -118,7 +118,7 @@ function SettingsScreen() {
                 <Text style={styles.settingLabel}>Terms of Service</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-            </TouchableOpacity>
+          </TouchableOpacity>
           </View>
         </View>
 
@@ -141,9 +141,9 @@ function SettingsScreen() {
                 SoundHelix Sample Music{'\n'}
                 Free for use
               </Text>
-            </View>
-          </View>
         </View>
+      </View>
+    </View>
 
         {/* Sign Out */}
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
@@ -164,14 +164,14 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    container: {
-      flex: 1,
+  container: {
+    flex: 1,
       padding: theme.spacing.lg,
-    },
-    section: {
+  },
+  section: {
       marginBottom: theme.spacing.xl,
-    },
-    sectionTitle: {
+  },
+  sectionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 13,
       color: theme.colors.textMuted,
@@ -185,11 +185,11 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.md,
       ...theme.shadows.sm,
-    },
-    settingItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
       paddingVertical: theme.spacing.sm,
       paddingHorizontal: theme.spacing.sm,
     },
@@ -197,13 +197,13 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing.md,
-    },
-    settingLabel: {
+  },
+  settingLabel: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 16,
+    fontSize: 16,
       color: theme.colors.text,
-    },
-    settingValue: {
+  },
+  settingValue: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
       color: theme.colors.textLight,
@@ -235,12 +235,12 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
     },
     themeOptionText: {
       fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
+    fontSize: 14,
       color: theme.colors.text,
     },
     themeOptionTextSelected: {
       color: theme.colors.textOnPrimary,
-    },
+  },
     actionItem: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -259,16 +259,16 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       justifyContent: 'center',
       paddingVertical: theme.spacing.md,
       borderRadius: theme.borderRadius.lg,
-      borderWidth: 1,
+    borderWidth: 1,
       borderColor: theme.colors.error,
       gap: theme.spacing.xs,
       marginBottom: theme.spacing.lg,
-    },
+  },
     logoutText: {
       fontFamily: theme.fonts.ui.medium,
-      fontSize: 16,
+    fontSize: 16,
       color: theme.colors.error,
-    },
+  },
     version: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 12,
@@ -279,7 +279,7 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
     attributionItem: {
       paddingVertical: theme.spacing.sm,
       paddingHorizontal: theme.spacing.sm,
-    },
+  },
     attributionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
@@ -291,8 +291,8 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       fontSize: 13,
       color: theme.colors.textLight,
       lineHeight: 20,
-    },
-  });
+  },
+});
 
 export default function Settings() {
   return (

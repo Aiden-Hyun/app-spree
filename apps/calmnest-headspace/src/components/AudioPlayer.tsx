@@ -118,66 +118,66 @@ export function AudioPlayer({
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.lg,
-      ...theme.shadows.md,
-    },
-    infoContainer: {
-      alignItems: 'center',
-      marginBottom: theme.spacing.lg,
-    },
-    title: {
+  container: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    ...theme.shadows.md,
+  },
+  infoContainer: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  title: {
       fontFamily: theme.fonts.display.semiBold,
-      fontSize: 20,
-      color: theme.colors.text,
-      textAlign: 'center',
-    },
-    subtitle: {
+    fontSize: 20,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  subtitle: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 16,
-      color: theme.colors.textLight,
-      marginTop: theme.spacing.xs,
-      textAlign: 'center',
-    },
-    progressContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: theme.spacing.lg,
-    },
-    slider: {
-      flex: 1,
-      height: 40,
-      marginHorizontal: theme.spacing.sm,
-    },
-    timeText: {
+    fontSize: 16,
+    color: theme.colors.textLight,
+    marginTop: theme.spacing.xs,
+    textAlign: 'center',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: theme.spacing.sm,
+  },
+  timeText: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: theme.colors.textLight,
-      minWidth: 45,
-    },
-    controls: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: theme.spacing.lg,
-    },
-    playButton: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      backgroundColor: theme.colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      ...theme.shadows.lg,
-    },
-    controlButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: theme.colors.gray[200],
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-  });
+    fontSize: 14,
+    color: theme.colors.textLight,
+    minWidth: 45,
+  },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing.lg,
+  },
+  playButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.lg,
+  },
+  controlButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.gray[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

@@ -136,65 +136,65 @@ export function MeditationTimer({
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: {
-      alignItems: 'center',
-    },
-    timerContainer: {
-      position: 'relative',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    svg: {
-      position: 'absolute',
-    },
-    timerContent: {
-      alignItems: 'center',
-    },
-    timeText: {
+  container: {
+    alignItems: 'center',
+  },
+  timerContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  svg: {
+    position: 'absolute',
+  },
+  timerContent: {
+    alignItems: 'center',
+  },
+  timeText: {
       fontFamily: theme.fonts.display.regular,
-      fontSize: 48,
-      color: theme.colors.text,
-      letterSpacing: 2,
-    },
-    statusText: {
+    fontSize: 48,
+    color: theme.colors.text,
+    letterSpacing: 2,
+  },
+  statusText: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 18,
-      color: theme.colors.textLight,
-      marginTop: theme.spacing.sm,
-    },
-    controls: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: theme.spacing.xxl,
-      gap: theme.spacing.lg,
-    },
-    primaryButton: {
-      backgroundColor: theme.colors.primary,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.xl,
-      borderRadius: theme.borderRadius.full,
-      gap: theme.spacing.sm,
-      ...theme.shadows.md,
-    },
-    primaryButtonText: {
+    fontSize: 18,
+    color: theme.colors.textLight,
+    marginTop: theme.spacing.sm,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.xxl,
+    gap: theme.spacing.lg,
+  },
+  primaryButton: {
+    backgroundColor: theme.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.full,
+    gap: theme.spacing.sm,
+    ...theme.shadows.md,
+  },
+  primaryButtonText: {
       fontFamily: theme.fonts.ui.semiBold,
-      color: 'white',
-      fontSize: 18,
-    },
-    secondaryButton: {
-      backgroundColor: theme.colors.gray[200],
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      justifyContent: 'center',
-      alignItems: 'center',
-      ...theme.shadows.sm,
-    },
-    placeholderButton: {
-      width: 56,
-      height: 56,
-    },
-  });
+    color: 'white',
+    fontSize: 18,
+  },
+  secondaryButton: {
+    backgroundColor: theme.colors.gray[200],
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
+  placeholderButton: {
+    width: 56,
+    height: 56,
+  },
+});

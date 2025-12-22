@@ -239,159 +239,159 @@ function MeditationPlayerScreen() {
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.primary,
-    },
-    gradient: {
-      flex: 1,
-    },
-    loadingContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 16,
-    },
-    loadingText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 16,
-      color: 'white',
-    },
-    errorText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 18,
-      color: 'white',
-      marginTop: 16,
-    },
-    backButtonLarge: {
-      marginTop: 24,
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderRadius: theme.borderRadius.lg,
-    },
-    backButtonText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 16,
-      color: 'white',
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.md,
-      paddingBottom: theme.spacing.lg,
-    },
-    backButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    moreButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    content: {
-      flex: 1,
-      paddingHorizontal: theme.spacing.lg,
-    },
-    infoContainer: {
-      alignItems: 'center',
-      marginBottom: theme.spacing.xl,
-    },
-    category: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 13,
-      color: 'rgba(255, 255, 255, 0.7)',
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      marginBottom: theme.spacing.xs,
-    },
-    title: {
-      fontFamily: theme.fonts.display.semiBold,
-      fontSize: 28,
-      color: 'white',
-      textAlign: 'center',
-      marginBottom: theme.spacing.sm,
-    },
-    instructor: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 15,
-      color: 'rgba(255, 255, 255, 0.8)',
-      marginBottom: theme.spacing.md,
-    },
-    description: {
-      fontFamily: theme.fonts.body.regular,
-      fontSize: 15,
-      color: 'rgba(255, 255, 255, 0.85)',
-      textAlign: 'center',
-      lineHeight: 22,
-      paddingHorizontal: theme.spacing.lg,
-    },
-    metaRow: {
-      flexDirection: 'row',
-      gap: theme.spacing.lg,
-      marginTop: theme.spacing.md,
-    },
-    metaItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    metaText: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: 'rgba(255, 255, 255, 0.8)',
-      textTransform: 'capitalize',
-    },
-    toggleContainer: {
-      flexDirection: 'row',
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      borderRadius: theme.borderRadius.full,
-      padding: 4,
-      marginBottom: theme.spacing.xl,
-      alignSelf: 'center',
-    },
-    toggleButton: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingVertical: theme.spacing.sm,
-      borderRadius: theme.borderRadius.full,
-    },
-    toggleButtonActive: {
-      backgroundColor: 'white',
-    },
-    toggleText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 15,
-      color: 'rgba(255, 255, 255, 0.8)',
-    },
-    toggleTextActive: {
-      color: theme.colors.primary,
-    },
-    playerContainer: {
-      flex: 1,
-      justifyContent: 'center',
-    },
-    artworkContainer: {
-      alignItems: 'center',
-      marginBottom: theme.spacing.xxl,
-    },
-    artwork: {
-      width: 200,
-      height: 200,
-      borderRadius: 100,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  });
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+  },
+  gradient: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 16,
+    color: 'white',
+  },
+  errorText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 18,
+    color: 'white',
+    marginTop: 16,
+  },
+  backButtonLarge: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: theme.borderRadius.lg,
+  },
+  backButtonText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 16,
+    color: 'white',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  infoContainer: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  category: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.xs,
+  },
+  title: {
+    fontFamily: theme.fonts.display.semiBold,
+    fontSize: 28,
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  instructor: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: theme.spacing.md,
+  },
+  description: {
+    fontFamily: theme.fonts.body.regular,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textTransform: 'capitalize',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: theme.borderRadius.full,
+    padding: 4,
+    marginBottom: theme.spacing.xl,
+    alignSelf: 'center',
+  },
+  toggleButton: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+  },
+  toggleButtonActive: {
+    backgroundColor: 'white',
+  },
+  toggleText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  toggleTextActive: {
+    color: theme.colors.primary,
+  },
+  playerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  artworkContainer: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.xxl,
+  },
+  artwork: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 export default function MeditationPlayer() {
   return (

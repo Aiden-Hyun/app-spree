@@ -24,32 +24,32 @@ function RootNavigator() {
   const { theme } = useTheme();
 
   const screenOptions = useMemo(() => ({
-    headerStyle: {
-      backgroundColor: theme.colors.background,
-    },
-    headerTintColor: theme.colors.text,
-    headerTitleStyle: {
-      fontFamily: 'DMSans-SemiBold',
-    },
-    headerShadowVisible: false,
-    contentStyle: {
-      backgroundColor: theme.colors.background,
-    },
+          headerStyle: {
+            backgroundColor: theme.colors.background,
+          },
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: {
+            fontFamily: 'DMSans-SemiBold',
+          },
+          headerShadowVisible: false,
+          contentStyle: {
+            backgroundColor: theme.colors.background,
+          },
   }), [theme]);
 
   return (
     <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="login" 
-        options={{ 
-          title: 'Welcome',
-          headerShown: false,
-        }} 
-      />
-      <Stack.Screen 
-        name="meditation/[id]" 
-        options={{ 
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="login" 
+          options={{ 
+            title: 'Welcome',
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="meditation/[id]" 
+          options={{ 
           headerShown: false,
         }} 
       />
@@ -57,29 +57,35 @@ function RootNavigator() {
         name="sleep/[id]" 
         options={{ 
           headerShown: false,
-        }} 
-      />
-      <Stack.Screen 
-        name="breathing" 
-        options={{ 
-          title: 'Breathe',
-          presentation: 'modal',
+          }} 
+        />
+        <Stack.Screen 
+          name="breathing" 
+          options={{ 
+            title: 'Breathe',
+            presentation: 'modal',
           headerShown: false,
-        }} 
-      />
-      <Stack.Screen 
-        name="stats" 
-        options={{ 
-          title: 'Your Journey',
-        }} 
-      />
-      <Stack.Screen 
-        name="settings" 
-        options={{ 
-          title: 'Settings',
-        }} 
-      />
-    </Stack>
+          }} 
+        />
+        <Stack.Screen 
+          name="stats" 
+          options={{ 
+            title: 'Your Journey',
+          }} 
+        />
+        <Stack.Screen 
+          name="settings" 
+          options={{ 
+            title: 'Settings',
+          }} 
+        />
+        <Stack.Screen 
+          name="sleep-sounds" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+      </Stack>
   );
 }
 
@@ -102,7 +108,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <RootNavigator />
-      </AuthProvider>
+    </AuthProvider>
     </ThemeProvider>
   );
 }

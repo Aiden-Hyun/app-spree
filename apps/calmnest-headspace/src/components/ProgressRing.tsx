@@ -72,27 +72,27 @@ export function ProgressRing({
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    container: {
-      position: 'relative',
-    },
-    centerContent: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    centerText: {
+  container: {
+    position: 'relative',
+  },
+  centerContent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerText: {
       fontFamily: theme.fonts.display.bold,
-      fontSize: 24,
-      color: theme.colors.text,
-    },
-    centerSubtext: {
+    fontSize: 24,
+    color: theme.colors.text,
+  },
+  centerSubtext: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: theme.colors.textLight,
-      marginTop: 2,
-    },
-  });
+    fontSize: 14,
+    color: theme.colors.textLight,
+    marginTop: 2,
+  },
+});

@@ -64,66 +64,66 @@ export interface ThemeColors {
 
 // Light mode colors
 export const lightColors: ThemeColors = {
-  // Primary palette - Sage Green
-  primary: '#8B9F82',
-  primaryLight: '#A8B89F',
-  primaryDark: '#6B7F65',
-  
-  // Secondary - Warm Terracotta
-  secondary: '#C4A77D',
-  secondaryLight: '#D4BFA0',
-  secondaryDark: '#A68B5B',
-  
-  // Accent - Dusty Rose
-  accent: '#D4A5A5',
-  accentLight: '#E4C0C0',
-  accentDark: '#B88888',
-  
-  // Background colors - Warm tones
-  background: '#FAF8F5',
-  surface: '#FFFEF9',
-  surfaceElevated: '#FFFFFF',
-  
-  // Text colors - Warm charcoal
-  text: '#3D3A38',
-  textLight: '#8B8685',
-  textMuted: '#A8A5A3',
-  textOnPrimary: '#FFFFFF',
-  textOnDark: '#F5F0E8',
-  
-  // Status colors - Muted versions
-  success: '#7BA37B',
-  warning: '#D4B896',
-  error: '#C88B8B',
-  info: '#8BA5B8',
-  
-  // Neutral colors - Warm grays
-  gray: {
-    50: '#FDFCFA',
-    100: '#F5F3F0',
-    200: '#EBE8E4',
-    300: '#D9D5D0',
-    400: '#B8B4AE',
-    500: '#8B8685',
-    600: '#5C5856',
-    700: '#3D3A38',
-    800: '#2A2826',
-    900: '#1A1917',
-  },
-  
-  // Special colors for meditation moods
+    // Primary palette - Sage Green
+    primary: '#8B9F82',
+    primaryLight: '#A8B89F',
+    primaryDark: '#6B7F65',
+    
+    // Secondary - Warm Terracotta
+    secondary: '#C4A77D',
+    secondaryLight: '#D4BFA0',
+    secondaryDark: '#A68B5B',
+    
+    // Accent - Dusty Rose
+    accent: '#D4A5A5',
+    accentLight: '#E4C0C0',
+    accentDark: '#B88888',
+    
+    // Background colors - Warm tones
+    background: '#FAF8F5',
+    surface: '#FFFEF9',
+    surfaceElevated: '#FFFFFF',
+    
+    // Text colors - Warm charcoal
+    text: '#3D3A38',
+    textLight: '#8B8685',
+    textMuted: '#A8A5A3',
+    textOnPrimary: '#FFFFFF',
+    textOnDark: '#F5F0E8',
+    
+    // Status colors - Muted versions
+    success: '#7BA37B',
+    warning: '#D4B896',
+    error: '#C88B8B',
+    info: '#8BA5B8',
+    
+    // Neutral colors - Warm grays
+    gray: {
+      50: '#FDFCFA',
+      100: '#F5F3F0',
+      200: '#EBE8E4',
+      300: '#D9D5D0',
+      400: '#B8B4AE',
+      500: '#8B8685',
+      600: '#5C5856',
+      700: '#3D3A38',
+      800: '#2A2826',
+      900: '#1A1917',
+    },
+    
+    // Special colors for meditation moods
   calm: '#B4C4B0',
   focus: '#8B9F82',
   relax: '#C4A77D',
   sleep: '#1A1D29',
   energy: '#D4C4A8',
-  
+    
   // Sleep mode colors (always dark)
-  sleepBackground: '#1A1D29',
-  sleepSurface: '#252A3A',
-  sleepAccent: '#C9B896',
-  sleepText: '#F5F0E8',
-  sleepTextMuted: '#8B8A99',
+    sleepBackground: '#1A1D29',
+    sleepSurface: '#252A3A',
+    sleepAccent: '#C9B896',
+    sleepText: '#F5F0E8',
+    sleepTextMuted: '#8B8A99',
 };
 
 // Dark mode colors
@@ -309,51 +309,51 @@ const sharedTheme = {
     },
   },
 };
-
+  
 // Function to create shadows based on color scheme
 const createShadows = (isDark: boolean) => ({
-  sm: {
+    sm: {
     shadowColor: isDark ? '#000000' : '#3D3A38',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
     shadowOpacity: isDark ? 0.3 : 0.06,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: isDark ? '#000000' : '#3D3A38',
-    shadowOffset: {
-      width: 0,
-      height: 4,
+      shadowRadius: 4,
+      elevation: 1,
     },
+    md: {
+    shadowColor: isDark ? '#000000' : '#3D3A38',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
     shadowOpacity: isDark ? 0.4 : 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  lg: {
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    lg: {
     shadowColor: isDark ? '#000000' : '#3D3A38',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
     shadowOpacity: isDark ? 0.5 : 0.1,
-    shadowRadius: 16,
-    elevation: 5,
-  },
-  glow: {
-    shadowColor: isDark ? '#9DB094' : '#8B9F82',
-    shadowOffset: {
-      width: 0,
-      height: 0,
+      shadowRadius: 16,
+      elevation: 5,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 0,
-  },
+    glow: {
+    shadowColor: isDark ? '#9DB094' : '#8B9F82',
+      shadowOffset: {
+        width: 0,
+        height: 0,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 0,
+    },
 });
-
+  
 // Function to create gradients based on color scheme
 const createGradients = (isDark: boolean) => ({
   warmSunrise: isDark ? ['#252321', '#1A1917'] : ['#FAF8F5', '#F5EDE3'],
@@ -372,7 +372,7 @@ export function createTheme(colors: ThemeColors, isDark: boolean) {
     ...sharedTheme,
     shadows: createShadows(isDark),
     gradients: createGradients(isDark),
-  };
+};
 }
 
 // Theme type

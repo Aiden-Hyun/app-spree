@@ -57,32 +57,32 @@ function ProfileScreen() {
       >
         {/* Profile Header */}
         <AnimatedView delay={0} duration={500}>
-          <View style={styles.header}>
-            <View style={styles.avatarContainer}>
-              <LinearGradient
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            <LinearGradient
                 colors={avatarGradient}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
-                </Text>
-              </LinearGradient>
-            </View>
-            <Text style={styles.userName}>
-              {user?.email?.split('@')[0] || 'Friend'}
-            </Text>
-            <Text style={styles.memberSince}>
-              Meditating since {getMemberSince()}
-            </Text>
+              style={styles.avatar}
+            >
+              <Text style={styles.avatarText}>
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </Text>
+            </LinearGradient>
           </View>
+          <Text style={styles.userName}>
+            {user?.email?.split('@')[0] || 'Friend'}
+          </Text>
+          <Text style={styles.memberSince}>
+            Meditating since {getMemberSince()}
+          </Text>
+        </View>
         </AnimatedView>
 
         {/* Your Sanctuary Card */}
         <AnimatedView delay={100} duration={500}>
-          <View style={styles.sanctuaryCard}>
-            <Text style={styles.sanctuaryTitle}>Your Sanctuary</Text>
-            <View style={styles.sanctuaryDivider} />
-            
+        <View style={styles.sanctuaryCard}>
+          <Text style={styles.sanctuaryTitle}>Your Sanctuary</Text>
+          <View style={styles.sanctuaryDivider} />
+          
             {loading ? (
               <View style={styles.sanctuaryStats}>
                 {[0, 1, 2].map((i) => (
@@ -94,47 +94,47 @@ function ProfileScreen() {
                 ))}
               </View>
             ) : (
-              <View style={styles.sanctuaryStats}>
-                <View style={styles.sanctuaryStat}>
+          <View style={styles.sanctuaryStats}>
+            <View style={styles.sanctuaryStat}>
                   <View style={[styles.sanctuaryIconContainer, { backgroundColor: `${theme.colors.secondary}20` }]}>
                     <Ionicons name="flame-outline" size={24} color={theme.colors.secondary} />
                   </View>
-                  <View style={styles.sanctuaryStatInfo}>
-                    <Text style={styles.sanctuaryStatValue}>{stats?.total_sessions || 0}</Text>
-                    <Text style={styles.sanctuaryStatLabel}>sessions</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.sanctuaryStat}>
+              <View style={styles.sanctuaryStatInfo}>
+                <Text style={styles.sanctuaryStatValue}>{stats?.total_sessions || 0}</Text>
+                <Text style={styles.sanctuaryStatLabel}>sessions</Text>
+              </View>
+            </View>
+            
+            <View style={styles.sanctuaryStat}>
                   <View style={[styles.sanctuaryIconContainer, { backgroundColor: `${theme.colors.primary}20` }]}>
                     <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
                   </View>
-                  <View style={styles.sanctuaryStatInfo}>
-                    <Text style={styles.sanctuaryStatValue}>
-                      {formatTime(stats?.total_minutes || 0)}
-                    </Text>
-                    <Text style={styles.sanctuaryStatLabel}>mindful</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.sanctuaryStat}>
+              <View style={styles.sanctuaryStatInfo}>
+                <Text style={styles.sanctuaryStatValue}>
+                  {formatTime(stats?.total_minutes || 0)}
+                </Text>
+                <Text style={styles.sanctuaryStatLabel}>mindful</Text>
+              </View>
+            </View>
+            
+            <View style={styles.sanctuaryStat}>
                   <View style={[styles.sanctuaryIconContainer, { backgroundColor: `${theme.colors.accent}20` }]}>
                     <Ionicons name="trending-up-outline" size={24} color={theme.colors.accent} />
                   </View>
-                  <View style={styles.sanctuaryStatInfo}>
-                    <Text style={styles.sanctuaryStatValue}>{stats?.current_streak || 0}</Text>
-                    <Text style={styles.sanctuaryStatLabel}>day streak</Text>
-                  </View>
-                </View>
+              <View style={styles.sanctuaryStatInfo}>
+                <Text style={styles.sanctuaryStatValue}>{stats?.current_streak || 0}</Text>
+                <Text style={styles.sanctuaryStatLabel}>day streak</Text>
               </View>
-            )}
+            </View>
           </View>
+            )}
+        </View>
         </AnimatedView>
 
         {/* Milestones */}
         <View style={styles.section}>
           <AnimatedView delay={200} duration={500}>
-            <Text style={styles.sectionTitle}>Milestones</Text>
+          <Text style={styles.sectionTitle}>Milestones</Text>
           </AnimatedView>
           
           <View style={styles.milestonesGrid}>
@@ -148,33 +148,33 @@ function ProfileScreen() {
                   style={styles.milestoneCardWrapper}
                 >
                   <View 
-                    style={[
-                      styles.milestoneCard,
-                      isAchieved && styles.milestoneCardAchieved
-                    ]}
-                  >
+                  style={[
+                    styles.milestoneCard,
+                    isAchieved && styles.milestoneCardAchieved
+                  ]}
+                >
                     <View style={[
                       styles.milestoneIconContainer,
                       { backgroundColor: isAchieved ? `${milestone.color}20` : theme.colors.gray[100] }
-                    ]}>
+                  ]}>
                       <Ionicons 
                         name={isAchieved ? milestone.icon : 'lock-closed-outline'} 
                         size={28} 
                         color={isAchieved ? milestone.color : theme.colors.textMuted} 
                       />
                     </View>
-                    <Text style={[
-                      styles.milestoneLabel,
-                      isAchieved && styles.milestoneLabelAchieved
-                    ]}>
-                      {milestone.label}
-                    </Text>
-                    {isAchieved && (
+                  <Text style={[
+                    styles.milestoneLabel,
+                    isAchieved && styles.milestoneLabelAchieved
+                  ]}>
+                    {milestone.label}
+                  </Text>
+                  {isAchieved && (
                       <Text style={[styles.milestoneDescription, { color: milestone.color }]}>
-                        {milestone.description}
-                      </Text>
-                    )}
-                  </View>
+                      {milestone.description}
+                    </Text>
+                  )}
+                </View>
                 </AnimatedView>
               );
             })}
@@ -182,12 +182,12 @@ function ProfileScreen() {
           
           {getNextMilestone() && (
             <AnimatedView delay={500} duration={400}>
-              <View style={styles.nextMilestone}>
+            <View style={styles.nextMilestone}>
                 <Ionicons name="flag-outline" size={18} color={theme.colors.primary} />
-                <Text style={styles.nextMilestoneText}>
-                  {getNextMilestone()!.days - (stats?.longest_streak || 0)} days until {getNextMilestone()!.label.toLowerCase()}
-                </Text>
-              </View>
+              <Text style={styles.nextMilestoneText}>
+                {getNextMilestone()!.days - (stats?.longest_streak || 0)} days until {getNextMilestone()!.label.toLowerCase()}
+              </Text>
+            </View>
             </AnimatedView>
           )}
         </View>
@@ -195,106 +195,106 @@ function ProfileScreen() {
         {/* Preferences */}
         <View style={styles.section}>
           <AnimatedView delay={550} duration={400}>
-            <Text style={styles.sectionTitle}>Preferences</Text>
+          <Text style={styles.sectionTitle}>Preferences</Text>
           </AnimatedView>
           
           <AnimatedView delay={600} duration={400}>
-            <View style={styles.preferencesCard}>
+          <View style={styles.preferencesCard}>
               <AnimatedPressable style={styles.preferenceRow}>
-                <View style={styles.preferenceLeft}>
+              <View style={styles.preferenceLeft}>
                   <View style={styles.preferenceIconContainer}>
                     <Ionicons name="notifications-outline" size={20} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.preferenceLabel}>Reminder Time</Text>
-                </View>
-                <View style={styles.preferenceRight}>
-                  <Text style={styles.preferenceValue}>8:00 PM</Text>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-                </View>
+                <Text style={styles.preferenceLabel}>Reminder Time</Text>
+              </View>
+              <View style={styles.preferenceRight}>
+                <Text style={styles.preferenceValue}>8:00 PM</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+              </View>
               </AnimatedPressable>
-              
-              <View style={styles.preferenceDivider} />
-              
+            
+            <View style={styles.preferenceDivider} />
+            
               <AnimatedPressable style={styles.preferenceRow}>
-                <View style={styles.preferenceLeft}>
+              <View style={styles.preferenceLeft}>
                   <View style={styles.preferenceIconContainer}>
                     <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.preferenceLabel}>Session Length</Text>
-                </View>
-                <View style={styles.preferenceRight}>
-                  <Text style={styles.preferenceValue}>10 min</Text>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-                </View>
+                <Text style={styles.preferenceLabel}>Session Length</Text>
+              </View>
+              <View style={styles.preferenceRight}>
+                <Text style={styles.preferenceValue}>10 min</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+              </View>
               </AnimatedPressable>
-              
-              <View style={styles.preferenceDivider} />
-              
-              <View style={styles.preferenceRow}>
-                <View style={styles.preferenceLeft}>
+            
+            <View style={styles.preferenceDivider} />
+            
+            <View style={styles.preferenceRow}>
+              <View style={styles.preferenceLeft}>
                   <View style={styles.preferenceIconContainer}>
                     <Ionicons name="volume-medium-outline" size={20} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.preferenceLabel}>Background Sounds</Text>
-                </View>
-                <Switch
-                  value={true}
-                  trackColor={{ false: theme.colors.gray[300], true: theme.colors.primary }}
-                  thumbColor="white"
-                />
+                <Text style={styles.preferenceLabel}>Background Sounds</Text>
               </View>
+              <Switch
+                value={true}
+                trackColor={{ false: theme.colors.gray[300], true: theme.colors.primary }}
+                thumbColor="white"
+              />
             </View>
+          </View>
           </AnimatedView>
         </View>
 
         {/* Quick Links */}
         <View style={styles.section}>
           <AnimatedView delay={650} duration={400}>
-            <View style={styles.quickLinks}>
+          <View style={styles.quickLinks}>
               <AnimatedPressable 
                 onPress={() => router.push('/stats')}
-                style={styles.quickLink}
-              >
+              style={styles.quickLink}
+            >
                 <View style={[styles.quickLinkIcon, { backgroundColor: `${theme.colors.info}15` }]}>
                   <Ionicons name="stats-chart-outline" size={20} color={theme.colors.info} />
                 </View>
-                <Text style={styles.quickLinkText}>Statistics</Text>
+              <Text style={styles.quickLinkText}>Statistics</Text>
               </AnimatedPressable>
-              
+            
               <AnimatedPressable 
                 onPress={() => router.push('/settings')}
-                style={styles.quickLink}
-              >
+              style={styles.quickLink}
+            >
                 <View style={[styles.quickLinkIcon, { backgroundColor: `${theme.colors.textLight}15` }]}>
                   <Ionicons name="settings-outline" size={20} color={theme.colors.textLight} />
                 </View>
-                <Text style={styles.quickLinkText}>Settings</Text>
+              <Text style={styles.quickLinkText}>Settings</Text>
               </AnimatedPressable>
-              
+            
               <AnimatedPressable style={styles.quickLink}>
                 <View style={[styles.quickLinkIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
                   <Ionicons name="help-circle-outline" size={20} color={theme.colors.primary} />
                 </View>
-                <Text style={styles.quickLinkText}>Help</Text>
+              <Text style={styles.quickLinkText}>Help</Text>
               </AnimatedPressable>
-            </View>
+          </View>
           </AnimatedView>
         </View>
 
         {/* Logout */}
         <AnimatedView delay={700} duration={400}>
           <AnimatedPressable style={styles.logoutButton} onPress={logout}>
-            <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
-            <Text style={styles.logoutText}>Log Out</Text>
+          <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
+          <Text style={styles.logoutText}>Log Out</Text>
           </AnimatedPressable>
         </AnimatedView>
 
         {/* Footer */}
         <AnimatedView delay={750} duration={400}>
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>CalmNest v1.0.0</Text>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>CalmNest v1.0.0</Text>
             <Text style={styles.footerSubtext}>Made with love for your peace</Text>
-          </View>
+        </View>
         </AnimatedView>
       </ScrollView>
     </SafeAreaView>
@@ -303,73 +303,73 @@ function ProfileScreen() {
 
 const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    container: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: theme.spacing.xxl,
-    },
-    header: {
-      alignItems: 'center',
-      paddingTop: theme.spacing.xl,
-      paddingBottom: theme.spacing.lg,
-    },
-    avatarContainer: {
-      marginBottom: theme.spacing.md,
-    },
-    avatar: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+  },
+  avatarContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  avatar: {
       width: 96,
       height: 96,
       borderRadius: 48,
-      alignItems: 'center',
-      justifyContent: 'center',
-      ...theme.shadows.md,
-    },
-    avatarText: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.md,
+  },
+  avatarText: {
       fontFamily: theme.fonts.display.bold,
       fontSize: 40,
-      color: 'white',
-    },
-    userName: {
-      fontFamily: theme.fonts.display.semiBold,
+    color: 'white',
+  },
+  userName: {
+    fontFamily: theme.fonts.display.semiBold,
       fontSize: 26,
-      color: theme.colors.text,
-      marginBottom: 4,
-    },
-    memberSince: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: theme.colors.textLight,
-    },
-    sanctuaryCard: {
-      marginHorizontal: theme.spacing.lg,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.xl,
-      ...theme.shadows.sm,
-    },
-    sanctuaryTitle: {
-      fontFamily: theme.fonts.display.semiBold,
-      fontSize: 18,
-      color: theme.colors.text,
-      textAlign: 'center',
-    },
-    sanctuaryDivider: {
-      height: 1,
-      backgroundColor: theme.colors.gray[200],
-      marginVertical: theme.spacing.lg,
-    },
-    sanctuaryStats: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-    },
-    sanctuaryStat: {
-      alignItems: 'center',
-    },
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+  memberSince: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 14,
+    color: theme.colors.textLight,
+  },
+  sanctuaryCard: {
+    marginHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    ...theme.shadows.sm,
+  },
+  sanctuaryTitle: {
+    fontFamily: theme.fonts.display.semiBold,
+    fontSize: 18,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  sanctuaryDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
+    marginVertical: theme.spacing.lg,
+  },
+  sanctuaryStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  sanctuaryStat: {
+    alignItems: 'center',
+  },
     sanctuaryIconContainer: {
       width: 48,
       height: 48,
@@ -377,51 +377,51 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: theme.spacing.sm,
-    },
-    sanctuaryStatInfo: {
-      alignItems: 'center',
-    },
-    sanctuaryStatValue: {
+  },
+  sanctuaryStatInfo: {
+    alignItems: 'center',
+  },
+  sanctuaryStatValue: {
       fontFamily: theme.fonts.display.bold,
       fontSize: 24,
-      color: theme.colors.text,
-    },
-    sanctuaryStatLabel: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.textLight,
-      marginTop: 2,
-    },
-    section: {
-      marginTop: theme.spacing.xl,
-      paddingHorizontal: theme.spacing.lg,
-    },
-    sectionTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
+    color: theme.colors.text,
+  },
+  sanctuaryStatLabel: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 12,
+    color: theme.colors.textLight,
+    marginTop: 2,
+  },
+  section: {
+    marginTop: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
-      color: theme.colors.text,
-      marginBottom: theme.spacing.md,
-    },
-    milestonesGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+  milestonesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
       marginHorizontal: -theme.spacing.xs,
     },
     milestoneCardWrapper: {
       width: '50%',
       paddingHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.sm,
-    },
-    milestoneCard: {
-      backgroundColor: theme.colors.gray[100],
+  },
+  milestoneCard: {
+    backgroundColor: theme.colors.gray[100],
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.lg,
-      alignItems: 'center',
-    },
-    milestoneCardAchieved: {
-      backgroundColor: theme.colors.surface,
-      ...theme.shadows.sm,
-    },
+    alignItems: 'center',
+  },
+  milestoneCardAchieved: {
+    backgroundColor: theme.colors.surface,
+    ...theme.shadows.sm,
+  },
     milestoneIconContainer: {
       width: 56,
       height: 56,
@@ -429,54 +429,54 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: theme.spacing.sm,
-    },
-    milestoneLabel: {
+  },
+  milestoneLabel: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: theme.colors.textMuted,
-    },
-    milestoneLabelAchieved: {
-      color: theme.colors.text,
-    },
-    milestoneDescription: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      marginTop: 4,
-    },
-    nextMilestone: {
-      marginTop: theme.spacing.md,
-      padding: theme.spacing.md,
+    fontSize: 14,
+    color: theme.colors.textMuted,
+  },
+  milestoneLabelAchieved: {
+    color: theme.colors.text,
+  },
+  milestoneDescription: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  nextMilestone: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
       backgroundColor: isDark ? `${theme.colors.primary}30` : `${theme.colors.primary}10`,
-      borderRadius: theme.borderRadius.lg,
+    borderRadius: theme.borderRadius.lg,
       flexDirection: 'row',
-      alignItems: 'center',
+    alignItems: 'center',
       justifyContent: 'center',
       gap: theme.spacing.sm,
-    },
-    nextMilestoneText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
-      color: theme.colors.primary,
-    },
-    preferencesCard: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.xl,
+  },
+  nextMilestoneText: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 14,
+    color: theme.colors.primary,
+  },
+  preferencesCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
       paddingVertical: theme.spacing.sm,
       paddingHorizontal: theme.spacing.md,
-      ...theme.shadows.sm,
-    },
-    preferenceRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+    ...theme.shadows.sm,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
       paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.sm,
-    },
-    preferenceLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.md,
-    },
+    paddingHorizontal: theme.spacing.sm,
+  },
+  preferenceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
     preferenceIconContainer: {
       width: 36,
       height: 36,
@@ -485,38 +485,38 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    preferenceLabel: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 15,
-      color: theme.colors.text,
-    },
-    preferenceRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.xs,
-    },
-    preferenceValue: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: theme.colors.textLight,
-    },
-    preferenceDivider: {
-      height: 1,
-      backgroundColor: theme.colors.gray[200],
+  preferenceLabel: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 15,
+    color: theme.colors.text,
+  },
+  preferenceRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  preferenceValue: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 14,
+    color: theme.colors.textLight,
+  },
+  preferenceDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
       marginLeft: 60,
-    },
-    quickLinks: {
-      flexDirection: 'row',
-      gap: theme.spacing.sm,
-    },
-    quickLink: {
-      flex: 1,
-      alignItems: 'center',
-      backgroundColor: theme.colors.surface,
+  },
+  quickLinks: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  quickLink: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.lg,
-      ...theme.shadows.sm,
-    },
+    ...theme.shadows.sm,
+  },
     quickLinkIcon: {
       width: 44,
       height: 44,
@@ -525,45 +525,45 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       justifyContent: 'center',
       marginBottom: theme.spacing.sm,
     },
-    quickLinkText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 13,
-      color: theme.colors.text,
-    },
-    logoutButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginHorizontal: theme.spacing.lg,
-      marginTop: theme.spacing.xl,
-      paddingVertical: theme.spacing.md,
-      borderRadius: theme.borderRadius.lg,
+  quickLinkText: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 13,
+    color: theme.colors.text,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
       borderWidth: 1.5,
-      borderColor: theme.colors.error,
+    borderColor: theme.colors.error,
       gap: theme.spacing.sm,
-    },
-    logoutText: {
+  },
+  logoutText: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 15,
-      color: theme.colors.error,
-    },
-    footer: {
-      alignItems: 'center',
-      marginTop: theme.spacing.xl,
-      paddingBottom: theme.spacing.lg,
-    },
-    footerText: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.textMuted,
-    },
-    footerSubtext: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.textMuted,
-      marginTop: 4,
-    },
-  });
+    fontSize: 15,
+    color: theme.colors.error,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+  },
+  footerText: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  footerSubtext: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    marginTop: 4,
+  },
+});
 
 export default function Profile() {
   return (
