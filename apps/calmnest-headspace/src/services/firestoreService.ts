@@ -19,7 +19,8 @@ import {
   MeditationSession, 
   MeditationProgram,
   BreathingExercise,
-  SleepStory,
+  NatureSound,
+  BedtimeStory,
   DailyQuote,
   UserFavorite,
   MeditationCategory 
@@ -30,7 +31,7 @@ const meditationsCollection = collection(db, 'guided_meditations');
 const sessionsCollection = collection(db, 'meditation_sessions');
 const programsCollection = collection(db, 'meditation_programs');
 const breathingCollection = collection(db, 'breathing_exercises');
-const sleepStoriesCollection = collection(db, 'sleep_stories');
+const bedtimeStoriesCollection = collection(db, 'bedtime_stories');
 const quotesCollection = collection(db, 'daily_quotes');
 const favoritesCollection = collection(db, 'user_favorites');
 const usersCollection = collection(db, 'users');
@@ -268,34 +269,38 @@ export async function getBreathingExercises(): Promise<BreathingExercise[]> {
   }
 }
 
-// ==================== SLEEP STORIES ====================
+// ==================== BEDTIME STORIES ====================
 
-export async function getSleepStories(): Promise<SleepStory[]> {
+export async function getBedtimeStories(): Promise<BedtimeStory[]> {
   try {
-    const q = query(sleepStoriesCollection, orderBy('created_at', 'desc'));
+    const q = query(bedtimeStoriesCollection, orderBy('created_at', 'desc'));
     const snapshot = await getDocs(q);
     
     return snapshot.docs.map(doc => ({ 
       id: doc.id, 
       ...doc.data() 
-    } as SleepStory));
+    } as BedtimeStory));
   } catch (error) {
-    console.error('Error fetching sleep stories:', error);
+    console.error('Error fetching bedtime stories:', error);
     return [];
   }
 }
 
-export async function getSleepStoryById(id: string): Promise<SleepStory | null> {
+export async function getBedtimeStoryById(id: string): Promise<BedtimeStory | null> {
   try {
-    const docRef = doc(db, 'sleep_stories', id);
+    const docRef = doc(db, 'bedtime_stories', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as SleepStory;
+    return { id: docSnap.id, ...docSnap.data() } as BedtimeStory;
   } catch (error) {
-    console.error('Error fetching sleep story:', error);
+    console.error('Error fetching bedtime story:', error);
     return null;
   }
 }
+
+// Legacy aliases for backward compatibility
+export const getSleepStories = getBedtimeStories;
+export const getSleepStoryById = getBedtimeStoryById;
 
 // ==================== DAILY QUOTES ====================
 
@@ -348,7 +353,7 @@ export async function getUserFavorites(userId: string): Promise<UserFavorite[]> 
 export async function toggleFavorite(
   userId: string, 
   contentId: string, 
-  contentType: 'meditation' | 'sleep_story' | 'breathing_exercise'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise'
 ): Promise<boolean> {
   try {
     const q = query(

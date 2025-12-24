@@ -9,7 +9,7 @@
 
 const STORAGE_BUCKET = 'calmnest-e910e.firebasestorage.app';
 
-// Helper to generate Firebase Storage URL
+// Helper to generate Firebase Storage URL for nature sounds
 const storageUrl = (filename: string) => 
   `https://storage.googleapis.com/${STORAGE_BUCKET}/audio/sleep/${filename}`;
 
@@ -82,12 +82,8 @@ export const audioFiles: Record<string, string> = {
   sleep_train_locomotive: storageUrl('train_locomotive.mp3'),
   sleep_snow_crunch: storageUrl('snow_crunch.mp3'),
   
-  // Legacy keys (for backward compatibility with sleep stories)
-  sleep_nature: fragrantheart('relaxation/peaceful-sleep'),
-  sleep_ocean: fragrantheart('relaxation/deep-sleep'),
-  sleep_rain: storageUrl('rain_window.mp3'),
-  sleep_fantasy: fragrantheart('relaxation/golden-cone-of-light'),
-  sleep_yoga: fragrantheart('relaxation/yoga-nidra'),
+  // ========== BEDTIME STORIES (Local audio files) ==========
+  story_midnight_crossing: require('../../assets/audio/stories/the_midnight_crossing_act1.mp3'),
 };
 
 /**

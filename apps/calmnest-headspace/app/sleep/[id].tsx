@@ -8,16 +8,16 @@ import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AudioPlayer } from '../../src/components/AudioPlayer';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { getSleepStoryById } from '../../src/services/firestoreService';
+import { getBedtimeStoryById } from '../../src/services/firestoreService';
 import { getAudioFile } from '../../src/constants/audioFiles';
 import { Theme } from '../../src/theme';
-import { SleepStory } from '../../src/types';
+import { BedtimeStory } from '../../src/types';
 
 function SleepStoryPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const [story, setStory] = useState<SleepStory | null>(null);
+  const [story, setStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -28,10 +28,10 @@ function SleepStoryPlayerScreen() {
     async function loadStory() {
       try {
         setLoading(true);
-        const data = await getSleepStoryById(id as string);
+        const data = await getBedtimeStoryById(id as string);
         setStory(data);
       } catch (error) {
-        console.error('Failed to load sleep story:', error);
+        console.error('Failed to load bedtime story:', error);
       } finally {
         setLoading(false);
       }
@@ -77,10 +77,10 @@ function SleepStoryPlayerScreen() {
         return 'planet';
       case 'travel':
         return 'airplane';
-      case 'ocean':
-        return 'water';
-      case 'rain':
-        return 'rainy';
+      case 'fiction':
+        return 'book';
+      case 'thriller':
+        return 'skull';
       default:
         return 'book';
     }

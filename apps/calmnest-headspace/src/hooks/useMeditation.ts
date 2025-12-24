@@ -6,7 +6,7 @@ import { MeditationSession } from '../types';
 
 interface UseMeditationOptions {
   duration: number; // in minutes
-  sessionType: 'meditation' | 'breathing' | 'sleep_story';
+  sessionType: 'meditation' | 'breathing' | 'nature_sound' | 'bedtime_story';
   onComplete?: (sessionId: string) => void;
 }
 

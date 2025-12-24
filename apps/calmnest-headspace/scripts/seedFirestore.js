@@ -6,7 +6,7 @@
  * This script uploads all seed content to Firestore collections:
  * - guided_meditations (40)
  * - breathing_exercises (20)
- * - sleep_stories (20)
+ * - bedtime_stories (1)
  * - daily_quotes (35)
  * - meditation_programs (10)
  */
@@ -102,27 +102,8 @@ const imageFiles = {
   breathing_counting: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=800&q=80',
   breathing_victory: 'https://images.unsplash.com/photo-1494178270175-e96de2971df9?w=800&q=80',
   
-  // Sleep story images
-  sleep_moonlit_forest: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80',
-  sleep_ocean_waves: 'https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&q=80',
-  sleep_mountain: 'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&q=80',
-  sleep_starlit_garden: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=80',
-  sleep_gentle_rain: 'https://images.unsplash.com/photo-1428592953211-077101b2021b?w=800&q=80',
-  sleep_tropical_island: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
-  sleep_ancient_library: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80',
-  sleep_countryside_train: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800&q=80',
-  sleep_autumn_leaves: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80',
-  sleep_deep_ocean: 'https://images.unsplash.com/photo-1468581264429-2548ef9eb732?w=800&q=80',
-  sleep_cozy_cabin: 'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?w=800&q=80',
-  sleep_enchanted_castle: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80',
-  sleep_rainy_cafe: 'https://images.unsplash.com/photo-1445116572660-236099ec97a0?w=800&q=80',
-  sleep_lighthouse: 'https://images.unsplash.com/photo-1504681869696-d977211a5f4c?w=800&q=80',
-  sleep_japanese_garden: 'https://images.unsplash.com/photo-1528164344705-47542687000d?w=800&q=80',
-  sleep_sailing: 'https://images.unsplash.com/photo-1500514966906-fe245eea9344?w=800&q=80',
-  sleep_floating_cloud: 'https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=800&q=80',
-  sleep_night_garden: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=800&q=80',
-  sleep_thunderstorm: 'https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?w=800&q=80',
-  sleep_northern_lights: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80',
+  // Bedtime story images
+  story_thriller_midnight: 'https://images.unsplash.com/photo-1509248961725-aec71c87a22c?w=800&q=80',
   
   // Program images
   program_basics: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80',
@@ -225,29 +206,10 @@ const seedBreathingExercises = [
   { title: 'Victory Breath', description: 'Build confidence through powerful breathing.', duration_minutes: 5, pattern: '4-4-4-4', inhale_seconds: 4, hold_seconds: 4, exhale_seconds: 4, hold_after_exhale_seconds: 4, audio_file: 'breathing_energy', thumbnail_url: getImageUrl('breathing_victory'), benefits: ['Builds confidence', 'Inner strength', 'Empowering'] },
 ];
 
-// ==================== SLEEP STORIES (20) ====================
+// ==================== BEDTIME STORIES (1) ====================
 
-const seedSleepStories = [
-  { title: 'Moonlit Forest', description: 'Wander through an enchanted forest bathed in silver moonlight.', duration_minutes: 15, category: 'nature', narrator: 'Emma', audio_file: 'sleep_nature', thumbnail_url: getImageUrl('sleep_moonlit_forest'), is_premium: false },
-  { title: 'Ocean Waves', description: 'Rest on a quiet beach as gentle waves lap at the shore.', duration_minutes: 15, category: 'ocean', narrator: 'James', audio_file: 'sleep_ocean', thumbnail_url: getImageUrl('sleep_ocean_waves'), is_premium: false },
-  { title: 'Mountain Journey', description: 'Travel through misty mountain paths to a cozy cabin.', duration_minutes: 15, category: 'travel', narrator: 'Emma', audio_file: 'sleep_fantasy', thumbnail_url: getImageUrl('sleep_mountain'), is_premium: false },
-  { title: 'Starlit Garden', description: 'Explore a magical garden under a canopy of stars.', duration_minutes: 15, category: 'fantasy', narrator: 'James', audio_file: 'sleep_fantasy', thumbnail_url: getImageUrl('sleep_starlit_garden'), is_premium: false },
-  { title: 'Gentle Rain', description: 'Listen to rain pattering on the window while safe inside.', duration_minutes: 20, category: 'rain', narrator: 'Sarah', audio_file: 'sleep_rain', thumbnail_url: getImageUrl('sleep_gentle_rain'), is_premium: false },
-  { title: 'Tropical Island', description: 'Escape to a peaceful tropical island paradise.', duration_minutes: 18, category: 'travel', narrator: 'Emma', audio_file: 'sleep_ocean', thumbnail_url: getImageUrl('sleep_tropical_island'), is_premium: false },
-  { title: 'Ancient Library', description: 'Discover a magical library where books whisper stories.', duration_minutes: 20, category: 'fantasy', narrator: 'James', audio_file: 'sleep_fantasy', thumbnail_url: getImageUrl('sleep_ancient_library'), is_premium: false },
-  { title: 'Countryside Train', description: 'Travel by train through rolling countryside.', duration_minutes: 25, category: 'travel', narrator: 'Michael', audio_file: 'sleep_fantasy', thumbnail_url: getImageUrl('sleep_countryside_train'), is_premium: false },
-  { title: 'Autumn Leaves', description: 'Walk through a peaceful forest in autumn.', duration_minutes: 15, category: 'nature', narrator: 'Emma', audio_file: 'sleep_nature', thumbnail_url: getImageUrl('sleep_autumn_leaves'), is_premium: false },
-  { title: 'Deep Ocean', description: 'Descend into the peaceful depths of the ocean.', duration_minutes: 20, category: 'ocean', narrator: 'James', audio_file: 'sleep_ocean', thumbnail_url: getImageUrl('sleep_deep_ocean'), is_premium: true },
-  { title: 'Cozy Cabin', description: 'Spend the night in a warm cabin while snow falls outside.', duration_minutes: 20, category: 'nature', narrator: 'Sarah', audio_file: 'sleep_nature', thumbnail_url: getImageUrl('sleep_cozy_cabin'), is_premium: false },
-  { title: 'Enchanted Castle', description: 'Explore the halls of a peaceful castle.', duration_minutes: 25, category: 'fantasy', narrator: 'Emma', audio_file: 'sleep_fantasy', thumbnail_url: getImageUrl('sleep_enchanted_castle'), is_premium: true },
-  { title: 'Rainy Night Café', description: 'Sit by the window of a cozy café on a rainy night.', duration_minutes: 18, category: 'rain', narrator: 'Michael', audio_file: 'sleep_rain', thumbnail_url: getImageUrl('sleep_rainy_cafe'), is_premium: false },
-  { title: 'Lighthouse Keeper', description: 'Keep watch at a peaceful lighthouse by the sea.', duration_minutes: 20, category: 'ocean', narrator: 'James', audio_file: 'sleep_ocean', thumbnail_url: getImageUrl('sleep_lighthouse'), is_premium: false },
-  { title: 'Japanese Garden', description: 'Find peace in a traditional Japanese garden.', duration_minutes: 15, category: 'nature', narrator: 'Emma', audio_file: 'sleep_nature', thumbnail_url: getImageUrl('sleep_japanese_garden'), is_premium: false },
-  { title: 'Sailing Adventure', description: 'Sail across calm seas under a blanket of stars.', duration_minutes: 20, category: 'travel', narrator: 'James', audio_file: 'sleep_ocean', thumbnail_url: getImageUrl('sleep_sailing'), is_premium: true },
-  { title: 'Floating Cloud', description: 'Rest on a soft cloud drifting through the sky.', duration_minutes: 15, category: 'fantasy', narrator: 'Sarah', audio_file: 'sleep_fantasy', thumbnail_url: getImageUrl('sleep_floating_cloud'), is_premium: false },
-  { title: 'Night Garden', description: 'Stroll through a garden at night with moonflowers.', duration_minutes: 18, category: 'nature', narrator: 'Emma', audio_file: 'sleep_nature', thumbnail_url: getImageUrl('sleep_night_garden'), is_premium: false },
-  { title: 'Thunderstorm Lullaby', description: 'Distant thunder rumbles while you are safe and cozy.', duration_minutes: 25, category: 'rain', narrator: 'Michael', audio_file: 'sleep_rain', thumbnail_url: getImageUrl('sleep_thunderstorm'), is_premium: false },
-  { title: 'Northern Lights', description: 'Watch the aurora dance across the arctic sky.', duration_minutes: 20, category: 'nature', narrator: 'Emma', audio_file: 'sleep_nature', thumbnail_url: getImageUrl('sleep_northern_lights'), is_premium: true },
+const seedBedtimeStories = [
+  { title: 'The Midnight Crossing', description: 'A suspenseful journey through shadows and mystery. The night holds secrets waiting to be discovered.', duration_minutes: 6, category: 'thriller', narrator: 'Rachel', audio_file: 'story_midnight_crossing', thumbnail_url: getImageUrl('story_thriller_midnight'), is_premium: false },
 ];
 
 // ==================== DAILY QUOTES (35) ====================
@@ -341,7 +303,7 @@ async function main() {
     console.log('Step 1: Clearing existing data...\n');
     await clearCollection('guided_meditations');
     await clearCollection('breathing_exercises');
-    await clearCollection('sleep_stories');
+    await clearCollection('bedtime_stories');
     await clearCollection('daily_quotes');
     await clearCollection('meditation_programs');
     
@@ -350,7 +312,7 @@ async function main() {
     // Seed new data
     await seedCollection('guided_meditations', seedMeditations);
     await seedCollection('breathing_exercises', seedBreathingExercises);
-    await seedCollection('sleep_stories', seedSleepStories);
+    await seedCollection('bedtime_stories', seedBedtimeStories);
     await seedCollection('daily_quotes', seedQuotes);
     await seedCollection('meditation_programs', seedPrograms);
     
@@ -359,10 +321,10 @@ async function main() {
     console.log('Summary:');
     console.log(`  - ${seedMeditations.length} guided meditations`);
     console.log(`  - ${seedBreathingExercises.length} breathing exercises`);
-    console.log(`  - ${seedSleepStories.length} sleep stories`);
+    console.log(`  - ${seedBedtimeStories.length} bedtime stories`);
     console.log(`  - ${seedQuotes.length} daily quotes`);
     console.log(`  - ${seedPrograms.length} meditation programs`);
-    console.log(`\n  TOTAL: ${seedMeditations.length + seedBreathingExercises.length + seedSleepStories.length + seedQuotes.length + seedPrograms.length} content items`);
+    console.log(`\n  TOTAL: ${seedMeditations.length + seedBreathingExercises.length + seedBedtimeStories.length + seedQuotes.length + seedPrograms.length} content items`);
     console.log('\n🧘 Your content is ready with images!\n');
     
     process.exit(0);

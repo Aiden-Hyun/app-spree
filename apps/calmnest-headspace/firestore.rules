@@ -29,7 +29,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /sleep_stories/{docId} {
+    match /bedtime_stories/{docId} {
       allow read: if true;
       allow write: if false;
     }

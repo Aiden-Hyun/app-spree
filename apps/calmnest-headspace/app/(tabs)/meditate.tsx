@@ -212,7 +212,16 @@ function MeditateScreen() {
         {/* Browse by Theme */}
         <View style={styles.section}>
           <AnimatedView delay={400} duration={400}>
-          <Text style={styles.sectionTitle}>Browse by theme</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Browse by theme</Text>
+              <AnimatedPressable 
+                onPress={() => router.push('/meditations')}
+                style={styles.seeAllButton}
+              >
+                <Text style={styles.seeAllText}>See all</Text>
+                <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
+              </AnimatedPressable>
+            </View>
           </AnimatedView>
           <View style={styles.themeGrid}>
             {themeCategories.map((cat, index) => (
@@ -340,11 +349,28 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+  },
   sectionTitle: {
     fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 18,
+    fontSize: 18,
     color: theme.colors.text,
-    marginBottom: theme.spacing.md,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  seeAllText: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 14,
+    color: theme.colors.primary,
   },
   moodGrid: {
     flexDirection: 'row',

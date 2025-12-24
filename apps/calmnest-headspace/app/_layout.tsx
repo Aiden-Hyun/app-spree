@@ -85,6 +85,12 @@ function RootNavigator() {
             headerShown: false,
           }} 
         />
+        <Stack.Screen 
+          name="meditations" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
       </Stack>
   );
 }

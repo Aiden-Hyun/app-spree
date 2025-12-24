@@ -861,241 +861,30 @@ export const seedBreathingExercises: SeedBreathingExercise[] = [
   },
 ];
 
-// ==================== SLEEP STORIES (20 entries) ====================
+// ==================== BEDTIME STORIES ====================
 
-export interface SeedSleepStory {
+export interface SeedBedtimeStory {
   title: string;
   description: string;
   duration_minutes: number;
-  category: "nature" | "fantasy" | "travel" | "rain" | "ocean";
+  category: "nature" | "fantasy" | "travel" | "fiction" | "thriller";
   narrator: string;
   audio_file: string;
   image: string;
   is_premium: boolean;
 }
 
-export const seedSleepStories: SeedSleepStory[] = [
-  // Original 4
+export const seedBedtimeStories: SeedBedtimeStory[] = [
   {
-    title: "Moonlit Forest",
+    title: "The Midnight Crossing",
     description:
-      "Wander through an enchanted forest bathed in silver moonlight. Let the gentle sounds of nature guide you to sleep.",
-    duration_minutes: 15,
-    category: "nature",
-    narrator: "Emma",
-    audio_file: "sleep_nature",
-    image: "sleep_moonlit_forest",
+      "A suspenseful journey through shadows and mystery. The night holds secrets waiting to be discovered as you drift into sleep.",
+    duration_minutes: 6,
+    category: "thriller",
+    narrator: "Rachel",
+    audio_file: "story_midnight_crossing",
+    image: "story_thriller_midnight",
     is_premium: false,
-  },
-  {
-    title: "Ocean Waves",
-    description:
-      "Rest on a quiet beach as gentle waves lap at the shore. The rhythm of the ocean carries you to dreamland.",
-    duration_minutes: 15,
-    category: "ocean",
-    narrator: "James",
-    audio_file: "sleep_ocean",
-    image: "sleep_ocean_waves",
-    is_premium: false,
-  },
-  {
-    title: "Mountain Journey",
-    description:
-      "Travel through misty mountain paths to a cozy cabin retreat. A peaceful escape for restful sleep.",
-    duration_minutes: 15,
-    category: "travel",
-    narrator: "Emma",
-    audio_file: "sleep_fantasy",
-    image: "sleep_mountain",
-    is_premium: false,
-  },
-  {
-    title: "Starlit Garden",
-    description:
-      "Explore a magical garden under a canopy of stars. Fireflies dance as you drift into peaceful dreams.",
-    duration_minutes: 15,
-    category: "fantasy",
-    narrator: "James",
-    audio_file: "sleep_fantasy",
-    image: "sleep_starlit_garden",
-    is_premium: false,
-  },
-  // 16 more
-  {
-    title: "Gentle Rain",
-    description:
-      "Listen to rain pattering on the window while safe and warm inside. The perfect lullaby.",
-    duration_minutes: 20,
-    category: "rain",
-    narrator: "Sarah",
-    audio_file: "sleep_rain",
-    image: "sleep_gentle_rain",
-    is_premium: false,
-  },
-  {
-    title: "Tropical Island",
-    description:
-      "Escape to a peaceful tropical island. Palm trees sway as you rest in a hammock.",
-    duration_minutes: 18,
-    category: "travel",
-    narrator: "Emma",
-    audio_file: "sleep_ocean",
-    image: "sleep_tropical_island",
-    is_premium: false,
-  },
-  {
-    title: "Ancient Library",
-    description:
-      "Discover a magical library where books whisper ancient stories. Knowledge lulls you to sleep.",
-    duration_minutes: 20,
-    category: "fantasy",
-    narrator: "James",
-    audio_file: "sleep_fantasy",
-    image: "sleep_ancient_library",
-    is_premium: false,
-  },
-  {
-    title: "Countryside Train",
-    description:
-      "Travel by train through rolling countryside. The gentle motion rocks you to sleep.",
-    duration_minutes: 25,
-    category: "travel",
-    narrator: "Michael",
-    audio_file: "sleep_fantasy",
-    image: "sleep_countryside_train",
-    is_premium: false,
-  },
-  {
-    title: "Autumn Leaves",
-    description:
-      "Walk through a peaceful forest in autumn. Golden leaves drift down as you find rest.",
-    duration_minutes: 15,
-    category: "nature",
-    narrator: "Emma",
-    audio_file: "sleep_nature",
-    image: "sleep_autumn_leaves",
-    is_premium: false,
-  },
-  {
-    title: "Deep Ocean",
-    description:
-      "Descend into the peaceful depths of the ocean. Float weightlessly in calm blue waters.",
-    duration_minutes: 20,
-    category: "ocean",
-    narrator: "James",
-    audio_file: "sleep_ocean",
-    image: "sleep_deep_ocean",
-    is_premium: true,
-  },
-  {
-    title: "Cozy Cabin",
-    description:
-      "Spend the night in a warm cabin while snow falls outside. The fire crackles softly.",
-    duration_minutes: 20,
-    category: "nature",
-    narrator: "Sarah",
-    audio_file: "sleep_nature",
-    image: "sleep_cozy_cabin",
-    is_premium: false,
-  },
-  {
-    title: "Enchanted Castle",
-    description:
-      "Explore the halls of a peaceful castle. Ancient magic ensures sweet dreams.",
-    duration_minutes: 25,
-    category: "fantasy",
-    narrator: "Emma",
-    audio_file: "sleep_fantasy",
-    image: "sleep_enchanted_castle",
-    is_premium: true,
-  },
-  {
-    title: "Rainy Night Café",
-    description:
-      "Sit by the window of a cozy café on a rainy night. Watch the world slow down.",
-    duration_minutes: 18,
-    category: "rain",
-    narrator: "Michael",
-    audio_file: "sleep_rain",
-    image: "sleep_rainy_cafe",
-    is_premium: false,
-  },
-  {
-    title: "Lighthouse Keeper",
-    description:
-      "Keep watch at a peaceful lighthouse. The steady beam guides ships through the night.",
-    duration_minutes: 20,
-    category: "ocean",
-    narrator: "James",
-    audio_file: "sleep_ocean",
-    image: "sleep_lighthouse",
-    is_premium: false,
-  },
-  {
-    title: "Japanese Garden",
-    description:
-      "Find peace in a traditional Japanese garden. Koi swim lazily as cherry blossoms fall.",
-    duration_minutes: 15,
-    category: "nature",
-    narrator: "Emma",
-    audio_file: "sleep_nature",
-    image: "sleep_japanese_garden",
-    is_premium: false,
-  },
-  {
-    title: "Sailing Adventure",
-    description:
-      "Sail across calm seas under a blanket of stars. The gentle rocking guides you to sleep.",
-    duration_minutes: 20,
-    category: "travel",
-    narrator: "James",
-    audio_file: "sleep_ocean",
-    image: "sleep_sailing",
-    is_premium: true,
-  },
-  {
-    title: "Floating Cloud",
-    description:
-      "Rest on a soft cloud drifting through a peaceful sky. Weightless and free.",
-    duration_minutes: 15,
-    category: "fantasy",
-    narrator: "Sarah",
-    audio_file: "sleep_fantasy",
-    image: "sleep_floating_cloud",
-    is_premium: false,
-  },
-  {
-    title: "Night Garden",
-    description:
-      "Stroll through a garden at night. Jasmine and moonflowers release their gentle scents.",
-    duration_minutes: 18,
-    category: "nature",
-    narrator: "Emma",
-    audio_file: "sleep_nature",
-    image: "sleep_night_garden",
-    is_premium: false,
-  },
-  {
-    title: "Thunderstorm Lullaby",
-    description:
-      "Distant thunder rumbles while you're safe and cozy. The storm's rhythm lulls you to sleep.",
-    duration_minutes: 25,
-    category: "rain",
-    narrator: "Michael",
-    audio_file: "sleep_rain",
-    image: "sleep_thunderstorm",
-    is_premium: false,
-  },
-  {
-    title: "Northern Lights",
-    description:
-      "Watch the aurora dance across the arctic sky. Colors swirl as you drift into dreams.",
-    duration_minutes: 20,
-    category: "nature",
-    narrator: "Emma",
-    audio_file: "sleep_nature",
-    image: "sleep_northern_lights",
-    is_premium: true,
   },
 ];
 

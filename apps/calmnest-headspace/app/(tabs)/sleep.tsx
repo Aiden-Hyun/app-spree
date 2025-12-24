@@ -8,13 +8,13 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { Skeleton, SkeletonCard } from "../../src/components/Skeleton";
-import { getSleepStories } from "../../src/services/firestoreService";
+import { getBedtimeStories } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { getAudioFile } from "../../src/constants/audioFiles";
 import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
 import { Theme } from "../../src/theme";
-import { SleepStory } from "../../src/types";
+import { BedtimeStory } from "../../src/types";
 
 // Pick 6 featured sounds to show on main sleep page (one from each category)
 const featuredSoundIds = [
@@ -33,8 +33,8 @@ const quickAccessSounds = sleepSoundsData.filter((s) =>
 function SleepScreen() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [sleepStories, setSleepStories] = useState<SleepStory[]>([]);
-  const [featuredStory, setFeaturedStory] = useState<SleepStory | null>(null);
+  const [bedtimeStories, setBedtimeStories] = useState<BedtimeStory[]>([]);
+  const [featuredStory, setFeaturedStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSound, setSelectedSound] = useState<string | null>(null);
 
@@ -87,8 +87,8 @@ function SleepScreen() {
   const loadSleepContent = async () => {
     try {
       setLoading(true);
-      const stories = await getSleepStories();
-      setSleepStories(stories);
+      const stories = await getBedtimeStories();
+      setBedtimeStories(stories);
       if (stories.length > 0) {
         setFeaturedStory(stories[0]);
       }
@@ -232,7 +232,7 @@ function SleepScreen() {
                   onPress={() => router.push("/sleep-sounds")}
                   style={styles.sectionHeader}
                 >
-                  <Text style={styles.sectionTitle}>Sleep Sounds</Text>
+                  <Text style={styles.sectionTitle}>Nature Sounds</Text>
                   <View style={styles.sectionHeaderRight}>
                     <Text style={styles.seeAllText}>See all</Text>
                     <Ionicons
@@ -342,7 +342,7 @@ function SleepScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.storiesScroll}
                   >
-                    {sleepStories.map((story, index) => (
+                    {bedtimeStories.map((story, index) => (
                       <AnimatedPressable
                         key={story.id}
                         onPress={() => router.push(`/sleep/${story.id}`)}
@@ -363,6 +363,10 @@ function SleepScreen() {
                                   ? "planet"
                                   : story.category === "travel"
                                   ? "airplane"
+                                  : story.category === "thriller"
+                                  ? "skull"
+                                  : story.category === "fiction"
+                                  ? "book"
                                   : "book"
                               }
                               size={24}

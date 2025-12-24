@@ -13,7 +13,7 @@ export interface User {
 export interface UserPreferences {
   daily_reminder_time?: string;
   preferred_duration?: number;
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
   notification_enabled?: boolean;
   background_sounds?: boolean;
 }
@@ -23,7 +23,7 @@ export interface MeditationSession {
   id: string;
   user_id: string;
   duration_minutes: number;
-  session_type: 'meditation' | 'breathing' | 'sleep_story';
+  session_type: "meditation" | "breathing" | "nature_sound" | "bedtime_story";
   completed_at: string;
   notes?: string;
   mood_before?: number;
@@ -39,30 +39,30 @@ export interface GuidedMeditation {
   audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
   category: MeditationCategory;
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
+  difficulty_level: "beginner" | "intermediate" | "advanced";
   instructor?: string;
   is_premium: boolean;
   tags?: string[];
   created_at: string;
 }
 
-export type MeditationCategory = 
-  | 'focus'
-  | 'stress'
-  | 'anxiety'
-  | 'sleep'
-  | 'relationships'
-  | 'self-esteem'
-  | 'gratitude'
-  | 'body-scan'
-  | 'loving-kindness';
+export type MeditationCategory =
+  | "focus"
+  | "stress"
+  | "anxiety"
+  | "sleep"
+  | "relationships"
+  | "self-esteem"
+  | "gratitude"
+  | "body-scan"
+  | "loving-kindness";
 
 export interface MeditationProgram {
   id: string;
   title: string;
   description: string;
   duration_days: number;
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
+  difficulty_level: "beginner" | "intermediate" | "advanced";
   created_at: string;
   is_active: boolean;
   sessions?: GuidedMeditation[];
@@ -85,7 +85,7 @@ export interface BreathingExercise {
   description: string;
   pattern: BreathingPattern;
   duration_minutes: number;
-  difficulty_level: 'beginner' | 'intermediate' | 'advanced';
+  difficulty_level: "beginner" | "intermediate" | "advanced";
   benefits: string[];
 }
 
@@ -97,8 +97,22 @@ export interface BreathingPattern {
   cycles: number;
 }
 
-// Sleep content
-export interface SleepStory {
+// Nature Sounds (ambient audio for sleep)
+export interface NatureSound {
+  id: string;
+  title: string;
+  description: string;
+  duration_minutes: number;
+  audio_url?: string;
+  audio_file?: string; // Key for local audio asset (see audioFiles.ts)
+  thumbnail_url?: string;
+  category: "rain" | "ocean" | "forest" | "fire" | "wind" | "ambient";
+  is_premium: boolean;
+  created_at: string;
+}
+
+// Bedtime Stories (narrated stories for sleep)
+export interface BedtimeStory {
   id: string;
   title: string;
   description: string;
@@ -107,10 +121,13 @@ export interface SleepStory {
   audio_url?: string;
   audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
-  category: 'nature' | 'fantasy' | 'travel' | 'fiction' | 'ocean' | 'rain';
+  category: "nature" | "fantasy" | "travel" | "fiction" | "thriller";
   is_premium: boolean;
   created_at: string;
 }
+
+// Legacy alias for backward compatibility
+export type SleepStory = NatureSound;
 
 // Daily content
 export interface DailyQuote {
@@ -125,7 +142,11 @@ export interface UserFavorite {
   id: string;
   user_id: string;
   content_id: string;
-  content_type: 'meditation' | 'sleep_story' | 'breathing_exercise';
+  content_type:
+    | "meditation"
+    | "nature_sound"
+    | "bedtime_story"
+    | "breathing_exercise";
   favorited_at: string;
 }
 
