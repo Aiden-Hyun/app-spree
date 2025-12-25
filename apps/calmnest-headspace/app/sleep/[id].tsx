@@ -9,7 +9,7 @@ import { AudioPlayer } from '../../src/components/AudioPlayer';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { getBedtimeStoryById } from '../../src/services/firestoreService';
-import { getAudioFile } from '../../src/constants/audioFiles';
+import { getAudioUrl } from '../../src/constants/audioFiles';
 import { Theme } from '../../src/theme';
 import { BedtimeStory } from '../../src/types';
 
@@ -43,17 +43,25 @@ function SleepStoryPlayerScreen() {
   }, [id]);
 
   useEffect(() => {
-    if (story) {
-      const audioFile = story.audio_file 
-        ? getAudioFile(story.audio_file)
-        : null;
+    async function loadStoryAudio() {
+      if (!story) return;
       
-      if (audioFile) {
-        audioPlayer.loadAudio(audioFile);
-      } else if (story.audio_url) {
+      // Try to get audio URL from audio_file key
+      if (story.audio_file) {
+        const audioUrl = await getAudioUrl(story.audio_file);
+        if (audioUrl) {
+          audioPlayer.loadAudio(audioUrl);
+          return;
+        }
+      }
+      
+      // Fallback to direct audio_url
+      if (story.audio_url) {
         audioPlayer.loadAudio(story.audio_url);
       }
     }
+    
+    loadStoryAudio();
   }, [story]);
 
   const handleGoBack = () => {

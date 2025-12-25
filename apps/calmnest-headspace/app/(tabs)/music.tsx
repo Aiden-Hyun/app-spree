@@ -9,7 +9,7 @@ import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
-import { getAudioFile } from "../../src/constants/audioFiles";
+import { getAudioUrl } from "../../src/constants/audioFiles";
 import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
 import { whiteNoiseData, musicData, asmrData, MusicItem } from "../../src/constants/musicData";
 import { albumsData, Album } from "../../src/constants/albumsData";
@@ -53,7 +53,7 @@ function MusicScreen() {
         ];
         const sound = allSounds.find((s) => s.id === selectedSound);
         if (sound) {
-          const audioUrl = getAudioFile(sound.audioKey);
+          const audioUrl = await getAudioUrl(sound.audioKey);
           if (audioUrl) {
             await audioPlayer.loadAudio(audioUrl);
             audioPlayer.play();

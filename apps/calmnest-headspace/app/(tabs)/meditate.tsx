@@ -52,17 +52,17 @@ function MeditateScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
+      <ScrollView 
+        style={styles.container} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
         <AnimatedView delay={0} duration={400}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Practice</Text>
-            <Text style={styles.subtitle}>Find your stillness</Text>
-          </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Practice</Text>
+          <Text style={styles.subtitle}>Find your stillness</Text>
+        </View>
         </AnimatedView>
 
         {/* Courses */}
@@ -87,7 +87,7 @@ function MeditateScreen() {
                   style={styles.courseCard}
                 >
                   <View
-                    style={[
+                style={[
                       styles.courseIconContainer,
                       { backgroundColor: `${course.color}20` },
                     ]}
@@ -102,11 +102,11 @@ function MeditateScreen() {
                       {course.sessionCount} sessions
                     </Text>
                   </View>
-                </AnimatedPressable>
+              </AnimatedPressable>
               ))}
             </ScrollView>
-          </AnimatedView>
-        </View>
+            </AnimatedView>
+          </View>
 
         {/* Browse by Theme */}
         <View style={styles.section}>
@@ -140,18 +140,18 @@ function MeditateScreen() {
                   style={styles.themeCard}
                 >
                   <View
-                    style={[
+                style={[
                       styles.themeIconContainer,
                       { backgroundColor: `${cat.color}20` },
-                    ]}
-                  >
+                ]}
+              >
                     <Ionicons name={cat.icon} size={24} color={cat.color} />
                   </View>
-                  <Text style={styles.themeLabel}>{cat.label}</Text>
+                <Text style={styles.themeLabel}>{cat.label}</Text>
                 </AnimatedPressable>
               ))}
             </ScrollView>
-          </AnimatedView>
+              </AnimatedView>
         </View>
 
         {/* Emergency */}
@@ -161,10 +161,10 @@ function MeditateScreen() {
               <View style={styles.emergencyTitleRow}>
                 <Ionicons name="flash" size={20} color="#E57373" />
                 <Text style={styles.sectionTitle}>Emergency</Text>
-              </View>
+            </View>
               <Text style={styles.sectionSubtitle}>Quick relief in 1-3 minutes</Text>
             </View>
-          </AnimatedView>
+            </AnimatedView>
 
           <AnimatedView delay={350} duration={400}>
             <ScrollView
@@ -173,11 +173,11 @@ function MeditateScreen() {
               contentContainerStyle={styles.horizontalScroll}
             >
               {emergencyMeditationsData.map((meditation) => (
-                <AnimatedPressable
+                  <AnimatedPressable
                   key={meditation.id}
                   onPress={() => handleEmergencyPress(meditation)}
                   style={styles.emergencyCard}
-                >
+                  >
                   <View
                     style={[
                       styles.emergencyIconContainer,
@@ -223,9 +223,9 @@ function MeditateScreen() {
                   size={16}
                   color={theme.colors.primary}
                 />
-              </View>
-            </AnimatedPressable>
-          </AnimatedView>
+                    </View>
+                  </AnimatedPressable>
+                </AnimatedView>
 
           <AnimatedView delay={450} duration={400}>
             <ScrollView
@@ -269,35 +269,35 @@ function MeditateScreen() {
 
 const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    container: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: theme.spacing.xxl,
-    },
-    header: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      paddingBottom: theme.spacing.md,
-    },
-    title: {
-      fontFamily: theme.fonts.display.semiBold,
-      fontSize: 28,
-      color: theme.colors.text,
-      letterSpacing: -0.3,
-    },
-    subtitle: {
-      fontFamily: theme.fonts.body.italic,
-      fontSize: 15,
-      color: theme.colors.textLight,
-      marginTop: 4,
-    },
-    section: {
-      marginTop: theme.spacing.xl,
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
+  header: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+  },
+  title: {
+    fontFamily: theme.fonts.display.semiBold,
+    fontSize: 28,
+    color: theme.colors.text,
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontFamily: theme.fonts.body.italic,
+    fontSize: 15,
+    color: theme.colors.textLight,
+    marginTop: 4,
+  },
+  section: {
+    marginTop: theme.spacing.xl,
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -307,48 +307,48 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       marginBottom: theme.spacing.md,
     },
     sectionHeaderNoLink: {
-      paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
       marginBottom: theme.spacing.md,
     },
     emergencyTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-    },
-    sectionTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
+  },
+  sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
-      color: theme.colors.text,
+    color: theme.colors.text,
     },
     sectionSubtitle: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 13,
-      color: theme.colors.textLight,
+    fontSize: 13,
+    color: theme.colors.textLight,
       marginTop: 4,
     },
     seeAllContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
       gap: 4,
-    },
+  },
     seeAllText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
-      color: theme.colors.primary,
-    },
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 14,
+    color: theme.colors.primary,
+  },
     horizontalScroll: {
       paddingHorizontal: theme.spacing.lg,
       gap: theme.spacing.md,
-    },
-    themeCard: {
+  },
+  themeCard: {
       width: 100,
-      backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
       paddingVertical: theme.spacing.lg,
       paddingHorizontal: theme.spacing.sm,
-      alignItems: 'center',
-      ...theme.shadows.sm,
-    },
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
     themeIconContainer: {
       width: 48,
       height: 48,
@@ -356,13 +356,13 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: theme.spacing.sm,
-    },
-    themeLabel: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 12,
-      color: theme.colors.text,
-      textAlign: 'center',
-    },
+  },
+  themeLabel: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 12,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
     emergencyCard: {
       width: 140,
       backgroundColor: theme.colors.surface,
@@ -378,24 +378,24 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: theme.spacing.sm,
-    },
+  },
     emergencyTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
+    fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
-      color: theme.colors.text,
+    color: theme.colors.text,
       textAlign: 'center',
       marginBottom: 4,
-    },
+  },
     emergencyDescription: {
-      fontFamily: theme.fonts.ui.regular,
+    fontFamily: theme.fonts.ui.regular,
       fontSize: 12,
-      color: theme.colors.textLight,
+    color: theme.colors.textLight,
       textAlign: 'center',
       marginBottom: theme.spacing.sm,
-    },
+  },
     emergencyDuration: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
       gap: 4,
     },
     emergencyDurationText: {
@@ -405,33 +405,33 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     techniqueCard: {
       width: 130,
-      backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.md,
+    padding: theme.spacing.md,
       alignItems: 'center',
-      ...theme.shadows.sm,
-    },
+    ...theme.shadows.sm,
+  },
     techniqueIconContainer: {
       width: 56,
       height: 56,
       borderRadius: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
       marginBottom: theme.spacing.sm,
-    },
+  },
     techniqueTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
-      color: theme.colors.text,
+    color: theme.colors.text,
       textAlign: 'center',
       marginBottom: 4,
-    },
+  },
     techniqueDescription: {
-      fontFamily: theme.fonts.ui.regular,
+    fontFamily: theme.fonts.ui.regular,
       fontSize: 12,
-      color: theme.colors.textLight,
+    color: theme.colors.textLight,
       textAlign: 'center',
-    },
+  },
     courseCard: {
       width: 150,
       backgroundColor: theme.colors.surface,
@@ -464,7 +464,7 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontSize: 12,
       color: theme.colors.textLight,
     },
-  });
+});
 
 export default function Meditate() {
   return (

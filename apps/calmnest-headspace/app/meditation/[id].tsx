@@ -11,7 +11,7 @@ import { useMeditation } from '../../src/hooks/useMeditation';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { getMeditationById } from '../../src/services/firestoreService';
-import { getAudioFile } from '../../src/constants/audioFiles';
+import { getAudioUrl } from '../../src/constants/audioFiles';
 import { Theme } from '../../src/theme';
 import { GuidedMeditation } from '../../src/types';
 
@@ -53,17 +53,25 @@ function MeditationPlayerScreen() {
   }, [id]);
 
   useEffect(() => {
-    if (meditation) {
-      const audioFile = meditation.audio_file 
-        ? getAudioFile(meditation.audio_file)
-        : null;
+    async function loadMeditationAudio() {
+      if (!meditation) return;
       
-      if (audioFile) {
-        audioPlayer.loadAudio(audioFile);
-      } else if (meditation.audio_url) {
+      // Try to get audio URL from audio_file key
+      if (meditation.audio_file) {
+        const audioUrl = await getAudioUrl(meditation.audio_file);
+        if (audioUrl) {
+          audioPlayer.loadAudio(audioUrl);
+          return;
+        }
+      }
+      
+      // Fallback to direct audio_url
+      if (meditation.audio_url) {
         audioPlayer.loadAudio(meditation.audio_url);
       }
     }
+    
+    loadMeditationAudio();
   }, [meditation]);
 
   const handleGoBack = () => {

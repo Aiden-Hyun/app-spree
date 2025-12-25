@@ -16,7 +16,7 @@ export interface MusicItem {
   duration_minutes?: number;
 }
 
-// White Noise - placeholder data (no audio files yet)
+// White Noise - now with working audio files
 export const whiteNoiseData: MusicItem[] = [
   {
     id: 'white_noise_fan',
@@ -24,16 +24,16 @@ export const whiteNoiseData: MusicItem[] = [
     description: 'Steady fan motor hum',
     icon: 'sync',
     category: 'white-noise',
-    audioKey: 'white_noise_fan',
+    audioKey: 'wn_electric_fan',
     color: '#7B8FA1',
   },
   {
     id: 'white_noise_static',
-    title: 'White Static',
+    title: 'White Noise',
     description: 'Classic white noise static',
     icon: 'radio',
     category: 'white-noise',
-    audioKey: 'white_noise_static',
+    audioKey: 'wn_white_noise',
     color: '#8B8B9B',
   },
   {
@@ -42,7 +42,7 @@ export const whiteNoiseData: MusicItem[] = [
     description: 'Deep, low frequency rumble',
     icon: 'volume-high',
     category: 'white-noise',
-    audioKey: 'white_noise_brown',
+    audioKey: 'wn_brown_noise',
     color: '#9B8B7B',
   },
   {
@@ -51,8 +51,17 @@ export const whiteNoiseData: MusicItem[] = [
     description: 'Balanced, soothing tones',
     icon: 'volume-medium',
     category: 'white-noise',
-    audioKey: 'white_noise_pink',
+    audioKey: 'wn_pink_noise',
     color: '#C4A4B4',
+  },
+  {
+    id: 'white_noise_grey',
+    title: 'Grey Noise',
+    description: 'Balanced mid-frequency noise',
+    icon: 'volume-medium',
+    category: 'white-noise',
+    audioKey: 'wn_grey_noise',
+    color: '#A8A8B8',
   },
   {
     id: 'white_noise_airplane',
@@ -60,7 +69,7 @@ export const whiteNoiseData: MusicItem[] = [
     description: 'In-flight ambient sound',
     icon: 'airplane',
     category: 'white-noise',
-    audioKey: 'white_noise_airplane',
+    audioKey: 'wn_airplane_cabin',
     color: '#7B9BAE',
   },
   {
@@ -69,7 +78,7 @@ export const whiteNoiseData: MusicItem[] = [
     description: 'Cooling unit hum',
     icon: 'snow',
     category: 'white-noise',
-    audioKey: 'white_noise_ac',
+    audioKey: 'wn_air_conditioner',
     color: '#6B8F9B',
   },
 ];

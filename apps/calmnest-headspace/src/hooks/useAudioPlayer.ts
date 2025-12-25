@@ -5,7 +5,6 @@ import {
   setAudioModeAsync,
   AudioSource,
 } from "expo-audio";
-import { getAudioFile } from "../constants/audioFiles";
 
 export interface AudioPlayerState {
   isPlaying: boolean;
@@ -19,22 +18,20 @@ export interface AudioPlayerState {
 }
 
 /**
- * Resolve a source (string key, URL, or require() result) to an AudioSource
+ * Resolve a source (URL string or require() result) to an AudioSource
  */
 function resolveAudioSource(
   source: string | number | null
 ): AudioSource | null {
   if (!source) return null;
 
-  // If it's a string that matches an audio file key, resolve it
+  // If it's a URL string, wrap it in { uri: ... }
   if (typeof source === "string") {
-    const localFile = getAudioFile(source);
-    if (localFile) return localFile;
-    // Otherwise treat as URL
     return { uri: source };
   }
 
-  // Already a require() result (number)
+  // Already a require() result (number) - this shouldn't happen with remote URLs
+  // but keep for backwards compatibility
   return source;
 }
 
@@ -113,6 +110,7 @@ export function useAudioPlayer(initialSource?: string | number | null) {
           hasLoadedRef.current = true;
         }
       } catch (err) {
+        console.error("Failed to load audio:", err);
         const errorMessage =
           err instanceof Error ? err.message : "Failed to load audio";
         setError(errorMessage);
@@ -124,8 +122,8 @@ export function useAudioPlayer(initialSource?: string | number | null) {
   // Playback controls
   const play = useCallback(async () => {
     try {
-      player.volume = 1.0; // Ensure volume is at max
-      player.muted = false; // Ensure not muted
+      player.volume = 1.0;
+      player.muted = false;
       player.play();
     } catch (err) {
       console.warn("Failed to play:", err);
