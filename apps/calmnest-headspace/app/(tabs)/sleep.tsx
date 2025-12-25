@@ -16,6 +16,7 @@ import {
   sleepMeditationsData,
   SleepMeditation,
 } from "../../src/constants/sleepMeditationsData";
+import { seriesData, Series } from "../../src/constants/seriesData";
 
 function SleepScreen() {
   const router = useRouter();
@@ -67,6 +68,10 @@ function SleepScreen() {
     }
   };
 
+  const handleSeriesPress = (series: Series) => {
+    router.push(`/series/${series.id}`);
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -93,9 +98,56 @@ function SleepScreen() {
               </View>
             </AnimatedView>
 
-            {/* Bedtime Stories */}
+            {/* Series */}
             <View style={styles.section}>
               <AnimatedView delay={100} duration={400}>
+                <View style={styles.sectionHeaderNoLink}>
+                  <Text style={styles.sectionTitle}>Series</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Multi-chapter story collections
+                  </Text>
+                </View>
+              </AnimatedView>
+
+              <AnimatedView delay={150} duration={400}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.storiesScroll}
+                >
+                  {seriesData.map((series) => (
+                    <AnimatedPressable
+                      key={series.id}
+                      onPress={() => handleSeriesPress(series)}
+                      style={styles.seriesCard}
+                    >
+                      <View
+                        style={[
+                          styles.seriesIconContainer,
+                          { backgroundColor: `${series.color}20` },
+                        ]}
+                      >
+                        <Ionicons
+                          name={getCategoryIcon(series.category)}
+                          size={28}
+                          color={series.color}
+                        />
+                      </View>
+                      <Text style={styles.seriesTitle} numberOfLines={2}>
+                        {series.title}
+                      </Text>
+                      <Text style={styles.seriesMeta}>
+                        {series.chapterCount} chapters
+                      </Text>
+                    </AnimatedPressable>
+                  ))}
+                </ScrollView>
+              </AnimatedView>
+            </View>
+
+            {/* Bedtime Stories */}
+            <View style={styles.section}>
+              <AnimatedView delay={200} duration={400}>
                 <AnimatedPressable
                   onPress={() => router.push("/sleep/bedtime-stories")}
                   style={styles.sectionHeader}
@@ -113,7 +165,7 @@ function SleepScreen() {
               </AnimatedView>
 
               {loading ? (
-                <AnimatedView delay={150} duration={400}>
+                <AnimatedView delay={250} duration={400}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -137,7 +189,7 @@ function SleepScreen() {
                   </ScrollView>
                 </AnimatedView>
               ) : (
-                <AnimatedView delay={150} duration={400}>
+                <AnimatedView delay={250} duration={400}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -178,7 +230,7 @@ function SleepScreen() {
 
             {/* Sleep Meditations */}
             <View style={styles.section}>
-              <AnimatedView delay={200} duration={400}>
+              <AnimatedView delay={300} duration={400}>
                 <AnimatedPressable
                   onPress={() => router.push("/sleep/sleep-meditations")}
                   style={styles.sectionHeader}
@@ -195,7 +247,7 @@ function SleepScreen() {
                 </AnimatedPressable>
               </AnimatedView>
 
-              <AnimatedView delay={250} duration={400}>
+              <AnimatedView delay={350} duration={400}>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -289,10 +341,19 @@ const createStyles = (theme: Theme) =>
       justifyContent: "space-between",
       marginBottom: theme.spacing.md,
     },
+    sectionHeaderNoLink: {
+      marginBottom: theme.spacing.md,
+    },
     sectionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
       color: theme.colors.sleepText,
+    },
+    sectionSubtitle: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 13,
+      color: theme.colors.sleepTextMuted,
+      marginTop: 4,
     },
     seeAllContainer: {
       flexDirection: "row",
@@ -363,6 +424,33 @@ const createStyles = (theme: Theme) =>
       marginBottom: 4,
     },
     meditationMeta: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.sleepTextMuted,
+    },
+    seriesCard: {
+      width: 150,
+      backgroundColor: theme.colors.sleepSurface,
+      borderRadius: theme.borderRadius.xl,
+      padding: theme.spacing.md,
+      alignItems: "center",
+    },
+    seriesIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: theme.spacing.sm,
+    },
+    seriesTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 14,
+      color: theme.colors.sleepText,
+      textAlign: "center",
+      marginBottom: 4,
+    },
+    seriesMeta: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 12,
       color: theme.colors.sleepTextMuted,

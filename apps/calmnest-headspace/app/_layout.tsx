@@ -97,6 +97,24 @@ function RootNavigator() {
             headerShown: false,
           }} 
         />
+        <Stack.Screen 
+          name="course" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="series" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="album" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
       </Stack>
   );
 }

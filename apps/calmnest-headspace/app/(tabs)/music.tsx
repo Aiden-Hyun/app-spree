@@ -12,6 +12,7 @@ import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { getAudioFile } from "../../src/constants/audioFiles";
 import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
 import { whiteNoiseData, musicData, asmrData, MusicItem } from "../../src/constants/musicData";
+import { albumsData, Album } from "../../src/constants/albumsData";
 import { Theme } from "../../src/theme";
 
 // Featured items for each section (show first 6)
@@ -126,6 +127,27 @@ function MusicScreen() {
     </AnimatedView>
   );
 
+  const handleAlbumPress = (album: Album) => {
+    router.push(`/album/${album.id}`);
+  };
+
+  const getCategoryIcon = (category: string): keyof typeof Ionicons.glyphMap => {
+    switch (category) {
+      case "ambient":
+        return "planet";
+      case "piano":
+        return "musical-notes";
+      case "nature":
+        return "leaf";
+      case "classical":
+        return "musical-note";
+      case "lofi":
+        return "headset";
+      default:
+        return "disc";
+    }
+  };
+
   const renderSection = (
     title: string,
     sounds: Array<{ id: string; title: string; icon: string; color: string }>,
@@ -188,17 +210,65 @@ function MusicScreen() {
               </View>
             </AnimatedView>
 
+            {/* Albums Section */}
+            <View style={styles.section}>
+              <AnimatedView delay={100} duration={400}>
+                <View style={styles.sectionHeaderNoLink}>
+                  <Text style={styles.sectionTitle}>Albums</Text>
+                  <Text style={styles.sectionSubtitle}>Curated music collections</Text>
+                </View>
+              </AnimatedView>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.soundsScroll}
+              >
+                {albumsData.map((album, index) => (
+                  <AnimatedView
+                    key={album.id}
+                    delay={150 + index * 40}
+                    duration={400}
+                  >
+                    <AnimatedPressable
+                      onPress={() => handleAlbumPress(album)}
+                      style={styles.albumCard}
+                    >
+                      <View
+                        style={[
+                          styles.albumIconContainer,
+                          { backgroundColor: `${album.color}20` },
+                        ]}
+                      >
+                        <Ionicons
+                          name={getCategoryIcon(album.category)}
+                          size={28}
+                          color={album.color}
+                        />
+                      </View>
+                      <Text style={styles.albumTitle} numberOfLines={2}>
+                        {album.title}
+                      </Text>
+                      <Text style={styles.albumMeta}>
+                        {album.trackCount} tracks
+                      </Text>
+                    </AnimatedPressable>
+                  </AnimatedView>
+                ))}
+              </ScrollView>
+            </View>
+
             {/* White Noise Section */}
-            {renderSection("White Noise", featuredWhiteNoise, "/music/white-noise", 100)}
+            {renderSection("White Noise", featuredWhiteNoise, "/music/white-noise", 300)}
 
             {/* Nature Sounds Section */}
-            {renderSection("Nature Sounds", featuredNatureSounds, "/music/nature-sounds", 300)}
+            {renderSection("Nature Sounds", featuredNatureSounds, "/music/nature-sounds", 500)}
 
             {/* Music Section */}
-            {renderSection("Music", featuredMusic, "/music/music", 500)}
+            {renderSection("Music", featuredMusic, "/music/music", 700)}
 
             {/* ASMR Section */}
-            {renderSection("ASMR", featuredASMR, "/music/asmr", 700)}
+            {renderSection("ASMR", featuredASMR, "/music/asmr", 900)}
 
             {/* Bottom spacing */}
             <View style={{ height: 40 }} />
@@ -264,6 +334,16 @@ const createStyles = (theme: Theme) =>
       fontSize: 18,
       color: theme.colors.sleepText,
     },
+    sectionHeaderNoLink: {
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    sectionSubtitle: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 13,
+      color: theme.colors.sleepTextMuted,
+      marginTop: 4,
+    },
     seeAllButton: {
       flexDirection: "row",
       alignItems: "center",
@@ -315,6 +395,33 @@ const createStyles = (theme: Theme) =>
       position: "absolute",
       top: 8,
       right: 8,
+    },
+    albumCard: {
+      width: 150,
+      backgroundColor: theme.colors.sleepSurface,
+      borderRadius: theme.borderRadius.xl,
+      padding: theme.spacing.md,
+      alignItems: "center",
+    },
+    albumIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: theme.spacing.sm,
+    },
+    albumTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 14,
+      color: theme.colors.sleepText,
+      textAlign: "center",
+      marginBottom: 4,
+    },
+    albumMeta: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.sleepTextMuted,
     },
   });
 

@@ -10,6 +10,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import { emergencyMeditationsData, EmergencyMeditation } from '../../src/constants/emergencyMeditationsData';
 import { techniquesData, MeditationTechnique } from '../../src/constants/techniquesData';
+import { coursesData, Course } from '../../src/constants/coursesData';
 
 const themeCategories = [
   { id: 'focus', label: 'Focus', icon: 'eye-outline' as const, color: '#8B9F82' },
@@ -45,6 +46,10 @@ function MeditateScreen() {
     });
   };
 
+  const handleCoursePress = (course: Course) => {
+    router.push(`/course/${course.id}`);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -60,9 +65,52 @@ function MeditateScreen() {
           </View>
         </AnimatedView>
 
-        {/* Browse by Theme */}
+        {/* Courses */}
         <View style={styles.section}>
           <AnimatedView delay={100} duration={400}>
+            <View style={styles.sectionHeaderNoLink}>
+              <Text style={styles.sectionTitle}>Courses</Text>
+              <Text style={styles.sectionSubtitle}>Multi-day meditation programs</Text>
+            </View>
+          </AnimatedView>
+
+          <AnimatedView delay={150} duration={400}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {coursesData.map((course) => (
+                <AnimatedPressable
+                  key={course.id}
+                  onPress={() => handleCoursePress(course)}
+                  style={styles.courseCard}
+                >
+                  <View
+                    style={[
+                      styles.courseIconContainer,
+                      { backgroundColor: `${course.color}20` },
+                    ]}
+                  >
+                    <Ionicons name="school" size={28} color={course.color} />
+                  </View>
+                  <Text style={styles.courseTitle} numberOfLines={2}>
+                    {course.title}
+                  </Text>
+                  <View style={styles.courseMeta}>
+                    <Text style={styles.courseMetaText}>
+                      {course.sessionCount} sessions
+                    </Text>
+                  </View>
+                </AnimatedPressable>
+              ))}
+            </ScrollView>
+          </AnimatedView>
+        </View>
+
+        {/* Browse by Theme */}
+        <View style={styles.section}>
+          <AnimatedView delay={200} duration={400}>
             <AnimatedPressable
               onPress={() => router.push('/meditations')}
               style={styles.sectionHeader}
@@ -79,7 +127,7 @@ function MeditateScreen() {
             </AnimatedPressable>
           </AnimatedView>
 
-          <AnimatedView delay={150} duration={400}>
+          <AnimatedView delay={250} duration={400}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -108,7 +156,7 @@ function MeditateScreen() {
 
         {/* Emergency */}
         <View style={styles.section}>
-          <AnimatedView delay={200} duration={400}>
+          <AnimatedView delay={300} duration={400}>
             <View style={styles.sectionHeaderNoLink}>
               <View style={styles.emergencyTitleRow}>
                 <Ionicons name="flash" size={20} color="#E57373" />
@@ -118,7 +166,7 @@ function MeditateScreen() {
             </View>
           </AnimatedView>
 
-          <AnimatedView delay={250} duration={400}>
+          <AnimatedView delay={350} duration={400}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -162,7 +210,7 @@ function MeditateScreen() {
 
         {/* Browse by Techniques */}
         <View style={styles.section}>
-          <AnimatedView delay={300} duration={400}>
+          <AnimatedView delay={400} duration={400}>
             <AnimatedPressable
               onPress={() => router.push('/meditations/techniques')}
               style={styles.sectionHeader}
@@ -179,7 +227,7 @@ function MeditateScreen() {
             </AnimatedPressable>
           </AnimatedView>
 
-          <AnimatedView delay={350} duration={400}>
+          <AnimatedView delay={450} duration={400}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -383,6 +431,38 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontSize: 12,
       color: theme.colors.textLight,
       textAlign: 'center',
+    },
+    courseCard: {
+      width: 150,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
+      padding: theme.spacing.md,
+      alignItems: 'center',
+      ...theme.shadows.sm,
+    },
+    courseIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    courseTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 14,
+      color: theme.colors.text,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    courseMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    courseMetaText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.textLight,
     },
   });
 
