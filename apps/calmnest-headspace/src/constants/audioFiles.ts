@@ -83,7 +83,7 @@ export const audioFiles: Record<string, string> = {
   sleep_snow_crunch: storageUrl('snow_crunch.mp3'),
   
   // ========== BEDTIME STORIES (Local audio files) ==========
-  story_midnight_crossing: require('../../assets/audio/stories/the_midnight_crossing_act1.mp3'),
+  story_midnight_crossing: require('../../assets/audio/sleep/stories/midnight-crossing-chapter-1.mp3'),
 };
 
 /**
