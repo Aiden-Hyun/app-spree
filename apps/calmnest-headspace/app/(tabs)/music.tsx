@@ -1,0 +1,328 @@
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { ProtectedRoute } from "../../src/components/ProtectedRoute";
+import { AnimatedView } from "../../src/components/AnimatedView";
+import { AnimatedPressable } from "../../src/components/AnimatedPressable";
+import { useTheme } from "../../src/contexts/ThemeContext";
+import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
+import { getAudioFile } from "../../src/constants/audioFiles";
+import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
+import { whiteNoiseData, musicData, asmrData, MusicItem } from "../../src/constants/musicData";
+import { Theme } from "../../src/theme";
+
+// Featured items for each section (show first 6)
+const featuredNatureSounds = sleepSoundsData.slice(0, 6);
+const featuredWhiteNoise = whiteNoiseData.slice(0, 6);
+const featuredMusic = musicData.slice(0, 6);
+const featuredASMR = asmrData.slice(0, 6);
+
+function MusicScreen() {
+  const router = useRouter();
+  const { theme } = useTheme();
+  const [selectedSound, setSelectedSound] = useState<string | null>(null);
+
+  // Audio player
+  const audioPlayer = useAudioPlayer();
+  const prevSelectedSound = useRef<string | null>(null);
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Handle sound playback
+  useEffect(() => {
+    const handleSoundChange = async () => {
+      if (!selectedSound) {
+        if (audioPlayer.isPlaying) {
+          audioPlayer.pause();
+        }
+        prevSelectedSound.current = null;
+        return;
+      }
+
+      if (selectedSound !== prevSelectedSound.current) {
+        // Find sound in all categories
+        const allSounds = [
+          ...sleepSoundsData.map(s => ({ ...s, audioKey: s.audioKey })),
+          ...whiteNoiseData,
+          ...musicData,
+          ...asmrData,
+        ];
+        const sound = allSounds.find((s) => s.id === selectedSound);
+        if (sound) {
+          const audioUrl = getAudioFile(sound.audioKey);
+          if (audioUrl) {
+            await audioPlayer.loadAudio(audioUrl);
+            audioPlayer.play();
+          }
+        }
+        prevSelectedSound.current = selectedSound;
+      }
+    };
+
+    handleSoundChange();
+  }, [selectedSound]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      audioPlayer.cleanup();
+    };
+  }, []);
+
+  const renderSoundCard = (
+    sound: { id: string; title: string; icon: string; color: string },
+    index: number,
+    baseDelay: number
+  ) => (
+    <AnimatedView
+      key={sound.id}
+      delay={baseDelay + index * 40}
+      duration={400}
+      style={styles.soundCardWrapper}
+    >
+      <AnimatedPressable
+        onPress={() =>
+          setSelectedSound(selectedSound === sound.id ? null : sound.id)
+        }
+        style={[
+          styles.soundCard,
+          selectedSound === sound.id && styles.soundCardSelected,
+        ]}
+      >
+        <View
+          style={[
+            styles.soundIconContainer,
+            { backgroundColor: `${sound.color}25` },
+          ]}
+        >
+          <Ionicons
+            name={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
+            size={24}
+            color={selectedSound === sound.id ? theme.colors.sleepAccent : sound.color}
+          />
+        </View>
+        <Text
+          style={[
+            styles.soundLabel,
+            selectedSound === sound.id && styles.soundLabelSelected,
+          ]}
+          numberOfLines={1}
+        >
+          {sound.title}
+        </Text>
+        {selectedSound === sound.id && (
+          <View style={styles.soundPlaying}>
+            <Ionicons
+              name="volume-high"
+              size={12}
+              color={theme.colors.sleepAccent}
+            />
+          </View>
+        )}
+      </AnimatedPressable>
+    </AnimatedView>
+  );
+
+  const renderSection = (
+    title: string,
+    sounds: Array<{ id: string; title: string; icon: string; color: string }>,
+    route: string,
+    baseDelay: number
+  ) => (
+    <View style={styles.section}>
+      <AnimatedView delay={baseDelay} duration={400}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          <AnimatedPressable
+            onPress={() => router.push(route as any)}
+            style={styles.seeAllButton}
+          >
+            <Text style={styles.seeAllText}>See all</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={theme.colors.sleepTextMuted}
+            />
+          </AnimatedPressable>
+        </View>
+      </AnimatedView>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.soundsScroll}
+      >
+        {sounds.map((sound, index) =>
+          renderSoundCard(sound, index, baseDelay + 50)
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <LinearGradient
+        colors={theme.gradients.sleepyNight as [string, string]}
+        style={styles.gradient}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Header */}
+            <AnimatedView delay={0} duration={500}>
+              <View style={styles.header}>
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name="musical-notes"
+                    size={48}
+                    color={theme.colors.sleepAccent}
+                  />
+                </View>
+                <Text style={styles.title}>Sounds & Music</Text>
+                <Text style={styles.subtitle}>Find your perfect ambience</Text>
+              </View>
+            </AnimatedView>
+
+            {/* White Noise Section */}
+            {renderSection("White Noise", featuredWhiteNoise, "/music/white-noise", 100)}
+
+            {/* Nature Sounds Section */}
+            {renderSection("Nature Sounds", featuredNatureSounds, "/music/nature-sounds", 300)}
+
+            {/* Music Section */}
+            {renderSection("Music", featuredMusic, "/music/music", 500)}
+
+            {/* ASMR Section */}
+            {renderSection("ASMR", featuredASMR, "/music/asmr", 700)}
+
+            {/* Bottom spacing */}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
+  );
+}
+
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    gradient: {
+      flex: 1,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: theme.spacing.xxl,
+    },
+    header: {
+      alignItems: "center",
+      paddingTop: theme.spacing.xl,
+      paddingBottom: theme.spacing.lg,
+    },
+    iconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: "rgba(201, 184, 150, 0.1)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: theme.spacing.md,
+    },
+    title: {
+      fontFamily: theme.fonts.display.semiBold,
+      fontSize: 28,
+      color: theme.colors.sleepText,
+      letterSpacing: -0.3,
+    },
+    subtitle: {
+      fontFamily: theme.fonts.body.italic,
+      fontSize: 15,
+      color: theme.colors.sleepTextMuted,
+      marginTop: 4,
+    },
+    section: {
+      marginTop: theme.spacing.xl,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    sectionTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 18,
+      color: theme.colors.sleepText,
+    },
+    seeAllButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    seeAllText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.sleepTextMuted,
+    },
+    soundsScroll: {
+      paddingHorizontal: theme.spacing.lg,
+      gap: theme.spacing.sm,
+    },
+    soundCardWrapper: {
+      width: 100,
+    },
+    soundCard: {
+      backgroundColor: theme.colors.sleepSurface,
+      borderRadius: theme.borderRadius.xl,
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.sm,
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    soundCardSelected: {
+      borderColor: theme.colors.sleepAccent,
+      backgroundColor: "rgba(201, 184, 150, 0.1)",
+    },
+    soundIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: theme.spacing.sm,
+    },
+    soundLabel: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: theme.colors.sleepTextMuted,
+      textAlign: "center",
+    },
+    soundLabelSelected: {
+      color: theme.colors.sleepAccent,
+    },
+    soundPlaying: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+    },
+  });
+
+export default function Music() {
+  return (
+    <ProtectedRoute>
+      <MusicScreen />
+    </ProtectedRoute>
+  );
+}
+

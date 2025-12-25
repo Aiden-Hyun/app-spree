@@ -91,6 +91,12 @@ function RootNavigator() {
             headerShown: false,
           }} 
         />
+        <Stack.Screen 
+          name="music" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
       </Stack>
   );
 }

@@ -103,7 +103,7 @@ const imageFiles = {
   breathing_victory: 'https://images.unsplash.com/photo-1494178270175-e96de2971df9?w=800&q=80',
   
   // Bedtime story images
-  story_thriller_midnight: 'https://images.unsplash.com/photo-1509248961725-aec71c87a22c?w=800&q=80',
+  story_thriller_midnight: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=800&q=80',
   
   // Program images
   program_basics: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80',

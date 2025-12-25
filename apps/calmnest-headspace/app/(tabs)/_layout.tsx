@@ -77,6 +77,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="music"
+        options={{
+          title: 'Music',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? "musical-notes" : "musical-notes-outline"} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'You',

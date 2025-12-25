@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -7,28 +7,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
-import { Skeleton, SkeletonCard } from "../../src/components/Skeleton";
+import { Skeleton } from "../../src/components/Skeleton";
 import { getBedtimeStories } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
-import { getAudioFile } from "../../src/constants/audioFiles";
-import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
-
-// Pick 6 featured sounds to show on main sleep page (one from each category)
-const featuredSoundIds = [
-  "rain_window", // Rain
-  "ocean_waves", // Water
-  "fireplace_burning", // Fire
-  "wind_mountains", // Wind
-  "frogs_crickets_birds", // Nature
-  "thunder_lightning", // Ambient/Thunder
-];
-
-const quickAccessSounds = sleepSoundsData.filter((s) =>
-  featuredSoundIds.includes(s.id)
-);
 
 function SleepScreen() {
   const router = useRouter();
@@ -36,52 +19,11 @@ function SleepScreen() {
   const [bedtimeStories, setBedtimeStories] = useState<BedtimeStory[]>([]);
   const [featuredStory, setFeaturedStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSound, setSelectedSound] = useState<string | null>(null);
-
-  // Audio player for ambient sounds
-  const ambientAudio = useAudioPlayer();
-  const prevSelectedSound = useRef<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     loadSleepContent();
-  }, []);
-
-  // Handle ambient sound playback
-  useEffect(() => {
-    const handleSoundChange = async () => {
-      // If sound was deselected, stop playback
-      if (!selectedSound) {
-        if (ambientAudio.isPlaying) {
-          ambientAudio.pause();
-        }
-        prevSelectedSound.current = null;
-        return;
-      }
-
-      // If a different sound was selected, load and play it
-      if (selectedSound !== prevSelectedSound.current) {
-        const sound = quickAccessSounds.find((s) => s.id === selectedSound);
-        if (sound) {
-          const audioUrl = getAudioFile(sound.audioKey);
-          if (audioUrl) {
-            await ambientAudio.loadAudio(audioUrl);
-            ambientAudio.play();
-          }
-        }
-        prevSelectedSound.current = selectedSound;
-      }
-    };
-
-    handleSoundChange();
-  }, [selectedSound]);
-
-  // Cleanup ambient audio on unmount
-  useEffect(() => {
-    return () => {
-      ambientAudio.cleanup();
-    };
   }, []);
 
   const loadSleepContent = async () => {
@@ -223,86 +165,6 @@ function SleepScreen() {
                   </AnimatedPressable>
                 </AnimatedView>
               ) : null}
-            </View>
-
-            {/* Sleep Sounds */}
-            <View style={styles.section}>
-              <AnimatedView delay={250} duration={400}>
-                <AnimatedPressable
-                  onPress={() => router.push("/sleep-sounds")}
-                  style={styles.sectionHeader}
-                >
-                  <Text style={styles.sectionTitle}>Nature Sounds</Text>
-                  <View style={styles.sectionHeaderRight}>
-                    <Text style={styles.seeAllText}>See all</Text>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={18}
-                      color={theme.colors.sleepTextMuted}
-                    />
-                  </View>
-                </AnimatedPressable>
-              </AnimatedView>
-
-              <View style={styles.soundsGrid}>
-                {quickAccessSounds.map((sound, index) => (
-                  <AnimatedView
-                    key={sound.id}
-                    delay={300 + index * 40}
-                    duration={400}
-                    style={styles.soundCardWrapper}
-                  >
-                    <AnimatedPressable
-                      onPress={() =>
-                        setSelectedSound(
-                          selectedSound === sound.id ? null : sound.id
-                        )
-                      }
-                      style={[
-                        styles.soundCard,
-                        selectedSound === sound.id && styles.soundCardSelected,
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.soundIconContainer,
-                          { backgroundColor: `${sound.color}25` },
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            `${sound.icon}-outline` as keyof typeof Ionicons.glyphMap
-                          }
-                          size={28}
-                          color={
-                            selectedSound === sound.id
-                              ? theme.colors.sleepAccent
-                              : sound.color
-                          }
-                        />
-                      </View>
-                      <Text
-                        style={[
-                          styles.soundLabel,
-                          selectedSound === sound.id &&
-                            styles.soundLabelSelected,
-                        ]}
-                      >
-                        {sound.title}
-                      </Text>
-                      {selectedSound === sound.id && (
-                        <View style={styles.soundPlaying}>
-                          <Ionicons
-                            name="volume-high"
-                            size={14}
-                            color={theme.colors.sleepAccent}
-                          />
-                        </View>
-                      )}
-                    </AnimatedPressable>
-                  </AnimatedView>
-                ))}
-              </View>
             </View>
 
             {/* Bedtime Stories */}
@@ -491,26 +353,11 @@ const createStyles = (theme: Theme) =>
       marginTop: theme.spacing.xl,
       paddingHorizontal: theme.spacing.lg,
     },
-    sectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: theme.spacing.md,
-    },
-    sectionHeaderRight: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
     sectionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
       color: theme.colors.sleepText,
-    },
-    seeAllText: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
-      color: theme.colors.sleepTextMuted,
+      marginBottom: theme.spacing.md,
     },
     featuredSkeleton: {
       backgroundColor: theme.colors.sleepSurface,
@@ -578,50 +425,6 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 16,
       color: theme.colors.sleepBackground,
-    },
-    soundsGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs,
-    },
-    soundCardWrapper: {
-      width: "33.33%",
-      paddingHorizontal: theme.spacing.xs,
-      marginBottom: theme.spacing.sm,
-    },
-    soundCard: {
-      backgroundColor: theme.colors.sleepSurface,
-      borderRadius: theme.borderRadius.xl,
-      paddingVertical: theme.spacing.lg,
-      paddingHorizontal: theme.spacing.sm,
-      alignItems: "center",
-      borderWidth: 2,
-      borderColor: "transparent",
-    },
-    soundCardSelected: {
-      borderColor: theme.colors.sleepAccent,
-      backgroundColor: "rgba(201, 184, 150, 0.1)",
-    },
-    soundIconContainer: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: theme.spacing.sm,
-    },
-    soundLabel: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 12,
-      color: theme.colors.sleepTextMuted,
-    },
-    soundLabelSelected: {
-      color: theme.colors.sleepAccent,
-    },
-    soundPlaying: {
-      position: "absolute",
-      top: 10,
-      right: 10,
     },
     storiesScroll: {
       gap: theme.spacing.md,
