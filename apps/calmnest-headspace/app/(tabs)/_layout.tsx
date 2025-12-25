@@ -40,7 +40,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Today',
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? "sunny" : "sunny-outline"} 
@@ -53,7 +53,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="meditate"
         options={{
-          title: 'Practice',
+          title: 'Meditate',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? "leaf" : "leaf-outline"} 
@@ -66,7 +66,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="sleep"
         options={{
-          title: 'Rest',
+          title: 'Sleep',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? "moon" : "moon-outline"} 
@@ -92,7 +92,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'You',
+          title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? "person" : "person-outline"} 
