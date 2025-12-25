@@ -54,7 +54,7 @@ function RootNavigator() {
         }} 
       />
       <Stack.Screen 
-        name="sleep/[id]" 
+        name="sleep" 
         options={{ 
           headerShown: false,
           }} 

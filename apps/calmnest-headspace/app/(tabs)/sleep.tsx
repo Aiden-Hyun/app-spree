@@ -12,12 +12,15 @@ import { getBedtimeStories } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
+import {
+  sleepMeditationsData,
+  SleepMeditation,
+} from "../../src/constants/sleepMeditationsData";
 
 function SleepScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const [bedtimeStories, setBedtimeStories] = useState<BedtimeStory[]>([]);
-  const [featuredStory, setFeaturedStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -31,9 +34,6 @@ function SleepScreen() {
       setLoading(true);
       const stories = await getBedtimeStories();
       setBedtimeStories(stories);
-      if (stories.length > 0) {
-        setFeaturedStory(stories[0]);
-      }
     } catch (error) {
       console.error("Failed to load sleep content:", error);
     } finally {
@@ -46,6 +46,25 @@ function SleepScreen() {
     if (hour >= 21 || hour < 5) return "Sweet dreams await";
     if (hour >= 17) return "Wind down and relax";
     return "Rest when you need it";
+  };
+
+  const getCategoryIcon = (
+    category: string
+  ): keyof typeof Ionicons.glyphMap => {
+    switch (category) {
+      case "nature":
+        return "leaf";
+      case "fantasy":
+        return "planet";
+      case "travel":
+        return "airplane";
+      case "thriller":
+        return "skull";
+      case "fiction":
+        return "book";
+      default:
+        return "book";
+    }
   };
 
   return (
@@ -74,107 +93,27 @@ function SleepScreen() {
               </View>
             </AnimatedView>
 
-            {/* Featured Story */}
-            <View style={styles.section}>
-              <AnimatedView delay={100} duration={400}>
-                <Text style={styles.sectionTitle}>Tonight's Story</Text>
-              </AnimatedView>
-
-              {loading ? (
-                <AnimatedView delay={150} duration={400}>
-                  <View style={styles.featuredSkeleton}>
-                    <Skeleton
-                      height={200}
-                      borderRadius={theme.borderRadius.xl}
-                    />
-                  </View>
-                </AnimatedView>
-              ) : featuredStory ? (
-                <AnimatedView delay={150} duration={400}>
-                  <AnimatedPressable
-                    onPress={() => router.push(`/sleep/${featuredStory.id}`)}
-                    style={styles.featuredCard}
-                  >
-                    {featuredStory.thumbnail_url ? (
-                      <Image
-                        source={{ uri: featuredStory.thumbnail_url }}
-                        style={styles.featuredImage}
-                      />
-                    ) : null}
-                    <LinearGradient
-                      colors={
-                        featuredStory.thumbnail_url
-                          ? ["transparent", "rgba(26, 29, 41, 0.9)"]
-                          : ["#3D4158", "#2A2D3E"]
-                      }
-                      style={[
-                        styles.featuredGradient,
-                        featuredStory.thumbnail_url &&
-                          styles.featuredGradientOverlay,
-                      ]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 1 }}
-                    >
-                      <View style={styles.featuredStars}>
-                        <Ionicons
-                          name="sparkles"
-                          size={24}
-                          color={theme.colors.sleepAccent}
-                        />
-                      </View>
-                      <Text style={styles.featuredTitle}>
-                        {featuredStory.title}
-                      </Text>
-                      <Text
-                        style={styles.featuredDescription}
-                        numberOfLines={2}
-                      >
-                        {featuredStory.description}
-                      </Text>
-                      <View style={styles.featuredMeta}>
-                        <View style={styles.metaItem}>
-                          <Ionicons
-                            name="time-outline"
-                            size={14}
-                            color={theme.colors.sleepTextMuted}
-                          />
-                          <Text style={styles.metaText}>
-                            {featuredStory.duration_minutes} min
-                          </Text>
-                        </View>
-                        <View style={styles.metaItem}>
-                          <Ionicons
-                            name="mic-outline"
-                            size={14}
-                            color={theme.colors.sleepTextMuted}
-                          />
-                          <Text style={styles.metaText}>
-                            {featuredStory.narrator}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.playButton}>
-                        <Ionicons
-                          name="play"
-                          size={24}
-                          color={theme.colors.sleepBackground}
-                        />
-                        <Text style={styles.playButtonText}>Play Story</Text>
-                      </View>
-                    </LinearGradient>
-                  </AnimatedPressable>
-                </AnimatedView>
-              ) : null}
-            </View>
-
             {/* Bedtime Stories */}
             <View style={styles.section}>
-              <AnimatedView delay={550} duration={400}>
-                <Text style={styles.sectionTitle}>Bedtime Stories</Text>
+              <AnimatedView delay={100} duration={400}>
+                <AnimatedPressable
+                  onPress={() => router.push("/sleep/bedtime-stories")}
+                  style={styles.sectionHeader}
+                >
+                  <Text style={styles.sectionTitle}>Bedtime Stories</Text>
+                  <View style={styles.seeAllContainer}>
+                    <Text style={styles.seeAllText}>See all</Text>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={theme.colors.sleepTextMuted}
+                    />
+                  </View>
+                </AnimatedPressable>
               </AnimatedView>
 
               {loading ? (
-                <AnimatedView delay={600} duration={400}>
+                <AnimatedView delay={150} duration={400}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -183,8 +122,8 @@ function SleepScreen() {
                     {[0, 1, 2].map((i) => (
                       <View key={i} style={styles.storyCard}>
                         <Skeleton
-                          height={80}
-                          borderRadius={theme.borderRadius.md}
+                          height={90}
+                          borderRadius={theme.borderRadius.lg}
                           style={{ marginBottom: theme.spacing.sm }}
                         />
                         <Skeleton
@@ -198,13 +137,13 @@ function SleepScreen() {
                   </ScrollView>
                 </AnimatedView>
               ) : (
-                <AnimatedView delay={600} duration={400}>
+                <AnimatedView delay={150} duration={400}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.storiesScroll}
                   >
-                    {bedtimeStories.map((story, index) => (
+                    {bedtimeStories.map((story) => (
                       <AnimatedPressable
                         key={story.id}
                         onPress={() => router.push(`/sleep/${story.id}`)}
@@ -218,19 +157,7 @@ function SleepScreen() {
                         ) : (
                           <View style={styles.storyIcon}>
                             <Ionicons
-                              name={
-                                story.category === "nature"
-                                  ? "leaf"
-                                  : story.category === "fantasy"
-                                  ? "planet"
-                                  : story.category === "travel"
-                                  ? "airplane"
-                                  : story.category === "thriller"
-                                  ? "skull"
-                                  : story.category === "fiction"
-                                  ? "book"
-                                  : "book"
-                              }
+                              name={getCategoryIcon(story.category)}
                               size={24}
                               color={theme.colors.sleepAccent}
                             />
@@ -249,57 +176,60 @@ function SleepScreen() {
               )}
             </View>
 
-            {/* Sleep Tips */}
+            {/* Sleep Meditations */}
             <View style={styles.section}>
-              <AnimatedView delay={700} duration={400}>
-                <Text style={styles.sectionTitle}>Sleep Better</Text>
+              <AnimatedView delay={200} duration={400}>
+                <AnimatedPressable
+                  onPress={() => router.push("/sleep/sleep-meditations")}
+                  style={styles.sectionHeader}
+                >
+                  <Text style={styles.sectionTitle}>Sleep Meditations</Text>
+                  <View style={styles.seeAllContainer}>
+                    <Text style={styles.seeAllText}>See all</Text>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={theme.colors.sleepTextMuted}
+                    />
+                  </View>
+                </AnimatedPressable>
               </AnimatedView>
 
-              <AnimatedView delay={750} duration={400}>
-                <View style={styles.tipsCard}>
-                  {[
-                    {
-                      icon: "thermometer-outline" as const,
-                      title: "Cool room",
-                      text: "65-68°F is ideal for sleep",
-                      color: "#7B9BAE",
-                    },
-                    {
-                      icon: "phone-portrait-outline" as const,
-                      title: "Screen-free",
-                      text: "30 min before bed",
-                      color: "#A8B4C4",
-                    },
-                    {
-                      icon: "time-outline" as const,
-                      title: "Consistent schedule",
-                      text: "Same time each night",
-                      color: "#C4A77D",
-                    },
-                  ].map((tip, index) => (
-                    <React.Fragment key={tip.title}>
-                      {index > 0 && <View style={styles.tipDivider} />}
-                      <View style={styles.tipItem}>
-                        <View
-                          style={[
-                            styles.tipIconContainer,
-                            { backgroundColor: `${tip.color}20` },
-                          ]}
-                        >
-                          <Ionicons
-                            name={tip.icon}
-                            size={24}
-                            color={tip.color}
-                          />
-                        </View>
-                        <View style={styles.tipContent}>
-                          <Text style={styles.tipTitle}>{tip.title}</Text>
-                          <Text style={styles.tipText}>{tip.text}</Text>
-                        </View>
+              <AnimatedView delay={250} duration={400}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.storiesScroll}
+                >
+                  {sleepMeditationsData.slice(0, 6).map((meditation) => (
+                    <AnimatedPressable
+                      key={meditation.id}
+                      onPress={() => router.push("/sleep/sleep-meditations")}
+                      style={styles.meditationCard}
+                    >
+                      <View
+                        style={[
+                          styles.meditationIcon,
+                          { backgroundColor: `${meditation.color}20` },
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            meditation.icon as keyof typeof Ionicons.glyphMap
+                          }
+                          size={24}
+                          color={meditation.color}
+                        />
                       </View>
-                    </React.Fragment>
+                      <Text style={styles.meditationTitle} numberOfLines={2}>
+                        {meditation.title}
+                      </Text>
+                      <Text style={styles.meditationMeta}>
+                        {meditation.duration_minutes} min
+                      </Text>
+                    </AnimatedPressable>
                   ))}
-                </View>
+                </ScrollView>
               </AnimatedView>
             </View>
           </ScrollView>
@@ -353,78 +283,26 @@ const createStyles = (theme: Theme) =>
       marginTop: theme.spacing.xl,
       paddingHorizontal: theme.spacing.lg,
     },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: theme.spacing.md,
+    },
     sectionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
       color: theme.colors.sleepText,
-      marginBottom: theme.spacing.md,
     },
-    featuredSkeleton: {
-      backgroundColor: theme.colors.sleepSurface,
-      borderRadius: theme.borderRadius.xl,
-      overflow: "hidden",
-    },
-    featuredCard: {
-      borderRadius: theme.borderRadius.xl,
-      overflow: "hidden",
-      position: "relative",
-    },
-    featuredImage: {
-      position: "absolute",
-      width: "100%",
-      height: "100%",
-      resizeMode: "cover",
-    },
-    featuredGradient: {
-      padding: theme.spacing.xl,
-    },
-    featuredGradientOverlay: {
-      paddingTop: 120,
-    },
-    featuredStars: {
-      marginBottom: theme.spacing.md,
-    },
-    featuredTitle: {
-      fontFamily: theme.fonts.display.semiBold,
-      fontSize: 24,
-      color: theme.colors.sleepText,
-      marginBottom: theme.spacing.xs,
-    },
-    featuredDescription: {
-      fontFamily: theme.fonts.body.regular,
-      fontSize: 15,
-      color: theme.colors.sleepTextMuted,
-      lineHeight: 22,
-      marginBottom: theme.spacing.md,
-    },
-    featuredMeta: {
-      flexDirection: "row",
-      gap: theme.spacing.lg,
-      marginBottom: theme.spacing.lg,
-    },
-    metaItem: {
+    seeAllContainer: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: 4,
     },
-    metaText: {
+    seeAllText: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 13,
+      fontSize: 14,
       color: theme.colors.sleepTextMuted,
-    },
-    playButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.sleepAccent,
-      paddingVertical: theme.spacing.md,
-      borderRadius: theme.borderRadius.lg,
-      gap: 8,
-    },
-    playButtonText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 16,
-      color: theme.colors.sleepBackground,
     },
     storiesScroll: {
       gap: theme.spacing.md,
@@ -462,42 +340,32 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.sleepTextMuted,
     },
-    tipsCard: {
+    meditationCard: {
+      width: 130,
       backgroundColor: theme.colors.sleepSurface,
       borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.lg,
-    },
-    tipItem: {
-      flexDirection: "row",
+      padding: theme.spacing.md,
       alignItems: "center",
     },
-    tipIconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+    meditationIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
       alignItems: "center",
       justifyContent: "center",
-      marginRight: theme.spacing.md,
+      marginBottom: theme.spacing.sm,
     },
-    tipContent: {
-      flex: 1,
-    },
-    tipTitle: {
+    meditationTitle: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 15,
+      fontSize: 14,
       color: theme.colors.sleepText,
+      textAlign: "center",
+      marginBottom: 4,
     },
-    tipText: {
+    meditationMeta: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 13,
+      fontSize: 12,
       color: theme.colors.sleepTextMuted,
-      marginTop: 2,
-    },
-    tipDivider: {
-      height: 1,
-      backgroundColor: "rgba(255,255,255,0.08)",
-      marginVertical: theme.spacing.md,
-      marginLeft: 64,
     },
   });
 
