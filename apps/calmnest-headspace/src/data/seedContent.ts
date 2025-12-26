@@ -876,17 +876,6 @@ export interface SeedBedtimeStory {
 
 export const seedBedtimeStories: SeedBedtimeStory[] = [
   {
-    title: "The Midnight Crossing",
-    description:
-      "A suspenseful journey through shadows and mystery. The night holds secrets waiting to be discovered as you drift into sleep.",
-    duration_minutes: 6,
-    category: "thriller",
-    narrator: "Rachel",
-    audio_file: "story_midnight_crossing",
-    image: "story_thriller_midnight",
-    is_premium: false,
-  },
-  {
     title: "The Shoemaker and the Elves",
     description:
       "A classic fairy tale about a kind shoemaker who receives magical help from tiny elves. Let this gentle story carry you off to dreamland.",

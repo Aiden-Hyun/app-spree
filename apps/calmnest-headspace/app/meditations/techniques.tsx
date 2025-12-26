@@ -36,8 +36,9 @@ function TechniquesScreen() {
   }, [selectedTechnique]);
 
   const handleMeditationPress = (meditation: TechniqueMeditation) => {
-    // TODO: Navigate to meditation player
-    console.log('Play technique meditation:', meditation.id);
+    router.push(
+      `/meditations/technique/${meditation.id}?audioKey=${meditation.audioKey}&title=${encodeURIComponent(meditation.title)}&description=${encodeURIComponent(meditation.description)}&duration=${meditation.duration_minutes}&instructor=${encodeURIComponent(meditation.instructor)}&technique=${meditation.technique}&color=${encodeURIComponent(meditation.color)}`
+    );
   };
 
   const renderMeditationItem = ({ item, index }: { item: TechniqueMeditation; index: number }) => (

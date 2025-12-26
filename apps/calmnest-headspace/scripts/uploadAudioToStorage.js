@@ -79,6 +79,16 @@ const filesToUpload = [
   // Bedtime stories
   { local: 'sleep/stories/midnight-crossing-chapter-1.mp3', remote: 'audio/sleep/stories/midnight-crossing-chapter-1.mp3' },
   { local: 'sleep/stories/the-shoemaker-and-the-elves.mp3', remote: 'audio/sleep/stories/the-shoemaker-and-the-elves.mp3' },
+
+  // ========== MEDITATE ==========
+  // Meditations
+  { local: 'meditate/meditations/body-scan-delilah.mp3', remote: 'audio/meditate/meditations/body-scan-delilah.mp3' },
+
+  // ========== ALBUMS ==========
+  // Meditation Music album
+  { local: 'music/albums/meditation-music/calm-reflection.mp3', remote: 'audio/music/albums/meditation-music/calm-reflection.mp3' },
+  { local: 'music/albums/meditation-music/inner-peace.mp3', remote: 'audio/music/albums/meditation-music/inner-peace.mp3' },
+  { local: 'music/albums/meditation-music/gentle-awakening.mp3', remote: 'audio/music/albums/meditation-music/gentle-awakening.mp3' },
 ];
 
 async function fileExistsInStorage(remotePath) {

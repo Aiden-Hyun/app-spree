@@ -68,6 +68,15 @@ const storagePaths: Record<string, string> = {
   ns_cat_purring_soft: 'audio/music/nature-sounds/cat-purring-soft.mp3',
   ns_train_journey: 'audio/music/nature-sounds/train-journey.mp3',
   ns_snow_footsteps: 'audio/music/nature-sounds/snow-footsteps.mp3',
+  
+  // ========== MEDITATIONS (Firebase Storage) ==========
+  meditation_body_scan: 'audio/meditate/meditations/body-scan-delilah.mp3',
+  
+  // ========== ALBUMS (Firebase Storage) ==========
+  // Meditation Music album
+  album_meditation_t1: 'audio/music/albums/meditation-music/calm-reflection.mp3',
+  album_meditation_t2: 'audio/music/albums/meditation-music/inner-peace.mp3',
+  album_meditation_t3: 'audio/music/albums/meditation-music/gentle-awakening.mp3',
 };
 
 // External URLs (public, no token needed)

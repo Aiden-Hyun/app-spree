@@ -46,7 +46,7 @@ export interface GuidedMeditation {
   created_at: string;
 }
 
-export type MeditationCategory =
+export type MeditationCategory = 
   | "focus"
   | "stress"
   | "anxiety"

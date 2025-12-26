@@ -77,23 +77,13 @@ export const techniquesData: MeditationTechnique[] = [
 export const techniqueMeditationsData: TechniqueMeditation[] = [
   // Body Scan
   {
-    id: 'tech_body_full',
-    title: 'Full Body Scan',
-    description: 'Complete head-to-toe awareness',
-    duration_minutes: 20,
+    id: 'tech_body_scan',
+    title: 'Body Scan',
+    description: 'Guided awareness through your entire body',
+    duration_minutes: 12,
     technique: 'body-scan',
-    instructor: 'Rachel',
-    audioKey: 'tech_body_full',
-    color: '#7DAFB4',
-  },
-  {
-    id: 'tech_body_quick',
-    title: 'Quick Body Check',
-    description: 'Rapid tension release',
-    duration_minutes: 5,
-    technique: 'body-scan',
-    instructor: 'Rachel',
-    audioKey: 'tech_body_quick',
+    instructor: 'Delilah',
+    audioKey: 'meditation_body_scan',
     color: '#7DAFB4',
   },
   // Breathing

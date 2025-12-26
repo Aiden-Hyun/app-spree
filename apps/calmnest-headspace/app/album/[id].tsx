@@ -45,8 +45,8 @@ function AlbumDetailScreen() {
   }
 
   const handleTrackPress = (track: AlbumTrack) => {
-    // TODO: Navigate to music player with track
-    console.log('Play track:', track.id);
+    // Navigate to album track player
+    router.push(`/album/track/${track.id}?audioKey=${track.audioKey}&title=${encodeURIComponent(track.title)}&albumTitle=${encodeURIComponent(album.title)}&duration=${track.duration_minutes}&artist=${encodeURIComponent(album.artist)}`);
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {

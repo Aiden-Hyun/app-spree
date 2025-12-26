@@ -45,8 +45,8 @@ function SeriesDetailScreen() {
   }
 
   const handleChapterPress = (chapter: SeriesChapter) => {
-    // TODO: Navigate to story player with chapter
-    console.log('Play chapter:', chapter.id);
+    // Navigate to series chapter player with the audioKey and narrator
+    router.push(`/series/chapter/${chapter.id}?audioKey=${chapter.audioKey}&title=${encodeURIComponent(chapter.title)}&seriesTitle=${encodeURIComponent(series.title)}&duration=${chapter.duration_minutes}&narrator=${encodeURIComponent(series.narrator)}`);
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {

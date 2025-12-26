@@ -207,10 +207,9 @@ const seedBreathingExercises = [
   { title: 'Victory Breath', description: 'Build confidence through powerful breathing.', duration_minutes: 5, pattern: '4-4-4-4', inhale_seconds: 4, hold_seconds: 4, exhale_seconds: 4, hold_after_exhale_seconds: 4, audio_file: 'breathing_energy', thumbnail_url: getImageUrl('breathing_victory'), benefits: ['Builds confidence', 'Inner strength', 'Empowering'] },
 ];
 
-// ==================== BEDTIME STORIES (2) ====================
+// ==================== BEDTIME STORIES (1) ====================
 
 const seedBedtimeStories = [
-  { title: 'The Midnight Crossing', description: 'A suspenseful journey through shadows and mystery. The night holds secrets waiting to be discovered.', duration_minutes: 6, category: 'thriller', narrator: 'Rachel', audio_file: 'story_midnight_crossing', thumbnail_url: getImageUrl('story_thriller_midnight'), is_premium: false },
   { title: 'The Shoemaker and the Elves', description: 'A classic fairy tale about a kind shoemaker who receives magical help from tiny elves. Let this gentle story carry you off to dreamland.', duration_minutes: 19, category: 'fairytale', narrator: 'Rachel', audio_file: 'story_shoemaker_elves', thumbnail_url: getImageUrl('story_fairytale_shoemaker'), is_premium: false },
 ];
 
