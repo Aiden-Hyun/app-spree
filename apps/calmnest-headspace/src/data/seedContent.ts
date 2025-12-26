@@ -867,7 +867,7 @@ export interface SeedBedtimeStory {
   title: string;
   description: string;
   duration_minutes: number;
-  category: "nature" | "fantasy" | "travel" | "fiction" | "thriller";
+  category: "nature" | "fantasy" | "travel" | "fiction" | "thriller" | "fairytale";
   narrator: string;
   audio_file: string;
   image: string;
@@ -884,6 +884,17 @@ export const seedBedtimeStories: SeedBedtimeStory[] = [
     narrator: "Rachel",
     audio_file: "story_midnight_crossing",
     image: "story_thriller_midnight",
+    is_premium: false,
+  },
+  {
+    title: "The Shoemaker and the Elves",
+    description:
+      "A classic fairy tale about a kind shoemaker who receives magical help from tiny elves. Let this gentle story carry you off to dreamland.",
+    duration_minutes: 19,
+    category: "fairytale",
+    narrator: "Rachel",
+    audio_file: "story_shoemaker_elves",
+    image: "story_fairytale_shoemaker",
     is_premium: false,
   },
 ];

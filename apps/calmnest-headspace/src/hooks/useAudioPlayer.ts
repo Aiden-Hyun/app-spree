@@ -15,6 +15,7 @@ export interface AudioPlayerState {
   formattedPosition: string;
   formattedDuration: string;
   error: string | null;
+  isLooping: boolean;
 }
 
 /**
@@ -40,6 +41,7 @@ function resolveAudioSource(
  */
 export function useAudioPlayer(initialSource?: string | number | null) {
   const [error, setError] = useState<string | null>(null);
+  const [isLooping, setIsLooping] = useState(false);
   const hasLoadedRef = useRef(false);
 
   // Configure audio mode on mount
@@ -94,8 +96,9 @@ export function useAudioPlayer(initialSource?: string | number | null) {
       formattedPosition: formatTime(status.currentTime),
       formattedDuration: formatTime(status.duration),
       error,
+      isLooping,
     }),
-    [status, error, formatTime]
+    [status, error, formatTime, isLooping]
   );
 
   // Load a new audio source using player.replace()
@@ -169,6 +172,18 @@ export function useAudioPlayer(initialSource?: string | number | null) {
     [player]
   );
 
+  const setLoop = useCallback(
+    (loop: boolean) => {
+      try {
+        player.loop = loop;
+        setIsLooping(loop);
+      } catch (err) {
+        console.warn("Failed to set loop:", err);
+      }
+    },
+    [player]
+  );
+
   const cleanup = useCallback(() => {
     try {
       player.pause();
@@ -188,6 +203,7 @@ export function useAudioPlayer(initialSource?: string | number | null) {
     stop,
     seekTo,
     setVolume,
+    setLoop,
     cleanup,
 
     // Raw player access if needed

@@ -1,10 +1,11 @@
 /**
- * Upload all audio files to Firebase Storage
+ * Upload audio files to Firebase Storage
  * 
- * Run with: node scripts/uploadAudioToStorage.js
+ * Usage:
+ *   node scripts/uploadAudioToStorage.js          # Upload new files only
+ *   node scripts/uploadAudioToStorage.js --force  # Re-upload all files
  * 
  * Prerequisites:
- * - Firebase CLI installed and logged in
  * - Firebase project configured
  * - serviceAccountKey.json in the calmnest-headspace folder
  */
@@ -38,18 +39,6 @@ const audioDir = path.join(__dirname, '..', 'assets', 'audio');
 
 // All audio files to upload - mapped from local path to Firebase Storage path
 const filesToUpload = [
-  // ========== MEDITATE ==========
-  // Guided meditations
-  { local: 'meditate/meditations/anxiety-relief.mp3', remote: 'audio/meditate/meditations/anxiety-relief.mp3' },
-  { local: 'meditate/meditations/body-scan.mp3', remote: 'audio/meditate/meditations/body-scan.mp3' },
-  { local: 'meditate/meditations/breathing-calm.mp3', remote: 'audio/meditate/meditations/breathing-calm.mp3' },
-  { local: 'meditate/meditations/breathing-energy.mp3', remote: 'audio/meditate/meditations/breathing-energy.mp3' },
-  { local: 'meditate/meditations/focus-clarity.mp3', remote: 'audio/meditate/meditations/focus-clarity.mp3' },
-  { local: 'meditate/meditations/gratitude.mp3', remote: 'audio/meditate/meditations/gratitude.mp3' },
-  { local: 'meditate/meditations/loving-kindness.mp3', remote: 'audio/meditate/meditations/loving-kindness.mp3' },
-  { local: 'meditate/meditations/self-esteem.mp3', remote: 'audio/meditate/meditations/self-esteem.mp3' },
-  { local: 'meditate/meditations/stress-relief.mp3', remote: 'audio/meditate/meditations/stress-relief.mp3' },
-
   // ========== MUSIC ==========
   // Nature sounds
   { local: 'music/nature-sounds/ambient-dreams.mp3', remote: 'audio/music/nature-sounds/ambient-dreams.mp3' },
@@ -89,14 +78,33 @@ const filesToUpload = [
   // ========== SLEEP ==========
   // Bedtime stories
   { local: 'sleep/stories/midnight-crossing-chapter-1.mp3', remote: 'audio/sleep/stories/midnight-crossing-chapter-1.mp3' },
+  { local: 'sleep/stories/the-shoemaker-and-the-elves.mp3', remote: 'audio/sleep/stories/the-shoemaker-and-the-elves.mp3' },
 ];
 
-async function uploadFile(localPath, remotePath) {
+async function fileExistsInStorage(remotePath) {
+  try {
+    const [exists] = await bucket.file(remotePath).exists();
+    return exists;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function uploadFile(localPath, remotePath, forceUpload = false) {
   const fullLocalPath = path.join(audioDir, localPath);
   
   if (!fs.existsSync(fullLocalPath)) {
-    console.log(`⚠️  Skipping (not found): ${localPath}`);
-    return false;
+    console.log(`⚠️  Skipping (not found locally): ${localPath}`);
+    return 'not_found';
+  }
+
+  // Check if file already exists in storage
+  if (!forceUpload) {
+    const exists = await fileExistsInStorage(remotePath);
+    if (exists) {
+      console.log(`⏭️  Skipping (already exists): ${remotePath}`);
+      return 'exists';
+    }
   }
 
   try {
@@ -108,47 +116,59 @@ async function uploadFile(localPath, remotePath) {
       },
     });
     console.log(`✅ Uploaded: ${remotePath}`);
-    return true;
+    return 'uploaded';
   } catch (error) {
     console.error(`❌ Failed to upload ${localPath}:`, error.message);
-    return false;
+    return 'failed';
   }
 }
 
 async function main() {
-  console.log('🚀 Starting upload of all audio files to Firebase Storage...\n');
-  console.log(`📁 Source directory: ${audioDir}`);
-  console.log(`📦 Total files to upload: ${filesToUpload.length}\n`);
+  const forceUpload = process.argv.includes('--force');
   
-  let successCount = 0;
+  console.log('🚀 Starting upload of audio files to Firebase Storage...\n');
+  console.log(`📁 Source directory: ${audioDir}`);
+  console.log(`📦 Total files: ${filesToUpload.length}`);
+  console.log(`🔄 Mode: ${forceUpload ? 'Force re-upload all' : 'Upload new files only'}\n`);
+  
+  let uploadedCount = 0;
+  let existsCount = 0;
+  let notFoundCount = 0;
   let failCount = 0;
-  let skipCount = 0;
 
   for (const file of filesToUpload) {
-    const result = await uploadFile(file.local, file.remote);
-    if (result === true) {
-      successCount++;
-    } else if (result === false) {
-      const fullPath = path.join(audioDir, file.local);
-      if (!fs.existsSync(fullPath)) {
-        skipCount++;
-      } else {
+    const result = await uploadFile(file.local, file.remote, forceUpload);
+    switch (result) {
+      case 'uploaded':
+        uploadedCount++;
+        break;
+      case 'exists':
+        existsCount++;
+        break;
+      case 'not_found':
+        notFoundCount++;
+        break;
+      case 'failed':
         failCount++;
-      }
+        break;
     }
   }
 
   console.log('\n========================================');
   console.log('📊 Upload Summary:');
-  console.log(`   ✅ Successful: ${successCount}`);
-  console.log(`   ⚠️  Skipped: ${skipCount}`);
+  console.log(`   ✅ Uploaded: ${uploadedCount}`);
+  console.log(`   ⏭️  Already exists: ${existsCount}`);
+  console.log(`   ⚠️  Not found locally: ${notFoundCount}`);
   console.log(`   ❌ Failed: ${failCount}`);
   console.log('========================================');
   
-  if (successCount > 0) {
-    console.log('\n🎉 Audio files are now available at:');
-    console.log('   https://storage.googleapis.com/calmnest-e910e.firebasestorage.app/audio/...');
+  if (uploadedCount > 0) {
+    console.log('\n🎉 New audio files uploaded!');
+  } else if (existsCount > 0 && uploadedCount === 0) {
+    console.log('\n✨ All files already exist in storage.');
   }
+  
+  console.log('\nTip: Use --force to re-upload all files');
 }
 
 main().catch(console.error);

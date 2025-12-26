@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -8,8 +8,6 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
-import { getAudioUrl } from "../../src/constants/audioFiles";
 import { sleepSoundsData, SleepSoundCategory, categoryLabels } from "../../src/constants/sleepSoundsData";
 import { Theme } from "../../src/theme";
 
@@ -18,11 +16,7 @@ const categories: (SleepSoundCategory | 'all')[] = ['all', 'rain', 'water', 'fir
 function NatureSoundsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [selectedSound, setSelectedSound] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<SleepSoundCategory | 'all'>('all');
-
-  const audioPlayer = useAudioPlayer();
-  const prevSelectedSound = useRef<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -31,46 +25,15 @@ function NatureSoundsScreen() {
     return sleepSoundsData.filter(s => s.category === selectedCategory);
   }, [selectedCategory]);
 
-  useEffect(() => {
-    const handleSoundChange = async () => {
-      if (!selectedSound) {
-        if (audioPlayer.isPlaying) {
-          audioPlayer.pause();
-        }
-        prevSelectedSound.current = null;
-        return;
-      }
-
-      if (selectedSound !== prevSelectedSound.current) {
-        const sound = sleepSoundsData.find((s) => s.id === selectedSound);
-        if (sound) {
-          const audioUrl = await getAudioUrl(sound.audioKey);
-          if (audioUrl) {
-            await audioPlayer.loadAudio(audioUrl);
-            audioPlayer.play();
-          }
-        }
-        prevSelectedSound.current = selectedSound;
-      }
-    };
-
-    handleSoundChange();
-  }, [selectedSound]);
-
-  useEffect(() => {
-    return () => {
-      audioPlayer.cleanup();
-    };
-  }, []);
+  const handleSoundPress = (soundId: string) => {
+    router.push(`/music/${soundId}`);
+  };
 
   const renderItem = ({ item, index }: { item: typeof sleepSoundsData[0]; index: number }) => (
     <AnimatedView delay={index * 50} duration={400}>
       <AnimatedPressable
-        onPress={() => setSelectedSound(selectedSound === item.id ? null : item.id)}
-        style={[
-          styles.soundCard,
-          selectedSound === item.id && styles.soundCardSelected,
-        ]}
+        onPress={() => handleSoundPress(item.id)}
+        style={styles.soundCard}
       >
         <View
           style={[
@@ -81,23 +44,14 @@ function NatureSoundsScreen() {
           <Ionicons
             name={`${item.icon}-outline` as keyof typeof Ionicons.glyphMap}
             size={28}
-            color={selectedSound === item.id ? theme.colors.sleepAccent : item.color}
+            color={item.color}
           />
         </View>
         <View style={styles.soundInfo}>
-          <Text style={[
-            styles.soundTitle,
-            selectedSound === item.id && styles.soundTitleSelected,
-          ]}>
-            {item.title}
-          </Text>
+          <Text style={styles.soundTitle}>{item.title}</Text>
           <Text style={styles.soundDescription}>{item.description}</Text>
         </View>
-        {selectedSound === item.id ? (
-          <Ionicons name="pause-circle" size={32} color={theme.colors.sleepAccent} />
-        ) : (
-          <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
-        )}
+        <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
       </AnimatedPressable>
     </AnimatedView>
   );
@@ -228,12 +182,6 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.sleepSurface,
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.md,
-      borderWidth: 2,
-      borderColor: "transparent",
-    },
-    soundCardSelected: {
-      borderColor: theme.colors.sleepAccent,
-      backgroundColor: "rgba(201, 184, 150, 0.1)",
     },
     soundIconContainer: {
       width: 56,
@@ -252,9 +200,6 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.sleepText,
       marginBottom: 4,
     },
-    soundTitleSelected: {
-      color: theme.colors.sleepAccent,
-    },
     soundDescription: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
@@ -269,4 +214,3 @@ export default function NatureSounds() {
     </ProtectedRoute>
   );
 }
-

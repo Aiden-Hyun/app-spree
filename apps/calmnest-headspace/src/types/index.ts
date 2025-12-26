@@ -121,7 +121,7 @@ export interface BedtimeStory {
   audio_url?: string;
   audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
-  category: "nature" | "fantasy" | "travel" | "fiction" | "thriller";
+  category: "nature" | "fantasy" | "travel" | "fiction" | "thriller" | "fairytale";
   is_premium: boolean;
   created_at: string;
 }

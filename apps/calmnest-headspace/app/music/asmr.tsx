@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -8,61 +8,24 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
-import { getAudioUrl } from "../../src/constants/audioFiles";
 import { asmrData } from "../../src/constants/musicData";
 import { Theme } from "../../src/theme";
 
 function ASMRScreen() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [selectedSound, setSelectedSound] = useState<string | null>(null);
-
-  const audioPlayer = useAudioPlayer();
-  const prevSelectedSound = useRef<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  useEffect(() => {
-    const handleSoundChange = async () => {
-      if (!selectedSound) {
-        if (audioPlayer.isPlaying) {
-          audioPlayer.pause();
-        }
-        prevSelectedSound.current = null;
-        return;
-      }
-
-      if (selectedSound !== prevSelectedSound.current) {
-        const sound = asmrData.find((s) => s.id === selectedSound);
-        if (sound) {
-          const audioUrl = await getAudioUrl(sound.audioKey);
-          if (audioUrl) {
-            await audioPlayer.loadAudio(audioUrl);
-            audioPlayer.play();
-          }
-        }
-        prevSelectedSound.current = selectedSound;
-      }
-    };
-
-    handleSoundChange();
-  }, [selectedSound]);
-
-  useEffect(() => {
-    return () => {
-      audioPlayer.cleanup();
-    };
-  }, []);
+  const handleSoundPress = (soundId: string) => {
+    router.push(`/music/${soundId}`);
+  };
 
   const renderItem = ({ item, index }: { item: typeof asmrData[0]; index: number }) => (
     <AnimatedView delay={index * 50} duration={400}>
       <AnimatedPressable
-        onPress={() => setSelectedSound(selectedSound === item.id ? null : item.id)}
-        style={[
-          styles.soundCard,
-          selectedSound === item.id && styles.soundCardSelected,
-        ]}
+        onPress={() => handleSoundPress(item.id)}
+        style={styles.soundCard}
       >
         <View
           style={[
@@ -73,23 +36,14 @@ function ASMRScreen() {
           <Ionicons
             name={`${item.icon}-outline` as keyof typeof Ionicons.glyphMap}
             size={28}
-            color={selectedSound === item.id ? theme.colors.sleepAccent : item.color}
+            color={item.color}
           />
         </View>
         <View style={styles.soundInfo}>
-          <Text style={[
-            styles.soundTitle,
-            selectedSound === item.id && styles.soundTitleSelected,
-          ]}>
-            {item.title}
-          </Text>
+          <Text style={styles.soundTitle}>{item.title}</Text>
           <Text style={styles.soundDescription}>{item.description}</Text>
         </View>
-        {selectedSound === item.id ? (
-          <Ionicons name="pause-circle" size={32} color={theme.colors.sleepAccent} />
-        ) : (
-          <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
-        )}
+        <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
       </AnimatedPressable>
     </AnimatedView>
   );
@@ -173,12 +127,6 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.sleepSurface,
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.md,
-      borderWidth: 2,
-      borderColor: "transparent",
-    },
-    soundCardSelected: {
-      borderColor: theme.colors.sleepAccent,
-      backgroundColor: "rgba(201, 184, 150, 0.1)",
     },
     soundIconContainer: {
       width: 56,
@@ -196,9 +144,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       color: theme.colors.sleepText,
       marginBottom: 4,
-    },
-    soundTitleSelected: {
-      color: theme.colors.sleepAccent,
     },
     soundDescription: {
       fontFamily: theme.fonts.ui.regular,
@@ -225,4 +170,3 @@ export default function ASMR() {
     </ProtectedRoute>
   );
 }
-

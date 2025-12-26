@@ -17,21 +17,9 @@ const fragrantheart = (path: string) =>
 
 // Storage paths for Firebase-hosted audio (private - needs download URL)
 const storagePaths: Record<string, string> = {
-  // ========== GUIDED MEDITATION AUDIO (Firebase Storage) ==========
-  meditation_gratitude: 'audio/meditate/meditations/gratitude.mp3',
-  meditation_stress: 'audio/meditate/meditations/stress-relief.mp3',
-  meditation_focus: 'audio/meditate/meditations/focus-clarity.mp3',
-  meditation_anxiety: 'audio/meditate/meditations/anxiety-relief.mp3',
-  meditation_selfesteem: 'audio/meditate/meditations/self-esteem.mp3',
-  meditation_bodyscan: 'audio/meditate/meditations/body-scan.mp3',
-  meditation_lovingkindness: 'audio/meditate/meditations/loving-kindness.mp3',
-  
-  // ========== BREATHING EXERCISE AUDIO (Firebase Storage) ==========
-  breathing_calm: 'audio/meditate/meditations/breathing-calm.mp3',
-  breathing_energy: 'audio/meditate/meditations/breathing-energy.mp3',
-  
   // ========== BEDTIME STORIES (Firebase Storage) ==========
   story_midnight_crossing: 'audio/sleep/stories/midnight-crossing-chapter-1.mp3',
+  story_shoemaker_elves: 'audio/sleep/stories/the-shoemaker-and-the-elves.mp3',
   
   // ========== WHITE NOISE (Firebase Storage) ==========
   wn_electric_fan: 'audio/music/white-noise/electric-fan.mp3',

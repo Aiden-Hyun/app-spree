@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -8,10 +8,8 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
-import { getAudioUrl } from "../../src/constants/audioFiles";
 import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
-import { whiteNoiseData, musicData, asmrData, MusicItem } from "../../src/constants/musicData";
+import { whiteNoiseData, musicData, asmrData } from "../../src/constants/musicData";
 import { albumsData, Album } from "../../src/constants/albumsData";
 import { Theme } from "../../src/theme";
 
@@ -24,54 +22,12 @@ const featuredASMR = asmrData.slice(0, 6);
 function MusicScreen() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [selectedSound, setSelectedSound] = useState<string | null>(null);
-
-  // Audio player
-  const audioPlayer = useAudioPlayer();
-  const prevSelectedSound = useRef<string | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Handle sound playback
-  useEffect(() => {
-    const handleSoundChange = async () => {
-      if (!selectedSound) {
-        if (audioPlayer.isPlaying) {
-          audioPlayer.pause();
-        }
-        prevSelectedSound.current = null;
-        return;
-      }
-
-      if (selectedSound !== prevSelectedSound.current) {
-        // Find sound in all categories
-        const allSounds = [
-          ...sleepSoundsData.map(s => ({ ...s, audioKey: s.audioKey })),
-          ...whiteNoiseData,
-          ...musicData,
-          ...asmrData,
-        ];
-        const sound = allSounds.find((s) => s.id === selectedSound);
-        if (sound) {
-          const audioUrl = await getAudioUrl(sound.audioKey);
-          if (audioUrl) {
-            await audioPlayer.loadAudio(audioUrl);
-            audioPlayer.play();
-          }
-        }
-        prevSelectedSound.current = selectedSound;
-      }
-    };
-
-    handleSoundChange();
-  }, [selectedSound]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      audioPlayer.cleanup();
-    };
-  }, []);
+  const handleSoundPress = (soundId: string) => {
+    router.push(`/music/${soundId}`);
+  };
 
   const renderSoundCard = (
     sound: { id: string; title: string; icon: string; color: string },
@@ -85,13 +41,8 @@ function MusicScreen() {
       style={styles.soundCardWrapper}
     >
       <AnimatedPressable
-        onPress={() =>
-          setSelectedSound(selectedSound === sound.id ? null : sound.id)
-        }
-        style={[
-          styles.soundCard,
-          selectedSound === sound.id && styles.soundCardSelected,
-        ]}
+        onPress={() => handleSoundPress(sound.id)}
+        style={styles.soundCard}
       >
         <View
           style={[
@@ -102,27 +53,12 @@ function MusicScreen() {
           <Ionicons
             name={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
             size={24}
-            color={selectedSound === sound.id ? theme.colors.sleepAccent : sound.color}
+            color={sound.color}
           />
         </View>
-        <Text
-          style={[
-            styles.soundLabel,
-            selectedSound === sound.id && styles.soundLabelSelected,
-          ]}
-          numberOfLines={1}
-        >
+        <Text style={styles.soundLabel} numberOfLines={1}>
           {sound.title}
         </Text>
-        {selectedSound === sound.id && (
-          <View style={styles.soundPlaying}>
-            <Ionicons
-              name="volume-high"
-              size={12}
-              color={theme.colors.sleepAccent}
-            />
-          </View>
-        )}
       </AnimatedPressable>
     </AnimatedView>
   );
@@ -367,12 +303,6 @@ const createStyles = (theme: Theme) =>
       paddingVertical: theme.spacing.md,
       paddingHorizontal: theme.spacing.sm,
       alignItems: "center",
-      borderWidth: 2,
-      borderColor: "transparent",
-    },
-    soundCardSelected: {
-      borderColor: theme.colors.sleepAccent,
-      backgroundColor: "rgba(201, 184, 150, 0.1)",
     },
     soundIconContainer: {
       width: 48,
@@ -387,14 +317,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.sleepTextMuted,
       textAlign: "center",
-    },
-    soundLabelSelected: {
-      color: theme.colors.sleepAccent,
-    },
-    soundPlaying: {
-      position: "absolute",
-      top: 8,
-      right: 8,
     },
     albumCard: {
       width: 150,
