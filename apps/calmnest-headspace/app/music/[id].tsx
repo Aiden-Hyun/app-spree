@@ -9,7 +9,9 @@ import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { SoundPlayer } from '../../src/components/SoundPlayer';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getAudioUrl } from '../../src/constants/audioFiles';
+import { addToListeningHistory } from '../../src/services/firestoreService';
 import { sleepSoundsData, SleepSound } from '../../src/constants/sleepSoundsData';
 import { whiteNoiseData, musicData, asmrData, MusicItem } from '../../src/constants/musicData';
 import { Theme } from '../../src/theme';
@@ -22,11 +24,13 @@ function SoundPlayerScreen() {
   const { id, category } = useLocalSearchParams<{ id: string; category?: string }>();
   const router = useRouter();
   const { theme } = useTheme();
+  const { user } = useAuth();
   
   const [sound, setSound] = useState<SoundData | null>(null);
   const [timerMinutes, setTimerMinutes] = useState<number | null>(DEFAULT_TIMER_MINUTES);
   const [remainingSeconds, setRemainingSeconds] = useState(DEFAULT_TIMER_MINUTES * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayer = useAudioPlayer();
@@ -102,12 +106,25 @@ function SoundPlayerScreen() {
     }
   }, [audioPlayer]);
 
-  const handlePlay = useCallback(() => {
+  const handlePlay = useCallback(async () => {
     audioPlayer.play();
     if (timerMinutes !== null) {
       setIsTimerRunning(true);
     }
-  }, [audioPlayer, timerMinutes]);
+    
+    // Track listening history on first play
+    if (!hasTrackedPlay && user && sound && id) {
+      setHasTrackedPlay(true);
+      await addToListeningHistory(
+        user.uid,
+        id,
+        'nature_sound',
+        sound.title,
+        timerMinutes || 30, // Use timer duration or default
+        undefined
+      );
+    }
+  }, [audioPlayer, timerMinutes, hasTrackedPlay, user, sound, id]);
 
   const handlePause = useCallback(() => {
     audioPlayer.pause();

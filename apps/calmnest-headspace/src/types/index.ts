@@ -150,6 +150,24 @@ export interface UserFavorite {
   favorited_at: string;
 }
 
+// Listening History
+export interface ListeningHistoryItem {
+  id: string;
+  user_id: string;
+  content_id: string;
+  content_type:
+    | "meditation"
+    | "nature_sound"
+    | "bedtime_story"
+    | "breathing_exercise"
+    | "series_chapter"
+    | "album_track";
+  content_title: string; // Denormalized for quick display
+  content_thumbnail?: string; // Denormalized
+  duration_minutes: number;
+  played_at: string;
+}
+
 // Statistics
 export interface UserStats {
   total_sessions: number;

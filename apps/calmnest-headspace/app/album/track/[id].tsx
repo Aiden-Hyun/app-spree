@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,7 +8,9 @@ import { ProtectedRoute } from '../../../src/components/ProtectedRoute';
 import { AudioPlayer } from '../../../src/components/AudioPlayer';
 import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
+import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrl } from '../../../src/constants/audioFiles';
+import { addToListeningHistory, toggleFavorite, isFavorite } from '../../../src/services/firestoreService';
 import { Theme } from '../../../src/theme';
 
 function AlbumTrackPlayerScreen() {
@@ -22,9 +24,24 @@ function AlbumTrackPlayerScreen() {
   }>();
   const router = useRouter();
   const { theme } = useTheme();
+  const { user } = useAuth();
+
+  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
+
+  // Check if favorited on load
+  useEffect(() => {
+    async function checkFavorite() {
+      if (user && id) {
+        const favorited = await isFavorite(user.uid, id);
+        setIsFavorited(favorited);
+      }
+    }
+    checkFavorite();
+  }, [user, id]);
 
   useEffect(() => {
     async function loadTrackAudio() {
@@ -44,6 +61,34 @@ function AlbumTrackPlayerScreen() {
     router.back();
   };
 
+  const handlePlayPause = async () => {
+    if (audioPlayer.isPlaying) {
+      audioPlayer.pause();
+    } else {
+      audioPlayer.play();
+      
+      // Track listening history on first play
+      if (!hasTrackedPlay && user && id && title) {
+        setHasTrackedPlay(true);
+        await addToListeningHistory(
+          user.uid,
+          id,
+          'album_track',
+          `${albumTitle}: ${title}`,
+          parseInt(duration) || 0,
+          undefined
+        );
+      }
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!user || !id) return;
+    
+    const newFavorited = await toggleFavorite(user.uid, id, 'nature_sound');
+    setIsFavorited(newFavorited);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
@@ -57,8 +102,12 @@ function AlbumTrackPlayerScreen() {
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.sleepText} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="heart-outline" size={24} color={theme.colors.sleepText} />
+          <TouchableOpacity onPress={handleToggleFavorite} style={styles.moreButton}>
+            <Ionicons 
+              name={isFavorited ? "heart" : "heart-outline"} 
+              size={24} 
+              color={isFavorited ? theme.colors.error : theme.colors.sleepText} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -104,8 +153,8 @@ function AlbumTrackPlayerScreen() {
                 progress={audioPlayer.progress}
                 formattedPosition={audioPlayer.formattedPosition}
                 formattedDuration={audioPlayer.formattedDuration}
-                onPlay={audioPlayer.play}
-                onPause={audioPlayer.pause}
+                onPlay={handlePlayPause}
+                onPause={handlePlayPause}
                 onSeek={audioPlayer.seekTo}
               />
             )}
@@ -220,4 +269,3 @@ export default function AlbumTrackPlayer() {
     </ProtectedRoute>
   );
 }
-

@@ -10,7 +10,8 @@ import { AudioPlayer } from '../../src/components/AudioPlayer';
 import { useMeditation } from '../../src/hooks/useMeditation';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { getMeditationById } from '../../src/services/firestoreService';
+import { getMeditationById, addToListeningHistory, toggleFavorite, isFavorite } from '../../src/services/firestoreService';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getAudioUrl } from '../../src/constants/audioFiles';
 import { Theme } from '../../src/theme';
 import { GuidedMeditation } from '../../src/types';
@@ -19,9 +20,12 @@ function MeditationPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [meditation, setMeditation] = useState<GuidedMeditation | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTimer, setShowTimer] = useState(false);
+  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -33,6 +37,17 @@ function MeditationPlayerScreen() {
       console.log('Meditation completed:', session);
     },
   });
+
+  // Check if favorited on load
+  useEffect(() => {
+    async function checkFavorite() {
+      if (user && id) {
+        const favorited = await isFavorite(user.uid, id as string);
+        setIsFavorited(favorited);
+      }
+    }
+    checkFavorite();
+  }, [user, id]);
 
   useEffect(() => {
     async function loadMeditation() {
@@ -79,7 +94,14 @@ function MeditationPlayerScreen() {
     router.back();
   };
 
-  const handlePlayPause = () => {
+  const handleToggleFavorite = async () => {
+    if (!user || !meditation) return;
+    
+    const newFavorited = await toggleFavorite(user.uid, meditation.id, 'meditation');
+    setIsFavorited(newFavorited);
+  };
+
+  const handlePlayPause = async () => {
     if (audioPlayer.isPlaying) {
       audioPlayer.pause();
       if (meditationTimer.isActive && !meditationTimer.isPaused) {
@@ -91,6 +113,19 @@ function MeditationPlayerScreen() {
         meditationTimer.start();
       } else if (meditationTimer.isPaused) {
         meditationTimer.resume();
+      }
+      
+      // Track listening history on first play
+      if (!hasTrackedPlay && user && meditation) {
+        setHasTrackedPlay(true);
+        await addToListeningHistory(
+          user.uid,
+          meditation.id,
+          'meditation',
+          meditation.title,
+          meditation.duration_minutes,
+          meditation.thumbnail_url
+        );
       }
     }
   };
@@ -155,8 +190,12 @@ function MeditationPlayerScreen() {
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton}>
-            <Ionicons name="heart-outline" size={24} color="white" />
+          <TouchableOpacity onPress={handleToggleFavorite} style={styles.moreButton}>
+            <Ionicons 
+              name={isFavorited ? "heart" : "heart-outline"} 
+              size={24} 
+              color={isFavorited ? "#FF6B6B" : "white"} 
+            />
           </TouchableOpacity>
         </View>
 

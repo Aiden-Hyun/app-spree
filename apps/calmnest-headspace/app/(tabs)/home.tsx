@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -9,11 +9,17 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
-import { Skeleton, SkeletonCard, SkeletonListItem } from '../../src/components/Skeleton';
+import { Skeleton } from '../../src/components/Skeleton';
 import { useStats } from '../../src/hooks/useStats';
-import { getTodayQuote, getMeditations } from '../../src/services/firestoreService';
+import { 
+  getTodayQuote, 
+  getListeningHistory, 
+  getFavoritesWithDetails,
+  ResolvedContent
+} from '../../src/services/firestoreService';
+import { seriesData } from '../../src/constants/seriesData';
 import { Theme } from '../../src/theme';
-import { DailyQuote, GuidedMeditation } from '../../src/types';
+import { DailyQuote, ListeningHistoryItem } from '../../src/types';
 
 function HomeScreen() {
   const { user } = useAuth();
@@ -21,26 +27,31 @@ function HomeScreen() {
   const router = useRouter();
   const { stats, loading: statsLoading } = useStats();
   const [quote, setQuote] = useState<DailyQuote | null>(null);
-  const [featuredSession, setFeaturedSession] = useState<GuidedMeditation | null>(null);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<ListeningHistoryItem[]>([]);
+  const [favorites, setFavorites] = useState<ResolvedContent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
-  useEffect(() => {
-    loadHomeData();
-  }, []);
+  // Reload data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadHomeData();
+    }, [user])
+  );
 
   const loadHomeData = async () => {
+    if (!user) return;
+    
     try {
-      const [quoteData, meditations] = await Promise.all([
+      const [quoteData, historyData, favoritesData] = await Promise.all([
         getTodayQuote(),
-        getMeditations()
+        getListeningHistory(user.uid, 10),
+        getFavoritesWithDetails(user.uid)
       ]);
       setQuote(quoteData);
-      if (meditations.length > 0) {
-        const randomIndex = Math.floor(Math.random() * Math.min(meditations.length, 5));
-        setFeaturedSession(meditations[randomIndex]);
-      }
+      setRecentlyPlayed(historyData);
+      setFavorites(favoritesData);
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -64,12 +75,6 @@ function HomeScreen() {
     return '🌙';
   };
 
-  const quickActions = [
-    { id: 'breathe', label: 'Breathe', icon: 'cloud-outline' as const, route: '/breathing' },
-    { id: 'sleep', label: 'Sleep', icon: 'moon-outline' as const, route: '/(tabs)/sleep' },
-    { id: 'focus', label: 'Focus', icon: 'eye-outline' as const, route: '/(tabs)/meditate' },
-  ];
-
   const renderStreakDots = () => {
     const currentStreak = stats?.current_streak || 0;
     const dots = [];
@@ -87,11 +92,139 @@ function HomeScreen() {
     return dots;
   };
 
+  // Helper to find series chapter by ID
+  const findSeriesChapter = (chapterId: string) => {
+    for (const series of seriesData) {
+      const chapter = series.chapters.find(ch => ch.id === chapterId);
+      if (chapter) {
+        return { series, chapter };
+      }
+    }
+    return null;
+  };
+
+  const navigateToContent = (contentId: string, contentType: string) => {
+    switch (contentType) {
+      case 'meditation':
+        router.push({ pathname: '/meditation/[id]', params: { id: contentId } });
+        break;
+      case 'bedtime_story':
+        router.push({ pathname: '/sleep/[id]', params: { id: contentId } });
+        break;
+      case 'breathing_exercise':
+        router.push('/breathing');
+        break;
+      case 'nature_sound':
+        router.push({ pathname: '/music/[id]', params: { id: contentId } });
+        break;
+      case 'series_chapter':
+        // Look up series chapter data and navigate with full params
+        const result = findSeriesChapter(contentId);
+        if (result) {
+          router.push({
+            pathname: '/series/chapter/[id]',
+            params: {
+              id: result.chapter.id,
+              audioKey: result.chapter.audioKey,
+              title: result.chapter.title,
+              seriesTitle: result.series.title,
+              duration: String(result.chapter.duration_minutes),
+              narrator: result.series.narrator
+            }
+          });
+        } else {
+          router.push('/(tabs)/sleep');
+        }
+        break;
+      case 'album_track':
+        // Album tracks require additional params - navigate to music tab for now
+        router.push('/(tabs)/music');
+        break;
+    }
+  };
+
+  const getContentIcon = (contentType: string): keyof typeof Ionicons.glyphMap => {
+    switch (contentType) {
+      case 'meditation':
+        return 'leaf';
+      case 'bedtime_story':
+      case 'series_chapter':
+        return 'book';
+      case 'album_track':
+        return 'musical-notes';
+      case 'breathing_exercise':
+        return 'cloud';
+      case 'nature_sound':
+        return 'musical-notes';
+      default:
+        return 'play-circle';
+    }
+  };
+
   const intentionGradient = isDark 
     ? [theme.colors.surface, theme.colors.background] as [string, string]
     : ['#F5EDE3', '#FAF8F5'] as [string, string];
 
-  const featuredDefaultGradient = theme.gradients.sage as [string, string];
+  const renderRecentlyPlayedItem = useCallback(({ item }: { item: ListeningHistoryItem }) => (
+    <AnimatedPressable
+      onPress={() => navigateToContent(item.content_id, item.content_type)}
+      style={styles.contentCard}
+    >
+      {item.content_thumbnail ? (
+        <Image source={{ uri: item.content_thumbnail }} style={styles.contentThumbnail} />
+      ) : (
+        <View style={[styles.contentThumbnail, styles.contentThumbnailPlaceholder]}>
+          <Ionicons 
+            name={getContentIcon(item.content_type)} 
+            size={24} 
+            color={theme.colors.primary} 
+          />
+        </View>
+      )}
+      <Text style={styles.contentTitle} numberOfLines={2}>{item.content_title}</Text>
+      <Text style={styles.contentMeta}>{item.duration_minutes} min</Text>
+    </AnimatedPressable>
+  ), [styles, theme]);
+
+  const renderFavoriteItem = useCallback(({ item }: { item: ResolvedContent }) => (
+    <AnimatedPressable
+      onPress={() => navigateToContent(item.id, item.content_type)}
+      style={styles.contentCard}
+    >
+      {item.thumbnail_url ? (
+        <Image source={{ uri: item.thumbnail_url }} style={styles.contentThumbnail} />
+      ) : (
+        <View style={[styles.contentThumbnail, styles.contentThumbnailPlaceholder]}>
+          <Ionicons 
+            name={getContentIcon(item.content_type)} 
+            size={24} 
+            color={theme.colors.primary} 
+          />
+        </View>
+      )}
+      <Text style={styles.contentTitle} numberOfLines={2}>{item.title}</Text>
+      <Text style={styles.contentMeta}>{item.duration_minutes} min</Text>
+    </AnimatedPressable>
+  ), [styles, theme]);
+
+  const renderSkeletonCards = () => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalList}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={styles.contentCard}>
+          <Skeleton width={120} height={120} style={{ borderRadius: theme.borderRadius.lg }} />
+          <Skeleton width={100} height={14} style={{ marginTop: 8 }} />
+          <Skeleton width={60} height={12} style={{ marginTop: 4 }} />
+        </View>
+      ))}
+    </ScrollView>
+  );
+
+  const renderEmptyState = (message: string) => (
+    <View style={styles.emptyState}>
+      <Ionicons name="musical-notes-outline" size={32} color={theme.colors.textLight} />
+      <Text style={styles.emptyStateText}>{message}</Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -102,113 +235,76 @@ function HomeScreen() {
       >
         {/* Header */}
         <AnimatedView delay={0} duration={400}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              {getGreeting()} {getGreetingEmoji()}
-            </Text>
-            <Text style={styles.userName}>
-              {user?.email?.split('@')[0] || 'Friend'}
-            </Text>
-          </View>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.greeting}>
+                {getGreeting()} {getGreetingEmoji()}
+              </Text>
+              <Text style={styles.userName}>
+                {user?.email?.split('@')[0] || 'Friend'}
+              </Text>
+            </View>
             <AnimatedPressable 
               onPress={() => router.push('/settings')}
-            style={styles.settingsButton}
-          >
-            <Ionicons name="settings-outline" size={22} color={theme.colors.textLight} />
+              style={styles.settingsButton}
+            >
+              <Ionicons name="settings-outline" size={22} color={theme.colors.textLight} />
             </AnimatedPressable>
-        </View>
+          </View>
         </AnimatedView>
 
-        {/* Daily Intention Card */}
-        <AnimatedView delay={100} duration={400}>
-        <View style={styles.intentionCard}>
-          <LinearGradient
-              colors={intentionGradient}
-            style={styles.intentionGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.intentionIcon}>
-              <Text style={styles.intentionEmoji}>🕊️</Text>
-            </View>
-            <Text style={styles.intentionLabel}>Today's Intention</Text>
-              {loading ? (
-                <Skeleton height={20} width="80%" style={{ alignSelf: 'center' }} />
-              ) : (
-            <Text style={styles.intentionText}>
-              {quote?.text || "Take a breath. You're exactly where you need to be."}
-            </Text>
-              )}
-            {quote?.author && (
-              <Text style={styles.intentionAuthor}>— {quote.author}</Text>
-            )}
-          </LinearGradient>
-        </View>
-        </AnimatedView>
-
-        {/* Featured Session */}
-          <View style={styles.section}>
-          <AnimatedView delay={200} duration={400}>
-            <Text style={styles.sectionTitle}>Recommended for you</Text>
+        {/* Recently Played Section */}
+        <View style={styles.section}>
+          <AnimatedView delay={100} duration={400}>
+            <Text style={styles.sectionTitle}>Recently Played</Text>
           </AnimatedView>
           
-          {loading ? (
-            <AnimatedView delay={250} duration={400}>
-              <SkeletonCard />
-            </AnimatedView>
-          ) : featuredSession ? (
-            <AnimatedView delay={250} duration={400}>
-              <AnimatedPressable 
-              onPress={() => router.push({
-                pathname: '/meditation/[id]',
-                params: { id: featuredSession.id }
-              })}
-                style={styles.featuredCard}
-              >
-                {featuredSession.thumbnail_url ? (
-                  <Image 
-                    source={{ uri: featuredSession.thumbnail_url }} 
-                    style={styles.featuredImage}
-                  />
-                ) : null}
-              <LinearGradient
-                  colors={featuredSession.thumbnail_url 
-                    ? ['transparent', 'rgba(0,0,0,0.6)'] 
-                    : featuredDefaultGradient}
-                  style={[
-                    styles.featuredGradient,
-                    featuredSession.thumbnail_url && styles.featuredGradientOverlay
-                  ]}
-                start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-              >
-                <View style={styles.featuredContent}>
-                    {!featuredSession.thumbnail_url && (
-                  <View style={styles.featuredIcon}>
-                    <Ionicons name="leaf" size={28} color="white" />
-                  </View>
-                    )}
-                  <View style={styles.featuredInfo}>
-                    <Text style={styles.featuredTitle}>{featuredSession.title}</Text>
-                    <Text style={styles.featuredMeta}>
-                      {featuredSession.duration_minutes} min · {featuredSession.category}
-                    </Text>
-                  </View>
-                  <View style={styles.playButton}>
-                    <Ionicons name="play" size={20} color={theme.colors.primary} />
-                  </View>
-                </View>
-              </LinearGradient>
-              </AnimatedPressable>
-            </AnimatedView>
-          ) : null}
-          </View>
+          <AnimatedView delay={150} duration={400}>
+            {loading ? (
+              renderSkeletonCards()
+            ) : recentlyPlayed.length > 0 ? (
+              <FlatList
+                horizontal
+                data={recentlyPlayed}
+                keyExtractor={(item) => item.id}
+                renderItem={renderRecentlyPlayedItem}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalListContent}
+              />
+            ) : (
+              renderEmptyState("Start listening to build your history")
+            )}
+          </AnimatedView>
+        </View>
 
-        {/* Your Journey */}
+        {/* Favorites Section */}
+        <View style={styles.section}>
+          <AnimatedView delay={200} duration={400}>
+            <Text style={styles.sectionTitle}>Favorites</Text>
+          </AnimatedView>
+          
+          <AnimatedView delay={250} duration={400}>
+            {loading ? (
+              renderSkeletonCards()
+            ) : favorites.length > 0 ? (
+              <FlatList
+                horizontal
+                data={favorites}
+                keyExtractor={(item) => item.id}
+                renderItem={renderFavoriteItem}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalListContent}
+              />
+            ) : (
+              renderEmptyState("Tap the heart icon to save favorites")
+            )}
+          </AnimatedView>
+        </View>
+
+        {/* Your Journey Section */}
         <View style={styles.section}>
           <AnimatedView delay={300} duration={400}>
-          <Text style={styles.sectionTitle}>Your Journey</Text>
+            <Text style={styles.sectionTitle}>Your Journey</Text>
           </AnimatedView>
           
           <AnimatedView delay={350} duration={400}>
@@ -231,66 +327,59 @@ function HomeScreen() {
                 </View>
               </View>
             ) : (
-          <View style={styles.journeyCard}>
-            <View style={styles.streakRow}>
-              <View style={styles.streakDots}>
-                {renderStreakDots()}
-              </View>
-              <View style={styles.streakInfo}>
-                <Text style={styles.streakNumber}>{stats?.current_streak || 0}</Text>
-                <Text style={styles.streakLabel}>day streak</Text>
-              </View>
-            </View>
-            <View style={styles.journeyDivider} />
-            <View style={styles.journeyStats}>
-              <View style={styles.journeyStat}>
-                <Text style={styles.journeyStatValue}>
-                  {stats?.weekly_minutes?.reduce((a, b) => a + b, 0) || 0}
-                </Text>
-                <Text style={styles.journeyStatLabel}>min this week</Text>
-              </View>
-              <View style={styles.journeyStat}>
-                <Text style={styles.journeyStatValue}>{stats?.total_sessions || 0}</Text>
-                <Text style={styles.journeyStatLabel}>total sessions</Text>
-              </View>
-            </View>
-          </View>
+              <AnimatedPressable onPress={() => router.push('/stats')} style={styles.journeyCard}>
+                <View style={styles.streakRow}>
+                  <View style={styles.streakDots}>
+                    {renderStreakDots()}
+                  </View>
+                  <View style={styles.streakInfo}>
+                    <Text style={styles.streakNumber}>{stats?.current_streak || 0}</Text>
+                    <Text style={styles.streakLabel}>day streak</Text>
+                  </View>
+                </View>
+                <View style={styles.journeyDivider} />
+                <View style={styles.journeyStats}>
+                  <View style={styles.journeyStat}>
+                    <Text style={styles.journeyStatValue}>
+                      {stats?.weekly_minutes?.reduce((a, b) => a + b, 0) || 0}
+                    </Text>
+                    <Text style={styles.journeyStatLabel}>min this week</Text>
+                  </View>
+                  <View style={styles.journeyStat}>
+                    <Text style={styles.journeyStatValue}>{stats?.total_sessions || 0}</Text>
+                    <Text style={styles.journeyStatLabel}>total sessions</Text>
+                  </View>
+                </View>
+              </AnimatedPressable>
             )}
           </AnimatedView>
         </View>
 
-        {/* Quick Access */}
-        <View style={styles.section}>
-          <AnimatedView delay={400} duration={400}>
-          <Text style={styles.sectionTitle}>Quick Access</Text>
-          </AnimatedView>
-          
-          <View style={styles.quickGrid}>
-            {quickActions.map((action, index) => (
-              <AnimatedView key={action.id} delay={450 + index * 50} duration={400}>
-                <AnimatedPressable
-                  onPress={() => router.push(action.route as any)}
-                style={styles.quickCard}
-              >
-                  <View style={styles.quickIconContainer}>
-                    <Ionicons name={action.icon} size={28} color={theme.colors.primary} />
-                  </View>
-                <Text style={styles.quickLabel}>{action.label}</Text>
-                </AnimatedPressable>
-              </AnimatedView>
-            ))}
+        {/* Inspirational Quote Section */}
+        <AnimatedView delay={400} duration={400}>
+          <View style={styles.quoteCard}>
+            <LinearGradient
+              colors={intentionGradient}
+              style={styles.quoteGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.quoteIcon}>
+                <Text style={styles.quoteEmoji}>✨</Text>
+              </View>
+              <Text style={styles.quoteLabel}>Daily Inspiration</Text>
+              {loading ? (
+                <Skeleton height={20} width="80%" style={{ alignSelf: 'center' }} />
+              ) : (
+                <Text style={styles.quoteText}>
+                  {quote?.text || "Take a breath. You're exactly where you need to be."}
+                </Text>
+              )}
+              {quote?.author && (
+                <Text style={styles.quoteAuthor}>— {quote.author}</Text>
+              )}
+            </LinearGradient>
           </View>
-        </View>
-
-        {/* See all stats link */}
-        <AnimatedView delay={600} duration={400}>
-          <AnimatedPressable 
-            onPress={() => router.push('/stats')}
-          style={styles.seeAllButton}
-        >
-          <Text style={styles.seeAllText}>View detailed statistics</Text>
-          <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
-          </AnimatedPressable>
         </AnimatedView>
       </ScrollView>
     </SafeAreaView>
@@ -299,249 +388,206 @@ function HomeScreen() {
 
 const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: theme.spacing.xxl,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-  },
-  greeting: {
-    fontFamily: theme.fonts.ui.regular,
-    fontSize: 15,
-    color: theme.colors.textLight,
-    marginBottom: 4,
-  },
-  userName: {
-    fontFamily: theme.fonts.display.semiBold,
-    fontSize: 26,
-    color: theme.colors.text,
-    letterSpacing: -0.3,
-  },
-  settingsButton: {
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    container: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: theme.spacing.xxl,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.lg,
+      paddingBottom: theme.spacing.md,
+    },
+    greeting: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 15,
+      color: theme.colors.textLight,
+      marginBottom: 4,
+    },
+    userName: {
+      fontFamily: theme.fonts.display.semiBold,
+      fontSize: 26,
+      color: theme.colors.text,
+      letterSpacing: -0.3,
+    },
+    settingsButton: {
       width: 44,
       height: 44,
       borderRadius: 22,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...theme.shadows.sm,
-  },
-  intentionCard: {
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    borderRadius: theme.borderRadius.xl,
-    overflow: 'hidden',
-    ...theme.shadows.sm,
-  },
-  intentionGradient: {
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-  },
-  intentionIcon: {
-    marginBottom: theme.spacing.sm,
-  },
-  intentionEmoji: {
-    fontSize: 32,
-  },
-  intentionLabel: {
-    fontFamily: theme.fonts.ui.medium,
-    fontSize: 12,
-    color: theme.colors.textLight,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: theme.spacing.sm,
-  },
-  intentionText: {
-    fontFamily: theme.fonts.body.italic,
-    fontSize: 18,
-    color: theme.colors.text,
-    textAlign: 'center',
-    lineHeight: 26,
-  },
-  intentionAuthor: {
-    fontFamily: theme.fonts.ui.regular,
-    fontSize: 14,
-    color: theme.colors.textLight,
-    marginTop: theme.spacing.sm,
-  },
-  section: {
-    marginTop: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: theme.fonts.ui.semiBold,
-    fontSize: 18,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  featuredCard: {
-    borderRadius: theme.borderRadius.xl,
-    overflow: 'hidden',
-    ...theme.shadows.md,
-      position: 'relative',
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...theme.shadows.sm,
     },
-    featuredImage: {
-      position: 'absolute',
-      width: '100%',
-      height: '100%',
-      resizeMode: 'cover',
-  },
-  featuredGradient: {
-    padding: theme.spacing.lg,
-  },
-    featuredGradientOverlay: {
-      paddingTop: 80,
+    section: {
+      marginTop: theme.spacing.xl,
     },
-  featuredContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  featuredIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featuredInfo: {
-    flex: 1,
-    marginLeft: theme.spacing.md,
-  },
-  featuredTitle: {
-    fontFamily: theme.fonts.display.semiBold,
-    fontSize: 18,
-    color: 'white',
-    marginBottom: 4,
-  },
-  featuredMeta: {
-    fontFamily: theme.fonts.ui.regular,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    textTransform: 'capitalize',
-  },
-  playButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-    backgroundColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-      ...theme.shadows.md,
-  },
-  journeyCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.xl,
+    sectionTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 18,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+    },
+    horizontalList: {
+      paddingLeft: theme.spacing.lg,
+    },
+    horizontalListContent: {
+      paddingLeft: theme.spacing.lg,
+      paddingRight: theme.spacing.lg,
+      gap: theme.spacing.md,
+    },
+    contentCard: {
+      width: 130,
+      marginRight: theme.spacing.md,
+    },
+    contentThumbnail: {
+      width: 130,
+      height: 130,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.surface,
+    },
+    contentThumbnailPlaceholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? theme.colors.gray[100] : `${theme.colors.primary}15`,
+    },
+    contentTitle: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 14,
+      color: theme.colors.text,
+      marginTop: theme.spacing.sm,
+    },
+    contentMeta: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.textLight,
+      marginTop: 2,
+    },
+    emptyState: {
+      marginHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.xl,
+      paddingHorizontal: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+    },
+    emptyStateText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textLight,
+      textAlign: 'center',
+    },
+    journeyCard: {
+      marginHorizontal: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.xl,
-    ...theme.shadows.sm,
-  },
-  streakRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  streakDots: {
-    flexDirection: 'row',
+      ...theme.shadows.sm,
+    },
+    streakRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    streakDots: {
+      flexDirection: 'row',
       gap: 10,
-  },
-  streakDot: {
+    },
+    streakDot: {
       width: 14,
       height: 14,
       borderRadius: 7,
-  },
-  streakDotFilled: {
-    backgroundColor: theme.colors.primary,
-  },
-  streakDotEmpty: {
-    backgroundColor: theme.colors.gray[200],
-  },
-  streakInfo: {
-    alignItems: 'flex-end',
-  },
-  streakNumber: {
-    fontFamily: theme.fonts.display.bold,
+    },
+    streakDotFilled: {
+      backgroundColor: theme.colors.primary,
+    },
+    streakDotEmpty: {
+      backgroundColor: theme.colors.gray[200],
+    },
+    streakInfo: {
+      alignItems: 'flex-end',
+    },
+    streakNumber: {
+      fontFamily: theme.fonts.display.bold,
       fontSize: 32,
-    color: theme.colors.primary,
-  },
-  streakLabel: {
-    fontFamily: theme.fonts.ui.regular,
+      color: theme.colors.primary,
+    },
+    streakLabel: {
+      fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
-    color: theme.colors.textLight,
-  },
-  journeyDivider: {
-    height: 1,
-    backgroundColor: theme.colors.gray[200],
+      color: theme.colors.textLight,
+    },
+    journeyDivider: {
+      height: 1,
+      backgroundColor: theme.colors.gray[200],
       marginVertical: theme.spacing.lg,
-  },
-  journeyStats: {
-    flexDirection: 'row',
-  },
-  journeyStat: {
-    flex: 1,
-  },
-  journeyStatValue: {
-    fontFamily: theme.fonts.display.semiBold,
+    },
+    journeyStats: {
+      flexDirection: 'row',
+    },
+    journeyStat: {
+      flex: 1,
+    },
+    journeyStatValue: {
+      fontFamily: theme.fonts.display.semiBold,
       fontSize: 24,
-    color: theme.colors.text,
-  },
-  journeyStatLabel: {
-    fontFamily: theme.fonts.ui.regular,
+      color: theme.colors.text,
+    },
+    journeyStatLabel: {
+      fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
-    color: theme.colors.textLight,
+      color: theme.colors.textLight,
       marginTop: 4,
-  },
-  quickGrid: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  quickCard: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
+    },
+    quoteCard: {
+      marginHorizontal: theme.spacing.lg,
+      marginTop: theme.spacing.xl,
       borderRadius: theme.borderRadius.xl,
+      overflow: 'hidden',
+      ...theme.shadows.sm,
+    },
+    quoteGradient: {
       padding: theme.spacing.xl,
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-    quickIconContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: isDark ? theme.colors.gray[100] : `${theme.colors.primary}15`,
       alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: theme.spacing.md,
-  },
-  quickLabel: {
-      fontFamily: theme.fonts.ui.semiBold,
-    fontSize: 14,
-    color: theme.colors.text,
-  },
-  seeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.xl,
-      paddingVertical: theme.spacing.md,
-    gap: theme.spacing.xs,
-  },
-  seeAllText: {
-    fontFamily: theme.fonts.ui.medium,
-    fontSize: 14,
-    color: theme.colors.primary,
-  },
-});
+    },
+    quoteIcon: {
+      marginBottom: theme.spacing.sm,
+    },
+    quoteEmoji: {
+      fontSize: 32,
+    },
+    quoteLabel: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: theme.colors.textLight,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: theme.spacing.sm,
+    },
+    quoteText: {
+      fontFamily: theme.fonts.body.italic,
+      fontSize: 18,
+      color: theme.colors.text,
+      textAlign: 'center',
+      lineHeight: 26,
+    },
+    quoteAuthor: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textLight,
+      marginTop: theme.spacing.sm,
+    },
+  });
 
 export default function Home() {
   return (

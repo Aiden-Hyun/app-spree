@@ -15,7 +15,8 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AudioPlayer } from "../../src/components/AudioPlayer";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { getBedtimeStoryById } from "../../src/services/firestoreService";
+import { getBedtimeStoryById, addToListeningHistory, toggleFavorite, isFavorite } from "../../src/services/firestoreService";
+import { useAuth } from "../../src/contexts/AuthContext";
 import { getAudioUrl } from "../../src/constants/audioFiles";
 import { getNarratorByName } from "../../src/constants/narratorData";
 import { Theme } from "../../src/theme";
@@ -25,12 +26,26 @@ function SleepStoryPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [story, setStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const audioPlayer = useAudioPlayer();
+
+  // Check if favorited on load
+  useEffect(() => {
+    async function checkFavorite() {
+      if (user && id) {
+        const favorited = await isFavorite(user.uid, id as string);
+        setIsFavorited(favorited);
+      }
+    }
+    checkFavorite();
+  }, [user, id]);
 
   useEffect(() => {
     async function loadStory() {
@@ -77,11 +92,31 @@ function SleepStoryPlayerScreen() {
     router.back();
   };
 
-  const handlePlayPause = () => {
+  const handleToggleFavorite = async () => {
+    if (!user || !story) return;
+    
+    const newFavorited = await toggleFavorite(user.uid, story.id, 'bedtime_story');
+    setIsFavorited(newFavorited);
+  };
+
+  const handlePlayPause = async () => {
     if (audioPlayer.isPlaying) {
       audioPlayer.pause();
     } else {
       audioPlayer.play();
+      
+      // Track listening history on first play
+      if (!hasTrackedPlay && user && story) {
+        setHasTrackedPlay(true);
+        await addToListeningHistory(
+          user.uid,
+          story.id,
+          'bedtime_story',
+          story.title,
+          story.duration_minutes,
+          story.thumbnail_url
+        );
+      }
     }
   };
 
@@ -161,11 +196,11 @@ function SleepStoryPlayerScreen() {
               color={theme.colors.sleepText}
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton}>
+          <TouchableOpacity onPress={handleToggleFavorite} style={styles.moreButton}>
             <Ionicons
-              name="heart-outline"
+              name={isFavorited ? "heart" : "heart-outline"}
               size={24}
-              color={theme.colors.sleepText}
+              color={isFavorited ? theme.colors.error : theme.colors.sleepText}
             />
           </TouchableOpacity>
         </View>
@@ -249,8 +284,8 @@ function SleepStoryPlayerScreen() {
               progress={audioPlayer.progress}
               formattedPosition={audioPlayer.formattedPosition}
               formattedDuration={audioPlayer.formattedDuration}
-              onPlay={audioPlayer.play}
-              onPause={audioPlayer.pause}
+              onPlay={handlePlayPause}
+              onPause={handlePlayPause}
               onSeek={audioPlayer.seekTo}
             />
           </View>

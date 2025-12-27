@@ -23,6 +23,7 @@ import {
   BedtimeStory,
   DailyQuote,
   UserFavorite,
+  ListeningHistoryItem,
   MeditationCategory 
 } from '../types';
 
@@ -34,6 +35,7 @@ const breathingCollection = collection(db, 'breathing_exercises');
 const bedtimeStoriesCollection = collection(db, 'bedtime_stories');
 const quotesCollection = collection(db, 'daily_quotes');
 const favoritesCollection = collection(db, 'user_favorites');
+const listeningHistoryCollection = collection(db, 'listening_history');
 const usersCollection = collection(db, 'users');
 
 // ==================== MEDITATIONS ====================
@@ -333,18 +335,30 @@ export async function getTodayQuote(): Promise<DailyQuote | null> {
 
 export async function getUserFavorites(userId: string): Promise<UserFavorite[]> {
   try {
+    // Use simple query without orderBy to avoid requiring composite index
+    // Sort client-side instead
     const q = query(
       favoritesCollection, 
-      where('user_id', '==', userId), 
-      orderBy('favorited_at', 'desc')
+      where('user_id', '==', userId)
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
-    } as UserFavorite));
-  } catch (error) {
+    const items = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return { 
+        id: doc.id, 
+        ...data,
+        favorited_at: data.favorited_at instanceof Timestamp
+          ? data.favorited_at.toDate().toISOString()
+          : new Date().toISOString()
+      } as UserFavorite;
+    });
+    
+    // Sort by favorited_at descending (most recent first)
+    return items.sort((a, b) => 
+      new Date(b.favorited_at).getTime() - new Date(a.favorited_at).getTime()
+    );
+  } catch (error: any) {
     console.error('Error fetching favorites:', error);
     return [];
   }
@@ -400,5 +414,147 @@ export async function isFavorite(
   } catch (error) {
     console.error('Error checking favorite:', error);
     return false;
+  }
+}
+
+// ==================== CONTENT RESOLVER ====================
+
+export interface ResolvedContent {
+  id: string;
+  title: string;
+  thumbnail_url?: string;
+  duration_minutes: number;
+  content_type: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise';
+}
+
+export async function getContentById(
+  contentId: string,
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise'
+): Promise<ResolvedContent | null> {
+  try {
+    let collectionName: string;
+    switch (contentType) {
+      case 'meditation':
+        collectionName = 'guided_meditations';
+        break;
+      case 'bedtime_story':
+        collectionName = 'bedtime_stories';
+        break;
+      case 'breathing_exercise':
+        collectionName = 'breathing_exercises';
+        break;
+      case 'nature_sound':
+        collectionName = 'nature_sounds';
+        break;
+      default:
+        return null;
+    }
+
+    const docRef = doc(db, collectionName, contentId);
+    const docSnap = await getDoc(docRef);
+    
+    if (!docSnap.exists()) return null;
+    
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      title: data.title || data.name || 'Untitled',
+      thumbnail_url: data.thumbnail_url,
+      duration_minutes: data.duration_minutes || 0,
+      content_type: contentType
+    };
+  } catch (error) {
+    console.error('Error fetching content by id:', error);
+    return null;
+  }
+}
+
+export async function getFavoritesWithDetails(userId: string): Promise<ResolvedContent[]> {
+  try {
+    const favorites = await getUserFavorites(userId);
+    const resolvedContent: ResolvedContent[] = [];
+    
+    for (const fav of favorites) {
+      const content = await getContentById(fav.content_id, fav.content_type);
+      if (content) {
+        resolvedContent.push(content);
+      }
+    }
+    
+    return resolvedContent;
+  } catch (error) {
+    console.error('Error fetching favorites with details:', error);
+    return [];
+  }
+}
+
+// ==================== LISTENING HISTORY ====================
+
+export async function addToListeningHistory(
+  userId: string,
+  contentId: string,
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track',
+  contentTitle: string,
+  durationMinutes: number,
+  contentThumbnail?: string
+): Promise<string> {
+  try {
+    const docRef = await addDoc(listeningHistoryCollection, {
+      user_id: userId,
+      content_id: contentId,
+      content_type: contentType,
+      content_title: contentTitle,
+      content_thumbnail: contentThumbnail || null,
+      duration_minutes: durationMinutes,
+      played_at: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error: any) {
+    console.error('Error adding to listening history:', error);
+    return '';
+  }
+}
+
+export async function getListeningHistory(
+  userId: string,
+  maxLimit = 10
+): Promise<ListeningHistoryItem[]> {
+  try {
+    // Use simple query without orderBy to avoid requiring composite index
+    // Sort client-side instead
+    const q = query(
+      listeningHistoryCollection,
+      where('user_id', '==', userId)
+    );
+    const snapshot = await getDocs(q);
+    
+    const items = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        played_at: data.played_at instanceof Timestamp
+          ? data.played_at.toDate().toISOString()
+          : new Date().toISOString()
+      } as ListeningHistoryItem;
+    });
+    
+    // Sort by played_at descending (most recent first)
+    const sorted = items.sort((a, b) => 
+      new Date(b.played_at).getTime() - new Date(a.played_at).getTime()
+    );
+    
+    // Deduplicate by content_id, keeping only the most recent play
+    const seen = new Set<string>();
+    const deduplicated = sorted.filter(item => {
+      if (seen.has(item.content_id)) return false;
+      seen.add(item.content_id);
+      return true;
+    });
+    
+    return deduplicated.slice(0, maxLimit);
+  } catch (error: any) {
+    console.error('Error fetching listening history:', error);
+    return [];
   }
 }
