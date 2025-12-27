@@ -120,25 +120,25 @@ function MusicScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header */}
-        <AnimatedView delay={0} duration={500}>
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name="musical-notes"
-                size={48}
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Header */}
+            <AnimatedView delay={0} duration={500}>
+              <View style={styles.header}>
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name="musical-notes"
+                    size={48}
                 color={theme.colors.primary}
-              />
-            </View>
-            <Text style={styles.title}>Sounds & Music</Text>
-            <Text style={styles.subtitle}>Find your perfect ambience</Text>
-          </View>
-        </AnimatedView>
+                  />
+                </View>
+                <Text style={styles.title}>Sounds & Music</Text>
+                <Text style={styles.subtitle}>Find your perfect ambience</Text>
+              </View>
+            </AnimatedView>
 
             {/* Albums Section */}
             <View style={styles.section}>
@@ -200,10 +200,10 @@ function MusicScreen() {
             {/* ASMR Section */}
             {renderSection("ASMR", featuredASMR, "/music/asmr", 900)}
 
-        {/* Bottom spacing */}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+            {/* Bottom spacing */}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
   );
 }
 

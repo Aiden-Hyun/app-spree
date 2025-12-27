@@ -346,7 +346,7 @@ export async function getUserFavorites(userId: string): Promise<UserFavorite[]> 
     const items = snapshot.docs.map(doc => {
       const data = doc.data();
       return { 
-        id: doc.id, 
+      id: doc.id, 
         ...data,
         favorited_at: data.favorited_at instanceof Timestamp
           ? data.favorited_at.toDate().toISOString()

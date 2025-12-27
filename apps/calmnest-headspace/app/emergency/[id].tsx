@@ -136,7 +136,6 @@ function EmergencyPlayerScreen() {
       durationMinutes={parseInt(duration) || 4}
       gradientColors={gradientColors}
       artworkIcon={(icon as any) || "flash"}
-      safeAreaBgColor={bgColor}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}

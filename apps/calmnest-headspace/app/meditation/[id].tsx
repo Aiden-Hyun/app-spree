@@ -173,7 +173,6 @@ function MeditationPlayerScreen() {
       difficultyLevel={meditation?.difficulty_level}
       gradientColors={getGradientColors()}
       artworkIcon="leaf"
-      safeAreaBgColor={theme.colors.primary}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}

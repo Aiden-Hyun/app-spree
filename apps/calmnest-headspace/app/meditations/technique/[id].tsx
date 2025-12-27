@@ -108,7 +108,6 @@ function TechniqueMeditationPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={getGradientColors()}
       artworkIcon={getTechniqueIcon()}
-      safeAreaBgColor={color || "#7DAFB4"}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}

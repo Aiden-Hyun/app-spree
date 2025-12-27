@@ -29,8 +29,6 @@ export interface MediaPlayerProps {
   gradientColors: [string, string];
   artworkIcon: keyof typeof Ionicons.glyphMap;
   artworkThumbnailUrl?: string;
-  safeAreaBgColor?: string;
-  iconColor?: string;
 
   // State
   isFavorited: boolean;
@@ -62,8 +60,6 @@ export function MediaPlayer({
   gradientColors,
   artworkIcon,
   artworkThumbnailUrl,
-  safeAreaBgColor,
-  iconColor = 'white',
   isFavorited,
   isLoading,
   audioPlayer,
@@ -76,39 +72,37 @@ export function MediaPlayer({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const bgColor = safeAreaBgColor || gradientColors[0];
-
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
-        <LinearGradient colors={gradientColors} style={styles.gradient}>
+      <LinearGradient colors={gradientColors} style={styles.fullScreen}>
+        <SafeAreaView style={styles.safeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={iconColor} />
-            <Text style={[styles.loadingText, { color: iconColor }]}>{loadingText}</Text>
+            <ActivityIndicator size="large" color="white" />
+            <Text style={styles.loadingText}>{loadingText}</Text>
           </View>
-        </LinearGradient>
-      </SafeAreaView>
+        </SafeAreaView>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bgColor }]}>
-      <LinearGradient
-        colors={gradientColors}
-        style={styles.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      >
+    <LinearGradient
+      colors={gradientColors}
+      style={styles.fullScreen}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+    >
+      <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={iconColor} />
+            <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
             <Ionicons
               name={isFavorited ? 'heart' : 'heart-outline'}
               size={24}
-              color={isFavorited ? '#FF6B6B' : iconColor}
+              color={isFavorited ? '#FF6B6B' : 'white'}
             />
           </TouchableOpacity>
         </View>
@@ -121,36 +115,30 @@ export function MediaPlayer({
               <Image source={{ uri: artworkThumbnailUrl }} style={styles.thumbnailImage} />
             ) : (
               <View style={styles.iconCircle}>
-                <Ionicons name={artworkIcon} size={64} color={iconColor} />
+                <Ionicons name={artworkIcon} size={64} color="white" />
               </View>
             )}
           </View>
 
           {/* Info */}
           <View style={styles.infoContainer}>
-            <Text style={[styles.category, { color: `${iconColor}B3` }]}>
-              {category.replace('-', ' ')}
-            </Text>
-            <Text style={[styles.title, { color: iconColor }]}>{title}</Text>
+            <Text style={styles.category}>{category.replace('-', ' ')}</Text>
+            <Text style={styles.title}>{title}</Text>
             {description && (
-              <Text style={[styles.description, { color: `${iconColor}D9` }]} numberOfLines={2}>
+              <Text style={styles.description} numberOfLines={2}>
                 {description}
               </Text>
             )}
 
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={16} color={`${iconColor}CC`} />
-                <Text style={[styles.metaText, { color: `${iconColor}CC` }]}>
-                  {durationMinutes} min
-                </Text>
+                <Ionicons name="time-outline" size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.metaText}>{durationMinutes} min</Text>
               </View>
               {difficultyLevel && (
                 <View style={styles.metaItem}>
-                  <Ionicons name="fitness-outline" size={16} color={`${iconColor}CC`} />
-                  <Text style={[styles.metaText, { color: `${iconColor}CC` }]}>
-                    {difficultyLevel}
-                  </Text>
+                  <Ionicons name="fitness-outline" size={16} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.metaText}>{difficultyLevel}</Text>
                 </View>
               )}
             </View>
@@ -165,12 +153,10 @@ export function MediaPlayer({
                   />
                 ) : (
                   <View style={styles.narratorPhotoPlaceholder}>
-                    <Ionicons name="person" size={16} color={`${iconColor}99`} />
+                    <Ionicons name="person" size={16} color="rgba(255,255,255,0.6)" />
                   </View>
                 )}
-                <Text style={[styles.narratorText, { color: `${iconColor}CC` }]}>
-                  with {instructor}
-                </Text>
+                <Text style={styles.narratorText}>with {instructor}</Text>
               </View>
             )}
           </View>
@@ -179,10 +165,8 @@ export function MediaPlayer({
           <View style={styles.playerContainer}>
             {audioPlayer.isLoading && !audioPlayer.duration ? (
               <View style={styles.loadingPlayer}>
-                <ActivityIndicator size="large" color={iconColor} />
-                <Text style={[styles.loadingPlayerText, { color: `${iconColor}B3` }]}>
-                  Loading audio...
-                </Text>
+                <ActivityIndicator size="large" color="white" />
+                <Text style={styles.loadingPlayerText}>Loading audio...</Text>
               </View>
             ) : (
               <AudioPlayer
@@ -203,17 +187,17 @@ export function MediaPlayer({
           {/* Optional Footer Content */}
           {footerContent}
         </View>
-      </LinearGradient>
-    </SafeAreaView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-    safeArea: {
+    fullScreen: {
       flex: 1,
     },
-    gradient: {
+    safeArea: {
       flex: 1,
     },
     loadingContainer: {
@@ -225,6 +209,7 @@ const createStyles = (theme: Theme) =>
     loadingText: {
       fontFamily: theme.fonts.ui.medium,
       fontSize: 16,
+      color: 'white',
     },
     header: {
       flexDirection: 'row',
@@ -237,7 +222,7 @@ const createStyles = (theme: Theme) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -245,7 +230,7 @@ const createStyles = (theme: Theme) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -278,6 +263,7 @@ const createStyles = (theme: Theme) =>
     category: {
       fontFamily: theme.fonts.ui.medium,
       fontSize: 13,
+      color: 'rgba(255, 255, 255, 0.7)',
       textTransform: 'uppercase',
       letterSpacing: 1,
       marginBottom: theme.spacing.xs,
@@ -285,12 +271,14 @@ const createStyles = (theme: Theme) =>
     title: {
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
+      color: 'white',
       textAlign: 'center',
       marginBottom: theme.spacing.sm,
     },
     description: {
       fontFamily: theme.fonts.body.regular,
       fontSize: 15,
+      color: 'rgba(255, 255, 255, 0.85)',
       textAlign: 'center',
       lineHeight: 22,
       paddingHorizontal: theme.spacing.md,
@@ -308,6 +296,7 @@ const createStyles = (theme: Theme) =>
     metaText: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.8)',
       textTransform: 'capitalize',
     },
     narratorSection: {
@@ -334,6 +323,7 @@ const createStyles = (theme: Theme) =>
     narratorText: {
       fontFamily: theme.fonts.ui.medium,
       fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.8)',
     },
     playerContainer: {
       width: '100%',
@@ -348,5 +338,6 @@ const createStyles = (theme: Theme) =>
     loadingPlayerText: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.7)',
     },
   });

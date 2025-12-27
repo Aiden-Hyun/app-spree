@@ -36,7 +36,7 @@ function HomeScreen() {
   // Reload data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadHomeData();
+    loadHomeData();
     }, [user])
   );
 
@@ -293,32 +293,32 @@ function HomeScreen() {
       >
         {/* Header */}
         <AnimatedView delay={0} duration={400}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>
-                {getGreeting()} {getGreetingEmoji()}
-              </Text>
-              <Text style={styles.userName}>
-                {user?.email?.split('@')[0] || 'Friend'}
-              </Text>
-            </View>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>
+              {getGreeting()} {getGreetingEmoji()}
+            </Text>
+            <Text style={styles.userName}>
+              {user?.email?.split('@')[0] || 'Friend'}
+            </Text>
+          </View>
             <AnimatedPressable 
               onPress={() => router.push('/settings')}
-              style={styles.settingsButton}
-            >
-              <Ionicons name="settings-outline" size={22} color={theme.colors.textLight} />
+            style={styles.settingsButton}
+          >
+            <Ionicons name="settings-outline" size={22} color={theme.colors.textLight} />
             </AnimatedPressable>
-          </View>
+        </View>
         </AnimatedView>
 
         {/* Recently Played Section */}
         <View style={styles.section}>
-          <AnimatedView delay={100} duration={400}>
+        <AnimatedView delay={100} duration={400}>
             <Text style={styles.sectionTitle}>Recently Played</Text>
           </AnimatedView>
           
           <AnimatedView delay={150} duration={400}>
-            {loading ? (
+              {loading ? (
               renderSkeletonCards()
             ) : recentlyPlayed.length > 0 ? (
               <FlatList
@@ -336,13 +336,13 @@ function HomeScreen() {
         </View>
 
         {/* Favorites Section */}
-        <View style={styles.section}>
+          <View style={styles.section}>
           <AnimatedView delay={200} duration={400}>
             <Text style={styles.sectionTitle}>Favorites</Text>
           </AnimatedView>
           
           <AnimatedView delay={250} duration={400}>
-            {loading ? (
+          {loading ? (
               renderSkeletonCards()
             ) : favorites.length > 0 ? (
               <FlatList
@@ -356,13 +356,13 @@ function HomeScreen() {
             ) : (
               renderEmptyState("Tap the heart icon to save favorites")
             )}
-          </AnimatedView>
-        </View>
+            </AnimatedView>
+          </View>
 
         {/* Your Journey Section */}
         <View style={styles.section}>
           <AnimatedView delay={300} duration={400}>
-            <Text style={styles.sectionTitle}>Your Journey</Text>
+          <Text style={styles.sectionTitle}>Your Journey</Text>
           </AnimatedView>
           
           <AnimatedView delay={350} duration={400}>
@@ -386,45 +386,45 @@ function HomeScreen() {
               </View>
             ) : (
               <AnimatedPressable onPress={() => router.push('/stats')} style={styles.journeyCard}>
-                <View style={styles.streakRow}>
-                  <View style={styles.streakDots}>
-                    {renderStreakDots()}
-                  </View>
-                  <View style={styles.streakInfo}>
-                    <Text style={styles.streakNumber}>{stats?.current_streak || 0}</Text>
-                    <Text style={styles.streakLabel}>day streak</Text>
-                  </View>
-                </View>
-                <View style={styles.journeyDivider} />
-                <View style={styles.journeyStats}>
-                  <View style={styles.journeyStat}>
-                    <Text style={styles.journeyStatValue}>
-                      {stats?.weekly_minutes?.reduce((a, b) => a + b, 0) || 0}
-                    </Text>
-                    <Text style={styles.journeyStatLabel}>min this week</Text>
-                  </View>
-                  <View style={styles.journeyStat}>
-                    <Text style={styles.journeyStatValue}>{stats?.total_sessions || 0}</Text>
-                    <Text style={styles.journeyStatLabel}>total sessions</Text>
-                  </View>
-                </View>
+            <View style={styles.streakRow}>
+              <View style={styles.streakDots}>
+                {renderStreakDots()}
+              </View>
+              <View style={styles.streakInfo}>
+                <Text style={styles.streakNumber}>{stats?.current_streak || 0}</Text>
+                <Text style={styles.streakLabel}>day streak</Text>
+              </View>
+            </View>
+            <View style={styles.journeyDivider} />
+            <View style={styles.journeyStats}>
+              <View style={styles.journeyStat}>
+                <Text style={styles.journeyStatValue}>
+                  {stats?.weekly_minutes?.reduce((a, b) => a + b, 0) || 0}
+                </Text>
+                <Text style={styles.journeyStatLabel}>min this week</Text>
+              </View>
+              <View style={styles.journeyStat}>
+                <Text style={styles.journeyStatValue}>{stats?.total_sessions || 0}</Text>
+                <Text style={styles.journeyStatLabel}>total sessions</Text>
+              </View>
+            </View>
               </AnimatedPressable>
             )}
           </AnimatedView>
         </View>
 
         {/* Inspirational Quote Section */}
-        <AnimatedView delay={400} duration={400}>
+          <AnimatedView delay={400} duration={400}>
           <View style={styles.quoteCard}>
             <LinearGradient
               colors={intentionGradient}
               style={styles.quoteGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-            >
+              >
               <View style={styles.quoteIcon}>
                 <Text style={styles.quoteEmoji}>✨</Text>
-              </View>
+                  </View>
               <Text style={styles.quoteLabel}>Daily Inspiration</Text>
               {loading ? (
                 <Skeleton height={20} width="80%" style={{ alignSelf: 'center' }} />
@@ -446,53 +446,53 @@ function HomeScreen() {
 
 const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    container: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: theme.spacing.xxl,
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      paddingBottom: theme.spacing.md,
-    },
-    greeting: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 15,
-      color: theme.colors.textLight,
-      marginBottom: 4,
-    },
-    userName: {
-      fontFamily: theme.fonts.display.semiBold,
-      fontSize: 26,
-      color: theme.colors.text,
-      letterSpacing: -0.3,
-    },
-    settingsButton: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+  },
+  greeting: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 15,
+    color: theme.colors.textLight,
+    marginBottom: 4,
+  },
+  userName: {
+    fontFamily: theme.fonts.display.semiBold,
+    fontSize: 26,
+    color: theme.colors.text,
+    letterSpacing: -0.3,
+  },
+  settingsButton: {
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: theme.colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      ...theme.shadows.sm,
-    },
-    section: {
-      marginTop: theme.spacing.xl,
-    },
-    sectionTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 18,
-      color: theme.colors.text,
-      marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.sm,
+  },
+  section: {
+    marginTop: theme.spacing.xl,
+  },
+  sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 18,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
       paddingHorizontal: theme.spacing.lg,
     },
     horizontalList: {
@@ -506,7 +506,7 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     contentCard: {
       width: 130,
       marginRight: theme.spacing.md,
-    },
+  },
     contentThumbnail: {
       width: 130,
       height: 130,
@@ -514,8 +514,8 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       backgroundColor: theme.colors.surface,
     },
     contentThumbnailPlaceholder: {
-      alignItems: 'center',
-      justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
       backgroundColor: isDark ? theme.colors.gray[100] : `${theme.colors.primary}15`,
     },
     contentTitle: {
@@ -523,7 +523,7 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontSize: 14,
       color: theme.colors.text,
       marginTop: theme.spacing.sm,
-    },
+  },
     contentMeta: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 12,
@@ -540,73 +540,73 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       gap: theme.spacing.sm,
     },
     emptyStateText: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 14,
       color: theme.colors.textLight,
       textAlign: 'center',
-    },
-    journeyCard: {
+  },
+  journeyCard: {
       marginHorizontal: theme.spacing.lg,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.xl,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.xl,
-      ...theme.shadows.sm,
-    },
-    streakRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    streakDots: {
-      flexDirection: 'row',
+    ...theme.shadows.sm,
+  },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  streakDots: {
+    flexDirection: 'row',
       gap: 10,
-    },
-    streakDot: {
+  },
+  streakDot: {
       width: 14,
       height: 14,
       borderRadius: 7,
-    },
-    streakDotFilled: {
-      backgroundColor: theme.colors.primary,
-    },
-    streakDotEmpty: {
-      backgroundColor: theme.colors.gray[200],
-    },
-    streakInfo: {
-      alignItems: 'flex-end',
-    },
-    streakNumber: {
-      fontFamily: theme.fonts.display.bold,
+  },
+  streakDotFilled: {
+    backgroundColor: theme.colors.primary,
+  },
+  streakDotEmpty: {
+    backgroundColor: theme.colors.gray[200],
+  },
+  streakInfo: {
+    alignItems: 'flex-end',
+  },
+  streakNumber: {
+    fontFamily: theme.fonts.display.bold,
       fontSize: 32,
-      color: theme.colors.primary,
-    },
-    streakLabel: {
-      fontFamily: theme.fonts.ui.regular,
+    color: theme.colors.primary,
+  },
+  streakLabel: {
+    fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
-      color: theme.colors.textLight,
-    },
-    journeyDivider: {
-      height: 1,
-      backgroundColor: theme.colors.gray[200],
+    color: theme.colors.textLight,
+  },
+  journeyDivider: {
+    height: 1,
+    backgroundColor: theme.colors.gray[200],
       marginVertical: theme.spacing.lg,
-    },
-    journeyStats: {
-      flexDirection: 'row',
-    },
-    journeyStat: {
-      flex: 1,
-    },
-    journeyStatValue: {
-      fontFamily: theme.fonts.display.semiBold,
+  },
+  journeyStats: {
+    flexDirection: 'row',
+  },
+  journeyStat: {
+    flex: 1,
+  },
+  journeyStatValue: {
+    fontFamily: theme.fonts.display.semiBold,
       fontSize: 24,
-      color: theme.colors.text,
-    },
-    journeyStatLabel: {
-      fontFamily: theme.fonts.ui.regular,
+    color: theme.colors.text,
+  },
+  journeyStatLabel: {
+    fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
-      color: theme.colors.textLight,
+    color: theme.colors.textLight,
       marginTop: 4,
-    },
+  },
     quoteCard: {
       marginHorizontal: theme.spacing.lg,
       marginTop: theme.spacing.xl,
@@ -620,12 +620,12 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     quoteIcon: {
       marginBottom: theme.spacing.sm,
-    },
+  },
     quoteEmoji: {
       fontSize: 32,
-    },
+  },
     quoteLabel: {
-      fontFamily: theme.fonts.ui.medium,
+    fontFamily: theme.fonts.ui.medium,
       fontSize: 12,
       color: theme.colors.textLight,
       textTransform: 'uppercase',
@@ -641,11 +641,11 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     quoteAuthor: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 14,
+    fontSize: 14,
       color: theme.colors.textLight,
       marginTop: theme.spacing.sm,
-    },
-  });
+  },
+});
 
 export default function Home() {
   return (

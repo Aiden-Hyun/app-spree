@@ -46,9 +46,9 @@ function AlbumTrackPlayerScreen() {
       }
       
       try {
-        const audioUrl = await getAudioUrl(audioKey);
-        if (audioUrl) {
-          audioPlayer.loadAudio(audioUrl);
+      const audioUrl = await getAudioUrl(audioKey);
+      if (audioUrl) {
+        audioPlayer.loadAudio(audioUrl);
         }
       } finally {
         setLoading(false);
@@ -109,8 +109,6 @@ function AlbumTrackPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={theme.gradients.sleepyNight as [string, string]}
       artworkIcon="musical-notes"
-      safeAreaBgColor={theme.colors.sleepBackground}
-      iconColor={theme.colors.sleepAccent}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}

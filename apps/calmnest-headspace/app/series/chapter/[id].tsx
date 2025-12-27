@@ -52,9 +52,9 @@ function SeriesChapterPlayerScreen() {
       }
       
       try {
-        const audioUrl = await getAudioUrl(audioKey);
-        if (audioUrl) {
-          audioPlayer.loadAudio(audioUrl);
+      const audioUrl = await getAudioUrl(audioKey);
+      if (audioUrl) {
+        audioPlayer.loadAudio(audioUrl);
         }
       } finally {
         setLoading(false);
@@ -108,10 +108,10 @@ function SeriesChapterPlayerScreen() {
   };
 
   const sleepTimerButton = (
-    <TouchableOpacity style={styles.timerButton}>
-      <Ionicons name="moon-outline" size={20} color={theme.colors.sleepTextMuted} />
-      <Text style={styles.timerButtonText}>Set Sleep Timer</Text>
-    </TouchableOpacity>
+          <TouchableOpacity style={styles.timerButton}>
+            <Ionicons name="moon-outline" size={20} color={theme.colors.sleepTextMuted} />
+            <Text style={styles.timerButtonText}>Set Sleep Timer</Text>
+          </TouchableOpacity>
   );
 
   return (
@@ -123,8 +123,6 @@ function SeriesChapterPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={theme.gradients.sleepyNight as [string, string]}
       artworkIcon="book"
-      safeAreaBgColor={theme.colors.sleepBackground}
-      iconColor={theme.colors.sleepAccent}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}

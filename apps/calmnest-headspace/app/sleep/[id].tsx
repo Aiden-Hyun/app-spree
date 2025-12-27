@@ -176,8 +176,6 @@ function SleepStoryPlayerScreen() {
       gradientColors={["#1A1D29", "#2A2D3E"]}
       artworkIcon={getCategoryIcon()}
       artworkThumbnailUrl={story?.thumbnail_url}
-      safeAreaBgColor="#1A1D29"
-      iconColor={theme.colors.sleepAccent}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
