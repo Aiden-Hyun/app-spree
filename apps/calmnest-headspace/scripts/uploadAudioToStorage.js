@@ -81,6 +81,9 @@ const filesToUpload = [
   { local: 'sleep/stories/the-shoemaker-and-the-elves.mp3', remote: 'audio/sleep/stories/the-shoemaker-and-the-elves.mp3' },
 
   // ========== MEDITATE ==========
+  // Emergency meditations
+  { local: 'meditate/emergency/panic-relief.mp3', remote: 'audio/meditate/emergency/panic-relief.mp3' },
+  
   // Meditations
   { local: 'meditate/meditations/body-scan-delilah.mp3', remote: 'audio/meditate/meditations/body-scan-delilah.mp3' },
 

@@ -69,6 +69,9 @@ const storagePaths: Record<string, string> = {
   ns_train_journey: 'audio/music/nature-sounds/train-journey.mp3',
   ns_snow_footsteps: 'audio/music/nature-sounds/snow-footsteps.mp3',
   
+  // ========== EMERGENCY MEDITATIONS (Firebase Storage) ==========
+  emergency_panic_relief: 'audio/meditate/emergency/panic-relief.mp3',
+  
   // ========== MEDITATIONS (Firebase Storage) ==========
   meditation_body_scan: 'audio/meditate/meditations/body-scan-delilah.mp3',
   

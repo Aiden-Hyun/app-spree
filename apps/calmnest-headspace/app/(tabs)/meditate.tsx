@@ -35,8 +35,18 @@ function MeditateScreen() {
   };
 
   const handleEmergencyPress = (meditation: EmergencyMeditation) => {
-    // TODO: Navigate to quick meditation player
-    console.log('Play emergency meditation:', meditation.id);
+    router.push({
+      pathname: '/emergency/[id]',
+      params: {
+        id: meditation.id,
+        title: meditation.title,
+        description: meditation.description,
+        duration: meditation.duration_minutes.toString(),
+        audioKey: meditation.audioKey,
+        color: meditation.color,
+        icon: meditation.icon,
+      },
+    });
   };
 
   const handleTechniquePress = (technique: MeditationTechnique) => {
