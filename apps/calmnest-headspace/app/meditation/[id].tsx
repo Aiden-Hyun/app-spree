@@ -97,8 +97,20 @@ function MeditationPlayerScreen() {
   const handleToggleFavorite = async () => {
     if (!user || !meditation) return;
     
-    const newFavorited = await toggleFavorite(user.uid, meditation.id, 'meditation');
-    setIsFavorited(newFavorited);
+    // Optimistic update - toggle immediately
+    const previousState = isFavorited;
+    setIsFavorited(!previousState);
+    
+    try {
+      const newFavorited = await toggleFavorite(user.uid, meditation.id, 'meditation');
+      // Sync with server response in case of mismatch
+      if (newFavorited !== !previousState) {
+        setIsFavorited(newFavorited);
+      }
+    } catch {
+      // Revert on error
+      setIsFavorited(previousState);
+    }
   };
 
   const handlePlayPause = async () => {

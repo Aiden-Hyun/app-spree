@@ -367,23 +367,24 @@ export async function getUserFavorites(userId: string): Promise<UserFavorite[]> 
 export async function toggleFavorite(
   userId: string, 
   contentId: string, 
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track'
 ): Promise<boolean> {
   try {
+    // Query ALL favorites for this content (any type) to handle legacy data
     const q = query(
       favoritesCollection,
       where('user_id', '==', userId),
-      where('content_id', '==', contentId),
-      where('content_type', '==', contentType)
+      where('content_id', '==', contentId)
     );
     const existing = await getDocs(q);
     
     if (!existing.empty) {
-      // Remove favorite
-      await deleteDoc(existing.docs[0].ref);
+      // Remove ALL favorites for this content (handles legacy entries with wrong type)
+      const deletePromises = existing.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
       return false;
     } else {
-      // Add favorite
+      // Add favorite with correct content type
       await addDoc(favoritesCollection, {
         user_id: userId,
         content_id: contentId,
@@ -429,9 +430,45 @@ export interface ResolvedContent {
 
 export async function getContentById(
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track'
 ): Promise<ResolvedContent | null> {
   try {
+    // Handle local data types (series_chapter, album_track)
+    if (contentType === 'series_chapter') {
+      const { seriesData } = await import('../constants/seriesData');
+      for (const series of seriesData) {
+        const chapter = series.chapters.find(c => c.id === contentId);
+        if (chapter) {
+          return {
+            id: contentId,
+            title: `${series.title}: ${chapter.title}`,
+            thumbnail_url: series.thumbnailUrl,
+            duration_minutes: chapter.duration_minutes,
+            content_type: contentType
+          };
+        }
+      }
+      return null;
+    }
+    
+    if (contentType === 'album_track') {
+      const { albumsData } = await import('../constants/albumsData');
+      for (const album of albumsData) {
+        const track = album.tracks.find(t => t.id === contentId);
+        if (track) {
+          return {
+            id: contentId,
+            title: `${album.title}: ${track.title}`,
+            thumbnail_url: album.thumbnailUrl,
+            duration_minutes: track.duration_minutes,
+            content_type: contentType
+          };
+        }
+      }
+      return null;
+    }
+
+    // Handle Firestore-stored types
     let collectionName: string;
     switch (contentType) {
       case 'meditation':

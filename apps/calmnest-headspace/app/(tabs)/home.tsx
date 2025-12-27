@@ -51,7 +51,15 @@ function HomeScreen() {
       ]);
       setQuote(quoteData);
       setRecentlyPlayed(historyData);
-      setFavorites(favoritesData);
+      
+      // Deduplicate favorites by content id
+      const seenIds = new Set<string>();
+      const uniqueFavorites = favoritesData.filter(fav => {
+        if (seenIds.has(fav.id)) return false;
+        seenIds.add(fav.id);
+        return true;
+      });
+      setFavorites(uniqueFavorites);
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {

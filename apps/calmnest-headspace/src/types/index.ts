@@ -146,7 +146,9 @@ export interface UserFavorite {
     | "meditation"
     | "nature_sound"
     | "bedtime_story"
-    | "breathing_exercise";
+    | "breathing_exercise"
+    | "series_chapter"
+    | "album_track";
   favorited_at: string;
 }
 

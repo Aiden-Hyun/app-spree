@@ -87,8 +87,20 @@ function SeriesChapterPlayerScreen() {
   const handleToggleFavorite = async () => {
     if (!user || !id) return;
     
-    const newFavorited = await toggleFavorite(user.uid, id, 'bedtime_story');
-    setIsFavorited(newFavorited);
+    // Optimistic update - toggle immediately
+    const previousState = isFavorited;
+    setIsFavorited(!previousState);
+    
+    try {
+      const newFavorited = await toggleFavorite(user.uid, id, 'series_chapter');
+      // Sync with server response in case of mismatch
+      if (newFavorited !== !previousState) {
+        setIsFavorited(newFavorited);
+      }
+    } catch {
+      // Revert on error
+      setIsFavorited(previousState);
+    }
   };
 
   return (
