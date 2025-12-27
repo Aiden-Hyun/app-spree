@@ -18,6 +18,7 @@ import {
   ResolvedContent
 } from '../../src/services/firestoreService';
 import { seriesData } from '../../src/constants/seriesData';
+import { albumsData } from '../../src/constants/albumsData';
 import { Theme } from '../../src/theme';
 import { DailyQuote, ListeningHistoryItem } from '../../src/types';
 
@@ -111,6 +112,17 @@ function HomeScreen() {
     return null;
   };
 
+  // Helper to find album track by ID
+  const findAlbumTrack = (trackId: string) => {
+    for (const album of albumsData) {
+      const track = album.tracks.find(t => t.id === trackId);
+      if (track) {
+        return { album, track };
+      }
+    }
+    return null;
+  };
+
   const navigateToContent = (contentId: string, contentType: string) => {
     // Handle emergency content that may have been saved with wrong type
     if (contentId.startsWith('emergency_')) {
@@ -170,8 +182,23 @@ function HomeScreen() {
         }
         break;
       case 'album_track':
-        // Album tracks require additional params - navigate to music tab for now
-        router.push('/(tabs)/music');
+        // Look up album track data and navigate with full params
+        const albumResult = findAlbumTrack(contentId);
+        if (albumResult) {
+          router.push({
+            pathname: '/album/track/[id]',
+            params: {
+              id: albumResult.track.id,
+              audioKey: albumResult.track.audioKey,
+              title: albumResult.track.title,
+              albumTitle: albumResult.album.title,
+              duration: String(albumResult.track.duration_minutes),
+              artist: albumResult.album.artist
+            }
+          });
+        } else {
+          router.push('/(tabs)/music');
+        }
         break;
       case 'emergency':
         // Look up emergency meditation data and navigate with full params

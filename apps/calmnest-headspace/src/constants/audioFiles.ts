@@ -80,6 +80,10 @@ const storagePaths: Record<string, string> = {
   album_meditation_t1: 'audio/music/albums/meditation-music/calm-reflection.mp3',
   album_meditation_t2: 'audio/music/albums/meditation-music/inner-peace.mp3',
   album_meditation_t3: 'audio/music/albums/meditation-music/gentle-awakening.mp3',
+
+  // ========== ASMR (Firebase Storage) ==========
+  asmr_page_turning: 'audio/music/asmr/page-turning.mp3',
+  asmr_keyboard: 'audio/music/asmr/keyboard-typing.mp3',
 };
 
 // External URLs (public, no token needed)

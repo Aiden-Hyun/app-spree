@@ -142,61 +142,25 @@ export const musicData: MusicItem[] = [
   },
 ];
 
-// ASMR - placeholder data (no audio files yet)
+// ASMR - with working audio files
 export const asmrData: MusicItem[] = [
-  {
-    id: 'asmr_whisper',
-    title: 'Soft Whispers',
-    description: 'Gentle whispering sounds',
-    icon: 'chatbubble',
-    category: 'asmr',
-    audioKey: 'asmr_whisper',
-    color: '#C4A4C4',
-  },
-  {
-    id: 'asmr_tapping',
-    title: 'Tapping Sounds',
-    description: 'Rhythmic finger tapping',
-    icon: 'hand-left',
-    category: 'asmr',
-    audioKey: 'asmr_tapping',
-    color: '#A4B4C4',
-  },
-  {
-    id: 'asmr_brushing',
-    title: 'Brush Strokes',
-    description: 'Soft brush on microphone',
-    icon: 'brush',
-    category: 'asmr',
-    audioKey: 'asmr_brushing',
-    color: '#B4A4A4',
-  },
-  {
-    id: 'asmr_typing',
-    title: 'Keyboard Typing',
-    description: 'Mechanical keyboard sounds',
-    icon: 'keypad',
-    category: 'asmr',
-    audioKey: 'asmr_typing',
-    color: '#8B9BAE',
-  },
   {
     id: 'asmr_page_turning',
     title: 'Page Turning',
-    description: 'Book pages being turned',
+    description: 'Gentle book pages being turned',
     icon: 'book',
     category: 'asmr',
     audioKey: 'asmr_page_turning',
     color: '#9B8B7B',
   },
   {
-    id: 'asmr_rain_window',
-    title: 'Rain on Glass',
-    description: 'ASMR rain on window pane',
-    icon: 'rainy',
+    id: 'asmr_keyboard',
+    title: 'Keyboard Typing',
+    description: 'Satisfying mechanical keyboard sounds',
+    icon: 'keypad',
     category: 'asmr',
-    audioKey: 'asmr_rain_window',
-    color: '#7B9BAE',
+    audioKey: 'asmr_keyboard',
+    color: '#8B9BAE',
   },
 ];
 

@@ -92,6 +92,10 @@ const filesToUpload = [
   { local: 'music/albums/meditation-music/calm-reflection.mp3', remote: 'audio/music/albums/meditation-music/calm-reflection.mp3' },
   { local: 'music/albums/meditation-music/inner-peace.mp3', remote: 'audio/music/albums/meditation-music/inner-peace.mp3' },
   { local: 'music/albums/meditation-music/gentle-awakening.mp3', remote: 'audio/music/albums/meditation-music/gentle-awakening.mp3' },
+
+  // ========== ASMR ==========
+  { local: 'music/asmr/page-turning.mp3', remote: 'audio/music/asmr/page-turning.mp3' },
+  { local: 'music/asmr/keyboard-typing.mp3', remote: 'audio/music/asmr/keyboard-typing.mp3' },
 ];
 
 async function fileExistsInStorage(remotePath) {

@@ -69,12 +69,16 @@ export function MediaPlayer({
   loadingText = 'Loading...',
   footerContent,
 }: MediaPlayerProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Use dark gradient in dark mode
+  const darkGradient: [string, string] = ['#1A1D29', '#2A2D3E'];
+  const effectiveGradient = isDark ? darkGradient : gradientColors;
 
   if (isLoading) {
     return (
-      <LinearGradient colors={gradientColors} style={styles.fullScreen}>
+      <LinearGradient colors={effectiveGradient} style={styles.fullScreen}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="white" />
@@ -87,7 +91,7 @@ export function MediaPlayer({
 
   return (
     <LinearGradient
-      colors={gradientColors}
+      colors={effectiveGradient}
       style={styles.fullScreen}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
