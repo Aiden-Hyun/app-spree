@@ -115,6 +115,12 @@ function RootNavigator() {
             headerShown: false,
           }} 
         />
+        <Stack.Screen 
+          name="emergency" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
       </Stack>
   );
 }

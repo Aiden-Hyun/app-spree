@@ -367,7 +367,7 @@ export async function getUserFavorites(userId: string): Promise<UserFavorite[]> 
 export async function toggleFavorite(
   userId: string, 
   contentId: string, 
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency'
 ): Promise<boolean> {
   try {
     // Query ALL favorites for this content (any type) to handle legacy data
@@ -430,9 +430,25 @@ export interface ResolvedContent {
 
 export async function getContentById(
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency'
 ): Promise<ResolvedContent | null> {
   try {
+    // Handle emergency meditations (local data)
+    if (contentType === 'emergency') {
+      const { emergencyMeditationsData } = await import('../constants/emergencyMeditationsData');
+      const emergency = emergencyMeditationsData.find(e => e.id === contentId);
+      if (emergency) {
+        return {
+          id: contentId,
+          title: emergency.title,
+          thumbnail_url: undefined,
+          duration_minutes: emergency.duration_minutes,
+          content_type: contentType
+        };
+      }
+      return null;
+    }
+
     // Handle local data types (series_chapter, album_track)
     if (contentType === 'series_chapter') {
       const { seriesData } = await import('../constants/seriesData');
@@ -530,7 +546,7 @@ export async function getFavoritesWithDetails(userId: string): Promise<ResolvedC
 export async function addToListeningHistory(
   userId: string,
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track',
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency',
   contentTitle: string,
   durationMinutes: number,
   contentThumbnail?: string

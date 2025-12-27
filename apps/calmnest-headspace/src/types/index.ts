@@ -148,7 +148,8 @@ export interface UserFavorite {
     | "bedtime_story"
     | "breathing_exercise"
     | "series_chapter"
-    | "album_track";
+    | "album_track"
+    | "emergency";
   favorited_at: string;
 }
 

@@ -47,6 +47,12 @@ export const narrators: Record<string, Narrator> = {
     photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80',
     bio: 'Gentle guide for body awareness',
   },
+  brittney: {
+    id: 'brittney',
+    name: 'Brittney',
+    photoUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&q=80',
+    bio: 'Calming voice for moments of stress',
+  },
 };
 
 /**

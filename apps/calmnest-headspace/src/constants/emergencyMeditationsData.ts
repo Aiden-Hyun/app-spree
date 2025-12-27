@@ -11,6 +11,7 @@ export interface EmergencyMeditation {
   icon: string;
   color: string;
   audioKey: string;
+  narrator?: string;
 }
 
 export const emergencyMeditationsData: EmergencyMeditation[] = [
@@ -18,10 +19,11 @@ export const emergencyMeditationsData: EmergencyMeditation[] = [
     id: 'emergency_panic',
     title: 'Panic Relief',
     description: 'Calm racing thoughts fast',
-    duration_minutes: 2,
+    duration_minutes: 4,
     icon: 'flash',
     color: '#E57373',
     audioKey: 'emergency_panic_relief',
+    narrator: 'Brittney',
   },
 ];
 

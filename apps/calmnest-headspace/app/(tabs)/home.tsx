@@ -112,6 +112,31 @@ function HomeScreen() {
   };
 
   const navigateToContent = (contentId: string, contentType: string) => {
+    // Handle emergency content that may have been saved with wrong type
+    if (contentId.startsWith('emergency_')) {
+      import('../../src/constants/emergencyMeditationsData').then(({ emergencyMeditationsData }) => {
+        const emergency = emergencyMeditationsData.find(e => e.id === contentId);
+        if (emergency) {
+          router.push({
+            pathname: '/emergency/[id]',
+            params: {
+              id: emergency.id,
+              title: emergency.title,
+              description: emergency.description,
+              duration: String(emergency.duration_minutes),
+              audioKey: emergency.audioKey,
+              color: emergency.color,
+              icon: emergency.icon,
+              narrator: emergency.narrator || ''
+            }
+          });
+        } else {
+          router.push('/(tabs)/meditate');
+        }
+      });
+      return;
+    }
+
     switch (contentType) {
       case 'meditation':
         router.push({ pathname: '/meditation/[id]', params: { id: contentId } });
@@ -148,6 +173,29 @@ function HomeScreen() {
         // Album tracks require additional params - navigate to music tab for now
         router.push('/(tabs)/music');
         break;
+      case 'emergency':
+        // Look up emergency meditation data and navigate with full params
+        import('../../src/constants/emergencyMeditationsData').then(({ emergencyMeditationsData }) => {
+          const emergency = emergencyMeditationsData.find(e => e.id === contentId);
+          if (emergency) {
+            router.push({
+              pathname: '/emergency/[id]',
+              params: {
+                id: emergency.id,
+                title: emergency.title,
+                description: emergency.description,
+                duration: String(emergency.duration_minutes),
+                audioKey: emergency.audioKey,
+                color: emergency.color,
+                icon: emergency.icon,
+                narrator: emergency.narrator || ''
+              }
+            });
+          } else {
+            router.push('/(tabs)/meditate');
+          }
+        });
+        break;
     }
   };
 
@@ -164,6 +212,8 @@ function HomeScreen() {
         return 'cloud';
       case 'nature_sound':
         return 'musical-notes';
+      case 'emergency':
+        return 'flash';
       default:
         return 'play-circle';
     }

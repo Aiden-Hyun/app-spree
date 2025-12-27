@@ -45,6 +45,7 @@ function MeditateScreen() {
         audioKey: meditation.audioKey,
         color: meditation.color,
         icon: meditation.icon,
+        narrator: meditation.narrator || '',
       },
     });
   };
