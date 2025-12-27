@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
@@ -21,9 +20,9 @@ const featuredASMR = asmrData.slice(0, 6);
 
 function MusicScreen() {
   const router = useRouter();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   const handleSoundPress = (soundId: string) => {
     router.push(`/music/${soundId}`);
@@ -102,7 +101,7 @@ function MusicScreen() {
             <Ionicons
               name="chevron-forward"
               size={16}
-              color={theme.colors.sleepTextMuted}
+              color={theme.colors.textLight}
             />
           </AnimatedPressable>
         </View>
@@ -121,30 +120,25 @@ function MusicScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={theme.gradients.sleepyNight as [string, string]}
-        style={styles.gradient}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <SafeAreaView style={styles.safeArea}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Header */}
-            <AnimatedView delay={0} duration={500}>
-              <View style={styles.header}>
-                <View style={styles.iconContainer}>
-                  <Ionicons
-                    name="musical-notes"
-                    size={48}
-                    color={theme.colors.sleepAccent}
-                  />
-                </View>
-                <Text style={styles.title}>Sounds & Music</Text>
-                <Text style={styles.subtitle}>Find your perfect ambience</Text>
-              </View>
-            </AnimatedView>
+        {/* Header */}
+        <AnimatedView delay={0} duration={500}>
+          <View style={styles.header}>
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name="musical-notes"
+                size={48}
+                color={theme.colors.primary}
+              />
+            </View>
+            <Text style={styles.title}>Sounds & Music</Text>
+            <Text style={styles.subtitle}>Find your perfect ambience</Text>
+          </View>
+        </AnimatedView>
 
             {/* Albums Section */}
             <View style={styles.section}>
@@ -206,25 +200,18 @@ function MusicScreen() {
             {/* ASMR Section */}
             {renderSection("ASMR", featuredASMR, "/music/asmr", 900)}
 
-            {/* Bottom spacing */}
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </SafeAreaView>
-      </LinearGradient>
-    </View>
+        {/* Bottom spacing */}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const createStyles = (theme: Theme) =>
+const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    gradient: {
-      flex: 1,
-    },
     safeArea: {
       flex: 1,
+      backgroundColor: theme.colors.background,
     },
     scrollContent: {
       paddingBottom: theme.spacing.xxl,
@@ -238,7 +225,7 @@ const createStyles = (theme: Theme) =>
       width: 80,
       height: 80,
       borderRadius: 40,
-      backgroundColor: "rgba(201, 184, 150, 0.1)",
+      backgroundColor: isDark ? theme.colors.gray[100] : `${theme.colors.primary}15`,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: theme.spacing.md,
@@ -246,13 +233,13 @@ const createStyles = (theme: Theme) =>
     title: {
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
-      color: theme.colors.sleepText,
+      color: theme.colors.text,
       letterSpacing: -0.3,
     },
     subtitle: {
       fontFamily: theme.fonts.body.italic,
       fontSize: 15,
-      color: theme.colors.sleepTextMuted,
+      color: theme.colors.textLight,
       marginTop: 4,
     },
     section: {
@@ -268,7 +255,7 @@ const createStyles = (theme: Theme) =>
     sectionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
-      color: theme.colors.sleepText,
+      color: theme.colors.text,
     },
     sectionHeaderNoLink: {
       paddingHorizontal: theme.spacing.lg,
@@ -277,7 +264,7 @@ const createStyles = (theme: Theme) =>
     sectionSubtitle: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
-      color: theme.colors.sleepTextMuted,
+      color: theme.colors.textLight,
       marginTop: 4,
     },
     seeAllButton: {
@@ -288,7 +275,7 @@ const createStyles = (theme: Theme) =>
     seeAllText: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
-      color: theme.colors.sleepTextMuted,
+      color: theme.colors.textLight,
     },
     soundsScroll: {
       paddingHorizontal: theme.spacing.lg,
@@ -298,11 +285,12 @@ const createStyles = (theme: Theme) =>
       width: 100,
     },
     soundCard: {
-      backgroundColor: theme.colors.sleepSurface,
+      backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
       paddingVertical: theme.spacing.md,
       paddingHorizontal: theme.spacing.sm,
       alignItems: "center",
+      ...theme.shadows.sm,
     },
     soundIconContainer: {
       width: 48,
@@ -315,15 +303,16 @@ const createStyles = (theme: Theme) =>
     soundLabel: {
       fontFamily: theme.fonts.ui.medium,
       fontSize: 12,
-      color: theme.colors.sleepTextMuted,
+      color: theme.colors.textLight,
       textAlign: "center",
     },
     albumCard: {
       width: 150,
-      backgroundColor: theme.colors.sleepSurface,
+      backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.md,
       alignItems: "center",
+      ...theme.shadows.sm,
     },
     albumIconContainer: {
       width: 64,
@@ -336,14 +325,14 @@ const createStyles = (theme: Theme) =>
     albumTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
-      color: theme.colors.sleepText,
+      color: theme.colors.text,
       textAlign: "center",
       marginBottom: 4,
     },
     albumMeta: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 12,
-      color: theme.colors.sleepTextMuted,
+      color: theme.colors.textLight,
     },
   });
 
