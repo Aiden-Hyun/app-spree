@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
+import { ContentCard } from '../../src/components/ContentCard';
 import { Skeleton } from '../../src/components/Skeleton';
 import { useStats } from '../../src/hooks/useStats';
 import { 
@@ -335,54 +336,32 @@ function HomeScreen() {
     const thumbnailUrl = item.content_thumbnail || getThumbnailForContent(item.content_id, item.content_type);
     
     return (
-      <AnimatedPressable
+      <ContentCard
+        title={item.content_title}
+        thumbnailUrl={thumbnailUrl}
+        fallbackIcon={getContentIcon(item.content_type)}
+        meta={`${item.duration_minutes} min`}
         onPress={() => navigateToContent(item.content_id, item.content_type)}
-        style={styles.contentCard}
-      >
-        {thumbnailUrl ? (
-          <Image source={{ uri: thumbnailUrl }} style={styles.contentThumbnail} />
-        ) : (
-          <View style={[styles.contentThumbnail, styles.contentThumbnailPlaceholder]}>
-            <Ionicons 
-              name={getContentIcon(item.content_type)} 
-              size={24} 
-              color={theme.colors.primary} 
-            />
-          </View>
-        )}
-        <Text style={styles.contentTitle} numberOfLines={2}>{item.content_title}</Text>
-        <Text style={styles.contentMeta}>{item.duration_minutes} min</Text>
-      </AnimatedPressable>
+      />
     );
-  }, [styles, theme]);
+  }, []);
 
   const renderFavoriteItem = useCallback(({ item }: { item: ResolvedContent }) => (
-    <AnimatedPressable
+    <ContentCard
+      title={item.title}
+      thumbnailUrl={item.thumbnail_url}
+      fallbackIcon={getContentIcon(item.content_type)}
+      meta={`${item.duration_minutes} min`}
       onPress={() => navigateToContent(item.id, item.content_type)}
-      style={styles.contentCard}
-    >
-      {item.thumbnail_url ? (
-        <Image source={{ uri: item.thumbnail_url }} style={styles.contentThumbnail} />
-      ) : (
-        <View style={[styles.contentThumbnail, styles.contentThumbnailPlaceholder]}>
-          <Ionicons 
-            name={getContentIcon(item.content_type)} 
-            size={24} 
-            color={theme.colors.primary} 
-          />
-        </View>
-      )}
-      <Text style={styles.contentTitle} numberOfLines={2}>{item.title}</Text>
-      <Text style={styles.contentMeta}>{item.duration_minutes} min</Text>
-    </AnimatedPressable>
-  ), [styles, theme]);
+    />
+  ), []);
 
   const renderSkeletonCards = () => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalList}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalListContent}>
       {[1, 2, 3].map((i) => (
-        <View key={i} style={styles.contentCard}>
-          <Skeleton width={120} height={120} style={{ borderRadius: theme.borderRadius.lg }} />
-          <Skeleton width={100} height={14} style={{ marginTop: 8 }} />
+        <View key={i} style={styles.skeletonCard}>
+          <Skeleton width={150} height={120} style={{ borderRadius: theme.borderRadius.lg }} />
+          <Skeleton width={120} height={14} style={{ marginTop: 8 }} />
           <Skeleton width={60} height={12} style={{ marginTop: 4 }} />
         </View>
       ))}
@@ -607,40 +586,12 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     marginBottom: theme.spacing.md,
       paddingHorizontal: theme.spacing.lg,
     },
-    horizontalList: {
-      paddingLeft: theme.spacing.lg,
-    },
     horizontalListContent: {
-      paddingLeft: theme.spacing.lg,
-      paddingRight: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.lg,
       gap: theme.spacing.md,
     },
-    contentCard: {
-      width: 130,
-      marginRight: theme.spacing.md,
-  },
-    contentThumbnail: {
-      width: 130,
-      height: 130,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.surface,
-    },
-    contentThumbnailPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-      backgroundColor: isDark ? theme.colors.gray[100] : `${theme.colors.primary}15`,
-    },
-    contentTitle: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
-      color: theme.colors.text,
-      marginTop: theme.spacing.sm,
-  },
-    contentMeta: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.textLight,
-      marginTop: 2,
+    skeletonCard: {
+      width: 150,
     },
     emptyState: {
       marginHorizontal: theme.spacing.lg,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
+import { ContentCard } from "../../src/components/ContentCard";
 import { Skeleton } from "../../src/components/Skeleton";
 import { getBedtimeStories } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
@@ -14,7 +15,6 @@ import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
 import {
   sleepMeditationsData,
-  SleepMeditation,
 } from "../../src/constants/sleepMeditationsData";
 import { seriesData, Series } from "../../src/constants/seriesData";
 
@@ -113,33 +113,19 @@ function SleepScreen() {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.storiesScroll}
+                  contentContainerStyle={styles.cardsScroll}
                 >
                   {seriesData.map((series) => (
-                    <AnimatedPressable
+                    <ContentCard
                       key={series.id}
+                      title={series.title}
+                      thumbnailUrl={series.thumbnailUrl}
+                      fallbackIcon={getCategoryIcon(series.category)}
+                      fallbackColor={series.color}
+                      meta={`${series.chapterCount} chapters`}
                       onPress={() => handleSeriesPress(series)}
-                      style={styles.seriesCard}
-                    >
-                      <View
-                        style={[
-                          styles.seriesIconContainer,
-                          { backgroundColor: `${series.color}20` },
-                        ]}
-                      >
-                        <Ionicons
-                          name={getCategoryIcon(series.category)}
-                          size={28}
-                          color={series.color}
-                        />
-                      </View>
-                      <Text style={styles.seriesTitle} numberOfLines={2}>
-                        {series.title}
-                      </Text>
-                      <Text style={styles.seriesMeta}>
-                        {series.chapterCount} chapters
-                      </Text>
-                    </AnimatedPressable>
+                      darkMode
+                    />
                   ))}
                 </ScrollView>
               </AnimatedView>
@@ -169,12 +155,12 @@ function SleepScreen() {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.storiesScroll}
+                    contentContainerStyle={styles.cardsScroll}
                   >
                     {[0, 1, 2].map((i) => (
-                      <View key={i} style={styles.storyCard}>
+                      <View key={i} style={styles.skeletonCard}>
                         <Skeleton
-                          height={90}
+                          height={120}
                           borderRadius={theme.borderRadius.lg}
                           style={{ marginBottom: theme.spacing.sm }}
                         />
@@ -193,35 +179,19 @@ function SleepScreen() {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.storiesScroll}
+                    contentContainerStyle={styles.cardsScroll}
                   >
                     {bedtimeStories.map((story) => (
-                      <AnimatedPressable
+                      <ContentCard
                         key={story.id}
+                        title={story.title}
+                        thumbnailUrl={story.thumbnail_url}
+                        fallbackIcon={getCategoryIcon(story.category)}
+                        fallbackColor={theme.colors.sleepAccent}
+                        meta={`${story.duration_minutes} min`}
                         onPress={() => router.push(`/sleep/${story.id}`)}
-                        style={styles.storyCard}
-                      >
-                        {story.thumbnail_url ? (
-                          <Image
-                            source={{ uri: story.thumbnail_url }}
-                            style={styles.storyImage}
-                          />
-                        ) : (
-                          <View style={styles.storyIcon}>
-                            <Ionicons
-                              name={getCategoryIcon(story.category)}
-                              size={24}
-                              color={theme.colors.sleepAccent}
-                            />
-                          </View>
-                        )}
-                        <Text style={styles.storyTitle} numberOfLines={2}>
-                          {story.title}
-                        </Text>
-                        <Text style={styles.storyMeta}>
-                          {story.duration_minutes} min
-                        </Text>
-                      </AnimatedPressable>
+                        darkMode
+                      />
                     ))}
                   </ScrollView>
                 </AnimatedView>
@@ -251,35 +221,18 @@ function SleepScreen() {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.storiesScroll}
+                  contentContainerStyle={styles.cardsScroll}
                 >
                   {sleepMeditationsData.slice(0, 6).map((meditation) => (
-                    <AnimatedPressable
+                    <ContentCard
                       key={meditation.id}
+                      title={meditation.title}
+                      fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
+                      fallbackColor={meditation.color}
+                      meta={`${meditation.duration_minutes} min`}
                       onPress={() => router.push("/sleep/sleep-meditations")}
-                      style={styles.meditationCard}
-                    >
-                      <View
-                        style={[
-                          styles.meditationIcon,
-                          { backgroundColor: `${meditation.color}20` },
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            meditation.icon as keyof typeof Ionicons.glyphMap
-                          }
-                          size={24}
-                          color={meditation.color}
-                        />
-                      </View>
-                      <Text style={styles.meditationTitle} numberOfLines={2}>
-                        {meditation.title}
-                      </Text>
-                      <Text style={styles.meditationMeta}>
-                        {meditation.duration_minutes} min
-                      </Text>
-                    </AnimatedPressable>
+                      darkMode
+                    />
                   ))}
                 </ScrollView>
               </AnimatedView>
@@ -365,95 +318,11 @@ const createStyles = (theme: Theme) =>
       fontSize: 14,
       color: theme.colors.sleepTextMuted,
     },
-    storiesScroll: {
+    cardsScroll: {
       gap: theme.spacing.md,
     },
-    storyCard: {
+    skeletonCard: {
       width: 150,
-      backgroundColor: theme.colors.sleepSurface,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.md,
-    },
-    storyImage: {
-      width: "100%",
-      height: 90,
-      borderRadius: theme.borderRadius.lg,
-      marginBottom: theme.spacing.sm,
-      resizeMode: "cover",
-    },
-    storyIcon: {
-      width: "100%",
-      height: 90,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: "rgba(201, 184, 150, 0.1)",
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: theme.spacing.sm,
-    },
-    storyTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: theme.colors.sleepText,
-      marginBottom: 4,
-    },
-    storyMeta: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.sleepTextMuted,
-    },
-    meditationCard: {
-      width: 130,
-      backgroundColor: theme.colors.sleepSurface,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.md,
-      alignItems: "center",
-    },
-    meditationIcon: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: theme.spacing.sm,
-    },
-    meditationTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: theme.colors.sleepText,
-      textAlign: "center",
-      marginBottom: 4,
-    },
-    meditationMeta: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.sleepTextMuted,
-    },
-    seriesCard: {
-      width: 150,
-      backgroundColor: theme.colors.sleepSurface,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.md,
-      alignItems: "center",
-    },
-    seriesIconContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: theme.spacing.sm,
-    },
-    seriesTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: theme.colors.sleepText,
-      textAlign: "center",
-      marginBottom: 4,
-    },
-    seriesMeta: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 12,
-      color: theme.colors.sleepTextMuted,
     },
   });
 
