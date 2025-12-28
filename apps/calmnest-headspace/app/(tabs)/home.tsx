@@ -19,6 +19,11 @@ import {
 } from '../../src/services/firestoreService';
 import { seriesData } from '../../src/constants/seriesData';
 import { albumsData } from '../../src/constants/albumsData';
+import { coursesData } from '../../src/constants/coursesData';
+import { emergencyMeditationsData } from '../../src/constants/emergencyMeditationsData';
+import { sleepSoundsData } from '../../src/constants/sleepSoundsData';
+import { whiteNoiseData, musicData, asmrData } from '../../src/constants/musicData';
+import { techniquesData, techniqueMeditationsData } from '../../src/constants/techniquesData';
 import { Theme } from '../../src/theme';
 import { DailyQuote, ListeningHistoryItem } from '../../src/types';
 
@@ -123,6 +128,59 @@ function HomeScreen() {
     return null;
   };
 
+  // Helper to find course session by ID
+  const findCourseSession = (sessionId: string) => {
+    for (const course of coursesData) {
+      const session = course.sessions.find(s => s.id === sessionId);
+      if (session) {
+        return { course, session };
+      }
+    }
+    return null;
+  };
+
+  // Helper to get thumbnail for content from local data
+  const getThumbnailForContent = (contentId: string, contentType: string): string | undefined => {
+    switch (contentType) {
+      case 'emergency':
+        return emergencyMeditationsData.find(e => e.id === contentId)?.thumbnailUrl;
+      case 'series_chapter':
+        for (const series of seriesData) {
+          if (series.chapters.some(c => c.id === contentId)) {
+            return series.thumbnailUrl;
+          }
+        }
+        return undefined;
+      case 'album_track':
+        for (const album of albumsData) {
+          if (album.tracks.some(t => t.id === contentId)) {
+            return album.thumbnailUrl;
+          }
+        }
+        return undefined;
+      case 'course_session':
+        for (const course of coursesData) {
+          if (course.sessions.some(s => s.id === contentId)) {
+            return course.thumbnailUrl;
+          }
+        }
+        return undefined;
+      case 'nature_sound':
+        // Check sleep sounds and white noise
+        const sleepSound = sleepSoundsData.find(s => s.id === contentId);
+        if (sleepSound) return sleepSound.thumbnailUrl;
+        const whiteNoise = whiteNoiseData.find(w => w.id === contentId);
+        if (whiteNoise) return whiteNoise.thumbnailUrl;
+        const music = musicData.find(m => m.id === contentId);
+        if (music) return music.thumbnailUrl;
+        const asmr = asmrData.find(a => a.id === contentId);
+        if (asmr) return asmr.thumbnailUrl;
+        return undefined;
+      default:
+        return undefined;
+    }
+  };
+
   const navigateToContent = (contentId: string, contentType: string) => {
     // Handle emergency content that may have been saved with wrong type
     if (contentId.startsWith('emergency_')) {
@@ -223,6 +281,26 @@ function HomeScreen() {
           }
         });
         break;
+      case 'course_session':
+        // Look up course session data and navigate with full params
+        const courseResult = findCourseSession(contentId);
+        if (courseResult) {
+          router.push({
+            pathname: '/course/session/[id]',
+            params: {
+              id: courseResult.session.id,
+              audioKey: courseResult.session.audioKey,
+              title: courseResult.session.title,
+              courseTitle: courseResult.course.title,
+              duration: String(courseResult.session.duration_minutes),
+              instructor: courseResult.course.instructor,
+              color: courseResult.course.color
+            }
+          });
+        } else {
+          router.push('/(tabs)/meditate');
+        }
+        break;
     }
   };
 
@@ -241,6 +319,8 @@ function HomeScreen() {
         return 'musical-notes';
       case 'emergency':
         return 'flash';
+      case 'course_session':
+        return 'school';
       default:
         return 'play-circle';
     }
@@ -250,26 +330,31 @@ function HomeScreen() {
     ? [theme.colors.surface, theme.colors.background] as [string, string]
     : ['#F5EDE3', '#FAF8F5'] as [string, string];
 
-  const renderRecentlyPlayedItem = useCallback(({ item }: { item: ListeningHistoryItem }) => (
-    <AnimatedPressable
-      onPress={() => navigateToContent(item.content_id, item.content_type)}
-      style={styles.contentCard}
-    >
-      {item.content_thumbnail ? (
-        <Image source={{ uri: item.content_thumbnail }} style={styles.contentThumbnail} />
-      ) : (
-        <View style={[styles.contentThumbnail, styles.contentThumbnailPlaceholder]}>
-          <Ionicons 
-            name={getContentIcon(item.content_type)} 
-            size={24} 
-            color={theme.colors.primary} 
-          />
-        </View>
-      )}
-      <Text style={styles.contentTitle} numberOfLines={2}>{item.content_title}</Text>
-      <Text style={styles.contentMeta}>{item.duration_minutes} min</Text>
-    </AnimatedPressable>
-  ), [styles, theme]);
+  const renderRecentlyPlayedItem = useCallback(({ item }: { item: ListeningHistoryItem }) => {
+    // Use stored thumbnail or look up from local data
+    const thumbnailUrl = item.content_thumbnail || getThumbnailForContent(item.content_id, item.content_type);
+    
+    return (
+      <AnimatedPressable
+        onPress={() => navigateToContent(item.content_id, item.content_type)}
+        style={styles.contentCard}
+      >
+        {thumbnailUrl ? (
+          <Image source={{ uri: thumbnailUrl }} style={styles.contentThumbnail} />
+        ) : (
+          <View style={[styles.contentThumbnail, styles.contentThumbnailPlaceholder]}>
+            <Ionicons 
+              name={getContentIcon(item.content_type)} 
+              size={24} 
+              color={theme.colors.primary} 
+            />
+          </View>
+        )}
+        <Text style={styles.contentTitle} numberOfLines={2}>{item.content_title}</Text>
+        <Text style={styles.contentMeta}>{item.duration_minutes} min</Text>
+      </AnimatedPressable>
+    );
+  }, [styles, theme]);
 
   const renderFavoriteItem = useCallback(({ item }: { item: ResolvedContent }) => (
     <AnimatedPressable

@@ -367,7 +367,7 @@ export async function getUserFavorites(userId: string): Promise<UserFavorite[]> 
 export async function toggleFavorite(
   userId: string, 
   contentId: string, 
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session'
 ): Promise<boolean> {
   try {
     // Query ALL favorites for this content (any type) to handle legacy data
@@ -425,12 +425,12 @@ export interface ResolvedContent {
   title: string;
   thumbnail_url?: string;
   duration_minutes: number;
-  content_type: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise';
+  content_type: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session';
 }
 
 export async function getContentById(
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session'
 ): Promise<ResolvedContent | null> {
   try {
     // Handle emergency meditations (local data)
@@ -441,7 +441,7 @@ export async function getContentById(
         return {
           id: contentId,
           title: emergency.title,
-          thumbnail_url: undefined,
+          thumbnail_url: emergency.thumbnailUrl,
           duration_minutes: emergency.duration_minutes,
           content_type: contentType
         };
@@ -477,6 +477,23 @@ export async function getContentById(
             title: `${album.title}: ${track.title}`,
             thumbnail_url: album.thumbnailUrl,
             duration_minutes: track.duration_minutes,
+            content_type: contentType
+          };
+        }
+      }
+      return null;
+    }
+
+    if (contentType === 'course_session') {
+      const { coursesData } = await import('../constants/coursesData');
+      for (const course of coursesData) {
+        const session = course.sessions.find(s => s.id === contentId);
+        if (session) {
+          return {
+            id: contentId,
+            title: `${course.title}: ${session.title}`,
+            thumbnail_url: course.thumbnailUrl,
+            duration_minutes: session.duration_minutes,
             content_type: contentType
           };
         }
@@ -546,7 +563,7 @@ export async function getFavoritesWithDetails(userId: string): Promise<ResolvedC
 export async function addToListeningHistory(
   userId: string,
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency',
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session',
   contentTitle: string,
   durationMinutes: number,
   contentThumbnail?: string

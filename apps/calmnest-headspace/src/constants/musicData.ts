@@ -14,6 +14,7 @@ export interface MusicItem {
   audioKey: string;
   color: string;
   duration_minutes?: number;
+  thumbnailUrl?: string;
 }
 
 // White Noise - now with working audio files
@@ -26,6 +27,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_electric_fan',
     color: '#7B8FA1',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80',
   },
   {
     id: 'white_noise_static',
@@ -35,6 +37,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_white_noise',
     color: '#8B8B9B',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&q=80',
   },
   {
     id: 'white_noise_brown',
@@ -44,6 +47,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_brown_noise',
     color: '#9B8B7B',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=400&q=80',
   },
   {
     id: 'white_noise_pink',
@@ -53,6 +57,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_pink_noise',
     color: '#C4A4B4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=400&q=80',
   },
   {
     id: 'white_noise_grey',
@@ -62,6 +67,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_grey_noise',
     color: '#A8A8B8',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1557683311-eac922347aa1?w=400&q=80',
   },
   {
     id: 'white_noise_airplane',
@@ -71,6 +77,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_airplane_cabin',
     color: '#7B9BAE',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&q=80',
   },
   {
     id: 'white_noise_ac',
@@ -80,6 +87,7 @@ export const whiteNoiseData: MusicItem[] = [
     category: 'white-noise',
     audioKey: 'wn_air_conditioner',
     color: '#6B8F9B',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=400&q=80',
   },
 ];
 
@@ -94,6 +102,7 @@ export const musicData: MusicItem[] = [
     audioKey: 'music_piano',
     color: '#A8A4C4',
     duration_minutes: 60,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=400&q=80',
   },
   {
     id: 'music_ambient',
@@ -103,6 +112,7 @@ export const musicData: MusicItem[] = [
     category: 'music',
     audioKey: 'music_ambient',
     color: '#8B7BAE',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=400&q=80',
   },
   {
     id: 'music_lofi',
@@ -112,6 +122,7 @@ export const musicData: MusicItem[] = [
     category: 'music',
     audioKey: 'music_lofi',
     color: '#9B8FAE',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&q=80',
   },
   {
     id: 'music_classical',
@@ -121,6 +132,7 @@ export const musicData: MusicItem[] = [
     category: 'music',
     audioKey: 'music_classical',
     color: '#C4B4A4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=400&q=80',
   },
   {
     id: 'music_guitar',
@@ -130,6 +142,7 @@ export const musicData: MusicItem[] = [
     category: 'music',
     audioKey: 'music_guitar',
     color: '#B4976D',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=400&q=80',
   },
   {
     id: 'music_meditation',
@@ -139,6 +152,7 @@ export const musicData: MusicItem[] = [
     category: 'music',
     audioKey: 'music_meditation',
     color: '#7B9B7F',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?w=400&q=80',
   },
 ];
 
@@ -152,6 +166,7 @@ export const asmrData: MusicItem[] = [
     category: 'asmr',
     audioKey: 'asmr_page_turning',
     color: '#9B8B7B',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&q=80',
   },
   {
     id: 'asmr_keyboard',
@@ -161,6 +176,7 @@ export const asmrData: MusicItem[] = [
     category: 'asmr',
     audioKey: 'asmr_keyboard',
     color: '#8B9BAE',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&q=80',
   },
 ];
 

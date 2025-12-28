@@ -149,7 +149,8 @@ export interface UserFavorite {
     | "breathing_exercise"
     | "series_chapter"
     | "album_track"
-    | "emergency";
+    | "emergency"
+    | "course_session";
   favorited_at: string;
 }
 
@@ -164,7 +165,9 @@ export interface ListeningHistoryItem {
     | "bedtime_story"
     | "breathing_exercise"
     | "series_chapter"
-    | "album_track";
+    | "album_track"
+    | "emergency"
+    | "course_session";
   content_title: string; // Denormalized for quick display
   content_thumbnail?: string; // Denormalized
   duration_minutes: number;

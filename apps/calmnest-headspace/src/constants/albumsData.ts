@@ -28,6 +28,7 @@ export const albumsData: Album[] = [
     id: 'album_meditation',
     title: 'Meditation Music',
     description: 'Peaceful ambient soundscapes designed for meditation and deep relaxation. Let these gentle melodies guide you to inner calm.',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?w=400&q=80',
     color: '#B4A7C7',
     artist: 'CalmNest',
     trackCount: 3,

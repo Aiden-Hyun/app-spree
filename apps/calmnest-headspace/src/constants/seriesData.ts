@@ -30,6 +30,7 @@ export const seriesData: Series[] = [
     title: "The Midnight Crossing",
     description:
       "A suspenseful journey through shadows and mystery. Each act unfolds new secrets as the night holds its breath, guiding you deeper into dreamland.",
+    thumbnailUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=400&q=80",
     color: "#4A5568",
     narrator: "Rachel",
     chapterCount: 1,

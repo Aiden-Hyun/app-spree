@@ -71,6 +71,7 @@ const storagePaths: Record<string, string> = {
   
   // ========== EMERGENCY MEDITATIONS (Firebase Storage) ==========
   emergency_panic_relief: 'audio/meditate/emergency/panic-relief.mp3',
+  emergency_478_breathing: 'audio/meditate/emergency/478-breathing.mp3',
   
   // ========== MEDITATIONS (Firebase Storage) ==========
   meditation_body_scan: 'audio/meditate/meditations/body-scan-delilah.mp3',
@@ -84,6 +85,10 @@ const storagePaths: Record<string, string> = {
   // ========== ASMR (Firebase Storage) ==========
   asmr_page_turning: 'audio/music/asmr/page-turning.mp3',
   asmr_keyboard: 'audio/music/asmr/keyboard-typing.mp3',
+
+  // ========== COURSES (Firebase Storage) ==========
+  course_10min_reset_session1: 'audio/meditate/courses/10-minute-reset-session1.mp3',
+  course_10min_reset_session2: 'audio/meditate/courses/10-minute-reset-session2.mp3',
 };
 
 // External URLs (public, no token needed)

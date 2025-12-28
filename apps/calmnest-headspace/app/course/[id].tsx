@@ -36,8 +36,19 @@ function CourseDetailScreen() {
   }
 
   const handleSessionPress = (session: CourseSession) => {
-    // TODO: Navigate to meditation player with session
-    console.log("Play session:", session.id);
+    if (!course) return;
+    router.push({
+      pathname: '/course/session/[id]',
+      params: {
+        id: session.id,
+        audioKey: session.audioKey,
+        title: session.title,
+        courseTitle: course.title,
+        duration: String(session.duration_minutes),
+        instructor: course.instructor,
+        color: course.color,
+      },
+    });
   };
 
   return (

@@ -83,6 +83,7 @@ const filesToUpload = [
   // ========== MEDITATE ==========
   // Emergency meditations
   { local: 'meditate/emergency/panic-relief.mp3', remote: 'audio/meditate/emergency/panic-relief.mp3' },
+  { local: 'meditate/emergency/478-breathing.mp3', remote: 'audio/meditate/emergency/478-breathing.mp3' },
   
   // Meditations
   { local: 'meditate/meditations/body-scan-delilah.mp3', remote: 'audio/meditate/meditations/body-scan-delilah.mp3' },
@@ -96,6 +97,10 @@ const filesToUpload = [
   // ========== ASMR ==========
   { local: 'music/asmr/page-turning.mp3', remote: 'audio/music/asmr/page-turning.mp3' },
   { local: 'music/asmr/keyboard-typing.mp3', remote: 'audio/music/asmr/keyboard-typing.mp3' },
+
+  // ========== COURSES ==========
+  { local: 'meditate/courses/10-minute-reset-session1.mp3', remote: 'audio/meditate/courses/10-minute-reset-session1.mp3' },
+  { local: 'meditate/courses/10-minute-reset-session2.mp3', remote: 'audio/meditate/courses/10-minute-reset-session2.mp3' },
 ];
 
 async function fileExistsInStorage(remotePath) {
