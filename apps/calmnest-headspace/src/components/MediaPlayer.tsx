@@ -80,7 +80,6 @@ export function MediaPlayer({
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
-  const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
 
   // Background audio hook
   const backgroundAudio = useBackgroundAudio();
@@ -93,7 +92,7 @@ export function MediaPlayer({
         if (sound) {
           const url = await getAudioUrl(sound.audioKey);
           if (url) {
-            backgroundAudio.loadAudio(url);
+            backgroundAudio.loadAudio(url, backgroundAudio.selectedSoundId);
           }
         }
       }
@@ -101,23 +100,16 @@ export function MediaPlayer({
     loadSavedSoundAudio();
   }, [backgroundAudio.isInitialized, backgroundAudio.selectedSoundId, enableBackgroundAudio]);
 
-  // Sync background audio with main audio play/pause
+  // Auto-play background audio when it's loaded and enabled (independent of main audio)
   useEffect(() => {
     if (!enableBackgroundAudio) return;
 
-    if (audioPlayer.isPlaying && backgroundAudio.isEnabled && backgroundAudio.selectedSoundId && backgroundAudio.hasAudioLoaded) {
-      // Play background audio when main audio starts
-      if (!hasStartedPlaying) {
-        setHasStartedPlaying(true);
-      }
-      // Small delay to ensure audio is ready
-      setTimeout(() => {
-        backgroundAudio.play();
-      }, 100);
-    } else if (!audioPlayer.isPlaying) {
-      backgroundAudio.pause();
+    // Play background audio automatically when it's loaded and enabled
+    // This runs independently of the main content audio
+    if (backgroundAudio.isEnabled && backgroundAudio.selectedSoundId && backgroundAudio.hasAudioLoaded) {
+      backgroundAudio.play();
     }
-  }, [audioPlayer.isPlaying, backgroundAudio.isEnabled, backgroundAudio.hasAudioLoaded, enableBackgroundAudio]);
+  }, [backgroundAudio.isEnabled, backgroundAudio.hasAudioLoaded, backgroundAudio.selectedSoundId, enableBackgroundAudio]);
 
   // Cleanup background audio on unmount
   useEffect(() => {
@@ -132,7 +124,7 @@ export function MediaPlayer({
       backgroundAudio.selectSound(soundId);
       const url = await getAudioUrl(audioKey);
       if (url) {
-        backgroundAudio.loadAudio(url);
+        backgroundAudio.loadAudio(url, soundId);
         // If main audio is playing, start background audio too
         if (audioPlayer.isPlaying) {
           setTimeout(() => {
@@ -192,7 +184,7 @@ export function MediaPlayer({
                 ]}
               >
                 <Ionicons
-                  name="layers"
+                  name="musical-notes"
                   size={20}
                   color={
                     backgroundAudio.isEnabled && backgroundAudio.selectedSoundId
@@ -313,6 +305,9 @@ export function MediaPlayer({
           visible={showBackgroundPicker}
           onClose={() => setShowBackgroundPicker(false)}
           selectedSoundId={backgroundAudio.selectedSoundId}
+          loadingSoundId={backgroundAudio.loadingSoundId}
+          isAudioReady={backgroundAudio.isAudioReady}
+          hasError={backgroundAudio.hasError}
           volume={backgroundAudio.volume}
           isEnabled={backgroundAudio.isEnabled}
           onSelectSound={handleSelectSound}

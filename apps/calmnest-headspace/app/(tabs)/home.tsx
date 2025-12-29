@@ -599,9 +599,9 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       paddingHorizontal: theme.spacing.lg,
       backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.lg,
-      alignItems: 'center',
+    alignItems: 'center',
       gap: theme.spacing.sm,
-    },
+  },
     emptyStateText: {
     fontFamily: theme.fonts.ui.regular,
     fontSize: 14,

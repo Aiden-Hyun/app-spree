@@ -1,13 +1,13 @@
 /**
  * Normalize audio files to consistent loudness
  * Uses FFmpeg's loudnorm filter (EBU R128) for professional-quality normalization
- * 
+ *
  * Usage: node scripts/normalizeAudio.js [--all] [--no-backup]
  * 
  * Options:
  *   --all       Normalize all files (not just those outside tolerance)
  *   --no-backup Skip creating backups
- * 
+ *
  * Prerequisites: FFmpeg must be installed (brew install ffmpeg)
  */
 
@@ -83,7 +83,7 @@ async function main() {
   console.log(`🎯 Target: ${TARGET_LUFS} LUFS`);
   console.log(`📁 Audio directory: ${audioDir}`);
   console.log(`📦 Files to process: ${filesToNormalize.length}\n`);
-  
+
   // Check if FFmpeg is installed
   try {
     execSync('ffmpeg -version', { stdio: 'ignore' });
@@ -92,13 +92,13 @@ async function main() {
     console.log('\nInstall with: brew install ffmpeg');
     process.exit(1);
   }
-  
+
   // Create backup directory
   if (!skipBackup) {
     console.log('📂 Creating backup directory...');
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
-    }
+  }
   }
   
   let successCount = 0;
@@ -166,7 +166,7 @@ async function main() {
       }
     }
   }
-  
+
   console.log('\n' + '='.repeat(70));
   console.log('\n📊 SUMMARY:\n');
   console.log(`   ✅ Normalized: ${successCount} files`);

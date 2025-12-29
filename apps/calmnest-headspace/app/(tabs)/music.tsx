@@ -148,75 +148,75 @@ function MusicScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header */}
-        <AnimatedView delay={0} duration={500}>
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name="musical-notes"
-                size={48}
-                color={theme.colors.primary}
-              />
-            </View>
-            <Text style={styles.title}>Sounds & Music</Text>
-            <Text style={styles.subtitle}>Find your perfect ambience</Text>
-          </View>
-        </AnimatedView>
-
-        {/* Albums Section */}
-        <View style={styles.section}>
-          <AnimatedView delay={100} duration={400}>
-            <View style={styles.sectionHeaderNoLink}>
-              <Text style={styles.sectionTitle}>Albums</Text>
-              <Text style={styles.sectionSubtitle}>Curated music collections</Text>
-            </View>
-          </AnimatedView>
-
+        <SafeAreaView style={styles.safeArea}>
           <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsScroll}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
           >
-            {albumsData.map((album, index) => (
-              <AnimatedView
-                key={album.id}
-                delay={150 + index * 40}
-                duration={400}
+            {/* Header */}
+            <AnimatedView delay={0} duration={500}>
+              <View style={styles.header}>
+                <View style={styles.iconContainer}>
+                  <Ionicons
+                    name="musical-notes"
+                    size={48}
+                color={theme.colors.primary}
+                  />
+                </View>
+                <Text style={styles.title}>Sounds & Music</Text>
+                <Text style={styles.subtitle}>Find your perfect ambience</Text>
+              </View>
+            </AnimatedView>
+
+            {/* Albums Section */}
+            <View style={styles.section}>
+              <AnimatedView delay={100} duration={400}>
+                <View style={styles.sectionHeaderNoLink}>
+                  <Text style={styles.sectionTitle}>Albums</Text>
+                  <Text style={styles.sectionSubtitle}>Curated music collections</Text>
+                </View>
+              </AnimatedView>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsScroll}
               >
+                {albumsData.map((album, index) => (
+                  <AnimatedView
+                    key={album.id}
+                    delay={150 + index * 40}
+                    duration={400}
+                  >
                 <ContentCard
                   title={album.title}
                   thumbnailUrl={album.thumbnailUrl}
                   fallbackIcon={getCategoryIcon(album.category)}
                   fallbackColor={album.color}
                   meta={`${album.trackCount} tracks`}
-                  onPress={() => handleAlbumPress(album)}
+                      onPress={() => handleAlbumPress(album)}
                 />
-              </AnimatedView>
-            ))}
-          </ScrollView>
-        </View>
+                  </AnimatedView>
+                ))}
+              </ScrollView>
+            </View>
 
-        {/* White Noise Section */}
+            {/* White Noise Section */}
         {renderSoundSection("White Noise", featuredWhiteNoise, "/music/white-noise", 300)}
 
-        {/* Nature Sounds Section */}
+            {/* Nature Sounds Section */}
         {renderNatureSoundsSection("Nature Sounds", featuredNatureSounds, "/music/nature-sounds", 500)}
 
-        {/* Music Section */}
+            {/* Music Section */}
         {renderSoundSection("Music", featuredMusic, "/music/music", 700)}
 
-        {/* ASMR Section */}
+            {/* ASMR Section */}
         {renderSoundSection("ASMR", featuredASMR, "/music/asmr", 900)}
 
-        {/* Bottom spacing */}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+            {/* Bottom spacing */}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </SafeAreaView>
   );
 }
 

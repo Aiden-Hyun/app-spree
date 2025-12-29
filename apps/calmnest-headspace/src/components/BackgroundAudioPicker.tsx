@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
@@ -22,6 +23,9 @@ interface BackgroundAudioPickerProps {
   visible: boolean;
   onClose: () => void;
   selectedSoundId: string | null;
+  loadingSoundId: string | null;
+  isAudioReady: boolean;
+  hasError: boolean;
   volume: number;
   isEnabled: boolean;
   onSelectSound: (soundId: string | null, audioKey: string | null) => void;
@@ -33,6 +37,9 @@ export function BackgroundAudioPicker({
   visible,
   onClose,
   selectedSoundId,
+  loadingSoundId,
+  isAudioReady,
+  hasError,
   volume,
   isEnabled,
   onSelectSound,
@@ -162,37 +169,62 @@ export function BackgroundAudioPicker({
             style={styles.soundList}
             showsVerticalScrollIndicator={false}
           >
-            {filteredSounds.map((sound) => (
-              <TouchableOpacity
-                key={sound.id}
-                style={[
-                  styles.soundItem,
-                  selectedSoundId === sound.id && isEnabled && styles.soundItemActive,
-                ]}
-                onPress={() => handleSoundSelect(sound)}
-              >
-                <View
+            {filteredSounds.map((sound) => {
+              const isThisSoundSelected = selectedSoundId === sound.id && isEnabled;
+              // Show error if this sound is selected and has error
+              const showError = isThisSoundSelected && hasError;
+              // Show loading if this sound is selected but audio is not ready and no error
+              const isLoading = isThisSoundSelected && !isAudioReady && !hasError;
+              // Only show checkmark if selected AND audio is actually ready
+              const showCheckmark = isThisSoundSelected && isAudioReady && !hasError;
+              
+              // #region agent log
+              if (isThisSoundSelected) {
+                fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BackgroundAudioPicker.tsx:render',message:'Selected sound render state',data:{soundId:sound.id,isThisSoundSelected,isAudioReady,hasError,showCheckmark,isLoading,showError},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'})}).catch(()=>{});
+              }
+              // #endregion
+              
+              return (
+                <TouchableOpacity
+                  key={sound.id}
                   style={[
-                    styles.soundIcon,
-                    { backgroundColor: `${sound.color}30` },
+                    styles.soundItem,
+                    isThisSoundSelected && styles.soundItemActive,
+                    showError && styles.soundItemError,
                   ]}
+                  onPress={() => handleSoundSelect(sound)}
                 >
-                  <Ionicons
-                    name={sound.icon as keyof typeof Ionicons.glyphMap}
-                    size={20}
-                    color={sound.color}
-                  />
-                </View>
-                <Text style={styles.soundTitle}>{sound.title}</Text>
-                {selectedSoundId === sound.id && isEnabled && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={22}
-                    color="#7DAFB4"
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
+                  <View
+                    style={[
+                      styles.soundIcon,
+                      { backgroundColor: `${sound.color}30` },
+                    ]}
+                  >
+                    <Ionicons
+                      name={sound.icon as keyof typeof Ionicons.glyphMap}
+                      size={20}
+                      color={sound.color}
+                    />
+                  </View>
+                  <Text style={styles.soundTitle}>{sound.title}</Text>
+                  {showError ? (
+                    <Ionicons
+                      name="close-circle"
+                      size={22}
+                      color="#E57373"
+                    />
+                  ) : isLoading ? (
+                    <ActivityIndicator size="small" color="#7DAFB4" />
+                  ) : showCheckmark ? (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={22}
+                      color="#7DAFB4"
+                    />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </View>
@@ -320,6 +352,9 @@ const createStyles = (theme: Theme) =>
     },
     soundItemActive: {
       backgroundColor: "rgba(125,175,180,0.15)",
+    },
+    soundItemError: {
+      backgroundColor: "rgba(229,115,115,0.15)",
     },
     soundIcon: {
       width: 40,

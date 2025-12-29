@@ -104,8 +104,8 @@ function MeditateScreen() {
                 />
               ))}
             </ScrollView>
-          </AnimatedView>
-        </View>
+            </AnimatedView>
+          </View>
 
         {/* Browse by Theme */}
         <View style={styles.section}>
@@ -139,18 +139,18 @@ function MeditateScreen() {
                   style={styles.themeCard}
                 >
                   <View
-                    style={[
+                style={[
                       styles.themeIconContainer,
                       { backgroundColor: `${cat.color}20` },
-                    ]}
-                  >
+                ]}
+              >
                     <Ionicons name={cat.icon} size={24} color={cat.color} />
                   </View>
-                  <Text style={styles.themeLabel}>{cat.label}</Text>
+                <Text style={styles.themeLabel}>{cat.label}</Text>
                 </AnimatedPressable>
               ))}
             </ScrollView>
-          </AnimatedView>
+              </AnimatedView>
         </View>
 
         {/* Emergency */}
@@ -160,10 +160,10 @@ function MeditateScreen() {
               <View style={styles.emergencyTitleRow}>
                 <Ionicons name="flash" size={20} color="#E57373" />
                 <Text style={styles.sectionTitle}>Emergency</Text>
-              </View>
+            </View>
               <Text style={styles.sectionSubtitle}>Quick relief in 1-3 minutes</Text>
             </View>
-          </AnimatedView>
+            </AnimatedView>
 
           <AnimatedView delay={350} duration={400}>
             <ScrollView
@@ -201,9 +201,9 @@ function MeditateScreen() {
                   size={16}
                   color={theme.colors.primary}
                 />
-              </View>
-            </AnimatedPressable>
-          </AnimatedView>
+                    </View>
+                  </AnimatedPressable>
+                </AnimatedView>
 
           <AnimatedView delay={450} duration={400}>
             <ScrollView
@@ -232,35 +232,35 @@ function MeditateScreen() {
 
 const createStyles = (theme: Theme, isDark: boolean) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    container: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingBottom: theme.spacing.xxl,
-    },
-    header: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      paddingBottom: theme.spacing.md,
-    },
-    title: {
-      fontFamily: theme.fonts.display.semiBold,
-      fontSize: 28,
-      color: theme.colors.text,
-      letterSpacing: -0.3,
-    },
-    subtitle: {
-      fontFamily: theme.fonts.body.italic,
-      fontSize: 15,
-      color: theme.colors.textLight,
-      marginTop: 4,
-    },
-    section: {
-      marginTop: theme.spacing.xl,
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
+  header: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+  },
+  title: {
+    fontFamily: theme.fonts.display.semiBold,
+    fontSize: 28,
+    color: theme.colors.text,
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontFamily: theme.fonts.body.italic,
+    fontSize: 15,
+    color: theme.colors.textLight,
+    marginTop: 4,
+  },
+  section: {
+    marginTop: theme.spacing.xl,
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -270,48 +270,48 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       marginBottom: theme.spacing.md,
     },
     sectionHeaderNoLink: {
-      paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
       marginBottom: theme.spacing.md,
     },
     emergencyTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-    },
-    sectionTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
+  },
+  sectionTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
-      color: theme.colors.text,
+    color: theme.colors.text,
     },
     sectionSubtitle: {
       fontFamily: theme.fonts.ui.regular,
-      fontSize: 13,
-      color: theme.colors.textLight,
+    fontSize: 13,
+    color: theme.colors.textLight,
       marginTop: 4,
     },
     seeAllContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
       gap: 4,
-    },
+  },
     seeAllText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
-      color: theme.colors.primary,
-    },
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 14,
+    color: theme.colors.primary,
+  },
     cardsScroll: {
       paddingHorizontal: theme.spacing.lg,
       gap: theme.spacing.md,
-    },
-    themeCard: {
+  },
+  themeCard: {
       width: 100,
-      backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
       paddingVertical: theme.spacing.lg,
       paddingHorizontal: theme.spacing.sm,
-      alignItems: 'center',
-      ...theme.shadows.sm,
-    },
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
     themeIconContainer: {
       width: 48,
       height: 48,
@@ -319,14 +319,14 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: theme.spacing.sm,
+  },
+  themeLabel: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 12,
+    color: theme.colors.text,
+    textAlign: 'center',
     },
-    themeLabel: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 12,
-      color: theme.colors.text,
-      textAlign: 'center',
-    },
-  });
+});
 
 export default function Meditate() {
   return (
