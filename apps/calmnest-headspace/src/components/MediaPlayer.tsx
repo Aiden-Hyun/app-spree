@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AudioPlayer } from './AudioPlayer';
+import { BackgroundAudioPicker } from './BackgroundAudioPicker';
 import { useTheme } from '../contexts/ThemeContext';
 import { Theme } from '../theme';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
+import { getAudioUrl } from '../constants/audioFiles';
+import { getBackgroundSoundById } from '../constants/backgroundSoundsData';
 
 export interface MediaPlayerProps {
   // Content info
@@ -47,6 +51,9 @@ export interface MediaPlayerProps {
 
   // Optional footer content (e.g., sleep timer button)
   footerContent?: React.ReactNode;
+
+  // Enable background audio feature (default: true for meditations)
+  enableBackgroundAudio?: boolean;
 }
 
 export function MediaPlayer({
@@ -68,13 +75,84 @@ export function MediaPlayer({
   onPlayPause,
   loadingText = 'Loading...',
   footerContent,
+  enableBackgroundAudio = true,
 }: MediaPlayerProps) {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+
+  // Background audio hook
+  const backgroundAudio = useBackgroundAudio();
+
+  // Load saved background sound audio URL when initialized
+  useEffect(() => {
+    async function loadSavedSoundAudio() {
+      if (enableBackgroundAudio && backgroundAudio.isInitialized && backgroundAudio.selectedSoundId) {
+        const sound = getBackgroundSoundById(backgroundAudio.selectedSoundId);
+        if (sound) {
+          const url = await getAudioUrl(sound.audioKey);
+          if (url) {
+            backgroundAudio.loadAudio(url);
+          }
+        }
+      }
+    }
+    loadSavedSoundAudio();
+  }, [backgroundAudio.isInitialized, backgroundAudio.selectedSoundId, enableBackgroundAudio]);
+
+  // Sync background audio with main audio play/pause
+  useEffect(() => {
+    if (!enableBackgroundAudio) return;
+
+    if (audioPlayer.isPlaying && backgroundAudio.isEnabled && backgroundAudio.selectedSoundId && backgroundAudio.hasAudioLoaded) {
+      // Play background audio when main audio starts
+      if (!hasStartedPlaying) {
+        setHasStartedPlaying(true);
+      }
+      // Small delay to ensure audio is ready
+      setTimeout(() => {
+        backgroundAudio.play();
+      }, 100);
+    } else if (!audioPlayer.isPlaying) {
+      backgroundAudio.pause();
+    }
+  }, [audioPlayer.isPlaying, backgroundAudio.isEnabled, backgroundAudio.hasAudioLoaded, enableBackgroundAudio]);
+
+  // Cleanup background audio on unmount
+  useEffect(() => {
+    return () => {
+      backgroundAudio.cleanup();
+    };
+  }, []);
+
+  // Handle background sound selection
+  const handleSelectSound = async (soundId: string | null, audioKey: string | null) => {
+    if (soundId && audioKey) {
+      backgroundAudio.selectSound(soundId);
+      const url = await getAudioUrl(audioKey);
+      if (url) {
+        backgroundAudio.loadAudio(url);
+        // If main audio is playing, start background audio too
+        if (audioPlayer.isPlaying) {
+          setTimeout(() => {
+            backgroundAudio.play();
+          }, 200);
+        }
+      }
+    } else {
+      backgroundAudio.selectSound(null);
+    }
+  };
 
   // Use dark gradient in dark mode
   const darkGradient: [string, string] = ['#1A1D29', '#2A2D3E'];
   const effectiveGradient = isDark ? darkGradient : gradientColors;
+
+  // Get current background sound name for display
+  const currentBackgroundSound = backgroundAudio.selectedSoundId
+    ? getBackgroundSoundById(backgroundAudio.selectedSoundId)
+    : null;
 
   if (isLoading) {
     return (
@@ -102,14 +180,52 @@ export function MediaPlayer({
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
-            <Ionicons
-              name={isFavorited ? 'heart' : 'heart-outline'}
-              size={24}
-              color={isFavorited ? '#FF6B6B' : 'white'}
-            />
-          </TouchableOpacity>
+          
+          <View style={styles.headerRight}>
+            {/* Background Audio Button */}
+            {enableBackgroundAudio && (
+              <TouchableOpacity
+                onPress={() => setShowBackgroundPicker(true)}
+                style={[
+                  styles.headerButton,
+                  backgroundAudio.isEnabled && backgroundAudio.selectedSoundId && styles.headerButtonActive,
+                ]}
+              >
+                <Ionicons
+                  name="layers"
+                  size={20}
+                  color={
+                    backgroundAudio.isEnabled && backgroundAudio.selectedSoundId
+                      ? '#7DAFB4'
+                      : 'white'
+                  }
+                />
+              </TouchableOpacity>
+            )}
+            
+            {/* Favorite Button */}
+            <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
+              <Ionicons
+                name={isFavorited ? 'heart' : 'heart-outline'}
+                size={24}
+                color={isFavorited ? '#FF6B6B' : 'white'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Background Audio Indicator */}
+        {enableBackgroundAudio && backgroundAudio.isEnabled && currentBackgroundSound && audioPlayer.isPlaying && (
+          <TouchableOpacity
+            style={styles.backgroundIndicator}
+            onPress={() => setShowBackgroundPicker(true)}
+          >
+            <Ionicons name="musical-notes" size={14} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.backgroundIndicatorText}>
+              {currentBackgroundSound.title}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Content */}
         <View style={styles.content}>
@@ -191,6 +307,18 @@ export function MediaPlayer({
           {/* Optional Footer Content */}
           {footerContent}
         </View>
+
+        {/* Background Audio Picker Modal */}
+        <BackgroundAudioPicker
+          visible={showBackgroundPicker}
+          onClose={() => setShowBackgroundPicker(false)}
+          selectedSoundId={backgroundAudio.selectedSoundId}
+          volume={backgroundAudio.volume}
+          isEnabled={backgroundAudio.isEnabled}
+          onSelectSound={handleSelectSound}
+          onVolumeChange={backgroundAudio.setVolume}
+          onToggleEnabled={backgroundAudio.setEnabled}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -222,6 +350,11 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: theme.spacing.lg,
       paddingVertical: theme.spacing.md,
     },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     backButton: {
       width: 44,
       height: 44,
@@ -230,6 +363,17 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    headerButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerButtonActive: {
+      backgroundColor: 'rgba(125, 175, 180, 0.25)',
+    },
     favoriteButton: {
       width: 44,
       height: 44,
@@ -237,6 +381,23 @@ const createStyles = (theme: Theme) =>
       backgroundColor: 'rgba(255, 255, 255, 0.15)',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    backgroundIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: 16,
+      alignSelf: 'center',
+      marginTop: -8,
+    },
+    backgroundIndicatorText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.7)',
     },
     content: {
       flex: 1,

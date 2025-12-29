@@ -101,6 +101,10 @@ const filesToUpload = [
   // ========== COURSES ==========
   { local: 'meditate/courses/10-minute-reset-session1.mp3', remote: 'audio/meditate/courses/10-minute-reset-session1.mp3' },
   { local: 'meditate/courses/10-minute-reset-session2.mp3', remote: 'audio/meditate/courses/10-minute-reset-session2.mp3' },
+  // Foundational Series
+  { local: 'meditate/courses/foundational-series/youre-safe-right-now.mp3', remote: 'audio/meditate/courses/foundational-series/youre-safe-right-now.mp3' },
+  { local: 'meditate/courses/foundational-series/when-your-mind-wont-stop.mp3', remote: 'audio/meditate/courses/foundational-series/when-your-mind-wont-stop.mp3' },
+  { local: 'meditate/courses/foundational-series/a-place-to-rest.mp3', remote: 'audio/meditate/courses/foundational-series/a-place-to-rest.mp3' },
 ];
 
 async function fileExistsInStorage(remotePath) {

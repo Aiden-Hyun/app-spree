@@ -89,6 +89,9 @@ const storagePaths: Record<string, string> = {
   // ========== COURSES (Firebase Storage) ==========
   course_10min_reset_session1: 'audio/meditate/courses/10-minute-reset-session1.mp3',
   course_10min_reset_session2: 'audio/meditate/courses/10-minute-reset-session2.mp3',
+  course_foundational_session1: 'audio/meditate/courses/foundational-series/youre-safe-right-now.mp3',
+  course_foundational_session2: 'audio/meditate/courses/foundational-series/when-your-mind-wont-stop.mp3',
+  course_foundational_session3: 'audio/meditate/courses/foundational-series/a-place-to-rest.mp3',
 };
 
 // External URLs (public, no token needed)

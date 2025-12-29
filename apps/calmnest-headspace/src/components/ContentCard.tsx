@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { AnimatedPressable } from './AnimatedPressable';
-import { useTheme } from '../contexts/ThemeContext';
-import { Theme } from '../theme';
+import React from "react";
+import { View, Text, Image, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { AnimatedPressable } from "./AnimatedPressable";
+import { useTheme } from "../contexts/ThemeContext";
+import { Theme } from "../theme";
 
 export interface ContentCardProps {
   title: string;
@@ -19,26 +19,26 @@ export interface ContentCardProps {
 export function ContentCard({
   title,
   thumbnailUrl,
-  fallbackIcon = 'musical-notes',
+  fallbackIcon = "musical-notes",
   fallbackColor,
   meta,
   onPress,
   darkMode = false,
 }: ContentCardProps) {
   const { theme, isDark } = useTheme();
-  
+
   // darkMode prop = Sleep page (always use sleep colors)
   // isDark = system/app dark mode (use regular dark colors)
   const isSleepPage = darkMode;
   const isRegularDark = isDark && !darkMode;
-  
+
   const styles = React.useMemo(
     () => createStyles(theme, isSleepPage, isRegularDark),
     [theme, isSleepPage, isRegularDark]
   );
 
   const accentColor = fallbackColor || theme.colors.primary;
-  
+
   // Card background with subtle color tint
   let cardBgColor: string;
   if (isSleepPage) {
@@ -53,12 +53,21 @@ export function ContentCard({
   }
 
   return (
-    <AnimatedPressable onPress={onPress} style={[styles.card, { backgroundColor: cardBgColor }]}>
+    <AnimatedPressable
+      onPress={onPress}
+      style={[styles.card, { backgroundColor: cardBgColor }]}
+    >
       <View style={styles.thumbnailContainer}>
         {thumbnailUrl ? (
           <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} />
         ) : (
-          <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: `${accentColor}20` }]}>
+          <View
+            style={[
+              styles.thumbnail,
+              styles.thumbnailPlaceholder,
+              { backgroundColor: `${accentColor}20` },
+            ]}
+          >
             <Ionicons name={fallbackIcon} size={40} color={accentColor} />
           </View>
         )}
@@ -67,61 +76,65 @@ export function ContentCard({
         {title}
       </Text>
       <Text style={styles.meta} numberOfLines={1}>
-        {meta || ' '}
+        {meta || " "}
       </Text>
     </AnimatedPressable>
   );
 }
 
 // 50% larger than previous (140 → 210)
-const CARD_WIDTH = 210;
-const THUMBNAIL_HEIGHT = 150;
+const CARD_WIDTH = 190;
+const THUMBNAIL_HEIGHT = 130;
 
-const createStyles = (theme: Theme, isSleepPage: boolean, isRegularDark: boolean) =>
+const createStyles = (
+  theme: Theme,
+  isSleepPage: boolean,
+  isRegularDark: boolean
+) =>
   StyleSheet.create({
     card: {
       width: CARD_WIDTH,
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.md,
-      alignItems: 'center',
+      alignItems: "center",
       ...theme.shadows.sm,
     },
     thumbnailContainer: {
-      width: '100%',
+      width: "100%",
       height: THUMBNAIL_HEIGHT,
       borderRadius: theme.borderRadius.lg,
-      overflow: 'hidden',
+      overflow: "hidden",
     },
     thumbnail: {
-      width: '100%',
-      height: '100%',
-      resizeMode: 'cover',
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
     },
     thumbnailPlaceholder: {
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: "center",
+      justifyContent: "center",
     },
     title: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 15,
       lineHeight: 20,
-      color: isSleepPage 
-        ? theme.colors.sleepText 
-        : isRegularDark 
-          ? theme.colors.text 
-          : theme.colors.text,
-      textAlign: 'center',
+      color: isSleepPage
+        ? theme.colors.sleepText
+        : isRegularDark
+        ? theme.colors.text
+        : theme.colors.text,
+      textAlign: "center",
       marginTop: theme.spacing.md,
     },
     meta: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
-      color: isSleepPage 
-        ? theme.colors.sleepTextMuted 
-        : isRegularDark 
-          ? theme.colors.textLight 
-          : theme.colors.textLight,
-      textAlign: 'center',
+      color: isSleepPage
+        ? theme.colors.sleepTextMuted
+        : isRegularDark
+        ? theme.colors.textLight
+        : theme.colors.textLight,
+      textAlign: "center",
       marginTop: 4,
     },
   });

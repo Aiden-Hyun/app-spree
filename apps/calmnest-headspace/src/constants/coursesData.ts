@@ -54,6 +54,43 @@ export const coursesData: Course[] = [
       },
     ],
   },
+  {
+    id: 'course_foundational_series',
+    title: 'Foundational Series',
+    description: 'A calming collection of meditations designed to help you feel safe, grounded, and at peace. Perfect for building a consistent practice.',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?w=400&q=80',
+    color: '#8B9DC3',
+    totalDuration: 26,
+    sessionCount: 3,
+    difficulty: 'beginner',
+    instructor: 'Rachel',
+    sessions: [
+      {
+        id: 'foundational_session1',
+        dayNumber: 1,
+        title: "Session 1: You're Safe Right Now",
+        description: 'A gentle meditation to help you feel safe and secure in this moment',
+        duration_minutes: 7,
+        audioKey: 'course_foundational_session1',
+      },
+      {
+        id: 'foundational_session2',
+        dayNumber: 2,
+        title: "Session 2: When Your Mind Won't Stop",
+        description: 'Find calm when racing thoughts feel overwhelming',
+        duration_minutes: 8,
+        audioKey: 'course_foundational_session2',
+      },
+      {
+        id: 'foundational_session3',
+        dayNumber: 3,
+        title: 'Session 3: A Place to Rest',
+        description: 'A nest visualization to find your inner place of peace',
+        duration_minutes: 11,
+        audioKey: 'course_foundational_session3',
+      },
+    ],
+  },
 ];
 
 export const getCourseById = (id: string): Course | undefined => {
