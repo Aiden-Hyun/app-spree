@@ -367,7 +367,7 @@ export async function getUserFavorites(userId: string): Promise<UserFavorite[]> 
 export async function toggleFavorite(
   userId: string, 
   contentId: string, 
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session' | 'sleep_meditation'
 ): Promise<boolean> {
   try {
     // Query ALL favorites for this content (any type) to handle legacy data
@@ -425,12 +425,12 @@ export interface ResolvedContent {
   title: string;
   thumbnail_url?: string;
   duration_minutes: number;
-  content_type: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session';
+  content_type: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session' | 'sleep_meditation';
 }
 
 export async function getContentById(
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session'
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session' | 'sleep_meditation'
 ): Promise<ResolvedContent | null> {
   try {
     // Handle emergency meditations (local data)
@@ -501,6 +501,21 @@ export async function getContentById(
       return null;
     }
 
+    if (contentType === 'sleep_meditation') {
+      const { sleepMeditationsData } = await import('../constants/sleepMeditationsData');
+      const meditation = sleepMeditationsData.find(m => m.id === contentId);
+      if (meditation) {
+        return {
+          id: contentId,
+          title: meditation.title,
+          thumbnail_url: meditation.thumbnailUrl,
+          duration_minutes: meditation.duration_minutes,
+          content_type: contentType
+        };
+      }
+      return null;
+    }
+
     // Handle Firestore-stored types
     let collectionName: string;
     switch (contentType) {
@@ -563,7 +578,7 @@ export async function getFavoritesWithDetails(userId: string): Promise<ResolvedC
 export async function addToListeningHistory(
   userId: string,
   contentId: string,
-  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session',
+  contentType: 'meditation' | 'nature_sound' | 'bedtime_story' | 'breathing_exercise' | 'series_chapter' | 'album_track' | 'emergency' | 'course_session' | 'sleep_meditation',
   contentTitle: string,
   durationMinutes: number,
   contentThumbnail?: string

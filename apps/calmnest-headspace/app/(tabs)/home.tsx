@@ -25,6 +25,7 @@ import { emergencyMeditationsData } from '../../src/constants/emergencyMeditatio
 import { sleepSoundsData } from '../../src/constants/sleepSoundsData';
 import { whiteNoiseData, musicData, asmrData } from '../../src/constants/musicData';
 import { techniquesData, techniqueMeditationsData } from '../../src/constants/techniquesData';
+import { sleepMeditationsData } from '../../src/constants/sleepMeditationsData';
 import { Theme } from '../../src/theme';
 import { DailyQuote, ListeningHistoryItem } from '../../src/types';
 
@@ -172,6 +173,9 @@ function HomeScreen() {
         if (sleepSound) return sleepSound.thumbnailUrl;
         const whiteNoise = whiteNoiseData.find(w => w.id === contentId);
         if (whiteNoise) return whiteNoise.thumbnailUrl;
+        return undefined;
+      case 'sleep_meditation':
+        return sleepMeditationsData.find(m => m.id === contentId)?.thumbnailUrl;
         const music = musicData.find(m => m.id === contentId);
         if (music) return music.thumbnailUrl;
         const asmr = asmrData.find(a => a.id === contentId);
@@ -302,6 +306,9 @@ function HomeScreen() {
           router.push('/(tabs)/meditate');
         }
         break;
+      case 'sleep_meditation':
+        router.push({ pathname: '/sleep/meditation/[id]', params: { id: contentId } });
+        break;
     }
   };
 
@@ -322,6 +329,8 @@ function HomeScreen() {
         return 'flash';
       case 'course_session':
         return 'school';
+      case 'sleep_meditation':
+        return 'moon';
       default:
         return 'play-circle';
     }

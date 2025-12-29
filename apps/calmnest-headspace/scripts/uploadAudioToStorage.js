@@ -80,6 +80,10 @@ const filesToUpload = [
   { local: 'sleep/stories/midnight-crossing-chapter-1.mp3', remote: 'audio/sleep/stories/midnight-crossing-chapter-1.mp3' },
   { local: 'sleep/stories/the-shoemaker-and-the-elves.mp3', remote: 'audio/sleep/stories/the-shoemaker-and-the-elves.mp3' },
 
+  // Sleep meditations
+  { local: 'sleep/meditations/even-if-you-dont-fall-asleep.mp3', remote: 'audio/sleep/meditations/even-if-you-dont-fall-asleep.mp3' },
+  { local: 'sleep/meditations/let-the-day-fall-away.mp3', remote: 'audio/sleep/meditations/let-the-day-fall-away.mp3' },
+
   // ========== MEDITATE ==========
   // Emergency meditations
   { local: 'meditate/emergency/panic-relief.mp3', remote: 'audio/meditate/emergency/panic-relief.mp3' },

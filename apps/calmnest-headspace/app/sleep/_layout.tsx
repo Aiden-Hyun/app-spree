@@ -6,6 +6,7 @@ export default function SleepLayout() {
       <Stack.Screen name="[id]" options={{ headerShown: false }} />
       <Stack.Screen name="bedtime-stories" options={{ headerShown: false }} />
       <Stack.Screen name="sleep-meditations" options={{ headerShown: false }} />
+      <Stack.Screen name="meditation/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -227,10 +227,11 @@ function SleepScreen() {
                     <ContentCard
                       key={meditation.id}
                       title={meditation.title}
+                      thumbnailUrl={meditation.thumbnailUrl}
                       fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
                       fallbackColor={meditation.color}
                       meta={`${meditation.duration_minutes} min`}
-                      onPress={() => router.push("/sleep/sleep-meditations")}
+                      onPress={() => router.push(`/sleep/meditation/${meditation.id}`)}
                       darkMode
                     />
                   ))}

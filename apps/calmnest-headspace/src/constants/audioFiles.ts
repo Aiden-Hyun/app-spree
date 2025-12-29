@@ -75,6 +75,10 @@ const storagePaths: Record<string, string> = {
   
   // ========== MEDITATIONS (Firebase Storage) ==========
   meditation_body_scan: 'audio/meditate/meditations/body-scan-delilah.mp3',
+
+  // ========== SLEEP MEDITATIONS (Firebase Storage) ==========
+  sleep_med_even_if_you_dont_fall_asleep: 'audio/sleep/meditations/even-if-you-dont-fall-asleep.mp3',
+  sleep_med_let_the_day_fall_away: 'audio/sleep/meditations/let-the-day-fall-away.mp3',
   
   // ========== ALBUMS (Firebase Storage) ==========
   // Meditation Music album

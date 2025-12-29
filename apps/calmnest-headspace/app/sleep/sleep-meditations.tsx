@@ -23,9 +23,7 @@ function SleepMeditationsScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handleMeditationPress = (meditation: SleepMeditation) => {
-    // TODO: Navigate to a meditation player screen
-    // For now, we could navigate to a generic player or show a toast
-    console.log('Play meditation:', meditation.id);
+    router.push(`/sleep/meditation/${meditation.id}`);
   };
 
   const renderMeditationItem = ({ item, index }: { item: SleepMeditation; index: number }) => (
