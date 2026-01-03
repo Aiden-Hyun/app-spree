@@ -28,6 +28,15 @@ const themeCategories = [
   { id: 'self-esteem', label: 'Self Love', icon: 'flower-outline' as const, color: '#D4A5A5' },
 ];
 
+const therapyCategories = [
+  { id: 'cbt', label: 'CBT', fullName: 'Cognitive Behavioral Therapy', icon: 'bulb-outline' as const, color: '#2DD4BF' },
+  { id: 'act', label: 'ACT', fullName: 'Acceptance & Commitment', icon: 'hand-left-outline' as const, color: '#818CF8' },
+  { id: 'dbt', label: 'DBT', fullName: 'Dialectical Behavior Therapy', icon: 'git-merge-outline' as const, color: '#F472B6' },
+  { id: 'mbct', label: 'MBCT', fullName: 'Mindfulness-Based CBT', icon: 'infinite-outline' as const, color: '#34D399' },
+  { id: 'ifs', label: 'IFS', fullName: 'Internal Family Systems', icon: 'people-outline' as const, color: '#FB923C' },
+  { id: 'somatic', label: 'Somatic', fullName: 'Body-Based Therapy', icon: 'body-outline' as const, color: '#A78BFA' },
+];
+
 function MeditateScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
@@ -58,6 +67,13 @@ function MeditateScreen() {
     router.push({
       pathname: '/meditations',
       params: { category: categoryId },
+    });
+  };
+
+  const handleTherapyPress = (therapyId: string) => {
+    router.push({
+      pathname: '/meditations/therapies',
+      params: { therapy: therapyId },
     });
   };
 
@@ -215,9 +231,56 @@ function MeditateScreen() {
               </AnimatedView>
         </View>
 
-        {/* Emergency */}
+        {/* Browse by Therapies */}
         <View style={styles.section}>
           <AnimatedView delay={300} duration={400}>
+            <AnimatedPressable
+              onPress={() => router.push('/meditations/therapies')}
+              style={styles.sectionHeader}
+            >
+              <Text style={styles.sectionTitle}>Browse by Therapies</Text>
+              <View style={styles.seeAllContainer}>
+                <Text style={styles.seeAllText}>See all</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={theme.colors.primary}
+                />
+              </View>
+            </AnimatedPressable>
+          </AnimatedView>
+
+          <AnimatedView delay={350} duration={400}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cardsScroll}
+            >
+              {therapyCategories.map((therapy) => (
+                <AnimatedPressable
+                  key={therapy.id}
+                  onPress={() => handleTherapyPress(therapy.id)}
+                  style={styles.therapyCard}
+                >
+                  <View
+                    style={[
+                      styles.therapyIconContainer,
+                      { backgroundColor: `${therapy.color}20` },
+                    ]}
+                  >
+                    <Ionicons name={therapy.icon} size={22} color={therapy.color} />
+                  </View>
+                  <Text style={styles.therapyLabel}>{therapy.label}</Text>
+                  <Text style={styles.therapySubLabel} numberOfLines={1}>{therapy.fullName}</Text>
+                </AnimatedPressable>
+              ))}
+            </ScrollView>
+          </AnimatedView>
+        </View>
+
+        {/* Emergency */}
+        <View style={styles.section}>
+          <AnimatedView delay={400} duration={400}>
             <View style={styles.sectionHeaderNoLink}>
               <View style={styles.emergencyTitleRow}>
                 <Ionicons name="flash" size={20} color="#E57373" />
@@ -227,7 +290,7 @@ function MeditateScreen() {
             </View>
             </AnimatedView>
 
-          <AnimatedView delay={350} duration={400}>
+          <AnimatedView delay={450} duration={400}>
             {loading ? (
               renderSkeletonCards(3)
             ) : (
@@ -254,7 +317,7 @@ function MeditateScreen() {
 
         {/* Browse by Techniques */}
         <View style={styles.section}>
-          <AnimatedView delay={400} duration={400}>
+          <AnimatedView delay={500} duration={400}>
             <AnimatedPressable
               onPress={() => router.push('/meditations/techniques')}
               style={styles.sectionHeader}
@@ -271,7 +334,7 @@ function MeditateScreen() {
                   </AnimatedPressable>
                 </AnimatedView>
 
-          <AnimatedView delay={450} duration={400}>
+          <AnimatedView delay={550} duration={400}>
             {loading ? (
               renderSkeletonCards(3)
             ) : (
@@ -395,7 +458,38 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     fontSize: 12,
     color: theme.colors.text,
     textAlign: 'center',
-    },
+  },
+  therapyCard: {
+    width: 120,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
+  therapyIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  therapyLabel: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 14,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  therapySubLabel: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 10,
+    color: theme.colors.textLight,
+    textAlign: 'center',
+    marginTop: 2,
+    paddingHorizontal: 4,
+  },
 });
 
 export default function Meditate() {
