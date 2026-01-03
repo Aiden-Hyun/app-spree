@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,19 +15,31 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
-import { sleepMeditationsData, SleepMeditation } from '../../src/constants/sleepMeditationsData';
+import { getSleepMeditations, FirestoreSleepMeditation } from '../../src/services/firestoreService';
 
 function SleepMeditationsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const [meditations, setMeditations] = useState<FirestoreSleepMeditation[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const handleMeditationPress = (meditation: SleepMeditation) => {
+  useEffect(() => {
+    async function loadMeditations() {
+      setLoading(true);
+      const data = await getSleepMeditations();
+      setMeditations(data);
+      setLoading(false);
+    }
+    loadMeditations();
+  }, []);
+
+  const handleMeditationPress = (meditation: FirestoreSleepMeditation) => {
     router.push(`/sleep/meditation/${meditation.id}`);
   };
 
-  const renderMeditationItem = ({ item, index }: { item: SleepMeditation; index: number }) => (
+  const renderMeditationItem = ({ item, index }: { item: FirestoreSleepMeditation; index: number }) => (
     <AnimatedView delay={100 + index * 30} duration={300}>
       <AnimatedPressable
         onPress={() => handleMeditationPress(item)}
@@ -90,14 +103,20 @@ function SleepMeditationsScreen() {
           </AnimatedView>
 
           {/* Meditations List */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.sleepAccent} />
+            </View>
+          ) : (
           <FlatList
-            data={sleepMeditationsData}
+              data={meditations}
             keyExtractor={(item) => item.id}
             renderItem={renderMeditationItem}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={() => <View style={{ height: theme.spacing.sm }} />}
           />
+          )}
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -203,6 +222,11 @@ const createStyles = (theme: Theme) =>
       height: 32,
       borderRadius: 16,
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadingContainer: {
+      flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },

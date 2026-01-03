@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -16,15 +17,25 @@ import { AnimatedView } from '../src/components/AnimatedView';
 import { AnimatedPressable } from '../src/components/AnimatedPressable';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { useAudioPlayer } from '../src/hooks/useAudioPlayer';
-import { getAudioUrl } from '../src/constants/audioFiles';
+import { getAudioUrlFromPath } from '../src/constants/audioFiles';
 import {
-  sleepSoundsData,
-  categoryLabels,
-  getSoundsByCategory,
-  SleepSound,
-  SleepSoundCategory,
-} from '../src/constants/sleepSoundsData';
+  getSleepSounds,
+  getSleepSoundsByCategory,
+  FirestoreSleepSound,
+} from '../src/services/firestoreService';
 import { Theme } from '../src/theme';
+
+type SleepSoundCategory = 'rain' | 'water' | 'fire' | 'wind' | 'nature' | 'ambient';
+
+const categoryLabels: Record<SleepSoundCategory | 'all', string> = {
+  all: 'All',
+  rain: 'Rain',
+  water: 'Water',
+  fire: 'Fire',
+  wind: 'Wind',
+  nature: 'Nature',
+  ambient: 'Ambient',
+};
 
 const { width } = Dimensions.get('window');
 // 2 columns with padding (24 * 2 = 48) and gap between (8)
@@ -35,14 +46,32 @@ function SleepSoundsScreen() {
   const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<SleepSoundCategory | 'all'>('all');
   const [playingSound, setPlayingSound] = useState<string | null>(null);
+  const [sounds, setSounds] = useState<FirestoreSleepSound[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const audioPlayer = useAudioPlayer();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const filteredSounds = useMemo(
-    () => getSoundsByCategory(selectedCategory),
-    [selectedCategory]
-  );
+  // Fetch sounds from Firestore
+  useEffect(() => {
+    async function fetchSounds() {
+      try {
+        setLoading(true);
+        let data: FirestoreSleepSound[];
+        if (selectedCategory === 'all') {
+          data = await getSleepSounds();
+        } else {
+          data = await getSleepSoundsByCategory(selectedCategory);
+        }
+        setSounds(data);
+      } catch (error) {
+        console.error('Error fetching sleep sounds:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSounds();
+  }, [selectedCategory]);
 
   const categories: (SleepSoundCategory | 'all')[] = [
     'all',
@@ -54,14 +83,14 @@ function SleepSoundsScreen() {
     'ambient',
   ];
 
-  const handleSoundPress = useCallback(async (sound: SleepSound) => {
+  const handleSoundPress = useCallback(async (sound: FirestoreSleepSound) => {
     if (playingSound === sound.id) {
       // Stop playing
       audioPlayer.pause();
       setPlayingSound(null);
     } else {
       // Play new sound
-      const audioUrl = await getAudioUrl(sound.audioKey);
+      const audioUrl = await getAudioUrlFromPath(sound.audioPath);
       if (audioUrl) {
         await audioPlayer.loadAudio(audioUrl);
         audioPlayer.play();
@@ -129,8 +158,13 @@ function SleepSoundsScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.gridContainer}
           >
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.sleepText} />
+              </View>
+            ) : (
             <View style={styles.grid}>
-              {filteredSounds.map((sound, index) => {
+              {sounds.map((sound, index) => {
                 const isPlaying = playingSound === sound.id;
                 return (
                   <AnimatedView
@@ -180,6 +214,7 @@ function SleepSoundsScreen() {
                 );
               })}
             </View>
+            )}
 
             {/* Attribution */}
             <View style={styles.attribution}>
@@ -316,6 +351,12 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.sleepTextMuted,
       opacity: 0.6,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xxl,
     },
   });
 

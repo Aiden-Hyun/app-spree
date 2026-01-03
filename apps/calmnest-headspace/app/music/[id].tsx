@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,13 +10,19 @@ import { SoundPlayer } from '../../src/components/SoundPlayer';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getAudioUrl } from '../../src/constants/audioFiles';
-import { addToListeningHistory } from '../../src/services/firestoreService';
-import { sleepSoundsData, SleepSound } from '../../src/constants/sleepSoundsData';
-import { whiteNoiseData, musicData, asmrData, MusicItem } from '../../src/constants/musicData';
+import { getAudioUrlFromPath } from '../../src/constants/audioFiles';
+import {
+  addToListeningHistory,
+  getSleepSounds,
+  getWhiteNoise,
+  getMusic,
+  getAsmr,
+  FirestoreSleepSound,
+  FirestoreMusicItem,
+} from '../../src/services/firestoreService';
 import { Theme } from '../../src/theme';
 
-type SoundData = SleepSound | MusicItem;
+type SoundData = FirestoreSleepSound | FirestoreMusicItem;
 
 const DEFAULT_TIMER_MINUTES = 45;
 
@@ -27,6 +33,7 @@ function SoundPlayerScreen() {
   const { user } = useAuth();
   
   const [sound, setSound] = useState<SoundData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [timerMinutes, setTimerMinutes] = useState<number | null>(DEFAULT_TIMER_MINUTES);
   const [remainingSeconds, setRemainingSeconds] = useState(DEFAULT_TIMER_MINUTES * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
@@ -37,33 +44,53 @@ function SoundPlayerScreen() {
   
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Find the sound data based on id and category
+  // Fetch sound data from Firestore based on id
   useEffect(() => {
-    if (!id) return;
-    
-    let foundSound: SoundData | undefined;
+    async function fetchSound() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        // Fetch all sound sources from Firestore
+        const [sleepSounds, whiteNoise, music, asmr] = await Promise.all([
+          getSleepSounds(),
+          getWhiteNoise(),
+          getMusic(),
+          getAsmr(),
+        ]);
     
     // Search in all data sources
-    const allSounds = [
-      ...sleepSoundsData,
-      ...whiteNoiseData,
-      ...musicData,
-      ...asmrData,
+        const allSounds: SoundData[] = [
+          ...sleepSounds,
+          ...whiteNoise,
+          ...music,
+          ...asmr,
     ];
     
-    foundSound = allSounds.find((s) => s.id === id);
+        const foundSound = allSounds.find((s) => s.id === id);
     
     if (foundSound) {
       setSound(foundSound);
     }
-  }, [id, category]);
+      } catch (error) {
+        console.error('Error fetching sound:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchSound();
+  }, [id]);
 
   // Load audio when sound is found
   useEffect(() => {
     async function loadSoundAudio() {
-      if (!sound) return;
+      if (!sound?.audioPath) return;
       
-      const audioUrl = await getAudioUrl(sound.audioKey);
+      const audioUrl = await getAudioUrlFromPath(sound.audioPath);
       if (audioUrl) {
         await audioPlayer.loadAudio(audioUrl);
         // Enable looping by default for ambient sounds
@@ -170,6 +197,24 @@ function SoundPlayerScreen() {
     };
   }, []);
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={theme.gradients.sleepyNight as [string, string]}
+          style={styles.gradient}
+        >
+          <SafeAreaView style={styles.safeArea}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.sleepText} />
+              <Text style={styles.loadingText}>Loading...</Text>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </View>
+    );
+  }
+
   if (!sound) {
     return null;
   }
@@ -240,6 +285,17 @@ const createStyles = (theme: Theme) =>
     playerContainer: {
       flex: 1,
       justifyContent: 'center',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: theme.spacing.md,
+    },
+    loadingText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 16,
+      color: theme.colors.sleepText,
     },
   });
 

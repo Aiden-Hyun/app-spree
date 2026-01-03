@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -16,16 +16,24 @@ import {
   getTodayQuote, 
   getListeningHistory, 
   getFavoritesWithDetails,
-  ResolvedContent
+  ResolvedContent,
+  getSeries,
+  getAlbums,
+  getCourses,
+  getEmergencyMeditations,
+  getSleepSounds,
+  getWhiteNoise,
+  getMusic,
+  getAsmr,
+  getSleepMeditations,
+  FirestoreSeries,
+  FirestoreAlbum,
+  FirestoreCourse,
+  FirestoreEmergencyMeditation,
+  FirestoreSleepSound,
+  FirestoreMusicItem,
+  FirestoreSleepMeditation,
 } from '../../src/services/firestoreService';
-import { seriesData } from '../../src/constants/seriesData';
-import { albumsData } from '../../src/constants/albumsData';
-import { coursesData } from '../../src/constants/coursesData';
-import { emergencyMeditationsData } from '../../src/constants/emergencyMeditationsData';
-import { sleepSoundsData } from '../../src/constants/sleepSoundsData';
-import { whiteNoiseData, musicData, asmrData } from '../../src/constants/musicData';
-import { techniquesData, techniqueMeditationsData } from '../../src/constants/techniquesData';
-import { sleepMeditationsData } from '../../src/constants/sleepMeditationsData';
 import { Theme } from '../../src/theme';
 import { DailyQuote, ListeningHistoryItem } from '../../src/types';
 
@@ -38,6 +46,17 @@ function HomeScreen() {
   const [recentlyPlayed, setRecentlyPlayed] = useState<ListeningHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<ResolvedContent[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Content data from Firestore
+  const seriesDataRef = useRef<FirestoreSeries[]>([]);
+  const albumsDataRef = useRef<FirestoreAlbum[]>([]);
+  const coursesDataRef = useRef<FirestoreCourse[]>([]);
+  const emergencyDataRef = useRef<FirestoreEmergencyMeditation[]>([]);
+  const sleepSoundsDataRef = useRef<FirestoreSleepSound[]>([]);
+  const whiteNoiseDataRef = useRef<FirestoreMusicItem[]>([]);
+  const musicDataRef = useRef<FirestoreMusicItem[]>([]);
+  const asmrDataRef = useRef<FirestoreMusicItem[]>([]);
+  const sleepMeditationsDataRef = useRef<FirestoreSleepMeditation[]>([]);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -52,13 +71,46 @@ function HomeScreen() {
     if (!user) return;
     
     try {
-      const [quoteData, historyData, favoritesData] = await Promise.all([
+      const [
+        quoteData, 
+        historyData, 
+        favoritesData,
+        seriesResult,
+        albumsResult,
+        coursesResult,
+        emergencyResult,
+        sleepSoundsResult,
+        whiteNoiseResult,
+        musicResult,
+        asmrResult,
+        sleepMeditationsResult
+      ] = await Promise.all([
         getTodayQuote(),
         getListeningHistory(user.uid, 10),
-        getFavoritesWithDetails(user.uid)
+        getFavoritesWithDetails(user.uid),
+        getSeries(),
+        getAlbums(),
+        getCourses(),
+        getEmergencyMeditations(),
+        getSleepSounds(),
+        getWhiteNoise(),
+        getMusic(),
+        getAsmr(),
+        getSleepMeditations()
       ]);
       setQuote(quoteData);
       setRecentlyPlayed(historyData);
+      
+      // Store content data in refs
+      seriesDataRef.current = seriesResult;
+      albumsDataRef.current = albumsResult;
+      coursesDataRef.current = coursesResult;
+      emergencyDataRef.current = emergencyResult;
+      sleepSoundsDataRef.current = sleepSoundsResult;
+      whiteNoiseDataRef.current = whiteNoiseResult;
+      musicDataRef.current = musicResult;
+      asmrDataRef.current = asmrResult;
+      sleepMeditationsDataRef.current = sleepMeditationsResult;
       
       // Deduplicate favorites by content id
       const seenIds = new Set<string>();
@@ -110,7 +162,7 @@ function HomeScreen() {
 
   // Helper to find series chapter by ID
   const findSeriesChapter = (chapterId: string) => {
-    for (const series of seriesData) {
+    for (const series of seriesDataRef.current) {
       const chapter = series.chapters.find(ch => ch.id === chapterId);
       if (chapter) {
         return { series, chapter };
@@ -121,8 +173,8 @@ function HomeScreen() {
 
   // Helper to find album track by ID
   const findAlbumTrack = (trackId: string) => {
-    for (const album of albumsData) {
-      const track = album.tracks.find(t => t.id === trackId);
+    for (const album of albumsDataRef.current) {
+      const track = album.tracks?.find(t => t.id === trackId);
       if (track) {
         return { album, track };
       }
@@ -132,8 +184,8 @@ function HomeScreen() {
 
   // Helper to find course session by ID
   const findCourseSession = (sessionId: string) => {
-    for (const course of coursesData) {
-      const session = course.sessions.find(s => s.id === sessionId);
+    for (const course of coursesDataRef.current) {
+      const session = course.sessions?.find(s => s.id === sessionId);
       if (session) {
         return { course, session };
       }
@@ -141,46 +193,45 @@ function HomeScreen() {
     return null;
   };
 
-  // Helper to get thumbnail for content from local data
+  // Helper to get thumbnail for content from Firestore data
   const getThumbnailForContent = (contentId: string, contentType: string): string | undefined => {
     switch (contentType) {
       case 'emergency':
-        return emergencyMeditationsData.find(e => e.id === contentId)?.thumbnailUrl;
+        return emergencyDataRef.current.find(e => e.id === contentId)?.thumbnailUrl;
       case 'series_chapter':
-        for (const series of seriesData) {
+        for (const series of seriesDataRef.current) {
           if (series.chapters.some(c => c.id === contentId)) {
             return series.thumbnailUrl;
           }
         }
         return undefined;
       case 'album_track':
-        for (const album of albumsData) {
-          if (album.tracks.some(t => t.id === contentId)) {
+        for (const album of albumsDataRef.current) {
+          if (album.tracks?.some(t => t.id === contentId)) {
             return album.thumbnailUrl;
           }
         }
         return undefined;
       case 'course_session':
-        for (const course of coursesData) {
-          if (course.sessions.some(s => s.id === contentId)) {
+        for (const course of coursesDataRef.current) {
+          if (course.sessions?.some(s => s.id === contentId)) {
             return course.thumbnailUrl;
           }
         }
         return undefined;
       case 'nature_sound':
         // Check sleep sounds and white noise
-        const sleepSound = sleepSoundsData.find(s => s.id === contentId);
+        const sleepSound = sleepSoundsDataRef.current.find(s => s.id === contentId);
         if (sleepSound) return sleepSound.thumbnailUrl;
-        const whiteNoise = whiteNoiseData.find(w => w.id === contentId);
+        const whiteNoise = whiteNoiseDataRef.current.find(w => w.id === contentId);
         if (whiteNoise) return whiteNoise.thumbnailUrl;
-        return undefined;
-      case 'sleep_meditation':
-        return sleepMeditationsData.find(m => m.id === contentId)?.thumbnailUrl;
-        const music = musicData.find(m => m.id === contentId);
+        const music = musicDataRef.current.find(m => m.id === contentId);
         if (music) return music.thumbnailUrl;
-        const asmr = asmrData.find(a => a.id === contentId);
+        const asmr = asmrDataRef.current.find(a => a.id === contentId);
         if (asmr) return asmr.thumbnailUrl;
         return undefined;
+      case 'sleep_meditation':
+        return sleepMeditationsDataRef.current.find(m => m.id === contentId)?.thumbnailUrl;
       default:
         return undefined;
     }
@@ -189,26 +240,24 @@ function HomeScreen() {
   const navigateToContent = (contentId: string, contentType: string) => {
     // Handle emergency content that may have been saved with wrong type
     if (contentId.startsWith('emergency_')) {
-      import('../../src/constants/emergencyMeditationsData').then(({ emergencyMeditationsData }) => {
-        const emergency = emergencyMeditationsData.find(e => e.id === contentId);
-        if (emergency) {
-          router.push({
-            pathname: '/emergency/[id]',
-            params: {
-              id: emergency.id,
-              title: emergency.title,
-              description: emergency.description,
-              duration: String(emergency.duration_minutes),
-              audioKey: emergency.audioKey,
-              color: emergency.color,
-              icon: emergency.icon,
-              narrator: emergency.narrator || ''
-            }
-          });
-        } else {
-          router.push('/(tabs)/meditate');
-        }
-      });
+      const emergency = emergencyDataRef.current.find(e => e.id === contentId);
+      if (emergency) {
+        router.push({
+          pathname: '/emergency/[id]',
+          params: {
+            id: emergency.id,
+            title: emergency.title,
+            description: emergency.description,
+            duration: String(emergency.duration_minutes),
+            audioPath: emergency.audioPath,
+            color: emergency.color,
+            icon: emergency.icon,
+            narrator: emergency.narrator || ''
+          }
+        });
+      } else {
+        router.push('/(tabs)/meditate');
+      }
       return;
     }
 
@@ -233,7 +282,7 @@ function HomeScreen() {
             pathname: '/series/chapter/[id]',
             params: {
               id: result.chapter.id,
-              audioKey: result.chapter.audioKey,
+              audioPath: result.chapter.audioPath,
               title: result.chapter.title,
               seriesTitle: result.series.title,
               duration: String(result.chapter.duration_minutes),
@@ -252,7 +301,7 @@ function HomeScreen() {
             pathname: '/album/track/[id]',
             params: {
               id: albumResult.track.id,
-              audioKey: albumResult.track.audioKey,
+              audioPath: albumResult.track.audioPath,
               title: albumResult.track.title,
               albumTitle: albumResult.album.title,
               duration: String(albumResult.track.duration_minutes),
@@ -264,27 +313,25 @@ function HomeScreen() {
         }
         break;
       case 'emergency':
-        // Look up emergency meditation data and navigate with full params
-        import('../../src/constants/emergencyMeditationsData').then(({ emergencyMeditationsData }) => {
-          const emergency = emergencyMeditationsData.find(e => e.id === contentId);
-          if (emergency) {
-            router.push({
-              pathname: '/emergency/[id]',
-              params: {
-                id: emergency.id,
-                title: emergency.title,
-                description: emergency.description,
-                duration: String(emergency.duration_minutes),
-                audioKey: emergency.audioKey,
-                color: emergency.color,
-                icon: emergency.icon,
-                narrator: emergency.narrator || ''
-              }
-            });
-          } else {
-            router.push('/(tabs)/meditate');
-          }
-        });
+        // Look up emergency meditation data from Firestore
+        const emergency = emergencyDataRef.current.find(e => e.id === contentId);
+        if (emergency) {
+          router.push({
+            pathname: '/emergency/[id]',
+            params: {
+              id: emergency.id,
+              title: emergency.title,
+              description: emergency.description,
+              duration: String(emergency.duration_minutes),
+              audioPath: emergency.audioPath,
+              color: emergency.color,
+              icon: emergency.icon,
+              narrator: emergency.narrator || ''
+            }
+          });
+        } else {
+          router.push('/(tabs)/meditate');
+        }
         break;
       case 'course_session':
         // Look up course session data and navigate with full params
@@ -294,7 +341,7 @@ function HomeScreen() {
             pathname: '/course/session/[id]',
             params: {
               id: courseResult.session.id,
-              audioKey: courseResult.session.audioKey,
+              audioPath: courseResult.session.audioPath,
               title: courseResult.session.title,
               courseTitle: courseResult.course.title,
               duration: String(courseResult.session.duration_minutes),

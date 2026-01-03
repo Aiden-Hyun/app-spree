@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useMemo, useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,15 +9,37 @@ import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
-import { getCourseById, CourseSession } from "../../src/constants/coursesData";
+import { getCourseById, FirestoreCourse, FirestoreCourseSession } from "../../src/services/firestoreService";
 
 function CourseDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme, isDark } = useTheme();
+  const [course, setCourse] = useState<FirestoreCourse | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const course = useMemo(() => getCourseById(id || ""), [id]);
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+
+  useEffect(() => {
+    async function loadCourse() {
+      if (!id) return;
+      setLoading(true);
+      const data = await getCourseById(id);
+      setCourse(data);
+      setLoading(false);
+    }
+    loadCourse();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.errorContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!course) {
     return (
@@ -35,13 +57,13 @@ function CourseDetailScreen() {
     );
   }
 
-  const handleSessionPress = (session: CourseSession) => {
+  const handleSessionPress = (session: FirestoreCourseSession) => {
     if (!course) return;
     router.push({
       pathname: '/course/session/[id]',
       params: {
         id: session.id,
-        audioKey: session.audioKey,
+        audioPath: session.audioPath,
         title: session.title,
         courseTitle: course.title,
         duration: String(session.duration_minutes),

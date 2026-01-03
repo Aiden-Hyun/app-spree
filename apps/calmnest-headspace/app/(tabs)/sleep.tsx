@@ -9,19 +9,23 @@ import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { ContentCard } from "../../src/components/ContentCard";
 import { Skeleton } from "../../src/components/Skeleton";
-import { getBedtimeStories } from "../../src/services/firestoreService";
+import { 
+  getBedtimeStories, 
+  getSleepMeditations, 
+  getSeries,
+  FirestoreSleepMeditation,
+  FirestoreSeries
+} from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
-import {
-  sleepMeditationsData,
-} from "../../src/constants/sleepMeditationsData";
-import { seriesData, Series } from "../../src/constants/seriesData";
 
 function SleepScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const [bedtimeStories, setBedtimeStories] = useState<BedtimeStory[]>([]);
+  const [sleepMeditations, setSleepMeditations] = useState<FirestoreSleepMeditation[]>([]);
+  const [series, setSeries] = useState<FirestoreSeries[]>([]);
   const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -33,8 +37,14 @@ function SleepScreen() {
   const loadSleepContent = async () => {
     try {
       setLoading(true);
-      const stories = await getBedtimeStories();
+      const [stories, meditations, seriesData] = await Promise.all([
+        getBedtimeStories(),
+        getSleepMeditations(),
+        getSeries()
+      ]);
       setBedtimeStories(stories);
+      setSleepMeditations(meditations);
+      setSeries(seriesData);
     } catch (error) {
       console.error("Failed to load sleep content:", error);
     } finally {
@@ -68,8 +78,8 @@ function SleepScreen() {
     }
   };
 
-  const handleSeriesPress = (series: Series) => {
-    router.push(`/series/${series.id}`);
+  const handleSeriesPress = (seriesItem: FirestoreSeries) => {
+    router.push(`/series/${seriesItem.id}`);
   };
 
   return (
@@ -115,15 +125,15 @@ function SleepScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.cardsScroll}
                 >
-                  {seriesData.map((series) => (
+                  {series.map((seriesItem) => (
                     <ContentCard
-                      key={series.id}
-                      title={series.title}
-                      thumbnailUrl={series.thumbnailUrl}
-                      fallbackIcon={getCategoryIcon(series.category)}
-                      fallbackColor={series.color}
-                      meta={`${series.chapterCount} chapters`}
-                      onPress={() => handleSeriesPress(series)}
+                      key={seriesItem.id}
+                      title={seriesItem.title}
+                      thumbnailUrl={seriesItem.thumbnailUrl}
+                      fallbackIcon={getCategoryIcon(seriesItem.category)}
+                      fallbackColor={seriesItem.color}
+                      meta={`${seriesItem.chapterCount} chapters`}
+                      onPress={() => handleSeriesPress(seriesItem)}
                       darkMode
                     />
                   ))}
@@ -223,7 +233,7 @@ function SleepScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.cardsScroll}
                 >
-                  {sleepMeditationsData.slice(0, 6).map((meditation) => (
+                  {sleepMeditations.slice(0, 6).map((meditation) => (
                     <ContentCard
                       key={meditation.id}
                       title={meditation.title}

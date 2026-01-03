@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,11 +13,13 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { useTheme } from "../contexts/ThemeContext";
 import { Theme } from "../theme";
-import {
-  backgroundSoundsData,
-  backgroundSoundCategories,
-  BackgroundSound,
-} from "../constants/backgroundSoundsData";
+import { getBackgroundSounds, FirestoreBackgroundSound } from "../services/firestoreService";
+
+const backgroundSoundCategories = [
+  { id: "nature", title: "Nature", icon: "leaf" },
+  { id: "ambient", title: "Ambient", icon: "planet" },
+  { id: "white-noise", title: "White Noise", icon: "radio" },
+];
 
 interface BackgroundAudioPickerProps {
   visible: boolean;
@@ -28,7 +30,7 @@ interface BackgroundAudioPickerProps {
   hasError: boolean;
   volume: number;
   isEnabled: boolean;
-  onSelectSound: (soundId: string | null, audioKey: string | null) => void;
+  onSelectSound: (soundId: string | null, audioPath: string | null) => void;
   onVolumeChange: (volume: number) => void;
   onToggleEnabled: (enabled: boolean) => void;
 }
@@ -49,18 +51,32 @@ export function BackgroundAudioPicker({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [activeCategory, setActiveCategory] = useState<string>("nature");
+  const [allSounds, setAllSounds] = useState<FirestoreBackgroundSound[]>([]);
+  const [loadingSounds, setLoadingSounds] = useState(true);
+
+  useEffect(() => {
+    async function loadSounds() {
+      setLoadingSounds(true);
+      const sounds = await getBackgroundSounds();
+      setAllSounds(sounds);
+      setLoadingSounds(false);
+    }
+    if (visible) {
+      loadSounds();
+    }
+  }, [visible]);
 
   const filteredSounds = useMemo(
-    () => backgroundSoundsData.filter((sound) => sound.category === activeCategory),
-    [activeCategory]
+    () => allSounds.filter((sound) => sound.category === activeCategory),
+    [activeCategory, allSounds]
   );
 
-  const handleSoundSelect = (sound: BackgroundSound) => {
+  const handleSoundSelect = (sound: FirestoreBackgroundSound) => {
     if (selectedSoundId === sound.id) {
       // Deselect if already selected
       onSelectSound(null, null);
     } else {
-      onSelectSound(sound.id, sound.audioKey);
+      onSelectSound(sound.id, sound.audioPath);
       if (!isEnabled) {
         onToggleEnabled(true);
       }
@@ -169,7 +185,11 @@ export function BackgroundAudioPicker({
             style={styles.soundList}
             showsVerticalScrollIndicator={false}
           >
-            {filteredSounds.map((sound) => {
+            {loadingSounds ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#7DAFB4" />
+              </View>
+            ) : filteredSounds.map((sound) => {
               const isThisSoundSelected = selectedSoundId === sound.id && isEnabled;
               // Show error if this sound is selected and has error
               const showError = isThisSoundSelected && hasError;
@@ -369,6 +389,10 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.medium,
       fontSize: 15,
       color: "#fff",
+    },
+    loadingContainer: {
+      paddingVertical: 40,
+      alignItems: "center",
     },
   });
 

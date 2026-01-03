@@ -7,15 +7,15 @@ import { MediaPlayer } from '../../../src/components/MediaPlayer';
 import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
-import { getAudioUrl } from '../../../src/constants/audioFiles';
+import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
 import { addToListeningHistory, toggleFavorite, isFavorite } from '../../../src/services/firestoreService';
 import { Theme } from '../../../src/theme';
 
 function SeriesChapterPlayerScreen() {
-  const { id, audioKey, title, seriesTitle, duration, narrator } = useLocalSearchParams<{
+  const { id, audioPath, title, seriesTitle, duration, narrator } = useLocalSearchParams<{
     id: string;
-    audioKey: string;
+    audioPath: string;
     title: string;
     seriesTitle: string;
     duration: string;
@@ -46,13 +46,13 @@ function SeriesChapterPlayerScreen() {
 
   useEffect(() => {
     async function loadChapterAudio() {
-      if (!audioKey) {
+      if (!audioPath) {
         setLoading(false);
         return;
       }
       
       try {
-      const audioUrl = await getAudioUrl(audioKey);
+      const audioUrl = await getAudioUrlFromPath(audioPath);
       if (audioUrl) {
         audioPlayer.loadAudio(audioUrl);
         }
@@ -62,7 +62,7 @@ function SeriesChapterPlayerScreen() {
     }
     
     loadChapterAudio();
-  }, [audioKey]);
+  }, [audioPath]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

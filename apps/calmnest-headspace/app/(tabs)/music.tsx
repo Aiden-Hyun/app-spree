@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useMemo, useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,28 +8,55 @@ import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { ContentCard } from "../../src/components/ContentCard";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { sleepSoundsData } from "../../src/constants/sleepSoundsData";
-import { whiteNoiseData, musicData, asmrData, MusicItem } from "../../src/constants/musicData";
-import { albumsData, Album } from "../../src/constants/albumsData";
 import { Theme } from "../../src/theme";
-
-// Featured items for each section (show first 6)
-const featuredNatureSounds = sleepSoundsData.slice(0, 6);
-const featuredWhiteNoise = whiteNoiseData.slice(0, 6);
-const featuredMusic = musicData.slice(0, 6);
-const featuredASMR = asmrData.slice(0, 6);
+import {
+  getSleepSounds,
+  getWhiteNoise,
+  getMusic,
+  getAsmr,
+  getAlbums,
+  FirestoreSleepSound,
+  FirestoreMusicItem,
+  FirestoreAlbum,
+} from "../../src/services/firestoreService";
 
 function MusicScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
+  const [sleepSounds, setSleepSounds] = useState<FirestoreSleepSound[]>([]);
+  const [whiteNoise, setWhiteNoise] = useState<FirestoreMusicItem[]>([]);
+  const [music, setMusic] = useState<FirestoreMusicItem[]>([]);
+  const [asmr, setAsmr] = useState<FirestoreMusicItem[]>([]);
+  const [albums, setAlbums] = useState<FirestoreAlbum[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+
+  useEffect(() => {
+    async function loadContent() {
+      setLoading(true);
+      const [sleepData, whiteData, musicData, asmrData, albumsData] = await Promise.all([
+        getSleepSounds(),
+        getWhiteNoise(),
+        getMusic(),
+        getAsmr(),
+        getAlbums()
+      ]);
+      setSleepSounds(sleepData);
+      setWhiteNoise(whiteData);
+      setMusic(musicData);
+      setAsmr(asmrData);
+      setAlbums(albumsData);
+      setLoading(false);
+    }
+    loadContent();
+  }, []);
 
   const handleSoundPress = (soundId: string) => {
     router.push(`/music/${soundId}`);
   };
 
-  const handleAlbumPress = (album: Album) => {
+  const handleAlbumPress = (album: FirestoreAlbum) => {
     router.push(`/album/${album.id}`);
   };
 
@@ -52,7 +79,7 @@ function MusicScreen() {
 
   const renderSoundSection = (
     title: string,
-    sounds: Array<MusicItem & { thumbnailUrl?: string }>,
+    sounds: Array<FirestoreMusicItem>,
     route: string,
     baseDelay: number
   ) => (
@@ -101,7 +128,7 @@ function MusicScreen() {
 
   const renderNatureSoundsSection = (
     title: string,
-    sounds: typeof featuredNatureSounds,
+    sounds: FirestoreSleepSound[],
     route: string,
     baseDelay: number
   ) => (
@@ -147,6 +174,16 @@ function MusicScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
         <SafeAreaView style={styles.safeArea}>
           <ScrollView
@@ -182,7 +219,7 @@ function MusicScreen() {
                 showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cardsScroll}
               >
-                {albumsData.map((album, index) => (
+                {albums.map((album, index) => (
                   <AnimatedView
                     key={album.id}
                     delay={150 + index * 40}
@@ -202,16 +239,16 @@ function MusicScreen() {
             </View>
 
             {/* White Noise Section */}
-        {renderSoundSection("White Noise", featuredWhiteNoise, "/music/white-noise", 300)}
+        {renderSoundSection("White Noise", whiteNoise.slice(0, 6), "/music/white-noise", 300)}
 
             {/* Nature Sounds Section */}
-        {renderNatureSoundsSection("Nature Sounds", featuredNatureSounds, "/music/nature-sounds", 500)}
+        {renderNatureSoundsSection("Nature Sounds", sleepSounds.slice(0, 6), "/music/nature-sounds", 500)}
 
             {/* Music Section */}
-        {renderSoundSection("Music", featuredMusic, "/music/music", 700)}
+        {renderSoundSection("Music", music.slice(0, 6), "/music/music", 700)}
 
             {/* ASMR Section */}
-        {renderSoundSection("ASMR", featuredASMR, "/music/asmr", 900)}
+        {renderSoundSection("ASMR", asmr.slice(0, 6), "/music/asmr", 900)}
 
             {/* Bottom spacing */}
             <View style={{ height: 40 }} />
@@ -293,6 +330,11 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     cardsScroll: {
       paddingHorizontal: theme.spacing.lg,
       gap: theme.spacing.md,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 

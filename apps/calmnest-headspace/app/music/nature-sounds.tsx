@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import React, { useState, useMemo, useEffect } from "react";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,28 +8,58 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { sleepSoundsData, SleepSoundCategory, categoryLabels } from "../../src/constants/sleepSoundsData";
+import { getSleepSounds, FirestoreSleepSound } from "../../src/services/firestoreService";
 import { Theme } from "../../src/theme";
 
+type SleepSoundCategory = 'rain' | 'water' | 'fire' | 'wind' | 'nature' | 'ambient';
+
 const categories: (SleepSoundCategory | 'all')[] = ['all', 'rain', 'water', 'fire', 'wind', 'nature', 'ambient'];
+
+const categoryLabels: Record<SleepSoundCategory | 'all', string> = {
+  all: 'All',
+  rain: 'Rain',
+  water: 'Water',
+  fire: 'Fire',
+  wind: 'Wind',
+  nature: 'Nature',
+  ambient: 'Ambient',
+};
 
 function NatureSoundsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<SleepSoundCategory | 'all'>('all');
+  const [sounds, setSounds] = useState<FirestoreSleepSound[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  // Fetch sounds from Firestore
+  useEffect(() => {
+    async function fetchSounds() {
+      try {
+        setLoading(true);
+        const data = await getSleepSounds();
+        setSounds(data);
+      } catch (error) {
+        console.error('Error fetching sounds:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSounds();
+  }, []);
+
   const filteredSounds = useMemo(() => {
-    if (selectedCategory === 'all') return sleepSoundsData;
-    return sleepSoundsData.filter(s => s.category === selectedCategory);
-  }, [selectedCategory]);
+    if (selectedCategory === 'all') return sounds;
+    return sounds.filter(s => s.category === selectedCategory);
+  }, [selectedCategory, sounds]);
 
   const handleSoundPress = (soundId: string) => {
     router.push(`/music/${soundId}`);
   };
 
-  const renderItem = ({ item, index }: { item: typeof sleepSoundsData[0]; index: number }) => (
+  const renderItem = ({ item, index }: { item: FirestoreSleepSound; index: number }) => (
     <AnimatedView delay={index * 50} duration={400}>
       <AnimatedPressable
         onPress={() => handleSoundPress(item.id)}
@@ -101,6 +131,11 @@ function NatureSoundsScreen() {
             />
           </View>
 
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.sleepText} />
+            </View>
+          ) : (
           <FlatList
             data={filteredSounds}
             renderItem={renderItem}
@@ -108,6 +143,7 @@ function NatureSoundsScreen() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
+          )}
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -204,6 +240,11 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
       color: theme.colors.sleepTextMuted,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });
 

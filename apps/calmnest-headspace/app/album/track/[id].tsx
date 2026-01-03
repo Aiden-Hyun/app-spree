@@ -5,13 +5,13 @@ import { MediaPlayer } from '../../../src/components/MediaPlayer';
 import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
-import { getAudioUrl } from '../../../src/constants/audioFiles';
+import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { addToListeningHistory, toggleFavorite, isFavorite } from '../../../src/services/firestoreService';
 
 function AlbumTrackPlayerScreen() {
-  const { id, audioKey, title, albumTitle, duration, artist } = useLocalSearchParams<{
+  const { id, audioPath, title, albumTitle, duration, artist } = useLocalSearchParams<{
     id: string;
-    audioKey: string;
+    audioPath: string;
     title: string;
     albumTitle: string;
     duration: string;
@@ -40,13 +40,13 @@ function AlbumTrackPlayerScreen() {
 
   useEffect(() => {
     async function loadTrackAudio() {
-      if (!audioKey) {
+      if (!audioPath) {
         setLoading(false);
         return;
       }
       
       try {
-      const audioUrl = await getAudioUrl(audioKey);
+      const audioUrl = await getAudioUrlFromPath(audioPath);
       if (audioUrl) {
         audioPlayer.loadAudio(audioUrl);
         }
@@ -56,7 +56,7 @@ function AlbumTrackPlayerScreen() {
     }
     
     loadTrackAudio();
-  }, [audioKey]);
+  }, [audioPath]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

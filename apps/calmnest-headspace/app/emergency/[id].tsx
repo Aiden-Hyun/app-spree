@@ -4,7 +4,7 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { useAuth } from "../../src/contexts/AuthContext";
-import { getAudioUrl } from "../../src/constants/audioFiles";
+import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
 import { getNarratorByName } from "../../src/constants/narratorData";
 import {
   addToListeningHistory,
@@ -23,13 +23,13 @@ function adjustColor(hex: string, percent: number): string {
 }
 
 function EmergencyPlayerScreen() {
-  const { id, title, description, duration, audioKey, color, icon, narrator } =
+  const { id, title, description, duration, audioPath, color, icon, narrator } =
     useLocalSearchParams<{
       id: string;
       title: string;
       description: string;
       duration: string;
-      audioKey: string;
+      audioPath: string;
       color: string;
       icon: string;
       narrator: string;
@@ -56,13 +56,13 @@ function EmergencyPlayerScreen() {
 
   useEffect(() => {
     async function loadAudio() {
-      if (!audioKey) {
+      if (!audioPath) {
         setLoading(false);
         return;
       }
 
       try {
-        const audioUrl = await getAudioUrl(audioKey);
+        const audioUrl = await getAudioUrlFromPath(audioPath);
         if (audioUrl) {
           audioPlayer.loadAudio(audioUrl);
         }
@@ -74,7 +74,7 @@ function EmergencyPlayerScreen() {
     }
 
     loadAudio();
-  }, [audioKey]);
+  }, [audioPath]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

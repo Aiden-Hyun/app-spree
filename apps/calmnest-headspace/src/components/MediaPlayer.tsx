@@ -16,8 +16,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Theme } from '../theme';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
-import { getAudioUrl } from '../constants/audioFiles';
-import { getBackgroundSoundById } from '../constants/backgroundSoundsData';
+import { getAudioUrlFromPath } from '../constants/audioFiles';
+import { getBackgroundSoundById, FirestoreBackgroundSound } from '../services/firestoreService';
 
 export interface MediaPlayerProps {
   // Content info
@@ -80,17 +80,31 @@ export function MediaPlayer({
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreBackgroundSound | null>(null);
 
   // Background audio hook
   const backgroundAudio = useBackgroundAudio();
+
+  // Fetch current background sound when selectedSoundId changes
+  useEffect(() => {
+    async function fetchCurrentSound() {
+      if (backgroundAudio.selectedSoundId) {
+        const sound = await getBackgroundSoundById(backgroundAudio.selectedSoundId);
+        setCurrentBackgroundSound(sound);
+      } else {
+        setCurrentBackgroundSound(null);
+      }
+    }
+    fetchCurrentSound();
+  }, [backgroundAudio.selectedSoundId]);
 
   // Load saved background sound audio URL when initialized
   useEffect(() => {
     async function loadSavedSoundAudio() {
       if (enableBackgroundAudio && backgroundAudio.isInitialized && backgroundAudio.selectedSoundId) {
-        const sound = getBackgroundSoundById(backgroundAudio.selectedSoundId);
+        const sound = await getBackgroundSoundById(backgroundAudio.selectedSoundId);
         if (sound) {
-          const url = await getAudioUrl(sound.audioKey);
+          const url = await getAudioUrlFromPath(sound.audioPath);
           if (url) {
             backgroundAudio.loadAudio(url, backgroundAudio.selectedSoundId);
           }
@@ -119,10 +133,10 @@ export function MediaPlayer({
   }, []);
 
   // Handle background sound selection
-  const handleSelectSound = async (soundId: string | null, audioKey: string | null) => {
-    if (soundId && audioKey) {
+  const handleSelectSound = async (soundId: string | null, audioPath: string | null) => {
+    if (soundId && audioPath) {
       backgroundAudio.selectSound(soundId);
-      const url = await getAudioUrl(audioKey);
+      const url = await getAudioUrlFromPath(audioPath);
       if (url) {
         backgroundAudio.loadAudio(url, soundId);
         // If main audio is playing, start background audio too
@@ -140,11 +154,6 @@ export function MediaPlayer({
   // Use dark gradient in dark mode
   const darkGradient: [string, string] = ['#1A1D29', '#2A2D3E'];
   const effectiveGradient = isDark ? darkGradient : gradientColors;
-
-  // Get current background sound name for display
-  const currentBackgroundSound = backgroundAudio.selectedSoundId
-    ? getBackgroundSoundById(backgroundAudio.selectedSoundId)
-    : null;
 
   if (isLoading) {
     return (
@@ -292,6 +301,13 @@ export function MediaPlayer({
                 onPlay={onPlayPause}
                 onPause={onPlayPause}
                 onSeek={audioPlayer.seekTo}
+                // Playback controls
+                playbackRate={audioPlayer.playbackRate}
+                isLooping={audioPlayer.isLooping}
+                onPlaybackRateChange={audioPlayer.setPlaybackRate}
+                onSkipBack={() => audioPlayer.skipBackward(15)}
+                onSkipForward={() => audioPlayer.skipForward(15)}
+                onToggleLoop={() => audioPlayer.setLoop(!audioPlayer.isLooping)}
               />
             )}
           </View>

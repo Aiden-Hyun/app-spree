@@ -13,12 +13,10 @@ import {
   addToListeningHistory,
   toggleFavorite,
   isFavorite,
+  getSleepMeditationById,
+  FirestoreSleepMeditation,
 } from "../../../src/services/firestoreService";
-import { getAudioUrl } from "../../../src/constants/audioFiles";
-import {
-  sleepMeditationsData,
-  SleepMeditation,
-} from "../../../src/constants/sleepMeditationsData";
+import { getAudioUrlFromPath } from "../../../src/constants/audioFiles";
 import { Theme } from "../../../src/theme";
 
 function SleepMeditationPlayerScreen() {
@@ -26,7 +24,9 @@ function SleepMeditationPlayerScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [meditation, setMeditation] = useState<SleepMeditation | null>(null);
+  const [meditation, setMeditation] = useState<FirestoreSleepMeditation | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
@@ -34,11 +34,16 @@ function SleepMeditationPlayerScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
 
-  // Find meditation from local data
+  // Fetch meditation from Firestore
   useEffect(() => {
-    const found = sleepMeditationsData.find((m) => m.id === id);
-    setMeditation(found || null);
-    setLoading(false);
+    async function loadMeditation() {
+      if (!id) return;
+      setLoading(true);
+      const data = await getSleepMeditationById(id as string);
+      setMeditation(data);
+      setLoading(false);
+    }
+    loadMeditation();
   }, [id]);
 
   // Check if favorited on load
@@ -55,9 +60,9 @@ function SleepMeditationPlayerScreen() {
   // Load audio when meditation is found
   useEffect(() => {
     async function loadAudio() {
-      if (!meditation) return;
+      if (!meditation?.audioPath) return;
 
-      const audioUrl = await getAudioUrl(meditation.audioKey);
+      const audioUrl = await getAudioUrlFromPath(meditation.audioPath);
       if (audioUrl) {
         audioPlayer.loadAudio(audioUrl);
       }

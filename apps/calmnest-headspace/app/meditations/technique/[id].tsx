@@ -4,13 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { ProtectedRoute } from "../../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../../src/hooks/useAudioPlayer";
-import { getAudioUrl } from "../../../src/constants/audioFiles";
+import { getAudioUrlFromPath } from "../../../src/constants/audioFiles";
 import { getNarratorByName } from "../../../src/constants/narratorData";
 
 function TechniqueMeditationPlayerScreen() {
   const {
     id,
-    audioKey,
+    audioPath,
     title,
     description,
     duration,
@@ -19,7 +19,7 @@ function TechniqueMeditationPlayerScreen() {
     color,
   } = useLocalSearchParams<{
     id: string;
-    audioKey: string;
+    audioPath: string;
     title: string;
     description: string;
     duration: string;
@@ -36,13 +36,13 @@ function TechniqueMeditationPlayerScreen() {
 
   useEffect(() => {
     async function loadAudio() {
-      if (!audioKey) {
+      if (!audioPath) {
         setLoading(false);
         return;
       }
 
       try {
-        const audioUrl = await getAudioUrl(audioKey);
+        const audioUrl = await getAudioUrlFromPath(audioPath);
         if (audioUrl) {
           audioPlayer.loadAudio(audioUrl);
         }
@@ -52,7 +52,7 @@ function TechniqueMeditationPlayerScreen() {
     }
 
     loadAudio();
-  }, [audioKey]);
+  }, [audioPath]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

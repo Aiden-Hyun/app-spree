@@ -75,7 +75,7 @@ const storagePaths: Record<string, string> = {
   
   // ========== MEDITATIONS (Firebase Storage) ==========
   meditation_body_scan: 'audio/meditate/meditations/body-scan-delilah.mp3',
-
+  
   // ========== SLEEP MEDITATIONS (Firebase Storage) ==========
   sleep_med_even_if_you_dont_fall_asleep: 'audio/sleep/meditations/even-if-you-dont-fall-asleep.mp3',
   sleep_med_let_the_day_fall_away: 'audio/sleep/meditations/let-the-day-fall-away.mp3',
@@ -199,6 +199,43 @@ export function getAudioFile(key: string): string | null {
 export async function preloadAudioUrls(keys: string[]): Promise<void> {
   const promises = keys.map(key => getAudioUrl(key).catch(() => null));
   await Promise.all(promises);
+}
+
+// Cache for path-based download URLs
+const pathUrlCache: Map<string, { url: string; timestamp: number }> = new Map();
+
+/**
+ * Get audio URL directly from a Firebase Storage path
+ * This is the preferred method for Firestore content that stores audioPath
+ * 
+ * @param audioPath - The Firebase Storage path (e.g., 'audio/sleep/meditations/my-file.mp3')
+ * @returns Promise<string | null> - The download URL or null if not found
+ */
+export async function getAudioUrlFromPath(audioPath: string): Promise<string | null> {
+  if (!audioPath) {
+    console.warn('No audio path provided');
+    return null;
+  }
+
+  // Check cache
+  const cached = pathUrlCache.get(audioPath);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.url;
+  }
+
+  try {
+    // Get download URL from Firebase Storage
+    const storageRef = ref(storage, audioPath);
+    const url = await getDownloadURL(storageRef);
+    
+    // Cache the URL
+    pathUrlCache.set(audioPath, { url, timestamp: Date.now() });
+    
+    return url;
+  } catch (error) {
+    console.error(`Failed to get download URL for path ${audioPath}:`, error);
+    return null;
+  }
 }
 
 // Export storage paths for reference

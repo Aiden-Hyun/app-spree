@@ -16,6 +16,7 @@ export interface AudioPlayerState {
   formattedDuration: string;
   error: string | null;
   isLooping: boolean;
+  playbackRate: number;
 }
 
 /**
@@ -42,6 +43,7 @@ function resolveAudioSource(
 export function useAudioPlayer(initialSource?: string | number | null) {
   const [error, setError] = useState<string | null>(null);
   const [isLooping, setIsLooping] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1.0);
   const hasLoadedRef = useRef(false);
 
   // Configure audio mode on mount
@@ -97,8 +99,9 @@ export function useAudioPlayer(initialSource?: string | number | null) {
       formattedDuration: formatTime(status.duration),
       error,
       isLooping,
+      playbackRate,
     }),
-    [status, error, formatTime, isLooping]
+    [status, error, formatTime, isLooping, playbackRate]
   );
 
   // Load a new audio source using player.replace()
@@ -184,6 +187,47 @@ export function useAudioPlayer(initialSource?: string | number | null) {
     [player]
   );
 
+  // Set playback speed (0.5 to 2.0 in 0.1 increments)
+  const setPlaybackRate = useCallback(
+    (rate: number) => {
+      try {
+        const clampedRate = Math.round(Math.max(0.5, Math.min(2.0, rate)) * 10) / 10;
+        // expo-audio uses setPlaybackRate method with optional pitch correction
+        player.setPlaybackRate(clampedRate, 'high');
+        setPlaybackRateState(clampedRate);
+      } catch (err) {
+        console.warn("Failed to set playback rate:", err);
+      }
+    },
+    [player]
+  );
+
+  // Skip forward by N seconds (default 15)
+  const skipForward = useCallback(
+    (seconds: number = 15) => {
+      try {
+        const newPosition = Math.min(status.currentTime + seconds, status.duration);
+        player.seekTo(newPosition);
+      } catch (err) {
+        console.warn("Failed to skip forward:", err);
+      }
+    },
+    [player, status.currentTime, status.duration]
+  );
+
+  // Skip backward by N seconds (default 15)
+  const skipBackward = useCallback(
+    (seconds: number = 15) => {
+      try {
+        const newPosition = Math.max(status.currentTime - seconds, 0);
+        player.seekTo(newPosition);
+      } catch (err) {
+        console.warn("Failed to skip backward:", err);
+      }
+    },
+    [player, status.currentTime]
+  );
+
   const cleanup = useCallback(() => {
     try {
       player.pause();
@@ -204,6 +248,9 @@ export function useAudioPlayer(initialSource?: string | number | null) {
     seekTo,
     setVolume,
     setLoop,
+    setPlaybackRate,
+    skipForward,
+    skipBackward,
     cleanup,
 
     // Raw player access if needed

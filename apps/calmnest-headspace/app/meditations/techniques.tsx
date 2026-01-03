@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,33 +16,49 @@ import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import {
-  techniquesData,
-  techniqueMeditationsData,
-  getMeditationsByTechnique,
-  MeditationTechnique,
-  TechniqueMeditation,
-} from '../../src/constants/techniquesData';
+  getTechniques,
+  getTechniqueMeditations,
+  FirestoreTechnique,
+  FirestoreTechniqueMeditation,
+} from '../../src/services/firestoreService';
 
 function TechniquesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ technique?: string }>();
   const { theme, isDark } = useTheme();
   const [selectedTechnique, setSelectedTechnique] = useState<string>(params.technique || 'all');
+  const [techniques, setTechniques] = useState<FirestoreTechnique[]>([]);
+  const [allMeditations, setAllMeditations] = useState<FirestoreTechniqueMeditation[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
-  const filteredMeditations = useMemo(() => {
-    if (selectedTechnique === 'all') return techniqueMeditationsData;
-    return getMeditationsByTechnique(selectedTechnique);
-  }, [selectedTechnique]);
+  useEffect(() => {
+    async function loadContent() {
+      setLoading(true);
+      const [techniquesData, meditationsData] = await Promise.all([
+        getTechniques(),
+        getTechniqueMeditations()
+      ]);
+      setTechniques(techniquesData);
+      setAllMeditations(meditationsData);
+      setLoading(false);
+    }
+    loadContent();
+  }, []);
 
-  const handleMeditationPress = (meditation: TechniqueMeditation) => {
+  const filteredMeditations = useMemo(() => {
+    if (selectedTechnique === 'all') return allMeditations;
+    return allMeditations.filter(m => m.techniqueId === selectedTechnique);
+  }, [selectedTechnique, allMeditations]);
+
+  const handleMeditationPress = (meditation: FirestoreTechniqueMeditation) => {
     router.push(
-      `/meditations/technique/${meditation.id}?audioKey=${meditation.audioKey}&title=${encodeURIComponent(meditation.title)}&description=${encodeURIComponent(meditation.description)}&duration=${meditation.duration_minutes}&instructor=${encodeURIComponent(meditation.instructor)}&technique=${meditation.technique}&color=${encodeURIComponent(meditation.color)}`
+      `/meditations/technique/${meditation.id}?audioPath=${encodeURIComponent(meditation.audioPath)}&title=${encodeURIComponent(meditation.title)}&description=${encodeURIComponent(meditation.description)}&duration=${meditation.duration_minutes}&instructor=${encodeURIComponent(meditation.instructor)}&technique=${meditation.techniqueId}&color=${encodeURIComponent(meditation.color)}`
     );
   };
 
-  const renderMeditationItem = ({ item, index }: { item: TechniqueMeditation; index: number }) => (
+  const renderMeditationItem = ({ item, index }: { item: FirestoreTechniqueMeditation; index: number }) => (
     <AnimatedView delay={100 + index * 30} duration={300}>
       <AnimatedPressable
         onPress={() => handleMeditationPress(item)}
@@ -49,7 +66,7 @@ function TechniquesScreen() {
       >
         <View style={[styles.meditationIcon, { backgroundColor: `${item.color}20` }]}>
           <Ionicons
-            name={techniquesData.find((t) => t.id === item.technique)?.icon as keyof typeof Ionicons.glyphMap || 'leaf'}
+            name={techniques.find((t) => t.id === item.techniqueId)?.icon as keyof typeof Ionicons.glyphMap || 'leaf'}
             size={24}
             color={item.color}
           />
@@ -78,6 +95,16 @@ function TechniquesScreen() {
       </AnimatedPressable>
     </AnimatedView>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -118,7 +145,7 @@ function TechniquesScreen() {
               All
             </Text>
           </AnimatedPressable>
-          {techniquesData.map((technique) => (
+          {techniques.map((technique) => (
             <AnimatedPressable
               key={technique.id}
               onPress={() => setSelectedTechnique(technique.id)}
@@ -151,7 +178,7 @@ function TechniquesScreen() {
         <AnimatedView delay={50} duration={300}>
           <View style={styles.descriptionContainer}>
             <Text style={styles.descriptionText}>
-              {techniquesData.find((t) => t.id === selectedTechnique)?.longDescription}
+              {techniques.find((t) => t.id === selectedTechnique)?.longDescription}
             </Text>
           </View>
         </AnimatedView>

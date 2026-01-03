@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -14,15 +15,44 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
-import { getSeriesById, SeriesChapter } from '../../src/constants/seriesData';
+import { getSeriesById, FirestoreSeries, FirestoreSeriesChapter } from '../../src/services/firestoreService';
 
 function SeriesDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
+  const [series, setSeries] = useState<FirestoreSeries | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const series = useMemo(() => getSeriesById(id || ''), [id]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    async function loadSeries() {
+      if (!id) return;
+      setLoading(true);
+      const data = await getSeriesById(id);
+      setSeries(data);
+      setLoading(false);
+    }
+    loadSeries();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={theme.gradients.sleepyNight as [string, string]}
+          style={styles.gradient}
+        >
+          <SafeAreaView style={styles.safeArea}>
+            <View style={styles.errorContainer}>
+              <ActivityIndicator size="large" color={theme.colors.sleepAccent} />
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </View>
+    );
+  }
 
   if (!series) {
     return (
@@ -44,9 +74,9 @@ function SeriesDetailScreen() {
     );
   }
 
-  const handleChapterPress = (chapter: SeriesChapter) => {
-    // Navigate to series chapter player with the audioKey and narrator
-    router.push(`/series/chapter/${chapter.id}?audioKey=${chapter.audioKey}&title=${encodeURIComponent(chapter.title)}&seriesTitle=${encodeURIComponent(series.title)}&duration=${chapter.duration_minutes}&narrator=${encodeURIComponent(series.narrator)}`);
+  const handleChapterPress = (chapter: FirestoreSeriesChapter) => {
+    // Navigate to series chapter player with the audioPath and narrator
+    router.push(`/series/chapter/${chapter.id}?audioPath=${encodeURIComponent(chapter.audioPath)}&title=${encodeURIComponent(chapter.title)}&seriesTitle=${encodeURIComponent(series.title)}&duration=${chapter.duration_minutes}&narrator=${encodeURIComponent(series.narrator)}`);
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {

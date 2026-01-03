@@ -7,15 +7,15 @@ import { MediaPlayer } from '../../../src/components/MediaPlayer';
 import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
-import { getAudioUrl } from '../../../src/constants/audioFiles';
+import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
 import { addToListeningHistory, toggleFavorite, isFavorite } from '../../../src/services/firestoreService';
 import { Theme } from '../../../src/theme';
 
 function CourseSessionPlayerScreen() {
-  const { id, audioKey, title, courseTitle, duration, instructor, color } = useLocalSearchParams<{
+  const { id, audioPath, title, courseTitle, duration, instructor, color } = useLocalSearchParams<{
     id: string;
-    audioKey: string;
+    audioPath: string;
     title: string;
     courseTitle: string;
     duration: string;
@@ -47,13 +47,13 @@ function CourseSessionPlayerScreen() {
 
   useEffect(() => {
     async function loadSessionAudio() {
-      if (!audioKey) {
+      if (!audioPath) {
         setLoading(false);
         return;
       }
       
       try {
-        const audioUrl = await getAudioUrl(audioKey);
+        const audioUrl = await getAudioUrlFromPath(audioPath);
         if (audioUrl) {
           audioPlayer.loadAudio(audioUrl);
         }
@@ -63,7 +63,7 @@ function CourseSessionPlayerScreen() {
     }
     
     loadSessionAudio();
-  }, [audioKey]);
+  }, [audioPath]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import React, { useMemo, useState, useEffect } from "react";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,20 +8,38 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { whiteNoiseData } from "../../src/constants/musicData";
+import { getWhiteNoise, FirestoreMusicItem } from "../../src/services/firestoreService";
 import { Theme } from "../../src/theme";
 
 function WhiteNoiseScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const [sounds, setSounds] = useState<FirestoreMusicItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Fetch sounds from Firestore
+  useEffect(() => {
+    async function fetchSounds() {
+      try {
+        setLoading(true);
+        const data = await getWhiteNoise();
+        setSounds(data);
+      } catch (error) {
+        console.error('Error fetching white noise:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSounds();
+  }, []);
 
   const handleSoundPress = (soundId: string) => {
     router.push(`/music/${soundId}`);
   };
 
-  const renderItem = ({ item, index }: { item: typeof whiteNoiseData[0]; index: number }) => (
+  const renderItem = ({ item, index }: { item: FirestoreMusicItem; index: number }) => (
     <AnimatedView delay={index * 50} duration={400}>
       <AnimatedPressable
         onPress={() => handleSoundPress(item.id)}
@@ -64,8 +82,13 @@ function WhiteNoiseScreen() {
             <View style={styles.headerSpacer} />
           </View>
 
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.sleepText} />
+            </View>
+          ) : (
           <FlatList
-            data={whiteNoiseData}
+              data={sounds}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
@@ -77,6 +100,7 @@ function WhiteNoiseScreen() {
               </View>
             }
           />
+          )}
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -160,6 +184,12 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 16,
       color: theme.colors.sleepTextMuted,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xxl,
     },
   });
 

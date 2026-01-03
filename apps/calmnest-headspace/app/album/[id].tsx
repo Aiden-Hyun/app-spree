@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -14,15 +15,44 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
-import { getAlbumById, AlbumTrack } from '../../src/constants/albumsData';
+import { getAlbumById, FirestoreAlbum, FirestoreAlbumTrack } from '../../src/services/firestoreService';
 
 function AlbumDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useTheme();
+  const [album, setAlbum] = useState<FirestoreAlbum | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const album = useMemo(() => getAlbumById(id || ''), [id]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    async function loadAlbum() {
+      if (!id) return;
+      setLoading(true);
+      const data = await getAlbumById(id);
+      setAlbum(data);
+      setLoading(false);
+    }
+    loadAlbum();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient
+          colors={theme.gradients.sleepyNight as [string, string]}
+          style={styles.gradient}
+        >
+          <SafeAreaView style={styles.safeArea}>
+            <View style={styles.errorContainer}>
+              <ActivityIndicator size="large" color={theme.colors.sleepAccent} />
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </View>
+    );
+  }
 
   if (!album) {
     return (
@@ -44,9 +74,9 @@ function AlbumDetailScreen() {
     );
   }
 
-  const handleTrackPress = (track: AlbumTrack) => {
+  const handleTrackPress = (track: FirestoreAlbumTrack) => {
     // Navigate to album track player
-    router.push(`/album/track/${track.id}?audioKey=${track.audioKey}&title=${encodeURIComponent(track.title)}&albumTitle=${encodeURIComponent(album.title)}&duration=${track.duration_minutes}&artist=${encodeURIComponent(album.artist)}`);
+    router.push(`/album/track/${track.id}?audioPath=${encodeURIComponent(track.audioPath)}&title=${encodeURIComponent(track.title)}&albumTitle=${encodeURIComponent(album.title)}&duration=${track.duration_minutes}&artist=${encodeURIComponent(album.artist)}`);
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {
