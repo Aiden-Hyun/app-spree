@@ -11,8 +11,8 @@ import {
   signInWithCredential
 } from "firebase/auth";
 import { auth } from "../firebase";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import appleAuth from "@invertase/react-native-apple-authentication";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 // Configure Google Sign In
 GoogleSignin.configure({
@@ -36,9 +36,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Apple Sign In is only available on iOS 13+
-  const isAppleSignInAvailable = Platform.OS === "ios" && appleAuth.isSupported;
+  const [isAppleSignInAvailable, setIsAppleSignInAvailable] = useState(false);
+
+  // Check Apple Sign In availability on mount
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync().then(setIsAppleSignInAvailable);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -58,18 +63,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    // Check if device supports Google Play Services
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    // Get the user's ID token
-    const signInResult = await GoogleSignin.signIn();
-    const idToken = signInResult.data?.idToken;
-    if (!idToken) {
-      throw new Error("No ID token found");
+    try {
+      // Check if device supports Google Play Services
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      // Get the user's ID token
+      const signInResult = await GoogleSignin.signIn();
+      const idToken = signInResult.data?.idToken;
+      if (!idToken) {
+        // User likely cancelled or no token returned; silently abort
+        return;
+      }
+      // Create a Google credential with the token
+      const googleCredential = GoogleAuthProvider.credential(idToken);
+      // Sign in with the credential
+      await signInWithCredential(auth, googleCredential);
+    } catch (err: any) {
+      // Swallow user-cancelled sign-in
+      if (
+        err?.code === statusCodes.SIGN_IN_CANCELLED ||
+        err?.code === "12501" // common Android cancel code
+      ) {
+        return;
+      }
+      throw err;
     }
-    // Create a Google credential with the token
-    const googleCredential = GoogleAuthProvider.credential(idToken);
-    // Sign in with the credential
-    await signInWithCredential(auth, googleCredential);
   };
 
   const signInWithApple = async () => {
@@ -77,26 +94,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Apple Sign In is not available on this device");
     }
     
-    // Perform Apple Sign In request
-    const appleAuthRequestResponse = await appleAuth.performRequest({
-      requestedOperation: appleAuth.Operation.LOGIN,
-      requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
-    });
+    try {
+      // Perform Apple Sign In request
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
 
-    // Ensure we have an identity token
-    const { identityToken, nonce } = appleAuthRequestResponse;
-    if (!identityToken) {
-      throw new Error("Apple Sign In failed - no identity token returned");
+      // Ensure we have an identity token
+      const { identityToken } = credential;
+      if (!identityToken) {
+        // User likely cancelled; silently abort
+        return;
+      }
+
+      // Create a Firebase credential from the Apple response (provider instance in modular SDK)
+      const provider = new OAuthProvider("apple.com");
+      const appleCredential = provider.credential({
+        idToken: identityToken,
+      });
+
+      // Sign in with the credential
+      await signInWithCredential(auth, appleCredential);
+    } catch (err: any) {
+      // Swallow user-cancelled sign-in
+      if (
+        err?.code === AppleAuthentication.AppleAuthenticationError?.CANCELED ||
+        err?.code === "ERR_CANCELED" ||
+        err?.code === "ERR_REQUEST_CANCELED"
+      ) {
+        return;
+      }
+      throw err;
     }
-
-    // Create a Firebase credential from the Apple response
-    const appleCredential = OAuthProvider.credential(
-      "apple.com",
-      { idToken: identityToken, rawNonce: nonce }
-    );
-
-    // Sign in with the credential
-    await signInWithCredential(auth, appleCredential);
   };
 
   const logout = async () => {

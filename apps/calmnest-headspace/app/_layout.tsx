@@ -45,6 +45,7 @@ function RootNavigator() {
           options={{ 
             title: 'Welcome',
             headerShown: false,
+            animation: 'none',
           }} 
         />
         <Stack.Screen 
