@@ -17,7 +17,7 @@ import { Theme } from '../theme';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
 import { getAudioUrlFromPath } from '../constants/audioFiles';
-import { getBackgroundSoundById, FirestoreBackgroundSound } from '../services/firestoreService';
+import { getBackgroundSoundById, getNarratorByName, FirestoreBackgroundSound } from '../services/firestoreService';
 
 export interface MediaPlayerProps {
   // Content info
@@ -81,9 +81,23 @@ export function MediaPlayer({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreBackgroundSound | null>(null);
+  const [narratorPhotoUrl, setNarratorPhotoUrl] = useState<string | null>(instructorPhotoUrl || null);
 
   // Background audio hook
   const backgroundAudio = useBackgroundAudio();
+
+  // Fetch narrator photo if not provided
+  useEffect(() => {
+    async function fetchNarratorPhoto() {
+      if (instructor && !instructorPhotoUrl) {
+        const narrator = await getNarratorByName(instructor);
+        if (narrator?.profileUrl) {
+          setNarratorPhotoUrl(narrator.profileUrl);
+        }
+      }
+    }
+    fetchNarratorPhoto();
+  }, [instructor, instructorPhotoUrl]);
 
   // Fetch current background sound when selectedSoundId changes
   useEffect(() => {
@@ -267,9 +281,9 @@ export function MediaPlayer({
             {/* Narrator */}
             {instructor && (
               <View style={styles.narratorSection}>
-                {instructorPhotoUrl ? (
+                {narratorPhotoUrl ? (
                   <Image
-                    source={{ uri: instructorPhotoUrl }}
+                    source={{ uri: narratorPhotoUrl }}
                     style={styles.narratorPhoto}
                   />
                 ) : (

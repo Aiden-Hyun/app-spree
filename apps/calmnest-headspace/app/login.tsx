@@ -26,7 +26,9 @@ export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const { signUp, signIn, loading } = useAuth();
+  const { signUp, signIn, signInWithGoogle, signInWithApple, isAppleSignInAvailable, loading } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const { theme, isDark } = useTheme();
   
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -71,6 +73,30 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setGoogleLoading(true);
+      await signInWithGoogle();
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setAppleLoading(true);
+      await signInWithApple();
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -215,6 +241,59 @@ export default function LoginScreen() {
           </Text>
             </AnimatedPressable>
           </AnimatedView>
+
+          {/* Divider */}
+          <AnimatedView delay={800} duration={500}>
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </AnimatedView>
+
+          {/* Google Sign In Button */}
+          <AnimatedView delay={900} duration={500}>
+            <AnimatedPressable
+              onPress={handleGoogleSignIn}
+              disabled={googleLoading}
+              style={styles.googleButton}
+            >
+              <View style={styles.googleButtonInner}>
+                {googleLoading ? (
+                  <ActivityIndicator color={theme.colors.text} size="small" />
+                ) : (
+                  <>
+                    <View style={styles.googleIconContainer}>
+                      <Text style={styles.googleIcon}>G</Text>
+                    </View>
+                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                  </>
+                )}
+              </View>
+            </AnimatedPressable>
+          </AnimatedView>
+
+          {/* Apple Sign In Button - iOS only */}
+          {isAppleSignInAvailable && (
+            <AnimatedView delay={1000} duration={500}>
+              <AnimatedPressable
+                onPress={handleAppleSignIn}
+                disabled={appleLoading}
+                style={styles.appleButton}
+              >
+                <View style={styles.appleButtonInner}>
+                  {appleLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="logo-apple" size={20} color="#fff" />
+                      <Text style={styles.appleButtonText}>Continue with Apple</Text>
+                    </>
+                  )}
+                </View>
+              </AnimatedPressable>
+            </AnimatedView>
+          )}
       </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -336,4 +415,73 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.semiBold,
       color: theme.colors.primary,
   },
+    dividerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: theme.spacing.lg,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.colors.border,
+    },
+    dividerText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      paddingHorizontal: theme.spacing.md,
+    },
+    googleButton: {
+      marginBottom: theme.spacing.lg,
+    },
+    googleButtonInner: {
+      backgroundColor: theme.colors.surface,
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.xl,
+      borderRadius: theme.borderRadius.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadows.sm,
+    },
+    googleIconContainer: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: '#fff',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    googleIcon: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 16,
+      color: '#4285F4',
+    },
+    googleButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    appleButton: {
+      marginBottom: theme.spacing.lg,
+    },
+    appleButtonInner: {
+      backgroundColor: '#000',
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.xl,
+      borderRadius: theme.borderRadius.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: theme.spacing.sm,
+      ...theme.shadows.sm,
+    },
+    appleButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 16,
+      color: '#fff',
+    },
 });

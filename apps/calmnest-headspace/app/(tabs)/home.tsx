@@ -59,6 +59,15 @@ function HomeScreen() {
   const sleepMeditationsDataRef = useRef<FirestoreSleepMeditation[]>([]);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const displayName = useMemo(() => {
+    const directName =
+      user?.displayName ||
+      user?.providerData?.find((provider) => provider.displayName)?.displayName;
+    if (directName) return directName;
+
+    const emailPrefix = user?.email?.split('@')[0];
+    return emailPrefix || 'Friend';
+  }, [user]);
 
   // Reload data when screen comes into focus
   useFocusEffect(
@@ -446,7 +455,7 @@ function HomeScreen() {
               {getGreeting()} {getGreetingEmoji()}
             </Text>
             <Text style={styles.userName}>
-              {user?.email?.split('@')[0] || 'Friend'}
+              {displayName}
             </Text>
           </View>
             <AnimatedPressable 

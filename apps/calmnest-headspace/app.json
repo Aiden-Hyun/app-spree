@@ -17,7 +17,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.calmnest.app"
+      "bundleIdentifier": "com.calmnest.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +33,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-audio"
+      "expo-audio",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.1012641376582-q3b2a8q3k1qlvgqokaq229aujeat7hme"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

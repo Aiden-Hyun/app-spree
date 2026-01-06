@@ -5,6 +5,16 @@ import { AnimatedPressable } from "./AnimatedPressable";
 import { useTheme } from "../contexts/ThemeContext";
 import { Theme } from "../theme";
 
+// Helper to convert hex color to rgba with opacity
+function hexToRgba(hex: string, opacity: number): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return hex;
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
 export interface ContentCardProps {
   title: string;
   thumbnailUrl?: string;
@@ -48,8 +58,8 @@ export function ContentCard({
     // Other pages in dark mode: use regular surface with subtle tint
     cardBgColor = theme.colors.surface;
   } else {
-    // Light mode: subtle accent color tint
-    cardBgColor = `${accentColor}12`;
+    // Light mode: subtle accent color tint (7% opacity)
+    cardBgColor = hexToRgba(accentColor, 0.07);
   }
 
   return (
@@ -65,7 +75,7 @@ export function ContentCard({
             style={[
               styles.thumbnail,
               styles.thumbnailPlaceholder,
-              { backgroundColor: `${accentColor}20` },
+              { backgroundColor: hexToRgba(accentColor, 0.125) },
             ]}
           >
             <Ionicons name={fallbackIcon} size={40} color={accentColor} />
