@@ -71,7 +71,7 @@ function RootNavigator() {
         <Stack.Screen 
           name="stats" 
           options={{ 
-            title: 'Your Journey',
+            headerShown: false,
           }} 
         />
         <Stack.Screen 

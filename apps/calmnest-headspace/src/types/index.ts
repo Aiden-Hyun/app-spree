@@ -197,5 +197,7 @@ export interface UserStats {
   favorite_time_of_day?: string;
   most_used_category?: MeditationCategory;
   weekly_minutes: number[];
+  monthly_minutes: number[];
+  yearly_minutes: number[];
   mood_improvement: number;
 }

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LineChart } from 'react-native-chart-kit';
+import { BarChart } from 'react-native-chart-kit';
 import { ProtectedRoute } from '../src/components/ProtectedRoute';
 import { StatsCard } from '../src/components/StatsCard';
 import { AnimatedView } from '../src/components/AnimatedView';
@@ -19,57 +19,80 @@ function StatsScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
   const { stats, loading } = useStats();
-  const [timeRange, setTimeRange] = useState<'week' | 'month'>('week');
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('week');
   const [chartData, setChartData] = useState<any>(null);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   useEffect(() => {
     loadChartData();
-  }, [timeRange, stats]);
+  }, [stats, timeRange]);
 
   const loadChartData = () => {
+    if (!stats) return;
+    
+    let labels: string[];
+    let data: number[];
+    
     if (timeRange === 'week') {
-      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const data = stats?.weekly_minutes || Array(7).fill(0);
-      
-      setChartData({
-        labels,
-        datasets: [{
-          data,
-          strokeWidth: 2,
-        }],
-      });
+      labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      data = stats.weekly_minutes || Array(7).fill(0);
+    } else if (timeRange === 'month') {
+      // Aggregate 30 days into 5 weekly totals
+      labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+      const monthlyData = stats.monthly_minutes || Array(30).fill(0);
+      data = [
+        monthlyData.slice(0, 7).reduce((a, b) => a + b, 0),   // Days 1-7
+        monthlyData.slice(7, 14).reduce((a, b) => a + b, 0),  // Days 8-14
+        monthlyData.slice(14, 21).reduce((a, b) => a + b, 0), // Days 15-21
+        monthlyData.slice(21, 28).reduce((a, b) => a + b, 0), // Days 22-28
+        monthlyData.slice(28, 30).reduce((a, b) => a + b, 0), // Days 29-30
+      ];
     } else {
-      const labels = Array(30).fill(0).map((_, i) => `${i + 1}`);
-      const data = Array(30).fill(0).map(() => Math.floor(Math.random() * 30));
-      
-      setChartData({
-        labels: labels.filter((_, i) => i % 5 === 0),
-        datasets: [{
-          data,
-          strokeWidth: 2,
-        }],
+      // Year view - 12 months
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const currentMonth = new Date().getMonth();
+      // Rotate labels so current month is last
+      labels = Array(12).fill(0).map((_, i) => {
+        const monthIndex = (currentMonth + 1 + i) % 12;
+        return monthNames[monthIndex];
       });
+      data = stats.yearly_minutes || Array(12).fill(0);
     }
+    
+    setChartData({
+      labels,
+      datasets: [{
+        data,
+      }],
+    });
+  };
+
+  // Calculate smart segments to avoid duplicate Y-axis labels
+  const getSmartSegments = (maxVal: number): number => {
+    if (maxVal <= 0) return 2;
+    if (maxVal <= 2) return Math.max(maxVal, 1); // 2 segments for max 2 (0, 1, 2)
+    if (maxVal <= 5) return maxVal; // match max for small values
+    if (maxVal <= 10) return 5;     // 5 segments (0, 2, 4, 6, 8, 10)
+    return 4;                        // 4 segments for larger values
   };
 
   const chartConfig = useMemo(() => ({
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'transparent',
     backgroundGradientFrom: theme.colors.surface,
     backgroundGradientTo: theme.colors.surface,
     decimalPlaces: 0,
+    barPercentage: 0.6,
     color: (opacity = 1) => isDark 
       ? `rgba(157, 176, 148, ${opacity})` 
       : `rgba(139, 159, 130, ${opacity})`,
-    labelColor: () => theme.colors.textLight,
-    style: {
-      borderRadius: theme.borderRadius.lg,
-    },
-    propsForDots: {
-      r: '5',
-      strokeWidth: '2',
-      stroke: theme.colors.primary,
+    labelColor: () => theme.colors.textMuted,
+    fillShadowGradientFrom: theme.colors.primary,
+    fillShadowGradientTo: theme.colors.primary,
+    fillShadowGradientOpacity: 1,
+    propsForBackgroundLines: {
+      stroke: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+      strokeWidth: 1,
     },
   }), [theme, isDark]);
 
@@ -81,9 +104,9 @@ function StatsScreen() {
           {/* Header */}
           <View style={styles.header}>
             <AnimatedPressable onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+              <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
             </AnimatedPressable>
-            <Text style={styles.title}>Your Statistics</Text>
+            <Text style={styles.title}>Statistics</Text>
             <View style={{ width: 44 }} />
           </View>
 
@@ -115,9 +138,9 @@ function StatsScreen() {
         <AnimatedView delay={0} duration={400}>
         <View style={styles.header}>
             <AnimatedPressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
             </AnimatedPressable>
-          <Text style={styles.title}>Your Statistics</Text>
+          <Text style={styles.title}>Statistics</Text>
             <View style={{ width: 44 }} />
         </View>
         </AnimatedView>
@@ -161,50 +184,55 @@ function StatsScreen() {
           </AnimatedView>
         </View>
 
-        {/* Time Range Toggle */}
-        <AnimatedView delay={250} duration={400}>
-        <View style={styles.toggleContainer}>
-            <AnimatedPressable
-              onPress={() => setTimeRange('week')}
-            style={[styles.toggleButton, timeRange === 'week' && styles.toggleButtonActive]}
-          >
-            <Text style={[styles.toggleText, timeRange === 'week' && styles.toggleTextActive]}>
-              Week
-            </Text>
-            </AnimatedPressable>
-            <AnimatedPressable
-              onPress={() => setTimeRange('month')}
-            style={[styles.toggleButton, timeRange === 'month' && styles.toggleButtonActive]}
-          >
-            <Text style={[styles.toggleText, timeRange === 'month' && styles.toggleTextActive]}>
-              Month
-            </Text>
-            </AnimatedPressable>
-        </View>
-        </AnimatedView>
-
         {/* Chart */}
-        <AnimatedView delay={300} duration={400}>
+        <AnimatedView delay={250} duration={400}>
         {chartData && (
           <View style={styles.chartContainer}>
             <Text style={styles.chartTitle}>Minutes Meditated</Text>
-              <View style={styles.chartCard}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <LineChart
+            
+            {/* Time Range Toggle */}
+            <View style={styles.toggleContainer}>
+              <AnimatedPressable
+                onPress={() => setTimeRange('week')}
+                style={[styles.toggleButton, timeRange === 'week' && styles.toggleButtonActive]}
+              >
+                <Text style={[styles.toggleText, timeRange === 'week' && styles.toggleTextActive]}>
+                  Week
+                </Text>
+              </AnimatedPressable>
+              <AnimatedPressable
+                onPress={() => setTimeRange('month')}
+                style={[styles.toggleButton, timeRange === 'month' && styles.toggleButtonActive]}
+              >
+                <Text style={[styles.toggleText, timeRange === 'month' && styles.toggleTextActive]}>
+                  Month
+                </Text>
+              </AnimatedPressable>
+              <AnimatedPressable
+                onPress={() => setTimeRange('year')}
+                style={[styles.toggleButton, timeRange === 'year' && styles.toggleButtonActive]}
+              >
+                <Text style={[styles.toggleText, timeRange === 'year' && styles.toggleTextActive]}>
+                  Year
+                </Text>
+              </AnimatedPressable>
+            </View>
+            
+            <View style={styles.chartCard}>
+              <BarChart
                 data={chartData}
-                    width={Math.max(width - 64, chartData.labels.length * 60)}
-                height={220}
+                width={width - 72}
+                height={200}
                 chartConfig={chartConfig}
-                bezier
                 style={styles.chart}
-                withInnerLines={false}
-                withOuterLines={false}
-                withVerticalLabels={true}
-                withHorizontalLabels={true}
+                withInnerLines={true}
+                showValuesOnTopOfBars={false}
                 fromZero={true}
+                segments={getSmartSegments(Math.max(...(chartData.datasets[0].data || [0])))}
+                yAxisSuffix=""
+                yAxisLabel=""
               />
-            </ScrollView>
-              </View>
+            </View>
           </View>
         )}
         </AnimatedView>
@@ -353,34 +381,8 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       paddingHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.sm,
   },
-  toggleContainer: {
-    flexDirection: 'row',
-      backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.full,
-    padding: 4,
-    marginHorizontal: theme.spacing.lg,
-      marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    alignSelf: 'center',
-      ...theme.shadows.sm,
-  },
-  toggleButton: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.full,
-  },
-  toggleButtonActive: {
-      backgroundColor: theme.colors.primary,
-  },
-  toggleText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-    color: theme.colors.textLight,
-  },
-  toggleTextActive: {
-      color: 'white',
-  },
   chartContainer: {
+    marginTop: theme.spacing.lg,
       paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
@@ -390,13 +392,41 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.full,
+    padding: 4,
+    marginBottom: theme.spacing.md,
+    alignSelf: 'flex-start',
+    ...theme.shadows.sm,
+  },
+  toggleButton: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+  },
+  toggleButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  toggleText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 13,
+    color: theme.colors.textLight,
+  },
+  toggleTextActive: {
+    color: 'white',
+  },
     chartCard: {
       backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.md,
+      paddingVertical: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.sm,
       ...theme.shadows.sm,
+      overflow: 'hidden',
     },
   chart: {
+    marginLeft: -16,
     borderRadius: theme.borderRadius.lg,
   },
   insightsSection: {

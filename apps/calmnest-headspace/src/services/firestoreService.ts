@@ -210,19 +210,43 @@ export async function getUserStats(userId: string) {
 
     // Calculate weekly minutes - map to Mon(0) through Sun(6)
     const weeklyMinutes = Array(7).fill(0);
+    // Calculate monthly minutes - last 30 days (index 0 = 29 days ago, index 29 = today)
+    const monthlyMinutes = Array(30).fill(0);
+    // Calculate yearly minutes - last 12 months (index 0 = 11 months ago, index 11 = current month)
+    const yearlyMinutes = Array(12).fill(0);
+    
     const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
     sessions.forEach((session) => {
       const sessionDate = new Date(session.completed_at);
       const daysDiff = Math.floor(
         (now.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24)
       );
+      
+      // Weekly: last 7 days mapped to Mon-Sun
       if (daysDiff >= 0 && daysDiff < 7) {
         // Get day of week for session (0 = Sunday, 6 = Saturday)
         // Convert to Mon-Sun format: Mon=0, Tue=1, ..., Sun=6
         const dayOfWeek = sessionDate.getDay();
         const mondayBasedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
         weeklyMinutes[mondayBasedIndex] += session.duration_minutes;
+      }
+      
+      // Monthly: last 30 days (index 29 = today, index 0 = 29 days ago)
+      if (daysDiff >= 0 && daysDiff < 30) {
+        const monthlyIndex = 29 - daysDiff;
+        monthlyMinutes[monthlyIndex] += session.duration_minutes;
+      }
+      
+      // Yearly: last 12 months (index 11 = current month, index 0 = 11 months ago)
+      const sessionMonth = sessionDate.getMonth();
+      const sessionYear = sessionDate.getFullYear();
+      const monthsDiff = (currentYear - sessionYear) * 12 + (currentMonth - sessionMonth);
+      if (monthsDiff >= 0 && monthsDiff < 12) {
+        const yearlyIndex = 11 - monthsDiff;
+        yearlyMinutes[yearlyIndex] += session.duration_minutes;
       }
     });
 
@@ -263,6 +287,8 @@ export async function getUserStats(userId: string) {
       longest_streak:
         userData.longest_streak || userData.meditation_streak || 0,
       weekly_minutes: weeklyMinutes,
+      monthly_minutes: monthlyMinutes,
+      yearly_minutes: yearlyMinutes,
       favorite_time_of_day: sessions.length > 0 ? favoriteTimeOfDay : undefined,
       mood_improvement: 0,
     };
@@ -274,6 +300,8 @@ export async function getUserStats(userId: string) {
       current_streak: 0,
       longest_streak: 0,
       weekly_minutes: Array(7).fill(0),
+      monthly_minutes: Array(30).fill(0),
+      yearly_minutes: Array(12).fill(0),
       mood_improvement: 0,
     };
   }
