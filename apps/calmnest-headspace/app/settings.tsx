@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme, ThemeMode } from '../src/contexts/ThemeContext';
 import { ProtectedRoute } from '../src/components/ProtectedRoute';
@@ -13,6 +14,7 @@ const themeModes: { id: ThemeMode; label: string; icon: string }[] = [
 ];
 
 function SettingsScreen() {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const { theme, themeMode, setThemeMode } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
@@ -21,6 +23,15 @@ function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Account Section */}
         <View style={styles.section}>
@@ -122,29 +133,6 @@ function SettingsScreen() {
           </View>
         </View>
 
-        {/* Audio Attribution */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Audio Credits</Text>
-          <View style={styles.card}>
-            <View style={styles.attributionItem}>
-              <Text style={styles.attributionTitle}>Guided Meditation</Text>
-              <Text style={styles.attributionText}>
-                "Guided Meditation" by Swami Guruparananda{'\n'}
-                Source: Internet Archive{'\n'}
-                License: Public Domain
-              </Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.attributionItem}>
-              <Text style={styles.attributionTitle}>Ambient Music</Text>
-              <Text style={styles.attributionText}>
-                SoundHelix Sample Music{'\n'}
-                Free for use
-              </Text>
-        </View>
-      </View>
-    </View>
-
         {/* Sign Out */}
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
@@ -164,10 +152,31 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-  container: {
-    flex: 1,
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 17,
+      color: theme.colors.text,
+    },
+    headerSpacer: {
+      width: 40,
+    },
+    container: {
+      flex: 1,
       padding: theme.spacing.lg,
-  },
+    },
   section: {
       marginBottom: theme.spacing.xl,
   },
@@ -276,22 +285,6 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       textAlign: 'center',
       marginBottom: theme.spacing.xxl,
     },
-    attributionItem: {
-      paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.sm,
-  },
-    attributionTitle: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs,
-    },
-    attributionText: {
-      fontFamily: theme.fonts.ui.regular,
-      fontSize: 13,
-      color: theme.colors.textLight,
-      lineHeight: 20,
-  },
 });
 
 export default function Settings() {

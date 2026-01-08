@@ -77,7 +77,7 @@ function RootNavigator() {
         <Stack.Screen 
           name="settings" 
           options={{ 
-            title: 'Settings',
+            headerShown: false,
           }} 
         />
         <Stack.Screen 
