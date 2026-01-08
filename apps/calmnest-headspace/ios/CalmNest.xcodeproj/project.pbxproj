@@ -22,7 +22,7 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = CalmNest/Info.plist; sourceTree = "<group>"; };
 		25A11C7AEE8F419D797C9858 /* libPods-CalmNest.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CalmNest.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		336C9CF914A42FA25939E477 /* Pods-CalmNest.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.debug.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.debug.xcconfig"; sourceTree = "<group>"; };
-		39867D69C2D7F5F8D32731D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = CalmNest/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		39867D69C2D7F5F8D32731D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = CalmNest/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		83681D5E8BDDFF83F3AE0A2D /* Pods-CalmNest.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.release.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.release.xcconfig"; sourceTree = "<group>"; };
 		951F6A7ED8DCDB4C33F5D498 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-CalmNest/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = CalmNest/SplashScreen.storyboard; sourceTree = "<group>"; };
@@ -128,7 +128,6 @@
 				336C9CF914A42FA25939E477 /* Pods-CalmNest.debug.xcconfig */,
 				83681D5E8BDDFF83F3AE0A2D /* Pods-CalmNest.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -363,6 +362,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CalmNest/CalmNest.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5LF39MCL5Q;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -399,6 +399,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CalmNest/CalmNest.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5LF39MCL5Q;
 				INFOPLIST_FILE = CalmNest/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
