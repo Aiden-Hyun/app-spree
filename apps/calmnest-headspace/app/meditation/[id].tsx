@@ -8,7 +8,7 @@ import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { MediaPlayer } from '../../src/components/MediaPlayer';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { getMeditationById, addToListeningHistory, toggleFavorite, isFavorite } from '../../src/services/firestoreService';
+import { getMeditationById, addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../src/services/firestoreService';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getAudioUrl } from '../../src/constants/audioFiles';
 import { getNarratorByName } from '../../src/constants/narratorData';
@@ -23,6 +23,7 @@ function MeditationPlayerScreen() {
   const [meditation, setMeditation] = useState<GuidedMeditation | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -78,6 +79,31 @@ function MeditationPlayerScreen() {
     
     loadMeditationAudio();
   }, [meditation]);
+
+  // Track session for stats when user completes 80% of audio
+  useEffect(() => {
+    async function trackSession() {
+      if (
+        !hasTrackedSession &&
+        user &&
+        meditation &&
+        audioPlayer.progress >= 0.8 &&
+        audioPlayer.duration > 0
+      ) {
+        setHasTrackedSession(true);
+        try {
+          await createSession({
+            user_id: user.uid,
+            duration_minutes: meditation.duration_minutes,
+            session_type: 'meditation',
+          });
+        } catch (error) {
+          console.error('Failed to track session:', error);
+        }
+      }
+    }
+    trackSession();
+  }, [audioPlayer.progress, hasTrackedSession, user, meditation]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

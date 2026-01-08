@@ -18,12 +18,26 @@ export interface UserPreferences {
   background_sounds?: boolean;
 }
 
+// Session type for all trackable content
+export type SessionType =
+  | "meditation"
+  | "breathing"
+  | "nature_sound"
+  | "bedtime_story"
+  | "course_session"
+  | "series_chapter"
+  | "album_track"
+  | "sleep_meditation"
+  | "emergency"
+  | "music"
+  | "technique";
+
 // Meditation types
 export interface MeditationSession {
   id: string;
   user_id: string;
   duration_minutes: number;
-  session_type: "meditation" | "breathing" | "nature_sound" | "bedtime_story";
+  session_type: SessionType;
   completed_at: string;
   notes?: string;
   mood_before?: number;

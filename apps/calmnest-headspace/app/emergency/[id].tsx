@@ -10,6 +10,7 @@ import {
   addToListeningHistory,
   toggleFavorite,
   isFavorite,
+  createSession,
 } from "../../src/services/firestoreService";
 
 // Helper to lighten a hex color
@@ -39,6 +40,7 @@ function EmergencyPlayerScreen() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
 
   const audioPlayer = useAudioPlayer();
@@ -75,6 +77,31 @@ function EmergencyPlayerScreen() {
 
     loadAudio();
   }, [audioPath]);
+
+  // Track session for stats when user completes 80% of audio
+  useEffect(() => {
+    async function trackSession() {
+      if (
+        !hasTrackedSession &&
+        user &&
+        id &&
+        audioPlayer.progress >= 0.8 &&
+        audioPlayer.duration > 0
+      ) {
+        setHasTrackedSession(true);
+        try {
+          await createSession({
+            user_id: user.uid,
+            duration_minutes: parseInt(duration) || 4,
+            session_type: "emergency",
+          });
+        } catch (error) {
+          console.error("Failed to track session:", error);
+        }
+      }
+    }
+    trackSession();
+  }, [audioPlayer.progress, hasTrackedSession, user, id, duration]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

@@ -6,7 +6,7 @@ import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
-import { addToListeningHistory, toggleFavorite, isFavorite } from '../../../src/services/firestoreService';
+import { addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../../src/services/firestoreService';
 
 function AlbumTrackPlayerScreen() {
   const { id, audioPath, title, albumTitle, duration, artist } = useLocalSearchParams<{
@@ -23,6 +23,7 @@ function AlbumTrackPlayerScreen() {
 
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
 
   const audioPlayer = useAudioPlayer();
@@ -57,6 +58,31 @@ function AlbumTrackPlayerScreen() {
     
     loadTrackAudio();
   }, [audioPath]);
+
+  // Track session for stats when user completes 80% of audio
+  useEffect(() => {
+    async function trackSession() {
+      if (
+        !hasTrackedSession &&
+        user &&
+        id &&
+        audioPlayer.progress >= 0.8 &&
+        audioPlayer.duration > 0
+      ) {
+        setHasTrackedSession(true);
+        try {
+          await createSession({
+            user_id: user.uid,
+            duration_minutes: parseInt(duration) || 0,
+            session_type: 'album_track',
+          });
+        } catch (error) {
+          console.error('Failed to track session:', error);
+        }
+      }
+    }
+    trackSession();
+  }, [audioPlayer.progress, hasTrackedSession, user, id, duration]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

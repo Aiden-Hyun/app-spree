@@ -8,7 +8,7 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { getBedtimeStoryById, addToListeningHistory, toggleFavorite, isFavorite } from "../../src/services/firestoreService";
+import { getBedtimeStoryById, addToListeningHistory, toggleFavorite, isFavorite, createSession } from "../../src/services/firestoreService";
 import { useAuth } from "../../src/contexts/AuthContext";
 import { getAudioUrl } from "../../src/constants/audioFiles";
 import { getNarratorByName } from "../../src/constants/narratorData";
@@ -23,6 +23,7 @@ function SleepStoryPlayerScreen() {
   const [story, setStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -78,6 +79,31 @@ function SleepStoryPlayerScreen() {
 
     loadStoryAudio();
   }, [story]);
+
+  // Track session for stats when user completes 80% of audio
+  useEffect(() => {
+    async function trackSession() {
+      if (
+        !hasTrackedSession &&
+        user &&
+        story &&
+        audioPlayer.progress >= 0.8 &&
+        audioPlayer.duration > 0
+      ) {
+        setHasTrackedSession(true);
+        try {
+          await createSession({
+            user_id: user.uid,
+            duration_minutes: story.duration_minutes,
+            session_type: 'bedtime_story',
+          });
+        } catch (error) {
+          console.error('Failed to track session:', error);
+        }
+      }
+    }
+    trackSession();
+  }, [audioPlayer.progress, hasTrackedSession, user, story]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

@@ -139,12 +139,21 @@ async function updateUserStats(userId: string) {
 
     const streak = calculateStreak(sessions);
 
+    // Get current longest streak from user doc
     const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    const userData = userDoc.exists() ? userDoc.data() : {};
+    const currentLongest = userData.longest_streak || 0;
+
+    // Update longest_streak if current streak exceeds it
+    const newLongestStreak = Math.max(streak, currentLongest);
+
     await setDoc(
       userRef,
       {
         total_meditation_minutes: totalMinutes,
         meditation_streak: streak,
+        longest_streak: newLongestStreak,
         updated_at: serverTimestamp(),
       },
       { merge: true }
@@ -199,19 +208,53 @@ export async function getUserStats(userId: string) {
 
     const userData = userDoc.exists() ? userDoc.data() : {};
 
-    // Calculate weekly minutes
+    // Calculate weekly minutes - map to Mon(0) through Sun(6)
     const weeklyMinutes = Array(7).fill(0);
-    const today = new Date();
+    const now = new Date();
 
     sessions.forEach((session) => {
       const sessionDate = new Date(session.completed_at);
       const daysDiff = Math.floor(
-        (today.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24)
+        (now.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24)
       );
-      if (daysDiff < 7) {
-        weeklyMinutes[6 - daysDiff] += session.duration_minutes;
+      if (daysDiff >= 0 && daysDiff < 7) {
+        // Get day of week for session (0 = Sunday, 6 = Saturday)
+        // Convert to Mon-Sun format: Mon=0, Tue=1, ..., Sun=6
+        const dayOfWeek = sessionDate.getDay();
+        const mondayBasedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        weeklyMinutes[mondayBasedIndex] += session.duration_minutes;
       }
     });
+
+    // Calculate favorite time of day
+    const timeOfDayCounts: Record<string, number> = {
+      Morning: 0,
+      Afternoon: 0,
+      Evening: 0,
+      Night: 0,
+    };
+
+    sessions.forEach((session) => {
+      const hour = new Date(session.completed_at).getHours();
+      if (hour >= 5 && hour < 12) {
+        timeOfDayCounts.Morning++;
+      } else if (hour >= 12 && hour < 17) {
+        timeOfDayCounts.Afternoon++;
+      } else if (hour >= 17 && hour < 21) {
+        timeOfDayCounts.Evening++;
+      } else {
+        timeOfDayCounts.Night++;
+      }
+    });
+
+    let favoriteTimeOfDay: string | undefined;
+    let maxCount = 0;
+    for (const [time, count] of Object.entries(timeOfDayCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        favoriteTimeOfDay = time;
+      }
+    }
 
     return {
       total_sessions: sessions.length,
@@ -220,6 +263,7 @@ export async function getUserStats(userId: string) {
       longest_streak:
         userData.longest_streak || userData.meditation_streak || 0,
       weekly_minutes: weeklyMinutes,
+      favorite_time_of_day: sessions.length > 0 ? favoriteTimeOfDay : undefined,
       mood_improvement: 0,
     };
   } catch (error) {

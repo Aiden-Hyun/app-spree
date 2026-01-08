@@ -9,7 +9,7 @@ import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
-import { addToListeningHistory, toggleFavorite, isFavorite } from '../../../src/services/firestoreService';
+import { addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../../src/services/firestoreService';
 import { Theme } from '../../../src/theme';
 
 function CourseSessionPlayerScreen() {
@@ -28,6 +28,7 @@ function CourseSessionPlayerScreen() {
   
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -64,6 +65,31 @@ function CourseSessionPlayerScreen() {
     
     loadSessionAudio();
   }, [audioPath]);
+
+  // Track session for stats when user completes 80% of audio
+  useEffect(() => {
+    async function trackSession() {
+      if (
+        !hasTrackedSession &&
+        user &&
+        id &&
+        audioPlayer.progress >= 0.8 &&
+        audioPlayer.duration > 0
+      ) {
+        setHasTrackedSession(true);
+        try {
+          await createSession({
+            user_id: user.uid,
+            duration_minutes: parseInt(duration) || 0,
+            session_type: 'course_session',
+          });
+        } catch (error) {
+          console.error('Failed to track session:', error);
+        }
+      }
+    }
+    trackSession();
+  }, [audioPlayer.progress, hasTrackedSession, user, id, duration]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();

@@ -19,6 +19,7 @@ import {
   getAsmr,
   FirestoreSleepSound,
   FirestoreMusicItem,
+  createSession,
 } from '../../src/services/firestoreService';
 import { Theme } from '../../src/theme';
 
@@ -38,6 +39,7 @@ function SoundPlayerScreen() {
   const [remainingSeconds, setRemainingSeconds] = useState(DEFAULT_TIMER_MINUTES * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
+  const [hasTrackedSession, setHasTrackedSession] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayer = useAudioPlayer();
@@ -124,14 +126,28 @@ function SoundPlayerScreen() {
     };
   }, [isTimerRunning, timerMinutes]);
 
-  const handleTimerEnd = useCallback(() => {
+  const handleTimerEnd = useCallback(async () => {
     setIsTimerRunning(false);
     audioPlayer.pause();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, [audioPlayer]);
+    
+    // Track session when timer ends (user completed their intended listening)
+    if (!hasTrackedSession && user && timerMinutes && timerMinutes >= 5) {
+      setHasTrackedSession(true);
+      try {
+        await createSession({
+          user_id: user.uid,
+          duration_minutes: timerMinutes,
+          session_type: 'music',
+        });
+      } catch (error) {
+        console.error('Failed to track session:', error);
+      }
+    }
+  }, [audioPlayer, hasTrackedSession, user, timerMinutes]);
 
   const handlePlay = useCallback(async () => {
     audioPlayer.play();
