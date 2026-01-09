@@ -18,7 +18,7 @@ import { Theme } from '../theme';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
 import { getAudioUrlFromPath } from '../constants/audioFiles';
-import { getBackgroundSoundById, getNarratorByName, FirestoreBackgroundSound, savePlaybackProgress, getPlaybackProgress, clearPlaybackProgress } from '../services/firestoreService';
+import { getSleepSoundById, getNarratorByName, FirestoreSleepSound, savePlaybackProgress, getPlaybackProgress, clearPlaybackProgress } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetwork } from '../contexts/NetworkContext';
 import { isDownloaded, downloadAudio, isDownloading as checkIsDownloading } from '../services/downloadService';
@@ -116,7 +116,7 @@ export function MediaPlayer({
   const { isOffline } = useNetwork();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
-  const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreBackgroundSound | null>(null);
+  const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreSleepSound | null>(null);
   const [narratorPhotoUrl, setNarratorPhotoUrl] = useState<string | null>(instructorPhotoUrl || null);
   
   // Auto-play state
@@ -218,7 +218,7 @@ export function MediaPlayer({
   useEffect(() => {
     async function fetchCurrentSound() {
       if (backgroundAudio.selectedSoundId) {
-        const sound = await getBackgroundSoundById(backgroundAudio.selectedSoundId);
+        const sound = await getSleepSoundById(backgroundAudio.selectedSoundId);
         setCurrentBackgroundSound(sound);
       } else {
         setCurrentBackgroundSound(null);
@@ -231,7 +231,7 @@ export function MediaPlayer({
   useEffect(() => {
     async function loadSavedSoundAudio() {
       if (enableBackgroundAudio && backgroundAudio.isInitialized && backgroundAudio.selectedSoundId) {
-        const sound = await getBackgroundSoundById(backgroundAudio.selectedSoundId);
+        const sound = await getSleepSoundById(backgroundAudio.selectedSoundId);
         if (sound) {
           const url = await getAudioUrlFromPath(sound.audioPath);
           if (url) {

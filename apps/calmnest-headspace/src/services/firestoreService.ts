@@ -1101,6 +1101,20 @@ export async function getSleepSoundsByCategory(
   }
 }
 
+export async function getSleepSoundById(
+  id: string
+): Promise<FirestoreSleepSound | null> {
+  try {
+    const docRef = doc(db, "sleep_sounds", id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+    return { id: docSnap.id, ...docSnap.data() } as FirestoreSleepSound;
+  } catch (error) {
+    console.error("Error fetching sleep sound by id:", error);
+    return null;
+  }
+}
+
 // ==================== BACKGROUND SOUNDS ====================
 
 export interface FirestoreBackgroundSound {

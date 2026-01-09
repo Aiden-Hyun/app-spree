@@ -13,13 +13,29 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { useTheme } from "../contexts/ThemeContext";
 import { Theme } from "../theme";
-import { getBackgroundSounds, FirestoreBackgroundSound } from "../services/firestoreService";
+import { getSleepSounds, FirestoreSleepSound } from "../services/firestoreService";
 
-const backgroundSoundCategories = [
-  { id: "nature", title: "Nature", icon: "leaf" },
-  { id: "ambient", title: "Ambient", icon: "planet" },
-  { id: "white-noise", title: "White Noise", icon: "radio" },
-];
+// Category icon mapping - used for display purposes
+const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  all: "apps",
+  rain: "rainy",
+  water: "water",
+  fire: "flame",
+  wind: "cloudy",
+  nature: "leaf",
+  ambient: "planet",
+};
+
+// Category label mapping - for display titles
+const categoryLabels: Record<string, string> = {
+  all: "All",
+  rain: "Rain",
+  water: "Water",
+  fire: "Fire",
+  wind: "Wind",
+  nature: "Nature",
+  ambient: "Ambient",
+};
 
 interface BackgroundAudioPickerProps {
   visible: boolean;
@@ -50,14 +66,14 @@ export function BackgroundAudioPicker({
 }: BackgroundAudioPickerProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [activeCategory, setActiveCategory] = useState<string>("nature");
-  const [allSounds, setAllSounds] = useState<FirestoreBackgroundSound[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [allSounds, setAllSounds] = useState<FirestoreSleepSound[]>([]);
   const [loadingSounds, setLoadingSounds] = useState(true);
 
   useEffect(() => {
     async function loadSounds() {
       setLoadingSounds(true);
-      const sounds = await getBackgroundSounds();
+      const sounds = await getSleepSounds();
       setAllSounds(sounds);
       setLoadingSounds(false);
     }
@@ -66,12 +82,21 @@ export function BackgroundAudioPicker({
     }
   }, [visible]);
 
+  // Derive categories dynamically from the sounds data
+  const categories = useMemo(() => {
+    const uniqueCats = [...new Set(allSounds.map((s) => s.category))];
+    // Sort alphabetically and add 'all' at the beginning
+    return ["all", ...uniqueCats.sort()];
+  }, [allSounds]);
+
   const filteredSounds = useMemo(
-    () => allSounds.filter((sound) => sound.category === activeCategory),
+    () => activeCategory === "all" 
+      ? allSounds 
+      : allSounds.filter((sound) => sound.category === activeCategory),
     [activeCategory, allSounds]
   );
 
-  const handleSoundSelect = (sound: FirestoreBackgroundSound) => {
+  const handleSoundSelect = (sound: FirestoreSleepSound) => {
     if (selectedSoundId === sound.id) {
       // Deselect if already selected
       onSelectSound(null, null);
@@ -149,21 +174,26 @@ export function BackgroundAudioPicker({
           </View>
 
           {/* Category Tabs */}
-          <View style={styles.categoryTabs}>
-            {backgroundSoundCategories.map((cat) => (
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryScrollView}
+            contentContainerStyle={styles.categoryTabs}
+          >
+            {categories.map((cat) => (
               <TouchableOpacity
-                key={cat.id}
+                key={cat}
                 style={[
                   styles.categoryTab,
-                  activeCategory === cat.id && styles.categoryTabActive,
+                  activeCategory === cat && styles.categoryTabActive,
                 ]}
-                onPress={() => setActiveCategory(cat.id)}
+                onPress={() => setActiveCategory(cat)}
               >
                 <Ionicons
-                  name={cat.icon as keyof typeof Ionicons.glyphMap}
+                  name={categoryIcons[cat] || "ellipse"}
                   size={16}
                   color={
-                    activeCategory === cat.id
+                    activeCategory === cat
                       ? "#fff"
                       : "rgba(255,255,255,0.5)"
                   }
@@ -171,14 +201,14 @@ export function BackgroundAudioPicker({
                 <Text
                   style={[
                     styles.categoryTabText,
-                    activeCategory === cat.id && styles.categoryTabTextActive,
+                    activeCategory === cat && styles.categoryTabTextActive,
                   ]}
                 >
-                  {cat.title}
+                  {categoryLabels[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
           {/* Sound List */}
           <ScrollView
@@ -198,11 +228,6 @@ export function BackgroundAudioPicker({
               // Only show checkmark if selected AND audio is actually ready
               const showCheckmark = isThisSoundSelected && isAudioReady && !hasError;
               
-              // #region agent log
-              if (isThisSoundSelected) {
-                fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BackgroundAudioPicker.tsx:render',message:'Selected sound render state',data:{soundId:sound.id,isThisSoundSelected,isAudioReady,hasError,showCheckmark,isLoading,showError},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'})}).catch(()=>{});
-              }
-              // #endregion
               
               return (
                 <TouchableOpacity
@@ -331,18 +356,21 @@ const createStyles = (theme: Theme) =>
       width: "100%",
       height: 40,
     },
+    categoryScrollView: {
+      maxHeight: 44,
+      marginBottom: 16,
+    },
     categoryTabs: {
       flexDirection: "row",
       paddingHorizontal: 20,
       gap: 8,
-      marginBottom: 16,
     },
     categoryTab: {
-      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       paddingVertical: 10,
+      paddingHorizontal: 14,
       borderRadius: 10,
       backgroundColor: "rgba(255,255,255,0.06)",
       gap: 6,
