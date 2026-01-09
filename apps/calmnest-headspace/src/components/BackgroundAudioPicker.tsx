@@ -293,7 +293,7 @@ const createStyles = (theme: Theme) =>
       borderTopRightRadius: 24,
       paddingTop: 20,
       paddingBottom: 40,
-      maxHeight: "80%",
+      height: "75%",
     },
     header: {
       flexDirection: "row",
@@ -387,6 +387,7 @@ const createStyles = (theme: Theme) =>
       color: "#fff",
     },
     soundList: {
+      flex: 1,
       paddingHorizontal: 20,
     },
     soundItem: {
