@@ -20,6 +20,8 @@ import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
 import { getAudioUrlFromPath } from '../constants/audioFiles';
 import { getBackgroundSoundById, getNarratorByName, FirestoreBackgroundSound, savePlaybackProgress, getPlaybackProgress, clearPlaybackProgress } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
+import { DownloadButton } from './DownloadButton';
+import { useNetwork } from '../contexts/NetworkContext';
 
 const AUTOPLAY_KEY = 'calmnest_autoplay_enabled';
 
@@ -68,6 +70,14 @@ export interface MediaPlayerProps {
   // Content identification for progress tracking
   contentId?: string;
   contentType?: string;
+
+  // Audio URL for download
+  audioUrl?: string;
+  
+  // Additional metadata for downloads
+  parentId?: string;
+  parentTitle?: string;
+  audioPath?: string;
 }
 
 export function MediaPlayer({
@@ -96,9 +106,14 @@ export function MediaPlayer({
   hasNext = false,
   contentId,
   contentType,
+  audioUrl,
+  parentId,
+  parentTitle,
+  audioPath,
 }: MediaPlayerProps) {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
+  const { isOffline } = useNetwork();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreBackgroundSound | null>(null);
@@ -373,6 +388,25 @@ export function MediaPlayer({
                   }
                 />
               </TouchableOpacity>
+            )}
+            
+            {/* Download Button */}
+            {!isOffline && contentId && contentType && audioUrl && (
+              <DownloadButton
+                contentId={contentId}
+                contentType={contentType}
+                audioUrl={audioUrl}
+                metadata={{
+                  title,
+                  duration_minutes: durationMinutes,
+                  thumbnailUrl: artworkThumbnailUrl,
+                  parentId,
+                  parentTitle,
+                  audioPath,
+                }}
+                size={24}
+                darkMode={true}
+              />
             )}
             
             {/* Favorite Button */}

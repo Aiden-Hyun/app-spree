@@ -3,8 +3,10 @@ import { Stack } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
+import { NetworkProvider } from '../src/contexts/NetworkContext';
 import { useFonts } from '../src/hooks/useFonts';
 import { lightColors } from '../src/theme';
+import { OfflineNavigator } from '../src/components/OfflineNavigator';
 
 function LoadingScreen() {
   return (
@@ -76,6 +78,12 @@ function RootNavigator() {
         />
         <Stack.Screen 
           name="settings" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="downloads" 
           options={{ 
             headerShown: false,
           }} 
@@ -156,8 +164,12 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <RootNavigator />
-    </AuthProvider>
+        <NetworkProvider>
+          <OfflineNavigator>
+            <RootNavigator />
+          </OfflineNavigator>
+        </NetworkProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

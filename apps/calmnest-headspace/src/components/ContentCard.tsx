@@ -82,7 +82,7 @@ export function ContentCard({
           </View>
         )}
       </View>
-      <Text style={styles.title} numberOfLines={2}>
+      <Text style={styles.title}>
         {title}
       </Text>
       <Text style={styles.meta} numberOfLines={1}>
@@ -107,6 +107,7 @@ const createStyles = (
       borderRadius: theme.borderRadius.xl,
       padding: theme.spacing.md,
       alignItems: "center",
+      flexShrink: 0,
       ...theme.shadows.sm,
     },
     thumbnailContainer: {

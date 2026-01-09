@@ -10,6 +10,7 @@ import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
+import { getLocalAudioPath } from '../../../src/services/downloadService';
 import { Theme } from '../../../src/theme';
 
 interface SessionItem {
@@ -43,6 +44,7 @@ function CourseSessionPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
@@ -81,9 +83,17 @@ function CourseSessionPlayerScreen() {
       }
       
       try {
-        const audioUrl = await getAudioUrlFromPath(audioPath);
-        if (audioUrl) {
-          audioPlayer.loadAudio(audioUrl);
+        // Try to use downloaded audio first, fall back to streaming
+        const localPath = await getLocalAudioPath(id);
+        if (localPath) {
+          setCurrentAudioUrl(localPath);
+          audioPlayer.loadAudio(localPath);
+        } else {
+          const audioUrl = await getAudioUrlFromPath(audioPath);
+          if (audioUrl) {
+            setCurrentAudioUrl(audioUrl);
+            audioPlayer.loadAudio(audioUrl);
+          }
         }
       } finally {
         setLoading(false);
@@ -240,6 +250,8 @@ function CourseSessionPlayerScreen() {
       hasNext={hasNext}
       contentId={id}
       contentType="course_session"
+      audioUrl={currentAudioUrl}
+      audioPath={audioPath}
     />
   );
 }

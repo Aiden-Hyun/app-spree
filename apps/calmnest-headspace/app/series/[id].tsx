@@ -18,15 +18,22 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import { getSeriesById, FirestoreSeries, FirestoreSeriesChapter, getCompletedContentIds } from '../../src/services/firestoreService';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { DownloadButton } from '../../src/components/DownloadButton';
+import { getAudioUrlFromPath } from '../../src/constants/audioFiles';
+import { useNetwork } from '../../src/contexts/NetworkContext';
+import { getDownloadedContentIds } from '../../src/services/downloadService';
 
 function SeriesDetailScreen() {
   const router = useRouter();
   const { id, autoOpenItemId } = useLocalSearchParams<{ id: string; autoOpenItemId?: string }>();
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { isOffline } = useNetwork();
   const [series, setSeries] = useState<FirestoreSeries | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -53,6 +60,33 @@ function SeriesDetailScreen() {
       loadCompletedIds();
     }, [user])
   );
+
+  // Fetch downloaded chapter IDs (refetch when screen comes into focus)
+  useFocusEffect(
+    useCallback(() => {
+      async function loadDownloadedIds() {
+        const ids = await getDownloadedContentIds('series_chapter');
+        setDownloadedIds(ids);
+      }
+      loadDownloadedIds();
+    }, [])
+  );
+
+  // Fetch audio URLs for chapters
+  useEffect(() => {
+    async function loadAudioUrls() {
+      if (!series) return;
+      const urls = new Map<string, string>();
+      for (const chapter of series.chapters) {
+        const url = await getAudioUrlFromPath(chapter.audioPath);
+        if (url) {
+          urls.set(chapter.id, url);
+        }
+      }
+      setAudioUrls(urls);
+    }
+    loadAudioUrls();
+  }, [series]);
 
   // Auto-open a specific chapter if autoOpenItemId is provided
   useEffect(() => {
@@ -232,6 +266,26 @@ function SeriesDetailScreen() {
                         )}
                       </View>
                     </View>
+                    {!isOffline && audioUrls.get(chapter.id) && (
+                      <DownloadButton
+                        contentId={chapter.id}
+                        contentType="series_chapter"
+                        audioUrl={audioUrls.get(chapter.id)!}
+                        metadata={{
+                          title: chapter.title,
+                          duration_minutes: chapter.duration_minutes,
+                          thumbnailUrl: series.thumbnailUrl,
+                          parentId: series.id,
+                          parentTitle: series.title,
+                          audioPath: chapter.audioPath,
+                        }}
+                        size={20}
+                        darkMode={true}
+                        onDownloadComplete={() => {
+                          getDownloadedContentIds('series_chapter').then(setDownloadedIds);
+                        }}
+                      />
+                    )}
                     <View style={styles.playButton}>
                       <Ionicons name="play" size={20} color={theme.colors.sleepAccent} />
                     </View>

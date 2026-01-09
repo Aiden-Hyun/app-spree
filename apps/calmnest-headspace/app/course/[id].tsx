@@ -11,15 +11,22 @@ import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
 import { getCourseById, FirestoreCourse, FirestoreCourseSession, getCompletedContentIds } from "../../src/services/firestoreService";
 import { useAuth } from "../../src/contexts/AuthContext";
+import { DownloadButton } from "../../src/components/DownloadButton";
+import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
+import { useNetwork } from "../../src/contexts/NetworkContext";
+import { getDownloadedContentIds, getLocalAudioPath } from "../../src/services/downloadService";
 
 function CourseDetailScreen() {
   const router = useRouter();
   const { id, autoOpenItemId } = useLocalSearchParams<{ id: string; autoOpenItemId?: string }>();
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
+  const { isOffline } = useNetwork();
   const [course, setCourse] = useState<FirestoreCourse | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -46,6 +53,33 @@ function CourseDetailScreen() {
       loadCompletedIds();
     }, [user])
   );
+
+  // Fetch downloaded session IDs (refetch when screen comes into focus)
+  useFocusEffect(
+    useCallback(() => {
+      async function loadDownloadedIds() {
+        const ids = await getDownloadedContentIds('course_session');
+        setDownloadedIds(ids);
+      }
+      loadDownloadedIds();
+    }, [])
+  );
+
+  // Fetch audio URLs for sessions
+  useEffect(() => {
+    async function loadAudioUrls() {
+      if (!course) return;
+      const urls = new Map<string, string>();
+      for (const session of course.sessions) {
+        const url = await getAudioUrlFromPath(session.audioPath);
+        if (url) {
+          urls.set(session.id, url);
+        }
+      }
+      setAudioUrls(urls);
+    }
+    loadAudioUrls();
+  }, [course]);
 
   // Auto-open a specific session if autoOpenItemId is provided
   useEffect(() => {
@@ -274,6 +308,26 @@ function CourseDetailScreen() {
                         )}
                       </View>
                     </View>
+                    {!isOffline && audioUrls.get(session.id) && (
+                      <DownloadButton
+                        contentId={session.id}
+                        contentType="course_session"
+                        audioUrl={audioUrls.get(session.id)!}
+                        metadata={{
+                          title: session.title,
+                          duration_minutes: session.duration_minutes,
+                          thumbnailUrl: course.thumbnailUrl,
+                          parentId: course.id,
+                          parentTitle: course.title,
+                          audioPath: session.audioPath,
+                        }}
+                        size={20}
+                        darkMode={isDark}
+                        onDownloadComplete={() => {
+                          getDownloadedContentIds('course_session').then(setDownloadedIds);
+                        }}
+                      />
+                    )}
                     <View style={styles.playButton}>
                       <Ionicons name="play" size={20} color={course.color} />
                     </View>

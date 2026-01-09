@@ -99,9 +99,26 @@ function SettingsScreen() {
           </View>
         </View>
         
+        {/* Downloads Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Storage</Text>
+          <View style={styles.card}>
+            <TouchableOpacity 
+              style={styles.actionItem}
+              onPress={() => router.push('/downloads')}
+            >
+              <View style={styles.settingLeft}>
+                <Ionicons name="cloud-download-outline" size={20} color={theme.colors.text} />
+                <Text style={styles.settingLabel}>Downloads</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
         {/* Actions Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions</Text>
+          <Text style={styles.sectionTitle}>Legal</Text>
           <View style={styles.card}>
             <TouchableOpacity 
               style={styles.actionItem}

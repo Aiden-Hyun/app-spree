@@ -7,6 +7,7 @@ import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
+import { getLocalAudioPath } from '../../../src/services/downloadService';
 
 interface TrackItem {
   id: string;
@@ -37,6 +38,7 @@ function AlbumTrackPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
 
   const audioPlayer = useAudioPlayer();
 
@@ -73,9 +75,17 @@ function AlbumTrackPlayerScreen() {
       }
       
       try {
-      const audioUrl = await getAudioUrlFromPath(audioPath);
-      if (audioUrl) {
-        audioPlayer.loadAudio(audioUrl);
+        // Try to use downloaded audio first, fall back to streaming
+        const localPath = await getLocalAudioPath(id);
+        if (localPath) {
+          setCurrentAudioUrl(localPath);
+          audioPlayer.loadAudio(localPath);
+        } else {
+          const audioUrl = await getAudioUrlFromPath(audioPath);
+          if (audioUrl) {
+            setCurrentAudioUrl(audioUrl);
+            audioPlayer.loadAudio(audioUrl);
+          }
         }
       } finally {
         setLoading(false);
@@ -225,6 +235,8 @@ function AlbumTrackPlayerScreen() {
       hasNext={hasNext}
       contentId={id}
       contentType="album_track"
+      audioUrl={currentAudioUrl}
+      audioPath={audioPath}
     />
   );
 }

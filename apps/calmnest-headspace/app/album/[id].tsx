@@ -18,15 +18,22 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import { getAlbumById, FirestoreAlbum, FirestoreAlbumTrack, getCompletedContentIds } from '../../src/services/firestoreService';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { DownloadButton } from '../../src/components/DownloadButton';
+import { getAudioUrlFromPath } from '../../src/constants/audioFiles';
+import { useNetwork } from '../../src/contexts/NetworkContext';
+import { getDownloadedContentIds } from '../../src/services/downloadService';
 
 function AlbumDetailScreen() {
   const router = useRouter();
   const { id, autoOpenItemId } = useLocalSearchParams<{ id: string; autoOpenItemId?: string }>();
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { isOffline } = useNetwork();
   const [album, setAlbum] = useState<FirestoreAlbum | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -53,6 +60,33 @@ function AlbumDetailScreen() {
       loadCompletedIds();
     }, [user])
   );
+
+  // Fetch downloaded track IDs (refetch when screen comes into focus)
+  useFocusEffect(
+    useCallback(() => {
+      async function loadDownloadedIds() {
+        const ids = await getDownloadedContentIds('album_track');
+        setDownloadedIds(ids);
+      }
+      loadDownloadedIds();
+    }, [])
+  );
+
+  // Fetch audio URLs for tracks
+  useEffect(() => {
+    async function loadAudioUrls() {
+      if (!album) return;
+      const urls = new Map<string, string>();
+      for (const track of album.tracks) {
+        const url = await getAudioUrlFromPath(track.audioPath);
+        if (url) {
+          urls.set(track.id, url);
+        }
+      }
+      setAudioUrls(urls);
+    }
+    loadAudioUrls();
+  }, [album]);
 
   // Auto-open a specific track if autoOpenItemId is provided
   useEffect(() => {
@@ -229,6 +263,26 @@ function AlbumDetailScreen() {
                         )}
                       </View>
                     </View>
+                    {!isOffline && audioUrls.get(track.id) && (
+                      <DownloadButton
+                        contentId={track.id}
+                        contentType="album_track"
+                        audioUrl={audioUrls.get(track.id)!}
+                        metadata={{
+                          title: track.title,
+                          duration_minutes: track.duration_minutes,
+                          thumbnailUrl: album.thumbnailUrl,
+                          parentId: album.id,
+                          parentTitle: album.title,
+                          audioPath: track.audioPath,
+                        }}
+                        size={20}
+                        darkMode={true}
+                        onDownloadComplete={() => {
+                          getDownloadedContentIds('album_track').then(setDownloadedIds);
+                        }}
+                      />
+                    )}
                     <View style={styles.playButton}>
                       <Ionicons name="play" size={20} color={theme.colors.sleepAccent} />
                     </View>

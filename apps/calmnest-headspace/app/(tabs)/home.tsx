@@ -36,6 +36,7 @@ import {
 } from '../../src/services/firestoreService';
 import { Theme } from '../../src/theme';
 import { DailyQuote, ListeningHistoryItem } from '../../src/types';
+import { getDownloadedContent, DownloadedContent } from '../../src/services/downloadService';
 
 function HomeScreen() {
   const { user } = useAuth();
@@ -46,6 +47,7 @@ function HomeScreen() {
   const [recentlyPlayed, setRecentlyPlayed] = useState<ListeningHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<ResolvedContent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadedContent, setDownloadedContent] = useState<DownloadedContent[]>([]);
   
   // Content data from Firestore
   const seriesDataRef = useRef<FirestoreSeries[]>([]);
@@ -73,8 +75,14 @@ function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
     loadHomeData();
+    loadDownloads();
     }, [user])
   );
+
+  const loadDownloads = async () => {
+    const downloads = await getDownloadedContent();
+    setDownloadedContent(downloads);
+  };
 
   const loadHomeData = async () => {
     if (!user) return;
