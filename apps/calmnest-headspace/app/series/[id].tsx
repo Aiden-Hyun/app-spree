@@ -34,6 +34,7 @@ function SeriesDetailScreen() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [refreshKey, setRefreshKey] = useState(0);
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -61,7 +62,7 @@ function SeriesDetailScreen() {
     }, [user])
   );
 
-  // Fetch downloaded chapter IDs (refetch when screen comes into focus)
+  // Refresh download status when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       async function loadDownloadedIds() {
@@ -69,6 +70,7 @@ function SeriesDetailScreen() {
         setDownloadedIds(ids);
       }
       loadDownloadedIds();
+      setRefreshKey(prev => prev + 1);
     }, [])
   );
 
@@ -281,6 +283,7 @@ function SeriesDetailScreen() {
                         }}
                         size={20}
                         darkMode={true}
+                        refreshKey={refreshKey}
                         onDownloadComplete={() => {
                           getDownloadedContentIds('series_chapter').then(setDownloadedIds);
                         }}

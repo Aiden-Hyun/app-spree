@@ -13,9 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../src/contexts/ThemeContext';
-import { Theme } from '../src/theme';
-import { useNetwork } from '../src/contexts/NetworkContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import { Theme } from '../../src/theme';
+import { useNetwork } from '../../src/contexts/NetworkContext';
 import {
   getDownloadedContent,
   deleteDownload,
@@ -23,7 +23,7 @@ import {
   getTotalStorageUsed,
   formatFileSize,
   DownloadedContent,
-} from '../src/services/downloadService';
+} from '../../src/services/downloadService';
 
 export default function DownloadsScreen() {
   const router = useRouter();
@@ -56,13 +56,10 @@ export default function DownloadsScreen() {
   const handleRetryConnection = async () => {
     setCheckingConnection(true);
     try {
-      // Force a fresh network check - this will update the hook state
-      // and trigger the OfflineNavigator to navigate back if connected
       const connected = await refreshNetwork();
       if (!connected) {
         Alert.alert('Still Offline', 'No internet connection detected. Please check your network settings.');
       }
-      // If connected, the OfflineNavigator will automatically navigate back
     } catch (error) {
       Alert.alert('Error', 'Failed to check connection status.');
     } finally {
@@ -110,20 +107,13 @@ export default function DownloadsScreen() {
 
   const getContentIcon = (contentType: string): keyof typeof Ionicons.glyphMap => {
     switch (contentType) {
-      case 'course_session':
-        return 'school';
-      case 'series_chapter':
-        return 'book';
-      case 'album_track':
-        return 'musical-notes';
-      case 'meditation':
-        return 'leaf';
-      case 'bedtime_story':
-        return 'moon';
-      case 'emergency':
-        return 'flash';
-      default:
-        return 'play-circle';
+      case 'course_session': return 'school';
+      case 'series_chapter': return 'book';
+      case 'album_track': return 'musical-notes';
+      case 'meditation': return 'leaf';
+      case 'bedtime_story': return 'moon';
+      case 'emergency': return 'flash';
+      default: return 'play-circle';
     }
   };
 
@@ -135,8 +125,19 @@ export default function DownloadsScreen() {
     });
   };
 
-  const renderItem = ({ item }: { item: DownloadedContent }) => (
-    <View style={styles.downloadItem}>
+  const handlePlayDownload = (item: DownloadedContent, itemIndex: number) => {
+    router.push({
+      pathname: '/downloads/player',
+      params: { contentId: item.contentId, index: String(itemIndex) },
+    });
+  };
+
+  const renderItem = ({ item, index }: { item: DownloadedContent; index: number }) => (
+    <TouchableOpacity 
+      style={styles.downloadItem}
+      onPress={() => handlePlayDownload(item, index)}
+      activeOpacity={0.7}
+    >
       <View style={styles.itemIcon}>
         <Ionicons
           name={getContentIcon(item.contentType)}
@@ -158,12 +159,15 @@ export default function DownloadsScreen() {
         )}
       </View>
       <TouchableOpacity
-        onPress={() => handleDeleteItem(item)}
+        onPress={(e) => {
+          e.stopPropagation();
+          handleDeleteItem(item);
+        }}
         style={styles.deleteButton}
       >
         <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

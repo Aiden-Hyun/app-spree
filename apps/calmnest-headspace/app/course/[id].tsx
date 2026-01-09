@@ -27,6 +27,7 @@ function CourseDetailScreen() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [refreshKey, setRefreshKey] = useState(0);
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -54,7 +55,7 @@ function CourseDetailScreen() {
     }, [user])
   );
 
-  // Fetch downloaded session IDs (refetch when screen comes into focus)
+  // Refresh download status when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       async function loadDownloadedIds() {
@@ -62,6 +63,8 @@ function CourseDetailScreen() {
         setDownloadedIds(ids);
       }
       loadDownloadedIds();
+      // Increment refreshKey to force DownloadButton components to re-check
+      setRefreshKey(prev => prev + 1);
     }, [])
   );
 
@@ -323,6 +326,7 @@ function CourseDetailScreen() {
                         }}
                         size={20}
                         darkMode={isDark}
+                        refreshKey={refreshKey}
                         onDownloadComplete={() => {
                           getDownloadedContentIds('course_session').then(setDownloadedIds);
                         }}

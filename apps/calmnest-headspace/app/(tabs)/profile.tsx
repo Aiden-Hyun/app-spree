@@ -214,6 +214,19 @@ function ProfileScreen() {
               <View style={styles.actionDivider} />
               
               <AnimatedPressable 
+                onPress={() => router.push('/downloads')}
+                style={styles.actionItem}
+              >
+                <View style={styles.actionLeft}>
+                  <Ionicons name="cloud-download-outline" size={20} color={theme.colors.text} />
+                  <Text style={styles.actionLabel}>Downloads</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+              </AnimatedPressable>
+              
+              <View style={styles.actionDivider} />
+              
+              <AnimatedPressable 
                 onPress={() => router.push('/settings')}
                 style={styles.actionItem}
               >

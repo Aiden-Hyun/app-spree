@@ -34,6 +34,7 @@ function AlbumDetailScreen() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [refreshKey, setRefreshKey] = useState(0);
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -61,7 +62,7 @@ function AlbumDetailScreen() {
     }, [user])
   );
 
-  // Fetch downloaded track IDs (refetch when screen comes into focus)
+  // Refresh download status when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       async function loadDownloadedIds() {
@@ -69,6 +70,7 @@ function AlbumDetailScreen() {
         setDownloadedIds(ids);
       }
       loadDownloadedIds();
+      setRefreshKey(prev => prev + 1);
     }, [])
   );
 
@@ -278,6 +280,7 @@ function AlbumDetailScreen() {
                         }}
                         size={20}
                         darkMode={true}
+                        refreshKey={refreshKey}
                         onDownloadComplete={() => {
                           getDownloadedContentIds('album_track').then(setDownloadedIds);
                         }}

@@ -83,12 +83,6 @@ function RootNavigator() {
           }} 
         />
         <Stack.Screen 
-          name="downloads" 
-          options={{ 
-            headerShown: false,
-          }} 
-        />
-        <Stack.Screen 
           name="terms" 
           options={{ 
             headerShown: false,
@@ -138,6 +132,12 @@ function RootNavigator() {
         />
         <Stack.Screen 
           name="emergency" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="downloads" 
           options={{ 
             headerShown: false,
           }} 

@@ -15,7 +15,7 @@ export function OfflineNavigator({ children }: OfflineNavigatorProps) {
   const pathname = usePathname();
   const { isOffline, isLoading } = useNetwork();
   const previousPathRef = useRef<string | null>(null);
-  const isOnDownloadsPage = pathname === '/downloads';
+  const isOnDownloadsPage = pathname === '/downloads' || pathname.startsWith('/downloads/');
   const hasNavigatedToOffline = useRef(false);
 
   useEffect(() => {

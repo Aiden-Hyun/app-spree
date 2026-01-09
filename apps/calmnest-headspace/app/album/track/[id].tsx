@@ -237,6 +237,7 @@ function AlbumTrackPlayerScreen() {
       contentType="album_track"
       audioUrl={currentAudioUrl}
       audioPath={audioPath}
+      parentTitle={albumTitle}
     />
   );
 }

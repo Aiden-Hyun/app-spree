@@ -25,6 +25,8 @@ interface DownloadButtonProps {
   size?: number;
   darkMode?: boolean;
   onDownloadComplete?: () => void;
+  /** When this changes, the download status is re-checked */
+  refreshKey?: number | string;
 }
 
 export function DownloadButton({
@@ -35,6 +37,7 @@ export function DownloadButton({
   size = 24,
   darkMode = false,
   onDownloadComplete,
+  refreshKey,
 }: DownloadButtonProps) {
   const { theme, isDark } = useTheme();
   const [downloaded, setDownloaded] = useState(false);
@@ -43,9 +46,10 @@ export function DownloadButton({
 
   const useDarkColors = darkMode || isDark;
 
+  // Check download status when contentId or refreshKey changes
   useEffect(() => {
     checkDownloadStatus();
-  }, [contentId]);
+  }, [contentId, refreshKey]);
 
   const checkDownloadStatus = async () => {
     const isAlreadyDownloaded = await isDownloaded(contentId);

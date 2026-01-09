@@ -253,6 +253,7 @@ function SeriesChapterPlayerScreen() {
       contentType="series_chapter"
       audioUrl={currentAudioUrl}
       audioPath={audioPath}
+      parentTitle={seriesTitle}
     />
   );
 }

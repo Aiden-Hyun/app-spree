@@ -252,6 +252,7 @@ function CourseSessionPlayerScreen() {
       contentType="course_session"
       audioUrl={currentAudioUrl}
       audioPath={audioPath}
+      parentTitle={courseTitle}
     />
   );
 }
