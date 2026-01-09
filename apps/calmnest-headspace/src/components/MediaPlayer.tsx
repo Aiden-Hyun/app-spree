@@ -553,11 +553,11 @@ export function MediaPlayer({
                 >
                   <Ionicons
                     name="play-skip-back"
-                    size={24}
+                    size={16}
                     color={hasPrevious ? 'white' : 'rgba(255,255,255,0.3)'}
                   />
                   <Text style={[styles.trackNavText, !hasPrevious && styles.trackNavTextDisabled]}>
-                    Previous
+                    Prev
                   </Text>
                 </TouchableOpacity>
 
@@ -571,7 +571,7 @@ export function MediaPlayer({
                   >
                     <Ionicons
                       name={autoPlayEnabled ? 'play-forward-circle' : 'play-forward-circle-outline'}
-                      size={18}
+                      size={16}
                       color={autoPlayEnabled ? 'white' : 'rgba(255,255,255,0.7)'}
                     />
                     <Text style={[styles.toggleText, autoPlayEnabled && styles.toggleTextActive]}>
@@ -600,7 +600,7 @@ export function MediaPlayer({
                         <>
                           <Ionicons
                             name={isDownloadedState ? 'checkmark-circle' : 'cloud-download-outline'}
-                            size={18}
+                            size={16}
                             color={isDownloadedState ? '#4CAF50' : 'white'}
                           />
                           <Text style={[styles.toggleText, isDownloadedState ? styles.toggleTextDownloaded : styles.toggleTextActive]}>
@@ -623,7 +623,7 @@ export function MediaPlayer({
                   </Text>
                   <Ionicons
                     name="play-skip-forward"
-                    size={24}
+                    size={16}
                     color={hasNext ? 'white' : 'rgba(255,255,255,0.3)'}
                   />
                 </TouchableOpacity>
@@ -871,18 +871,18 @@ const createStyles = (theme: Theme) =>
     },
     trackNavigation: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      justifyContent: 'space-evenly',
       alignItems: 'center',
       marginTop: theme.spacing.lg,
-      paddingHorizontal: theme.spacing.md,
+      paddingHorizontal: 4,
     },
     trackNavButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: theme.spacing.sm,
-      paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.md,
-      borderRadius: theme.borderRadius.lg,
+      gap: 3,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      borderRadius: theme.borderRadius.full,
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
     trackNavButtonDisabled: {
@@ -890,7 +890,7 @@ const createStyles = (theme: Theme) =>
     },
     trackNavText: {
       fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
+      fontSize: 12,
       color: 'white',
     },
     trackNavTextDisabled: {
@@ -899,14 +899,14 @@ const createStyles = (theme: Theme) =>
     centerControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 4,
     },
     toggleButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      paddingVertical: theme.spacing.xs,
-      paddingHorizontal: theme.spacing.sm,
+      gap: 3,
+      paddingVertical: 8,
+      paddingHorizontal: 8,
       borderRadius: theme.borderRadius.full,
       backgroundColor: 'rgba(255, 255, 255, 0.15)',
     },
