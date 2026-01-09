@@ -20,8 +20,8 @@ import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
 import { getAudioUrlFromPath } from '../constants/audioFiles';
 import { getBackgroundSoundById, getNarratorByName, FirestoreBackgroundSound, savePlaybackProgress, getPlaybackProgress, clearPlaybackProgress } from '../services/firestoreService';
 import { useAuth } from '../contexts/AuthContext';
-import { DownloadButton } from './DownloadButton';
 import { useNetwork } from '../contexts/NetworkContext';
+import { isDownloaded, downloadAudio, isDownloading as checkIsDownloading } from '../services/downloadService';
 
 const AUTOPLAY_KEY = 'calmnest_autoplay_enabled';
 
@@ -123,6 +123,11 @@ export function MediaPlayer({
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
   const hasTriggeredAutoPlay = useRef(false);
 
+  // Download state
+  const [isDownloadedState, setIsDownloadedState] = useState(false);
+  const [isDownloadingState, setIsDownloadingState] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
   // Playback progress tracking
   const lastSaveTime = useRef(0);
   const hasRestoredPosition = useRef(false);
@@ -141,6 +146,46 @@ export function MediaPlayer({
     }
     loadAutoPlayPreference();
   }, []);
+
+  // Check download status on mount and when contentId changes
+  useEffect(() => {
+    async function checkDownloadStatus() {
+      if (!contentId) return;
+      const downloaded = await isDownloaded(contentId);
+      setIsDownloadedState(downloaded);
+      setIsDownloadingState(checkIsDownloading(contentId));
+    }
+    checkDownloadStatus();
+  }, [contentId]);
+
+  // Handle download
+  const handleDownload = async () => {
+    if (!contentId || !contentType || !audioUrl || isDownloadingState || isDownloadedState) return;
+    
+    setIsDownloadingState(true);
+    setDownloadProgress(0);
+    
+    const success = await downloadAudio(
+      contentId,
+      contentType,
+      audioUrl,
+      {
+        title,
+        duration_minutes: durationMinutes,
+        thumbnailUrl: artworkThumbnailUrl,
+        parentId,
+        parentTitle,
+        audioPath,
+      },
+      (progress) => setDownloadProgress(progress)
+    );
+    
+    setIsDownloadingState(false);
+    setDownloadProgress(0);
+    if (success) {
+      setIsDownloadedState(true);
+    }
+  };
 
   // Save auto-play preference when it changes
   const toggleAutoPlay = async () => {
@@ -390,25 +435,6 @@ export function MediaPlayer({
               </TouchableOpacity>
             )}
             
-            {/* Download Button */}
-            {!isOffline && contentId && contentType && audioUrl && (
-              <DownloadButton
-                contentId={contentId}
-                contentType={contentType}
-                audioUrl={audioUrl}
-                metadata={{
-                  title,
-                  duration_minutes: durationMinutes,
-                  thumbnailUrl: artworkThumbnailUrl,
-                  parentId,
-                  parentTitle,
-                  audioPath,
-                }}
-                size={24}
-                darkMode={true}
-              />
-            )}
-            
             {/* Favorite Button */}
             <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
               <Ionicons
@@ -535,21 +561,56 @@ export function MediaPlayer({
                   </Text>
                 </TouchableOpacity>
 
-                {/* Auto-play Toggle */}
-                <TouchableOpacity
-                  style={[styles.autoPlayButton, autoPlayEnabled && styles.autoPlayButtonActive]}
-                  onPress={toggleAutoPlay}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={autoPlayEnabled ? 'play-forward-circle' : 'play-forward-circle-outline'}
-                    size={20}
-                    color={autoPlayEnabled ? 'white' : 'rgba(255,255,255,0.5)'}
-                  />
-                  <Text style={[styles.autoPlayText, autoPlayEnabled && styles.autoPlayTextActive]}>
-                    Auto
-                  </Text>
-                </TouchableOpacity>
+                {/* Center Controls: Auto-play & Download */}
+                <View style={styles.centerControls}>
+                  {/* Auto-play Toggle */}
+                  <TouchableOpacity
+                    style={[styles.toggleButton, autoPlayEnabled && styles.toggleButtonActive]}
+                    onPress={toggleAutoPlay}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={autoPlayEnabled ? 'play-forward-circle' : 'play-forward-circle-outline'}
+                      size={18}
+                      color={autoPlayEnabled ? 'white' : 'rgba(255,255,255,0.7)'}
+                    />
+                    <Text style={[styles.toggleText, autoPlayEnabled && styles.toggleTextActive]}>
+                      Autoplay
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Download Toggle */}
+                  {!isOffline && contentId && contentType && audioUrl && (
+                    <TouchableOpacity
+                      style={[
+                        styles.toggleButton,
+                        isDownloadedState && styles.toggleButtonActive,
+                        isDownloadingState && styles.toggleButtonDownloading,
+                      ]}
+                      onPress={handleDownload}
+                      activeOpacity={0.7}
+                      disabled={isDownloadingState || isDownloadedState}
+                    >
+                      {isDownloadingState ? (
+                        <>
+                          <ActivityIndicator size={14} color="white" />
+                          <Text style={styles.toggleTextActive}>{downloadProgress}%</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Ionicons
+                            name={isDownloadedState ? 'checkmark-circle' : 'cloud-download-outline'}
+                            size={18}
+                            color={isDownloadedState ? '#4CAF50' : 'white'}
+                          />
+                          <Text style={[styles.toggleText, isDownloadedState ? styles.toggleTextDownloaded : styles.toggleTextActive]}>
+                            {isDownloadedState ? 'Saved' : 'Download'}
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
 
                 <TouchableOpacity
                   style={[styles.trackNavButton, !hasNext && styles.trackNavButtonDisabled]}
@@ -565,6 +626,40 @@ export function MediaPlayer({
                     size={24}
                     color={hasNext ? 'white' : 'rgba(255,255,255,0.3)'}
                   />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Standalone Download Button (for content without prev/next) */}
+            {!(onPrevious || onNext) && !isOffline && contentId && contentType && audioUrl && (
+              <View style={styles.standaloneDownload}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    isDownloadedState && styles.toggleButtonActive,
+                    isDownloadingState && styles.toggleButtonDownloading,
+                  ]}
+                  onPress={handleDownload}
+                  activeOpacity={0.7}
+                  disabled={isDownloadingState || isDownloadedState}
+                >
+                  {isDownloadingState ? (
+                    <>
+                      <ActivityIndicator size={14} color="white" />
+                      <Text style={styles.toggleTextActive}>{downloadProgress}%</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons
+                        name={isDownloadedState ? 'checkmark-circle' : 'cloud-download-outline'}
+                        size={18}
+                        color={isDownloadedState ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
+                      />
+                      <Text style={[styles.toggleText, isDownloadedState && styles.toggleTextDownloaded]}>
+                        {isDownloadedState ? 'Saved' : 'Download'}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
@@ -801,24 +896,39 @@ const createStyles = (theme: Theme) =>
     trackNavTextDisabled: {
       color: 'rgba(255, 255, 255, 0.3)',
     },
-    autoPlayButton: {
+    centerControls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    toggleButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
       paddingVertical: theme.spacing.xs,
       paddingHorizontal: theme.spacing.sm,
       borderRadius: theme.borderRadius.full,
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
     },
-    autoPlayButtonActive: {
+    toggleButtonActive: {
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
-    autoPlayText: {
+    toggleButtonDownloading: {
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    toggleText: {
       fontFamily: theme.fonts.ui.medium,
       fontSize: 12,
-      color: 'rgba(255, 255, 255, 0.5)',
+      color: 'rgba(255, 255, 255, 0.7)',
     },
-    autoPlayTextActive: {
+    toggleTextActive: {
       color: 'white',
+    },
+    toggleTextDownloaded: {
+      color: '#4CAF50',
+    },
+    standaloneDownload: {
+      alignItems: 'center',
+      marginTop: theme.spacing.lg,
     },
   });
