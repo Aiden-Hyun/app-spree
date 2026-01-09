@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AudioPlayer } from './AudioPlayer';
 import { BackgroundAudioPicker } from './BackgroundAudioPicker';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,7 +18,10 @@ import { Theme } from '../theme';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
 import { getAudioUrlFromPath } from '../constants/audioFiles';
-import { getBackgroundSoundById, getNarratorByName, FirestoreBackgroundSound } from '../services/firestoreService';
+import { getBackgroundSoundById, getNarratorByName, FirestoreBackgroundSound, savePlaybackProgress, getPlaybackProgress, clearPlaybackProgress } from '../services/firestoreService';
+import { useAuth } from '../contexts/AuthContext';
+
+const AUTOPLAY_KEY = 'calmnest_autoplay_enabled';
 
 export interface MediaPlayerProps {
   // Content info
@@ -54,6 +58,16 @@ export interface MediaPlayerProps {
 
   // Enable background audio feature (default: true for meditations)
   enableBackgroundAudio?: boolean;
+
+  // Previous/Next navigation (for collections like courses, series, albums)
+  onPrevious?: () => void;
+  onNext?: () => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
+
+  // Content identification for progress tracking
+  contentId?: string;
+  contentType?: string;
 }
 
 export function MediaPlayer({
@@ -76,12 +90,53 @@ export function MediaPlayer({
   loadingText = 'Loading...',
   footerContent,
   enableBackgroundAudio = true,
+  onPrevious,
+  onNext,
+  hasPrevious = false,
+  hasNext = false,
+  contentId,
+  contentType,
 }: MediaPlayerProps) {
   const { theme, isDark } = useTheme();
+  const { user } = useAuth();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreBackgroundSound | null>(null);
   const [narratorPhotoUrl, setNarratorPhotoUrl] = useState<string | null>(instructorPhotoUrl || null);
+  
+  // Auto-play state
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
+  const hasTriggeredAutoPlay = useRef(false);
+
+  // Playback progress tracking
+  const lastSaveTime = useRef(0);
+  const hasRestoredPosition = useRef(false);
+
+  // Load auto-play preference from AsyncStorage
+  useEffect(() => {
+    async function loadAutoPlayPreference() {
+      try {
+        const stored = await AsyncStorage.getItem(AUTOPLAY_KEY);
+        if (stored !== null) {
+          setAutoPlayEnabled(stored === 'true');
+        }
+      } catch (error) {
+        console.error('Failed to load auto-play preference:', error);
+      }
+    }
+    loadAutoPlayPreference();
+  }, []);
+
+  // Save auto-play preference when it changes
+  const toggleAutoPlay = async () => {
+    const newValue = !autoPlayEnabled;
+    setAutoPlayEnabled(newValue);
+    try {
+      await AsyncStorage.setItem(AUTOPLAY_KEY, String(newValue));
+    } catch (error) {
+      console.error('Failed to save auto-play preference:', error);
+    }
+  };
 
   // Background audio hook
   const backgroundAudio = useBackgroundAudio();
@@ -145,6 +200,108 @@ export function MediaPlayer({
       backgroundAudio.cleanup();
     };
   }, []);
+
+  // Reset auto-play trigger flag when track changes
+  useEffect(() => {
+    hasTriggeredAutoPlay.current = false;
+  }, [title]);
+
+  // Auto-play next track when current one completes
+  useEffect(() => {
+    // Check if audio has completed naturally (progress >= 0.99 and not playing)
+    if (
+      autoPlayEnabled &&
+      hasNext &&
+      onNext &&
+      audioPlayer.progress >= 0.99 &&
+      !audioPlayer.isPlaying &&
+      audioPlayer.duration > 0 &&
+      !hasTriggeredAutoPlay.current
+    ) {
+      // Mark as triggered to prevent double-firing
+      hasTriggeredAutoPlay.current = true;
+      // Small delay to ensure smooth transition
+      setTimeout(() => {
+        onNext();
+      }, 500);
+    }
+  }, [autoPlayEnabled, hasNext, onNext, audioPlayer.progress, audioPlayer.isPlaying, audioPlayer.duration]);
+
+  // Restore playback position on mount
+  useEffect(() => {
+    async function restorePosition() {
+      if (!user?.uid || !contentId || hasRestoredPosition.current) return;
+      
+      const progress = await getPlaybackProgress(user.uid, contentId);
+      if (progress && progress.position_seconds > 5) {
+        // Wait for audio to be ready before seeking
+        const checkAndSeek = () => {
+          if (audioPlayer.duration > 0) {
+            audioPlayer.seekTo(progress.position_seconds);
+            hasRestoredPosition.current = true;
+          } else {
+            // Retry after a short delay if audio not ready
+            setTimeout(checkAndSeek, 100);
+          }
+        };
+        checkAndSeek();
+      } else {
+        hasRestoredPosition.current = true;
+      }
+    }
+    restorePosition();
+  }, [user?.uid, contentId, audioPlayer.duration]);
+
+  // Reset restore flag when content changes
+  useEffect(() => {
+    hasRestoredPosition.current = false;
+    lastSaveTime.current = 0;
+  }, [contentId]);
+
+  // Save playback position periodically (every 10 seconds) and on pause
+  useEffect(() => {
+    if (!user?.uid || !contentId || !contentType) return;
+    if (audioPlayer.position < 5 || audioPlayer.duration === 0) return;
+
+    const now = Date.now();
+    const shouldSave = 
+      (!audioPlayer.isPlaying && audioPlayer.position > 5) || // Save on pause
+      (now - lastSaveTime.current >= 10000); // Save every 10 seconds
+
+    if (shouldSave) {
+      lastSaveTime.current = now;
+      savePlaybackProgress(
+        user.uid,
+        contentId,
+        contentType,
+        audioPlayer.position,
+        audioPlayer.duration
+      );
+    }
+  }, [user?.uid, contentId, contentType, audioPlayer.position, audioPlayer.isPlaying, audioPlayer.duration]);
+
+  // Clear progress when content is completed
+  useEffect(() => {
+    if (!user?.uid || !contentId) return;
+    if (audioPlayer.progress >= 0.95 && audioPlayer.duration > 0) {
+      clearPlaybackProgress(user.uid, contentId);
+    }
+  }, [user?.uid, contentId, audioPlayer.progress, audioPlayer.duration]);
+
+  // Save position on unmount
+  useEffect(() => {
+    return () => {
+      if (user?.uid && contentId && contentType && audioPlayer.position > 5 && audioPlayer.duration > 0) {
+        savePlaybackProgress(
+          user.uid,
+          contentId,
+          contentType,
+          audioPlayer.position,
+          audioPlayer.duration
+        );
+      }
+    };
+  }, [user?.uid, contentId, contentType, audioPlayer.position, audioPlayer.duration]);
 
   // Handle background sound selection
   const handleSelectSound = async (soundId: string | null, audioPath: string | null) => {
@@ -323,6 +480,59 @@ export function MediaPlayer({
                 onSkipForward={() => audioPlayer.skipForward(15)}
                 onToggleLoop={() => audioPlayer.setLoop(!audioPlayer.isLooping)}
               />
+            )}
+
+            {/* Previous/Next Navigation */}
+            {(onPrevious || onNext) && (
+              <View style={styles.trackNavigation}>
+                <TouchableOpacity
+                  style={[styles.trackNavButton, !hasPrevious && styles.trackNavButtonDisabled]}
+                  onPress={hasPrevious ? onPrevious : undefined}
+                  disabled={!hasPrevious}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="play-skip-back"
+                    size={24}
+                    color={hasPrevious ? 'white' : 'rgba(255,255,255,0.3)'}
+                  />
+                  <Text style={[styles.trackNavText, !hasPrevious && styles.trackNavTextDisabled]}>
+                    Previous
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Auto-play Toggle */}
+                <TouchableOpacity
+                  style={[styles.autoPlayButton, autoPlayEnabled && styles.autoPlayButtonActive]}
+                  onPress={toggleAutoPlay}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={autoPlayEnabled ? 'play-forward-circle' : 'play-forward-circle-outline'}
+                    size={20}
+                    color={autoPlayEnabled ? 'white' : 'rgba(255,255,255,0.5)'}
+                  />
+                  <Text style={[styles.autoPlayText, autoPlayEnabled && styles.autoPlayTextActive]}>
+                    Auto
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.trackNavButton, !hasNext && styles.trackNavButtonDisabled]}
+                  onPress={hasNext ? onNext : undefined}
+                  disabled={!hasNext}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.trackNavText, !hasNext && styles.trackNavTextDisabled]}>
+                    Next
+                  </Text>
+                  <Ionicons
+                    name="play-skip-forward"
+                    size={24}
+                    color={hasNext ? 'white' : 'rgba(255,255,255,0.3)'}
+                  />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -529,5 +739,52 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 14,
       color: 'rgba(255, 255, 255, 0.7)',
+    },
+    trackNavigation: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.md,
+    },
+    trackNavButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    trackNavButtonDisabled: {
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    },
+    trackNavText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 14,
+      color: 'white',
+    },
+    trackNavTextDisabled: {
+      color: 'rgba(255, 255, 255, 0.3)',
+    },
+    autoPlayButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.sm,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    autoPlayButtonActive: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    autoPlayText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.5)',
+    },
+    autoPlayTextActive: {
+      color: 'white',
     },
   });

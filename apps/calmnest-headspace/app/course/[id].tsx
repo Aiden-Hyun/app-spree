@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
@@ -9,14 +9,18 @@ import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
-import { getCourseById, FirestoreCourse, FirestoreCourseSession } from "../../src/services/firestoreService";
+import { getCourseById, FirestoreCourse, FirestoreCourseSession, getCompletedContentIds } from "../../src/services/firestoreService";
+import { useAuth } from "../../src/contexts/AuthContext";
 
 function CourseDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, autoOpenItemId } = useLocalSearchParams<{ id: string; autoOpenItemId?: string }>();
   const { theme, isDark } = useTheme();
+  const { user } = useAuth();
   const [course, setCourse] = useState<FirestoreCourse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -30,6 +34,44 @@ function CourseDetailScreen() {
     }
     loadCourse();
   }, [id]);
+
+  // Fetch completed session IDs (refetch when screen comes into focus)
+  useFocusEffect(
+    useCallback(() => {
+      async function loadCompletedIds() {
+        if (!user) return;
+        const ids = await getCompletedContentIds(user.uid, 'course_session');
+        setCompletedIds(ids);
+      }
+      loadCompletedIds();
+    }, [user])
+  );
+
+  // Auto-open a specific session if autoOpenItemId is provided
+  useEffect(() => {
+    if (!course || !autoOpenItemId || hasAutoOpened.current) return;
+    
+    const index = course.sessions.findIndex(s => s.id === autoOpenItemId);
+    if (index !== -1) {
+      hasAutoOpened.current = true;
+      const session = course.sessions[index];
+      router.push({
+        pathname: '/course/session/[id]',
+        params: {
+          id: session.id,
+          audioPath: session.audioPath,
+          title: session.title,
+          courseTitle: course.title,
+          duration: String(session.duration_minutes),
+          instructor: course.instructor,
+          color: course.color,
+          thumbnailUrl: course.thumbnailUrl || '',
+          sessionsJson: JSON.stringify(course.sessions),
+          currentIndex: String(index),
+        },
+      });
+    }
+  }, [course, autoOpenItemId]);
 
   if (loading) {
     return (
@@ -57,8 +99,9 @@ function CourseDetailScreen() {
     );
   }
 
-  const handleSessionPress = (session: FirestoreCourseSession) => {
+  const handleSessionPress = (session: FirestoreCourseSession, index: number) => {
     if (!course) return;
+    
     router.push({
       pathname: '/course/session/[id]',
       params: {
@@ -69,6 +112,10 @@ function CourseDetailScreen() {
         duration: String(session.duration_minutes),
         instructor: course.instructor,
         color: course.color,
+        thumbnailUrl: course.thumbnailUrl || '',
+        // Pass sessions list for navigation
+        sessionsJson: JSON.stringify(course.sessions),
+        currentIndex: String(index),
       },
     });
   };
@@ -92,14 +139,21 @@ function CourseDetailScreen() {
             {/* Hero Section */}
             <AnimatedView delay={0} duration={400}>
               <View style={styles.heroSection}>
-                <View
-                  style={[
-                    styles.heroIcon,
-                    { backgroundColor: `${course.color}25` },
-                  ]}
-                >
-                  <Ionicons name="school" size={48} color={course.color} />
-                </View>
+                {course.thumbnailUrl ? (
+                  <Image
+                    source={{ uri: course.thumbnailUrl }}
+                    style={styles.heroImage}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.heroIcon,
+                      { backgroundColor: `${course.color}25` },
+                    ]}
+                  >
+                    <Ionicons name="school" size={48} color={course.color} />
+                  </View>
+                )}
                 <Text style={styles.courseTitle}>{course.title}</Text>
                 <View style={styles.courseMeta}>
                   <View style={styles.metaItem}>
@@ -162,24 +216,31 @@ function CourseDetailScreen() {
                   duration={300}
                 >
                   <AnimatedPressable
-                    onPress={() => handleSessionPress(session)}
+                    onPress={() => handleSessionPress(session, index)}
                     style={styles.sessionCard}
                   >
-                    <View
-                      style={[
-                        styles.sessionNumber,
-                        { backgroundColor: `${course.color}20` },
-                      ]}
-                    >
-                      <Text
+                    {course.thumbnailUrl ? (
+                      <Image
+                        source={{ uri: course.thumbnailUrl }}
+                        style={styles.sessionThumbnail}
+                      />
+                    ) : (
+                      <View
                         style={[
-                          styles.sessionNumberText,
-                          { color: course.color },
+                          styles.sessionNumber,
+                          { backgroundColor: `${course.color}20` },
                         ]}
                       >
-                        {session.dayNumber}
-                      </Text>
-                    </View>
+                        <Text
+                          style={[
+                            styles.sessionNumberText,
+                            { color: course.color },
+                          ]}
+                        >
+                          {session.dayNumber}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.sessionInfo}>
                       <Text style={styles.sessionTitle}>{session.title}</Text>
                       <Text style={styles.sessionDescription} numberOfLines={1}>
@@ -198,6 +259,19 @@ function CourseDetailScreen() {
                         <Text style={styles.sessionMetaText}>
                           {session.duration_minutes} min
                         </Text>
+                        {completedIds.has(session.id) && (
+                          <>
+                            <Text style={styles.sessionMetaText}>•</Text>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={12}
+                              color="#4CAF50"
+                            />
+                            <Text style={[styles.sessionMetaText, styles.completedText]}>
+                              Completed
+                            </Text>
+                          </>
+                        )}
                       </View>
                     </View>
                     <View style={styles.playButton}>
@@ -273,6 +347,12 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       justifyContent: "center",
       marginBottom: theme.spacing.lg,
     },
+    heroImage: {
+      width: 120,
+      height: 120,
+      borderRadius: 16,
+      marginBottom: theme.spacing.lg,
+    },
     courseTitle: {
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
@@ -333,6 +413,11 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "center",
     },
+    sessionThumbnail: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+    },
     sessionNumberText: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 16,
@@ -362,6 +447,9 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 11,
       color: isDark ? theme.colors.sleepTextMuted : theme.colors.textMuted,
+    },
+    completedText: {
+      color: "#4CAF50",
     },
     playButton: {
       width: 40,

@@ -284,18 +284,14 @@ function HomeScreen() {
         router.push({ pathname: '/music/[id]', params: { id: contentId } });
         break;
       case 'series_chapter':
-        // Look up series chapter data and navigate with full params
+        // Navigate to series detail page, which will auto-open the chapter
         const result = findSeriesChapter(contentId);
         if (result) {
           router.push({
-            pathname: '/series/chapter/[id]',
+            pathname: '/series/[id]',
             params: {
-              id: result.chapter.id,
-              audioPath: result.chapter.audioPath,
-              title: result.chapter.title,
-              seriesTitle: result.series.title,
-              duration: String(result.chapter.duration_minutes),
-              narrator: result.series.narrator
+              id: result.series.id,
+              autoOpenItemId: contentId
             }
           });
         } else {
@@ -303,18 +299,14 @@ function HomeScreen() {
         }
         break;
       case 'album_track':
-        // Look up album track data and navigate with full params
+        // Navigate to album detail page, which will auto-open the track
         const albumResult = findAlbumTrack(contentId);
         if (albumResult) {
           router.push({
-            pathname: '/album/track/[id]',
+            pathname: '/album/[id]',
             params: {
-              id: albumResult.track.id,
-              audioPath: albumResult.track.audioPath,
-              title: albumResult.track.title,
-              albumTitle: albumResult.album.title,
-              duration: String(albumResult.track.duration_minutes),
-              artist: albumResult.album.artist
+              id: albumResult.album.id,
+              autoOpenItemId: contentId
             }
           });
         } else {
@@ -343,19 +335,14 @@ function HomeScreen() {
         }
         break;
       case 'course_session':
-        // Look up course session data and navigate with full params
+        // Navigate to course detail page, which will auto-open the session
         const courseResult = findCourseSession(contentId);
         if (courseResult) {
           router.push({
-            pathname: '/course/session/[id]',
+            pathname: '/course/[id]',
             params: {
-              id: courseResult.session.id,
-              audioPath: courseResult.session.audioPath,
-              title: courseResult.session.title,
-              courseTitle: courseResult.course.title,
-              duration: String(courseResult.session.duration_minutes),
-              instructor: courseResult.course.instructor,
-              color: courseResult.course.color
+              id: courseResult.course.id,
+              autoOpenItemId: contentId
             }
           });
         } else {

@@ -199,6 +199,7 @@ function MeditationPlayerScreen() {
       difficultyLevel={meditation?.difficulty_level}
       gradientColors={getGradientColors()}
       artworkIcon="leaf"
+      artworkThumbnailUrl={meditation?.thumbnail_url}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
@@ -206,6 +207,8 @@ function MeditationPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading meditation..."
+      contentId={id}
+      contentType="meditation"
     />
   );
 }

@@ -54,6 +54,8 @@ export function useAudioPlayer(initialSource?: string | number | null) {
           playsInSilentMode: true,
           shouldPlayInBackground: true,
           shouldRouteThroughEarpiece: false,
+          // 'doNotMix' ensures audio pauses when other apps play audio
+          interruptionMode: 'doNotMix',
         });
         // Also set audio as active to acquire audio focus on Android
         const { setIsAudioActiveAsync } = await import("expo-audio");

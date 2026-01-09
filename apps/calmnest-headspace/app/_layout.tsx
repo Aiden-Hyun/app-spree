@@ -81,6 +81,18 @@ function RootNavigator() {
           }} 
         />
         <Stack.Screen 
+          name="terms" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="privacy" 
+          options={{ 
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
           name="sleep-sounds" 
           options={{ 
             headerShown: false,

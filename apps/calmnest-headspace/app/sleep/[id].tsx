@@ -210,6 +210,8 @@ function SleepStoryPlayerScreen() {
       onPlayPause={handlePlayPause}
       loadingText="Loading story..."
       footerContent={sleepTimerButton}
+      contentId={id}
+      contentType="bedtime_story"
     />
   );
 }

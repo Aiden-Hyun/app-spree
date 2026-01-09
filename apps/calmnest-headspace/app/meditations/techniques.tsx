@@ -54,7 +54,7 @@ function TechniquesScreen() {
 
   const handleMeditationPress = (meditation: FirestoreTechniqueMeditation) => {
     router.push(
-      `/meditations/technique/${meditation.id}?audioPath=${encodeURIComponent(meditation.audioPath)}&title=${encodeURIComponent(meditation.title)}&description=${encodeURIComponent(meditation.description)}&duration=${meditation.duration_minutes}&instructor=${encodeURIComponent(meditation.instructor)}&technique=${meditation.techniqueId}&color=${encodeURIComponent(meditation.color)}`
+      `/meditations/technique/${meditation.id}?audioPath=${encodeURIComponent(meditation.audioPath)}&title=${encodeURIComponent(meditation.title)}&description=${encodeURIComponent(meditation.description)}&duration=${meditation.duration_minutes}&instructor=${encodeURIComponent(meditation.instructor)}&technique=${meditation.techniqueId}&color=${encodeURIComponent(meditation.color)}&thumbnailUrl=${encodeURIComponent(meditation.thumbnailUrl || '')}`
     );
   };
 

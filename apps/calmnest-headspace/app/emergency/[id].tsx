@@ -24,7 +24,7 @@ function adjustColor(hex: string, percent: number): string {
 }
 
 function EmergencyPlayerScreen() {
-  const { id, title, description, duration, audioPath, color, icon, narrator } =
+  const { id, title, description, duration, audioPath, color, icon, narrator, thumbnailUrl } =
     useLocalSearchParams<{
       id: string;
       title: string;
@@ -34,6 +34,7 @@ function EmergencyPlayerScreen() {
       color: string;
       icon: string;
       narrator: string;
+      thumbnailUrl?: string;
     }>();
 
   const router = useRouter();
@@ -163,6 +164,7 @@ function EmergencyPlayerScreen() {
       durationMinutes={parseInt(duration) || 4}
       gradientColors={gradientColors}
       artworkIcon={(icon as any) || "flash"}
+      artworkThumbnailUrl={thumbnailUrl}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
@@ -170,6 +172,8 @@ function EmergencyPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading..."
+      contentId={id}
+      contentType="emergency"
     />
   );
 }

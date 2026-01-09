@@ -1,13 +1,14 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
@@ -15,14 +16,18 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
-import { getSeriesById, FirestoreSeries, FirestoreSeriesChapter } from '../../src/services/firestoreService';
+import { getSeriesById, FirestoreSeries, FirestoreSeriesChapter, getCompletedContentIds } from '../../src/services/firestoreService';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 function SeriesDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, autoOpenItemId } = useLocalSearchParams<{ id: string; autoOpenItemId?: string }>();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [series, setSeries] = useState<FirestoreSeries | null>(null);
   const [loading, setLoading] = useState(true);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -36,6 +41,43 @@ function SeriesDetailScreen() {
     }
     loadSeries();
   }, [id]);
+
+  // Fetch completed chapter IDs (refetch when screen comes into focus)
+  useFocusEffect(
+    useCallback(() => {
+      async function loadCompletedIds() {
+        if (!user) return;
+        const ids = await getCompletedContentIds(user.uid, 'series_chapter');
+        setCompletedIds(ids);
+      }
+      loadCompletedIds();
+    }, [user])
+  );
+
+  // Auto-open a specific chapter if autoOpenItemId is provided
+  useEffect(() => {
+    if (!series || !autoOpenItemId || hasAutoOpened.current) return;
+    
+    const index = series.chapters.findIndex(c => c.id === autoOpenItemId);
+    if (index !== -1) {
+      hasAutoOpened.current = true;
+      const chapter = series.chapters[index];
+      router.push({
+        pathname: '/series/chapter/[id]',
+        params: {
+          id: chapter.id,
+          audioPath: chapter.audioPath,
+          title: chapter.title,
+          seriesTitle: series.title,
+          duration: String(chapter.duration_minutes),
+          narrator: series.narrator,
+          thumbnailUrl: series.thumbnailUrl || '',
+          chaptersJson: JSON.stringify(series.chapters),
+          currentIndex: String(index),
+        },
+      });
+    }
+  }, [series, autoOpenItemId]);
 
   if (loading) {
     return (
@@ -74,9 +116,22 @@ function SeriesDetailScreen() {
     );
   }
 
-  const handleChapterPress = (chapter: FirestoreSeriesChapter) => {
+  const handleChapterPress = (chapter: FirestoreSeriesChapter, index: number) => {
     // Navigate to series chapter player with the audioPath and narrator
-    router.push(`/series/chapter/${chapter.id}?audioPath=${encodeURIComponent(chapter.audioPath)}&title=${encodeURIComponent(chapter.title)}&seriesTitle=${encodeURIComponent(series.title)}&duration=${chapter.duration_minutes}&narrator=${encodeURIComponent(series.narrator)}`);
+    router.push({
+      pathname: '/series/chapter/[id]',
+      params: {
+        id: chapter.id,
+        audioPath: chapter.audioPath,
+        title: chapter.title,
+        seriesTitle: series.title,
+        duration: String(chapter.duration_minutes),
+        narrator: series.narrator,
+        thumbnailUrl: series.thumbnailUrl || '',
+        chaptersJson: JSON.stringify(series.chapters),
+        currentIndex: String(index),
+      },
+    });
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {
@@ -107,9 +162,16 @@ function SeriesDetailScreen() {
             {/* Hero Section */}
             <AnimatedView delay={0} duration={400}>
               <View style={styles.heroSection}>
-                <View style={[styles.heroIcon, { backgroundColor: `${series.color}25` }]}>
-                  <Ionicons name={getCategoryIcon()} size={48} color={series.color} />
-                </View>
+                {series.thumbnailUrl ? (
+                  <Image
+                    source={{ uri: series.thumbnailUrl }}
+                    style={styles.heroImage}
+                  />
+                ) : (
+                  <View style={[styles.heroIcon, { backgroundColor: `${series.color}25` }]}>
+                    <Ionicons name={getCategoryIcon()} size={48} color={series.color} />
+                  </View>
+                )}
                 <Text style={styles.seriesTitle}>{series.title}</Text>
                 <View style={styles.seriesMeta}>
                   <View style={styles.metaItem}>
@@ -138,14 +200,21 @@ function SeriesDetailScreen() {
               {series.chapters.map((chapter, index) => (
                 <AnimatedView key={chapter.id} delay={150 + index * 50} duration={300}>
                   <AnimatedPressable
-                    onPress={() => handleChapterPress(chapter)}
+                    onPress={() => handleChapterPress(chapter, index)}
                     style={styles.chapterCard}
                   >
-                    <View style={[styles.chapterNumber, { backgroundColor: `${series.color}20` }]}>
-                      <Text style={[styles.chapterNumberText, { color: series.color }]}>
-                        {chapter.chapterNumber}
-                      </Text>
-                    </View>
+                    {series.thumbnailUrl ? (
+                      <Image
+                        source={{ uri: series.thumbnailUrl }}
+                        style={styles.chapterThumbnail}
+                      />
+                    ) : (
+                      <View style={[styles.chapterNumber, { backgroundColor: `${series.color}20` }]}>
+                        <Text style={[styles.chapterNumberText, { color: series.color }]}>
+                          {chapter.chapterNumber}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.chapterInfo}>
                       <Text style={styles.chapterTitle}>{chapter.title}</Text>
                       <Text style={styles.chapterDescription} numberOfLines={1}>
@@ -154,6 +223,13 @@ function SeriesDetailScreen() {
                       <View style={styles.chapterMeta}>
                         <Ionicons name="time-outline" size={12} color={theme.colors.sleepTextMuted} />
                         <Text style={styles.chapterMetaText}>{chapter.duration_minutes} min</Text>
+                        {completedIds.has(chapter.id) && (
+                          <>
+                            <Text style={styles.chapterMetaText}>•</Text>
+                            <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+                            <Text style={[styles.chapterMetaText, styles.completedText]}>Completed</Text>
+                          </>
+                        )}
                       </View>
                     </View>
                     <View style={styles.playButton}>
@@ -218,6 +294,12 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'center',
       marginBottom: theme.spacing.lg,
     },
+    heroImage: {
+      width: 120,
+      height: 120,
+      borderRadius: 16,
+      marginBottom: theme.spacing.lg,
+    },
     seriesTitle: {
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
@@ -275,6 +357,11 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    chapterThumbnail: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+    },
     chapterNumberText: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 16,
@@ -304,6 +391,9 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 11,
       color: theme.colors.sleepTextMuted,
+    },
+    completedText: {
+      color: '#4CAF50',
     },
     playButton: {
       width: 40,

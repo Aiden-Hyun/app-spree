@@ -9,11 +9,20 @@ import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
-import { addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../../src/services/firestoreService';
+import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { Theme } from '../../../src/theme';
 
+interface SessionItem {
+  id: string;
+  audioPath: string;
+  title: string;
+  duration_minutes: number;
+  dayNumber: number;
+  description?: string;
+}
+
 function CourseSessionPlayerScreen() {
-  const { id, audioPath, title, courseTitle, duration, instructor, color } = useLocalSearchParams<{
+  const { id, audioPath, title, courseTitle, duration, instructor, color, thumbnailUrl, sessionsJson, currentIndex, autoPlay } = useLocalSearchParams<{
     id: string;
     audioPath: string;
     title: string;
@@ -21,6 +30,10 @@ function CourseSessionPlayerScreen() {
     duration: string;
     instructor: string;
     color: string;
+    thumbnailUrl?: string;
+    sessionsJson?: string;
+    currentIndex?: string;
+    autoPlay?: string;
   }>();
   const router = useRouter();
   const { theme } = useTheme();
@@ -34,6 +47,20 @@ function CourseSessionPlayerScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
   const narratorData = instructor ? getNarratorByName(instructor) : undefined;
+
+  // Parse sessions for prev/next navigation
+  const sessions: SessionItem[] = useMemo(() => {
+    if (!sessionsJson) return [];
+    try {
+      return JSON.parse(sessionsJson);
+    } catch {
+      return [];
+    }
+  }, [sessionsJson]);
+
+  const currentIdx = parseInt(currentIndex || '0', 10);
+  const hasPrevious = sessions.length > 0 && currentIdx > 0;
+  const hasNext = sessions.length > 0 && currentIdx < sessions.length - 1;
 
   // Check if favorited on load
   useEffect(() => {
@@ -66,6 +93,13 @@ function CourseSessionPlayerScreen() {
     loadSessionAudio();
   }, [audioPath]);
 
+  // Auto-start playback when coming from auto-play navigation
+  useEffect(() => {
+    if (autoPlay === 'true' && !loading && audioPlayer.duration > 0 && !audioPlayer.isPlaying) {
+      audioPlayer.play();
+    }
+  }, [autoPlay, loading, audioPlayer.duration]);
+
   // Track session for stats when user completes 80% of audio
   useEffect(() => {
     async function trackSession() {
@@ -83,6 +117,8 @@ function CourseSessionPlayerScreen() {
             duration_minutes: parseInt(duration) || 0,
             session_type: 'course_session',
           });
+          // Mark this session as completed
+          await markContentCompleted(user.uid, id, 'course_session');
         } catch (error) {
           console.error('Failed to track session:', error);
         }
@@ -134,6 +170,49 @@ function CourseSessionPlayerScreen() {
     }
   };
 
+  const handlePrevious = () => {
+    if (!hasPrevious) return;
+    const prevSession = sessions[currentIdx - 1];
+    audioPlayer.cleanup();
+    router.replace({
+      pathname: '/course/session/[id]',
+      params: {
+        id: prevSession.id,
+        audioPath: prevSession.audioPath,
+        title: prevSession.title,
+        courseTitle,
+        duration: String(prevSession.duration_minutes),
+        instructor,
+        color,
+        thumbnailUrl: thumbnailUrl || '',
+        sessionsJson,
+        currentIndex: String(currentIdx - 1),
+      },
+    });
+  };
+
+  const handleNext = () => {
+    if (!hasNext) return;
+    const nextSession = sessions[currentIdx + 1];
+    audioPlayer.cleanup();
+    router.replace({
+      pathname: '/course/session/[id]',
+      params: {
+        id: nextSession.id,
+        audioPath: nextSession.audioPath,
+        title: nextSession.title,
+        courseTitle,
+        duration: String(nextSession.duration_minutes),
+        instructor,
+        color,
+        thumbnailUrl: thumbnailUrl || '',
+        sessionsJson,
+        currentIndex: String(currentIdx + 1),
+        autoPlay: 'true',
+      },
+    });
+  };
+
   // Use course color for gradient, fallback to teal
   const courseColor = color || '#7DAFB4';
   const gradientColors: [string, string] = [courseColor, `${courseColor}CC`];
@@ -147,6 +226,7 @@ function CourseSessionPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={gradientColors}
       artworkIcon="school"
+      artworkThumbnailUrl={thumbnailUrl}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
@@ -154,6 +234,12 @@ function CourseSessionPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading session..."
+      onPrevious={hasPrevious ? handlePrevious : undefined}
+      onNext={hasNext ? handleNext : undefined}
+      hasPrevious={hasPrevious}
+      hasNext={hasNext}
+      contentId={id}
+      contentType="course_session"
     />
   );
 }

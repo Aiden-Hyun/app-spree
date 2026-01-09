@@ -199,6 +199,8 @@ function SleepMeditationPlayerScreen() {
       onPlayPause={handlePlayPause}
       loadingText="Loading meditation..."
       footerContent={sleepTimerButton}
+      contentId={id}
+      contentType="sleep_meditation"
     />
   );
 }

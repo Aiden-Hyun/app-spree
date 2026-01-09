@@ -1345,3 +1345,152 @@ export function getNarratorProfileUrl(name: string): string | null {
   const cached = narratorCache.get(name.toLowerCase());
   return cached?.profileUrl || null;
 }
+
+// ==================== PLAYBACK PROGRESS ====================
+
+export interface PlaybackProgress {
+  user_id: string;
+  content_id: string;
+  content_type: string;
+  position_seconds: number;
+  duration_seconds: number;
+  updated_at: Timestamp;
+}
+
+const playbackProgressCollection = collection(db, "playback_progress");
+
+/**
+ * Save or update playback progress for a content item
+ */
+export async function savePlaybackProgress(
+  userId: string,
+  contentId: string,
+  contentType: string,
+  positionSeconds: number,
+  durationSeconds: number
+): Promise<void> {
+  // Skip saving if position is less than 5 seconds (not meaningful)
+  if (positionSeconds < 5) return;
+  
+  // Skip saving if content is nearly complete (will be cleared anyway)
+  if (durationSeconds > 0 && positionSeconds / durationSeconds >= 0.95) return;
+
+  try {
+    const docId = `${userId}_${contentId}`;
+    await setDoc(doc(playbackProgressCollection, docId), {
+      user_id: userId,
+      content_id: contentId,
+      content_type: contentType,
+      position_seconds: positionSeconds,
+      duration_seconds: durationSeconds,
+      updated_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Error saving playback progress:", error);
+  }
+}
+
+/**
+ * Get saved playback progress for a content item
+ */
+export async function getPlaybackProgress(
+  userId: string,
+  contentId: string
+): Promise<PlaybackProgress | null> {
+  try {
+    const docId = `${userId}_${contentId}`;
+    const docSnap = await getDoc(doc(playbackProgressCollection, docId));
+    
+    if (!docSnap.exists()) return null;
+    
+    return docSnap.data() as PlaybackProgress;
+  } catch (error) {
+    console.error("Error getting playback progress:", error);
+    return null;
+  }
+}
+
+/**
+ * Clear playback progress when content is completed
+ */
+export async function clearPlaybackProgress(
+  userId: string,
+  contentId: string
+): Promise<void> {
+  try {
+    const docId = `${userId}_${contentId}`;
+    await deleteDoc(doc(playbackProgressCollection, docId));
+  } catch (error) {
+    console.error("Error clearing playback progress:", error);
+  }
+}
+
+// ============================================================================
+// COMPLETED CONTENT TRACKING
+// ============================================================================
+
+const completedContentCollection = collection(db, "completed_content");
+
+/**
+ * Mark a content item as completed
+ */
+export async function markContentCompleted(
+  userId: string,
+  contentId: string,
+  contentType: string
+): Promise<void> {
+  try {
+    const docId = `${userId}_${contentId}`;
+    await setDoc(doc(completedContentCollection, docId), {
+      user_id: userId,
+      content_id: contentId,
+      content_type: contentType,
+      completed_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Error marking content as completed:", error);
+  }
+}
+
+/**
+ * Get all completed content IDs for a user and content type
+ */
+export async function getCompletedContentIds(
+  userId: string,
+  contentType: string
+): Promise<Set<string>> {
+  try {
+    const q = query(
+      completedContentCollection,
+      where("user_id", "==", userId),
+      where("content_type", "==", contentType)
+    );
+    const snapshot = await getDocs(q);
+    const completedIds = new Set<string>();
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      completedIds.add(data.content_id);
+    });
+    return completedIds;
+  } catch (error) {
+    console.error("Error getting completed content:", error);
+    return new Set<string>();
+  }
+}
+
+/**
+ * Check if a specific content item is completed
+ */
+export async function isContentCompleted(
+  userId: string,
+  contentId: string
+): Promise<boolean> {
+  try {
+    const docId = `${userId}_${contentId}`;
+    const docSnap = await getDoc(doc(completedContentCollection, docId));
+    return docSnap.exists();
+  } catch (error) {
+    console.error("Error checking content completion:", error);
+    return false;
+  }
+}

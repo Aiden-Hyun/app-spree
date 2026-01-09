@@ -9,17 +9,30 @@ import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
-import { addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../../src/services/firestoreService';
+import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { Theme } from '../../../src/theme';
 
+interface ChapterItem {
+  id: string;
+  audioPath: string;
+  title: string;
+  duration_minutes: number;
+  chapterNumber: number;
+  description?: string;
+}
+
 function SeriesChapterPlayerScreen() {
-  const { id, audioPath, title, seriesTitle, duration, narrator } = useLocalSearchParams<{
+  const { id, audioPath, title, seriesTitle, duration, narrator, thumbnailUrl, chaptersJson, currentIndex, autoPlay } = useLocalSearchParams<{
     id: string;
     audioPath: string;
     title: string;
     seriesTitle: string;
     duration: string;
     narrator: string;
+    thumbnailUrl?: string;
+    chaptersJson?: string;
+    currentIndex?: string;
+    autoPlay?: string;
   }>();
   const router = useRouter();
   const { theme } = useTheme();
@@ -33,6 +46,20 @@ function SeriesChapterPlayerScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
   const narratorData = narrator ? getNarratorByName(narrator) : undefined;
+
+  // Parse chapters for prev/next navigation
+  const chapters: ChapterItem[] = useMemo(() => {
+    if (!chaptersJson) return [];
+    try {
+      return JSON.parse(chaptersJson);
+    } catch {
+      return [];
+    }
+  }, [chaptersJson]);
+
+  const currentIdx = parseInt(currentIndex || '0', 10);
+  const hasPrevious = chapters.length > 0 && currentIdx > 0;
+  const hasNext = chapters.length > 0 && currentIdx < chapters.length - 1;
 
   // Check if favorited on load
   useEffect(() => {
@@ -65,6 +92,13 @@ function SeriesChapterPlayerScreen() {
     loadChapterAudio();
   }, [audioPath]);
 
+  // Auto-start playback when coming from auto-play navigation
+  useEffect(() => {
+    if (autoPlay === 'true' && !loading && audioPlayer.duration > 0 && !audioPlayer.isPlaying) {
+      audioPlayer.play();
+    }
+  }, [autoPlay, loading, audioPlayer.duration]);
+
   // Track session for stats when user completes 80% of audio
   useEffect(() => {
     async function trackSession() {
@@ -82,6 +116,8 @@ function SeriesChapterPlayerScreen() {
             duration_minutes: parseInt(duration) || 0,
             session_type: 'series_chapter',
           });
+          // Mark this chapter as completed
+          await markContentCompleted(user.uid, id, 'series_chapter');
         } catch (error) {
           console.error('Failed to track session:', error);
         }
@@ -133,6 +169,47 @@ function SeriesChapterPlayerScreen() {
     }
   };
 
+  const handlePrevious = () => {
+    if (!hasPrevious) return;
+    const prevChapter = chapters[currentIdx - 1];
+    audioPlayer.cleanup();
+    router.replace({
+      pathname: '/series/chapter/[id]',
+      params: {
+        id: prevChapter.id,
+        audioPath: prevChapter.audioPath,
+        title: prevChapter.title,
+        seriesTitle,
+        duration: String(prevChapter.duration_minutes),
+        narrator,
+        thumbnailUrl: thumbnailUrl || '',
+        chaptersJson,
+        currentIndex: String(currentIdx - 1),
+      },
+    });
+  };
+
+  const handleNext = () => {
+    if (!hasNext) return;
+    const nextChapter = chapters[currentIdx + 1];
+    audioPlayer.cleanup();
+    router.replace({
+      pathname: '/series/chapter/[id]',
+      params: {
+        id: nextChapter.id,
+        audioPath: nextChapter.audioPath,
+        title: nextChapter.title,
+        seriesTitle,
+        duration: String(nextChapter.duration_minutes),
+        narrator,
+        thumbnailUrl: thumbnailUrl || '',
+        chaptersJson,
+        currentIndex: String(currentIdx + 1),
+        autoPlay: 'true',
+      },
+    });
+  };
+
   const sleepTimerButton = (
           <TouchableOpacity style={styles.timerButton}>
             <Ionicons name="moon-outline" size={20} color={theme.colors.sleepTextMuted} />
@@ -149,6 +226,7 @@ function SeriesChapterPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={theme.gradients.sleepyNight as [string, string]}
       artworkIcon="book"
+      artworkThumbnailUrl={thumbnailUrl}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
@@ -157,6 +235,12 @@ function SeriesChapterPlayerScreen() {
       onPlayPause={handlePlayPause}
       loadingText="Loading chapter..."
       footerContent={sleepTimerButton}
+      onPrevious={hasPrevious ? handlePrevious : undefined}
+      onNext={hasNext ? handleNext : undefined}
+      hasPrevious={hasPrevious}
+      hasNext={hasNext}
+      contentId={id}
+      contentType="series_chapter"
     />
   );
 }

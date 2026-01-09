@@ -19,6 +19,7 @@ function TechniqueMeditationPlayerScreen() {
     instructor,
     technique,
     color,
+    thumbnailUrl,
   } = useLocalSearchParams<{
     id: string;
     audioPath: string;
@@ -28,6 +29,7 @@ function TechniqueMeditationPlayerScreen() {
     instructor: string;
     technique: string;
     color: string;
+    thumbnailUrl?: string;
   }>();
   const router = useRouter();
   const { user } = useAuth();
@@ -173,6 +175,7 @@ function TechniqueMeditationPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={getGradientColors()}
       artworkIcon={getTechniqueIcon()}
+      artworkThumbnailUrl={thumbnailUrl}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
@@ -180,6 +183,8 @@ function TechniqueMeditationPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading meditation..."
+      contentId={id}
+      contentType="technique_meditation"
     />
   );
 }

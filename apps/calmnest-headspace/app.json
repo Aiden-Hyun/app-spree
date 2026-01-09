@@ -18,7 +18,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.calmnest.app",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "adaptiveIcon": {

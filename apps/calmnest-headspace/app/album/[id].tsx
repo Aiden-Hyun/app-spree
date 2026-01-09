@@ -1,13 +1,14 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
@@ -15,14 +16,18 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
-import { getAlbumById, FirestoreAlbum, FirestoreAlbumTrack } from '../../src/services/firestoreService';
+import { getAlbumById, FirestoreAlbum, FirestoreAlbumTrack, getCompletedContentIds } from '../../src/services/firestoreService';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 function AlbumDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, autoOpenItemId } = useLocalSearchParams<{ id: string; autoOpenItemId?: string }>();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [album, setAlbum] = useState<FirestoreAlbum | null>(null);
   const [loading, setLoading] = useState(true);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -36,6 +41,43 @@ function AlbumDetailScreen() {
     }
     loadAlbum();
   }, [id]);
+
+  // Fetch completed track IDs (refetch when screen comes into focus)
+  useFocusEffect(
+    useCallback(() => {
+      async function loadCompletedIds() {
+        if (!user) return;
+        const ids = await getCompletedContentIds(user.uid, 'album_track');
+        setCompletedIds(ids);
+      }
+      loadCompletedIds();
+    }, [user])
+  );
+
+  // Auto-open a specific track if autoOpenItemId is provided
+  useEffect(() => {
+    if (!album || !autoOpenItemId || hasAutoOpened.current) return;
+    
+    const index = album.tracks.findIndex(t => t.id === autoOpenItemId);
+    if (index !== -1) {
+      hasAutoOpened.current = true;
+      const track = album.tracks[index];
+      router.push({
+        pathname: '/album/track/[id]',
+        params: {
+          id: track.id,
+          audioPath: track.audioPath,
+          title: track.title,
+          albumTitle: album.title,
+          duration: String(track.duration_minutes),
+          artist: album.artist,
+          thumbnailUrl: album.thumbnailUrl || '',
+          tracksJson: JSON.stringify(album.tracks),
+          currentIndex: String(index),
+        },
+      });
+    }
+  }, [album, autoOpenItemId]);
 
   if (loading) {
     return (
@@ -74,9 +116,22 @@ function AlbumDetailScreen() {
     );
   }
 
-  const handleTrackPress = (track: FirestoreAlbumTrack) => {
+  const handleTrackPress = (track: FirestoreAlbumTrack, index: number) => {
     // Navigate to album track player
-    router.push(`/album/track/${track.id}?audioPath=${encodeURIComponent(track.audioPath)}&title=${encodeURIComponent(track.title)}&albumTitle=${encodeURIComponent(album.title)}&duration=${track.duration_minutes}&artist=${encodeURIComponent(album.artist)}`);
+    router.push({
+      pathname: '/album/track/[id]',
+      params: {
+        id: track.id,
+        audioPath: track.audioPath,
+        title: track.title,
+        albumTitle: album.title,
+        duration: String(track.duration_minutes),
+        artist: album.artist,
+        thumbnailUrl: album.thumbnailUrl || '',
+        tracksJson: JSON.stringify(album.tracks),
+        currentIndex: String(index),
+      },
+    });
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {
@@ -107,9 +162,16 @@ function AlbumDetailScreen() {
             {/* Hero Section */}
             <AnimatedView delay={0} duration={400}>
               <View style={styles.heroSection}>
-                <View style={[styles.heroIcon, { backgroundColor: `${album.color}25` }]}>
-                  <Ionicons name={getCategoryIcon()} size={48} color={album.color} />
-                </View>
+                {album.thumbnailUrl ? (
+                  <Image
+                    source={{ uri: album.thumbnailUrl }}
+                    style={styles.heroImage}
+                  />
+                ) : (
+                  <View style={[styles.heroIcon, { backgroundColor: `${album.color}25` }]}>
+                    <Ionicons name={getCategoryIcon()} size={48} color={album.color} />
+                  </View>
+                )}
                 <Text style={styles.albumTitle}>{album.title}</Text>
                 <View style={styles.albumMeta}>
                   <View style={styles.metaItem}>
@@ -138,19 +200,33 @@ function AlbumDetailScreen() {
               {album.tracks.map((track, index) => (
                 <AnimatedView key={track.id} delay={150 + index * 40} duration={300}>
                   <AnimatedPressable
-                    onPress={() => handleTrackPress(track)}
+                    onPress={() => handleTrackPress(track, index)}
                     style={styles.trackCard}
                   >
-                    <View style={[styles.trackNumber, { backgroundColor: `${album.color}20` }]}>
-                      <Text style={[styles.trackNumberText, { color: album.color }]}>
-                        {track.trackNumber}
-                      </Text>
-                    </View>
+                    {album.thumbnailUrl ? (
+                      <Image
+                        source={{ uri: album.thumbnailUrl }}
+                        style={styles.trackThumbnail}
+                      />
+                    ) : (
+                      <View style={[styles.trackNumber, { backgroundColor: `${album.color}20` }]}>
+                        <Text style={[styles.trackNumberText, { color: album.color }]}>
+                          {track.trackNumber}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.trackInfo}>
                       <Text style={styles.trackTitle}>{track.title}</Text>
                       <View style={styles.trackMeta}>
                         <Ionicons name="time-outline" size={12} color={theme.colors.sleepTextMuted} />
                         <Text style={styles.trackMetaText}>{track.duration_minutes} min</Text>
+                        {completedIds.has(track.id) && (
+                          <>
+                            <Text style={styles.trackMetaText}>•</Text>
+                            <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+                            <Text style={[styles.trackMetaText, styles.completedText]}>Completed</Text>
+                          </>
+                        )}
                       </View>
                     </View>
                     <View style={styles.playButton}>
@@ -215,6 +291,12 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'center',
       marginBottom: theme.spacing.lg,
     },
+    heroImage: {
+      width: 120,
+      height: 120,
+      borderRadius: 16,
+      marginBottom: theme.spacing.lg,
+    },
     albumTitle: {
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
@@ -272,6 +354,11 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    trackThumbnail: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+    },
     trackNumberText: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
@@ -295,6 +382,9 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 11,
       color: theme.colors.sleepTextMuted,
+    },
+    completedText: {
+      color: '#4CAF50',
     },
     playButton: {
       width: 40,

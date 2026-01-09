@@ -21,12 +21,24 @@ function StatsScreen() {
   const { stats, loading } = useStats();
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('week');
   const [chartData, setChartData] = useState<any>(null);
+  const [dateRangeLabel, setDateRangeLabel] = useState<string>('');
+  const [weekOffset, setWeekOffset] = useState(0);   // 0 = current week, -1 = last week, etc.
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = current month, -1 = last month, etc.
+  const [yearOffset, setYearOffset] = useState(0);   // 0 = current year period, -1 = previous, etc.
+  const [canGoBack, setCanGoBack] = useState(true);  // Whether there's data to go back to
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
+  // Reset offsets when switching time ranges
+  useEffect(() => {
+    setWeekOffset(0);
+    setMonthOffset(0);
+    setYearOffset(0);
+  }, [timeRange]);
+
   useEffect(() => {
     loadChartData();
-  }, [stats, timeRange]);
+  }, [stats, timeRange, weekOffset, monthOffset, yearOffset]);
 
   const loadChartData = () => {
     if (!stats) return;
@@ -34,30 +46,136 @@ function StatsScreen() {
     let labels: string[];
     let data: number[];
     
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fullMonthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const now = new Date();
+    
     if (timeRange === 'week') {
       labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      data = stats.weekly_minutes || Array(7).fill(0);
-    } else if (timeRange === 'month') {
-      // Aggregate 30 days into 5 weekly totals
-      labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+      
+      // Find the Monday of the current week (or offset week)
+      const today = new Date(now);
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Days since Monday
+      
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - daysFromMonday + (weekOffset * 7));
+      monday.setHours(0, 0, 0, 0);
+      
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      
+      // Get data from monthly_minutes for Mon-Sun
       const monthlyData = stats.monthly_minutes || Array(30).fill(0);
-      data = [
-        monthlyData.slice(0, 7).reduce((a, b) => a + b, 0),   // Days 1-7
-        monthlyData.slice(7, 14).reduce((a, b) => a + b, 0),  // Days 8-14
-        monthlyData.slice(14, 21).reduce((a, b) => a + b, 0), // Days 15-21
-        monthlyData.slice(21, 28).reduce((a, b) => a + b, 0), // Days 22-28
-        monthlyData.slice(28, 30).reduce((a, b) => a + b, 0), // Days 29-30
-      ];
+      data = [];
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(monday);
+        dayDate.setDate(monday.getDate() + i);
+        const daysAgo = Math.floor((now.getTime() - dayDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysAgo >= 0 && daysAgo < 30) {
+          const index = 29 - daysAgo;
+          data.push(monthlyData[index] || 0);
+        } else {
+          data.push(0);
+        }
+      }
+      
+      // Check if we can go back (previous week has any data within 30-day window)
+      const prevMonday = new Date(monday);
+      prevMonday.setDate(monday.getDate() - 7);
+      const prevMondayDaysAgo = Math.floor((now.getTime() - prevMonday.getTime()) / (1000 * 60 * 60 * 24));
+      setCanGoBack(prevMondayDaysAgo < 30);
+      
+      // Format date range label
+      const startMonth = monthNames[monday.getMonth()];
+      const endMonth = monthNames[sunday.getMonth()];
+      const startDay = monday.getDate();
+      const endDay = sunday.getDate();
+      const startYear = monday.getFullYear();
+      const endYear = sunday.getFullYear();
+      
+      if (startYear !== endYear) {
+        setDateRangeLabel(`${startMonth} ${startDay}, ${startYear} - ${endMonth} ${endDay}, ${endYear}`);
+      } else if (startMonth === endMonth) {
+        setDateRangeLabel(`${startMonth} ${startDay}-${endDay}, ${endYear}`);
+      } else {
+        setDateRangeLabel(`${startMonth} ${startDay} - ${endMonth} ${endDay}, ${endYear}`);
+      }
+    } else if (timeRange === 'month') {
+      // Show calendar month with week labels (W1-W5)
+      const targetDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+      const targetMonth = targetDate.getMonth();
+      const targetYear = targetDate.getFullYear();
+      const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      
+      // Create week labels for the month
+      labels = ['W1', 'W2', 'W3', 'W4', daysInMonth > 28 ? 'W5' : ''].filter(Boolean);
+      
+      // Get sessions for this specific month from monthly_minutes
+      // monthly_minutes: index 0 = 29 days ago, index 29 = today
+      const monthlyData = stats.monthly_minutes || Array(30).fill(0);
+      
+      // Calculate how many days ago the target month started/ended
+      const monthStart = new Date(targetYear, targetMonth, 1);
+      const monthEnd = new Date(targetYear, targetMonth + 1, 0);
+      const daysAgoStart = Math.floor((now.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24));
+      const daysAgoEnd = Math.floor((now.getTime() - monthEnd.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Aggregate into weeks (only if data is within our 30-day window)
+      const weekData: number[] = [];
+      for (let week = 0; week < (daysInMonth > 28 ? 5 : 4); week++) {
+        let weekTotal = 0;
+        for (let day = 0; day < 7 && (week * 7 + day) < daysInMonth; day++) {
+          const dayOfMonth = week * 7 + day + 1;
+          const dayDate = new Date(targetYear, targetMonth, dayOfMonth);
+          const daysAgo = Math.floor((now.getTime() - dayDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysAgo >= 0 && daysAgo < 30) {
+            const index = 29 - daysAgo;
+            weekTotal += monthlyData[index] || 0;
+          }
+        }
+        weekData.push(weekTotal);
+      }
+      data = weekData;
+      
+      // Check if we can go back (previous month has any data within 30-day window)
+      const prevMonthEnd = new Date(targetYear, targetMonth, 0);
+      const prevMonthDaysAgo = Math.floor((now.getTime() - prevMonthEnd.getTime()) / (1000 * 60 * 60 * 24));
+      setCanGoBack(prevMonthDaysAgo < 30);
+      
+      setDateRangeLabel(`${fullMonthNames[targetMonth]} ${targetYear}`);
     } else {
-      // Year view - 12 months
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const currentMonth = new Date().getMonth();
-      // Rotate labels so current month is last
-      labels = Array(12).fill(0).map((_, i) => {
-        const monthIndex = (currentMonth + 1 + i) % 12;
-        return monthNames[monthIndex];
-      });
-      data = stats.yearly_minutes || Array(12).fill(0);
+      // Year view - show single calendar year (Jan-Dec) with navigation
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const targetYear = currentYear + yearOffset;
+      
+      // Labels: Jan through Dec
+      labels = monthNames; // ['Jan', 'Feb', ..., 'Dec']
+      
+      // Get data for each month of the target year
+      const yearlyData = stats.yearly_minutes || Array(12).fill(0);
+      data = Array(12).fill(0);
+      
+      // yearly_minutes: index 0 = 11 months ago, index 11 = current month
+      // Map each month of target year to the correct index
+      for (let month = 0; month < 12; month++) {
+        const monthDate = new Date(targetYear, month, 1);
+        const monthsDiff = (currentYear - targetYear) * 12 + (currentMonth - month);
+        
+        if (monthsDiff >= 0 && monthsDiff < 12) {
+          const index = 11 - monthsDiff;
+          data[month] = yearlyData[index] || 0;
+        }
+        // Future months or months > 12 months ago stay at 0
+      }
+      
+      // Check if we can go back (previous year has any data within 12-month window)
+      const prevYearLastMonth = new Date(targetYear - 1, 11, 1);
+      const prevYearMonthsDiff = (currentYear - (targetYear - 1)) * 12 + (currentMonth - 11);
+      setCanGoBack(prevYearMonthsDiff < 12);
+      
+      setDateRangeLabel(`${targetYear}`);
     }
     
     setChartData({
@@ -189,6 +307,38 @@ function StatsScreen() {
         {chartData && (
           <View style={styles.chartContainer}>
             <Text style={styles.chartTitle}>Minutes Meditated</Text>
+            {dateRangeLabel ? (
+              <View style={styles.dateRangeLabelContainer}>
+                <AnimatedPressable 
+                  onPress={() => {
+                    if (!canGoBack) return;
+                    if (timeRange === 'week') setWeekOffset(prev => prev - 1);
+                    else if (timeRange === 'month') setMonthOffset(prev => prev - 1);
+                    else if (timeRange === 'year') setYearOffset(prev => prev - 1);
+                  }} 
+                  style={[styles.navButton, !canGoBack && styles.navButtonDisabled]}
+                >
+                  <Ionicons name="chevron-back" size={18} color={canGoBack ? theme.colors.text : theme.colors.textMuted} />
+                </AnimatedPressable>
+                <Text style={styles.chartSubtitle}>{dateRangeLabel}</Text>
+                <AnimatedPressable 
+                  onPress={() => {
+                    const currentOffset = timeRange === 'week' ? weekOffset : timeRange === 'month' ? monthOffset : yearOffset;
+                    if (currentOffset >= 0) return;
+                    if (timeRange === 'week') setWeekOffset(prev => prev + 1);
+                    else if (timeRange === 'month') setMonthOffset(prev => prev + 1);
+                    else if (timeRange === 'year') setYearOffset(prev => prev + 1);
+                  }} 
+                  style={[styles.navButton, (timeRange === 'week' ? weekOffset >= 0 : timeRange === 'month' ? monthOffset >= 0 : yearOffset >= 0) && styles.navButtonDisabled]}
+                >
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={18} 
+                    color={(timeRange === 'week' ? weekOffset >= 0 : timeRange === 'month' ? monthOffset >= 0 : yearOffset >= 0) ? theme.colors.textMuted : theme.colors.text} 
+                  />
+                </AnimatedPressable>
+              </View>
+            ) : null}
             
             {/* Time Range Toggle */}
             <View style={styles.toggleContainer}>
@@ -390,7 +540,23 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.semiBold,
     fontSize: 18,
     color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  chartSubtitle: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 13,
+    color: theme.colors.textMuted,
+  },
+  dateRangeLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: theme.spacing.md,
+  },
+  navButton: {
+    padding: theme.spacing.xs,
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
   },
   toggleContainer: {
     flexDirection: 'row',

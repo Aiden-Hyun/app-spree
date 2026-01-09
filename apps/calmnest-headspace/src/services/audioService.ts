@@ -24,6 +24,8 @@ export async function configureAudioMode(): Promise<void> {
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       shouldRouteThroughEarpiece: false,
+      // 'doNotMix' ensures audio pauses when other apps play audio
+      interruptionMode: 'doNotMix',
     });
   } catch (error) {
     console.warn('Failed to configure audio mode:', error);

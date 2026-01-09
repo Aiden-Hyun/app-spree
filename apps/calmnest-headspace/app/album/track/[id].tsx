@@ -6,16 +6,28 @@ import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
-import { addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../../src/services/firestoreService';
+import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
+
+interface TrackItem {
+  id: string;
+  audioPath: string;
+  title: string;
+  duration_minutes: number;
+  trackNumber: number;
+}
 
 function AlbumTrackPlayerScreen() {
-  const { id, audioPath, title, albumTitle, duration, artist } = useLocalSearchParams<{
+  const { id, audioPath, title, albumTitle, duration, artist, thumbnailUrl, tracksJson, currentIndex, autoPlay } = useLocalSearchParams<{
     id: string;
     audioPath: string;
     title: string;
     albumTitle: string;
     duration: string;
     artist: string;
+    thumbnailUrl?: string;
+    tracksJson?: string;
+    currentIndex?: string;
+    autoPlay?: string;
   }>();
   const router = useRouter();
   const { theme } = useTheme();
@@ -27,6 +39,20 @@ function AlbumTrackPlayerScreen() {
   const [isFavoritedState, setIsFavoritedState] = useState(false);
 
   const audioPlayer = useAudioPlayer();
+
+  // Parse tracks for prev/next navigation
+  const tracks: TrackItem[] = useMemo(() => {
+    if (!tracksJson) return [];
+    try {
+      return JSON.parse(tracksJson);
+    } catch {
+      return [];
+    }
+  }, [tracksJson]);
+
+  const currentIdx = parseInt(currentIndex || '0', 10);
+  const hasPrevious = tracks.length > 0 && currentIdx > 0;
+  const hasNext = tracks.length > 0 && currentIdx < tracks.length - 1;
 
   // Check if favorited on load
   useEffect(() => {
@@ -59,6 +85,13 @@ function AlbumTrackPlayerScreen() {
     loadTrackAudio();
   }, [audioPath]);
 
+  // Auto-start playback when coming from auto-play navigation
+  useEffect(() => {
+    if (autoPlay === 'true' && !loading && audioPlayer.duration > 0 && !audioPlayer.isPlaying) {
+      audioPlayer.play();
+    }
+  }, [autoPlay, loading, audioPlayer.duration]);
+
   // Track session for stats when user completes 80% of audio
   useEffect(() => {
     async function trackSession() {
@@ -76,6 +109,8 @@ function AlbumTrackPlayerScreen() {
             duration_minutes: parseInt(duration) || 0,
             session_type: 'album_track',
           });
+          // Mark this track as completed
+          await markContentCompleted(user.uid, id, 'album_track');
         } catch (error) {
           console.error('Failed to track session:', error);
         }
@@ -127,6 +162,47 @@ function AlbumTrackPlayerScreen() {
     }
   };
 
+  const handlePrevious = () => {
+    if (!hasPrevious) return;
+    const prevTrack = tracks[currentIdx - 1];
+    audioPlayer.cleanup();
+    router.replace({
+      pathname: '/album/track/[id]',
+      params: {
+        id: prevTrack.id,
+        audioPath: prevTrack.audioPath,
+        title: prevTrack.title,
+        albumTitle,
+        duration: String(prevTrack.duration_minutes),
+        artist,
+        thumbnailUrl: thumbnailUrl || '',
+        tracksJson,
+        currentIndex: String(currentIdx - 1),
+      },
+    });
+  };
+
+  const handleNext = () => {
+    if (!hasNext) return;
+    const nextTrack = tracks[currentIdx + 1];
+    audioPlayer.cleanup();
+    router.replace({
+      pathname: '/album/track/[id]',
+      params: {
+        id: nextTrack.id,
+        audioPath: nextTrack.audioPath,
+        title: nextTrack.title,
+        albumTitle,
+        duration: String(nextTrack.duration_minutes),
+        artist,
+        thumbnailUrl: thumbnailUrl || '',
+        tracksJson,
+        currentIndex: String(currentIdx + 1),
+        autoPlay: 'true',
+      },
+    });
+  };
+
   return (
     <MediaPlayer
       category={albumTitle || 'Album'}
@@ -135,6 +211,7 @@ function AlbumTrackPlayerScreen() {
       durationMinutes={parseInt(duration) || 0}
       gradientColors={theme.gradients.sleepyNight as [string, string]}
       artworkIcon="musical-notes"
+      artworkThumbnailUrl={thumbnailUrl}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}
@@ -142,6 +219,12 @@ function AlbumTrackPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading track..."
+      onPrevious={hasPrevious ? handlePrevious : undefined}
+      onNext={hasNext ? handleNext : undefined}
+      hasPrevious={hasPrevious}
+      hasNext={hasNext}
+      contentId={id}
+      contentType="album_track"
     />
   );
 }

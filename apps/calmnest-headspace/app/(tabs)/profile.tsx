@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,7 +79,10 @@ function ProfileScreen() {
 
         {/* Your Sanctuary Card */}
         <AnimatedView delay={100} duration={500}>
-        <View style={styles.sanctuaryCard}>
+        <AnimatedPressable 
+          onPress={() => router.push('/stats')}
+          style={styles.sanctuaryCard}
+        >
           <Text style={styles.sanctuaryTitle}>Your Sanctuary</Text>
           <View style={styles.sanctuaryDivider} />
           
@@ -128,7 +131,7 @@ function ProfileScreen() {
             </View>
           </View>
             )}
-        </View>
+        </AnimatedPressable>
         </AnimatedView>
 
         {/* Milestones */}
@@ -192,92 +195,35 @@ function ProfileScreen() {
           )}
         </View>
 
-        {/* Preferences */}
-        <View style={styles.section}>
-          <AnimatedView delay={550} duration={400}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-          </AnimatedView>
-          
-          <AnimatedView delay={600} duration={400}>
-          <View style={styles.preferencesCard}>
-              <AnimatedPressable style={styles.preferenceRow}>
-              <View style={styles.preferenceLeft}>
-                  <View style={styles.preferenceIconContainer}>
-                    <Ionicons name="notifications-outline" size={20} color={theme.colors.primary} />
-                  </View>
-                <Text style={styles.preferenceLabel}>Reminder Time</Text>
-              </View>
-              <View style={styles.preferenceRight}>
-                <Text style={styles.preferenceValue}>8:00 PM</Text>
-                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-              </View>
-              </AnimatedPressable>
-            
-            <View style={styles.preferenceDivider} />
-            
-              <AnimatedPressable style={styles.preferenceRow}>
-              <View style={styles.preferenceLeft}>
-                  <View style={styles.preferenceIconContainer}>
-                    <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
-                  </View>
-                <Text style={styles.preferenceLabel}>Session Length</Text>
-              </View>
-              <View style={styles.preferenceRight}>
-                <Text style={styles.preferenceValue}>10 min</Text>
-                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-              </View>
-              </AnimatedPressable>
-            
-            <View style={styles.preferenceDivider} />
-            
-            <View style={styles.preferenceRow}>
-              <View style={styles.preferenceLeft}>
-                  <View style={styles.preferenceIconContainer}>
-                    <Ionicons name="volume-medium-outline" size={20} color={theme.colors.primary} />
-                  </View>
-                <Text style={styles.preferenceLabel}>Background Sounds</Text>
-              </View>
-              <Switch
-                value={true}
-                trackColor={{ false: theme.colors.gray[300], true: theme.colors.primary }}
-                thumbColor="white"
-              />
-            </View>
-          </View>
-          </AnimatedView>
-        </View>
-
-        {/* Quick Links */}
+        {/* Quick Actions */}
         <View style={styles.section}>
           <AnimatedView delay={650} duration={400}>
-          <View style={styles.quickLinks}>
+            <Text style={styles.sectionLabel}>ACTIONS</Text>
+            <View style={styles.actionsCard}>
               <AnimatedPressable 
                 onPress={() => router.push('/stats')}
-              style={styles.quickLink}
-            >
-                <View style={[styles.quickLinkIcon, { backgroundColor: `${theme.colors.info}15` }]}>
-                  <Ionicons name="stats-chart-outline" size={20} color={theme.colors.info} />
+                style={styles.actionItem}
+              >
+                <View style={styles.actionLeft}>
+                  <Ionicons name="stats-chart-outline" size={20} color={theme.colors.text} />
+                  <Text style={styles.actionLabel}>Statistics</Text>
                 </View>
-              <Text style={styles.quickLinkText}>Statistics</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
               </AnimatedPressable>
-            
+              
+              <View style={styles.actionDivider} />
+              
               <AnimatedPressable 
                 onPress={() => router.push('/settings')}
-              style={styles.quickLink}
-            >
-                <View style={[styles.quickLinkIcon, { backgroundColor: `${theme.colors.textLight}15` }]}>
-                  <Ionicons name="settings-outline" size={20} color={theme.colors.textLight} />
+                style={styles.actionItem}
+              >
+                <View style={styles.actionLeft}>
+                  <Ionicons name="settings-outline" size={20} color={theme.colors.text} />
+                  <Text style={styles.actionLabel}>Settings</Text>
                 </View>
-              <Text style={styles.quickLinkText}>Settings</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
               </AnimatedPressable>
-            
-              <AnimatedPressable style={styles.quickLink}>
-                <View style={[styles.quickLinkIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
-                  <Ionicons name="help-circle-outline" size={20} color={theme.colors.primary} />
-                </View>
-              <Text style={styles.quickLinkText}>Help</Text>
-              </AnimatedPressable>
-          </View>
+            </View>
           </AnimatedView>
         </View>
 
@@ -458,77 +404,39 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     fontSize: 14,
     color: theme.colors.primary,
   },
-  preferencesCard: {
+  sectionLabel: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing.sm,
+    letterSpacing: 0.5,
+  },
+  actionsCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.xl,
-      paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.md,
     ...theme.shadows.sm,
   },
-  preferenceRow: {
+  actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-      paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
   },
-  preferenceLeft: {
+  actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
   },
-    preferenceIconContainer: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: `${theme.colors.primary}15`,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  preferenceLabel: {
+  actionLabel: {
     fontFamily: theme.fonts.ui.regular,
-    fontSize: 15,
+    fontSize: 16,
     color: theme.colors.text,
   },
-  preferenceRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xs,
-  },
-  preferenceValue: {
-    fontFamily: theme.fonts.ui.regular,
-    fontSize: 14,
-    color: theme.colors.textLight,
-  },
-  preferenceDivider: {
+  actionDivider: {
     height: 1,
     backgroundColor: theme.colors.gray[200],
-      marginLeft: 60,
-  },
-  quickLinks: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  quickLink: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.lg,
-    ...theme.shadows.sm,
-  },
-    quickLinkIcon: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: theme.spacing.sm,
-    },
-  quickLinkText: {
-    fontFamily: theme.fonts.ui.medium,
-    fontSize: 13,
-    color: theme.colors.text,
+    marginLeft: theme.spacing.lg + 20 + theme.spacing.md,
   },
   logoutButton: {
     flexDirection: 'row',

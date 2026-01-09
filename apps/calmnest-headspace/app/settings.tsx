@@ -103,17 +103,10 @@ function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Actions</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="download-outline" size={20} color={theme.colors.text} />
-                <Text style={styles.settingLabel}>Export Data</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-            
-            <View style={styles.divider} />
-            
-            <TouchableOpacity style={styles.actionItem}>
+            <TouchableOpacity 
+              style={styles.actionItem}
+              onPress={() => router.push('/privacy')}
+            >
               <View style={styles.settingLeft}>
                 <Ionicons name="shield-outline" size={20} color={theme.colors.text} />
                 <Text style={styles.settingLabel}>Privacy Policy</Text>
@@ -123,7 +116,10 @@ function SettingsScreen() {
             
             <View style={styles.divider} />
             
-            <TouchableOpacity style={styles.actionItem}>
+            <TouchableOpacity 
+              style={styles.actionItem}
+              onPress={() => router.push('/terms')}
+            >
               <View style={styles.settingLeft}>
                 <Ionicons name="document-text-outline" size={20} color={theme.colors.text} />
                 <Text style={styles.settingLabel}>Terms of Service</Text>
