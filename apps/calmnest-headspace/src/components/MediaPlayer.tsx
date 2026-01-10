@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -114,6 +116,19 @@ export function MediaPlayer({
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const { isOffline } = useNetwork();
+  const { width: screenWidth } = useWindowDimensions();
+  
+  // Responsive breakpoints
+  const isSmallScreen = screenWidth < 375;
+  const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
+  
+  // Responsive values
+  const artworkSize = isSmallScreen ? 100 : isMediumScreen ? 120 : 140;
+  const titleFontSize = isSmallScreen ? 22 : isMediumScreen ? 25 : 28;
+  const artworkIconSize = isSmallScreen ? 48 : isMediumScreen ? 56 : 64;
+  const contentPadding = isSmallScreen ? 12 : isMediumScreen ? 16 : 24;
+  const sectionMargin = isSmallScreen ? 12 : isMediumScreen ? 16 : 24;
+  
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const [currentBackgroundSound, setCurrentBackgroundSound] = useState<FirestoreSleepSound | null>(null);
@@ -459,23 +474,30 @@ export function MediaPlayer({
           </TouchableOpacity>
         )}
 
-        {/* Content */}
-        <View style={styles.content}>
+        {/* Content - ScrollView for smaller screens */}
+        <ScrollView 
+          style={[styles.content, { paddingHorizontal: contentPadding }]}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Artwork: Thumbnail or Icon */}
-          <View style={styles.iconContainer}>
+          <View style={[styles.iconContainer, { marginTop: sectionMargin, marginBottom: sectionMargin }]}>
             {artworkThumbnailUrl ? (
-              <Image source={{ uri: artworkThumbnailUrl }} style={styles.thumbnailImage} />
+              <Image 
+                source={{ uri: artworkThumbnailUrl }} 
+                style={[styles.thumbnailImage, { width: artworkSize, height: artworkSize, borderRadius: artworkSize / 2 }]} 
+              />
             ) : (
-              <View style={styles.iconCircle}>
-                <Ionicons name={artworkIcon} size={64} color="white" />
+              <View style={[styles.iconCircle, { width: artworkSize, height: artworkSize, borderRadius: artworkSize / 2 }]}>
+                <Ionicons name={artworkIcon} size={artworkIconSize} color="white" />
               </View>
             )}
           </View>
 
           {/* Info */}
-          <View style={styles.infoContainer}>
+          <View style={[styles.infoContainer, { marginBottom: sectionMargin }]}>
             <Text style={styles.category}>{category.replace('-', ' ')}</Text>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={[styles.title, { fontSize: titleFontSize }]}>{title}</Text>
             {description && (
               <Text style={styles.description} numberOfLines={2}>
                 {description}
@@ -514,7 +536,7 @@ export function MediaPlayer({
           </View>
 
           {/* Audio Player */}
-          <View style={styles.playerContainer}>
+          <View style={[styles.playerContainer, { marginBottom: sectionMargin }]}>
             {audioPlayer.isLoading && !audioPlayer.duration ? (
               <View style={styles.loadingPlayer}>
                 <ActivityIndicator size="large" color="white" />
@@ -667,7 +689,7 @@ export function MediaPlayer({
 
           {/* Optional Footer Content */}
           {footerContent}
-        </View>
+        </ScrollView>
 
         {/* Background Audio Picker Modal */}
         <BackgroundAudioPicker
@@ -765,10 +787,13 @@ const createStyles = (theme: Theme) =>
     },
     content: {
       flex: 1,
-      paddingHorizontal: theme.spacing.xl,
+    },
+    contentContainer: {
       alignItems: 'center',
+      paddingBottom: theme.spacing.xl,
     },
     iconContainer: {
+      alignItems: 'center',
       marginTop: theme.spacing.xl,
       marginBottom: theme.spacing.xl,
     },
