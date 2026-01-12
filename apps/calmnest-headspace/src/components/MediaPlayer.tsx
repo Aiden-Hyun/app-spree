@@ -36,6 +36,7 @@ export interface MediaPlayerProps {
   instructor?: string;
   instructorPhotoUrl?: string;
   description?: string;
+  metaInfo?: string; // e.g., "CBT 101 · Module 1 Practice"
   durationMinutes: number;
   difficultyLevel?: string;
 
@@ -93,6 +94,7 @@ export function MediaPlayer({
   instructor,
   instructorPhotoUrl,
   description,
+  metaInfo,
   durationMinutes,
   difficultyLevel,
   gradientColors,
@@ -562,6 +564,9 @@ export function MediaPlayer({
           <View style={[styles.infoContainer, { marginBottom: sectionMargin }]}>
             <Text style={styles.category}>{category.replace('-', ' ')}</Text>
             <Text style={[styles.title, { fontSize: titleFontSize }]}>{title}</Text>
+            {metaInfo && (
+              <Text style={styles.metaInfoText}>{metaInfo}</Text>
+            )}
             {description && (
               <Text style={styles.description} numberOfLines={2}>
                 {description}
@@ -913,6 +918,13 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
       color: 'white',
+      textAlign: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    metaInfoText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: 'rgba(255, 255, 255, 0.6)',
       textAlign: 'center',
       marginBottom: theme.spacing.sm,
     },

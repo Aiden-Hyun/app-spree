@@ -87,10 +87,10 @@ function SeriesChapterPlayerScreen() {
           setCurrentAudioUrl(localPath);
           audioPlayer.loadAudio(localPath);
         } else {
-          const audioUrl = await getAudioUrlFromPath(audioPath);
-          if (audioUrl) {
+      const audioUrl = await getAudioUrlFromPath(audioPath);
+      if (audioUrl) {
             setCurrentAudioUrl(audioUrl);
-            audioPlayer.loadAudio(audioUrl);
+        audioPlayer.loadAudio(audioUrl);
           }
         }
       } finally {

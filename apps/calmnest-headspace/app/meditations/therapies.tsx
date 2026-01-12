@@ -253,6 +253,11 @@ export default function TherapiesScreen() {
                     </View>
                   )}
                   <View style={styles.courseInfo}>
+                    {course.code && (
+                      <View style={[styles.courseCodeBadge, { backgroundColor: `${course.color}20` }]}>
+                        <Text style={[styles.courseCodeText, { color: course.color }]}>{course.code}</Text>
+                      </View>
+                    )}
                     <Text style={styles.courseTitle}>{course.title}</Text>
                     <View style={styles.courseMetaRow}>
                       <View style={styles.courseMetaItem}>
@@ -449,6 +454,18 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     courseInfo: {
       flex: 1,
       marginLeft: theme.spacing.md,
+    },
+    courseCodeBadge: {
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.full,
+      alignSelf: "flex-start",
+      marginBottom: 4,
+    },
+    courseCodeText: {
+      fontFamily: theme.fonts.ui.bold,
+      fontSize: 10,
+      letterSpacing: 0.5,
     },
     courseTitle: {
       fontFamily: theme.fonts.ui.semiBold,

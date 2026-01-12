@@ -11,10 +11,12 @@ import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { getNarratorByName } from '../../../src/constants/narratorData';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { getLocalAudioPath } from '../../../src/services/downloadService';
+import { buildSessionMetaInfo } from '../../../src/utils/courseCodeParser';
 import { Theme } from '../../../src/theme';
 
 interface SessionItem {
   id: string;
+  code?: string;
   audioPath: string;
   title: string;
   duration_minutes: number;
@@ -23,11 +25,13 @@ interface SessionItem {
 }
 
 function CourseSessionPlayerScreen() {
-  const { id, audioPath, title, courseTitle, duration, instructor, color, thumbnailUrl, sessionsJson, currentIndex, autoPlay } = useLocalSearchParams<{
+  const { id, audioPath, title, courseTitle, courseCode, sessionCode, duration, instructor, color, thumbnailUrl, sessionsJson, currentIndex, autoPlay } = useLocalSearchParams<{
     id: string;
     audioPath: string;
     title: string;
     courseTitle: string;
+    courseCode?: string;
+    sessionCode?: string;
     duration: string;
     instructor: string;
     color: string;
@@ -155,9 +159,11 @@ function CourseSessionPlayerScreen() {
           user.uid,
           id,
           'course_session',
-          `${courseTitle}: ${title}`,
+          title, // Just session title, not "Course: Session"
           parseInt(duration) || 0,
-          undefined
+          thumbnailUrl, // Include thumbnail
+          courseCode, // Course code for display
+          sessionCode // Session code for module info
         );
       }
     }
@@ -191,6 +197,8 @@ function CourseSessionPlayerScreen() {
         audioPath: prevSession.audioPath,
         title: prevSession.title,
         courseTitle,
+        courseCode: courseCode || '',
+        sessionCode: prevSession.code || '',
         duration: String(prevSession.duration_minutes),
         instructor,
         color,
@@ -212,6 +220,8 @@ function CourseSessionPlayerScreen() {
         audioPath: nextSession.audioPath,
         title: nextSession.title,
         courseTitle,
+        courseCode: courseCode || '',
+        sessionCode: nextSession.code || '',
         duration: String(nextSession.duration_minutes),
         instructor,
         color,
@@ -227,12 +237,18 @@ function CourseSessionPlayerScreen() {
   const courseColor = color || '#7DAFB4';
   const gradientColors: [string, string] = [courseColor, `${courseColor}CC`];
 
+  // Build meta info from course and session codes
+  const metaInfo = sessionCode && courseCode 
+    ? buildSessionMetaInfo(sessionCode, courseCode) 
+    : undefined;
+
   return (
     <MediaPlayer
       category={courseTitle || 'Course'}
       title={title || 'Loading...'}
       instructor={instructor}
       instructorPhotoUrl={narratorData?.photoUrl}
+      metaInfo={metaInfo}
       durationMinutes={parseInt(duration) || 0}
       gradientColors={gradientColors}
       artworkIcon="school"

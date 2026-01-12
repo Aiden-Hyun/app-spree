@@ -12,6 +12,7 @@ import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { ContentCard } from '../../src/components/ContentCard';
 import { Skeleton } from '../../src/components/Skeleton';
 import { useStats } from '../../src/hooks/useStats';
+import { parseSessionCode, formatCourseCode } from '../../src/utils/courseCodeParser';
 import { 
   getTodayQuote, 
   getListeningHistory, 
@@ -395,26 +396,46 @@ function HomeScreen() {
     // Use stored thumbnail or look up from local data
     const thumbnailUrl = item.content_thumbnail || getThumbnailForContent(item.content_id, item.content_type);
     
+    // For course sessions, show code badge and module info
+    const isCourseSession = item.content_type === 'course_session';
+    const courseCode = isCourseSession ? item.course_code : undefined;
+    const moduleInfo = isCourseSession && item.session_code && item.course_code
+      ? parseSessionCode(item.session_code, item.course_code)
+      : undefined;
+    
     return (
       <ContentCard
         title={item.content_title}
         thumbnailUrl={thumbnailUrl}
         fallbackIcon={getContentIcon(item.content_type)}
+        code={courseCode}
+        subtitle={moduleInfo}
         meta={`${item.duration_minutes} min`}
         onPress={() => navigateToContent(item.content_id, item.content_type)}
       />
     );
   }, []);
 
-  const renderFavoriteItem = useCallback(({ item }: { item: ResolvedContent }) => (
-    <ContentCard
-      title={item.title}
-      thumbnailUrl={item.thumbnail_url}
-      fallbackIcon={getContentIcon(item.content_type)}
-      meta={`${item.duration_minutes} min`}
-      onPress={() => navigateToContent(item.id, item.content_type)}
-    />
-  ), []);
+  const renderFavoriteItem = useCallback(({ item }: { item: ResolvedContent }) => {
+    // For course sessions, show code badge and module info
+    const isCourseSession = item.content_type === 'course_session';
+    const courseCode = isCourseSession ? item.course_code : undefined;
+    const moduleInfo = isCourseSession && item.session_code && item.course_code
+      ? parseSessionCode(item.session_code, item.course_code)
+      : undefined;
+    
+    return (
+      <ContentCard
+        title={item.title}
+        thumbnailUrl={item.thumbnail_url}
+        fallbackIcon={getContentIcon(item.content_type)}
+        code={courseCode}
+        subtitle={moduleInfo}
+        meta={`${item.duration_minutes} min`}
+        onPress={() => navigateToContent(item.id, item.content_type)}
+      />
+    );
+  }, []);
 
   const renderSkeletonCards = () => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalListContent}>

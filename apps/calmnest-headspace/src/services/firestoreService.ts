@@ -548,6 +548,9 @@ export interface ResolvedContent {
     | "emergency"
     | "course_session"
     | "sleep_meditation";
+  // For course sessions - to display code badge and module info
+  course_code?: string; // e.g., "CBT101"
+  session_code?: string; // e.g., "CBT101M1L"
 }
 
 export async function getContentById(
@@ -623,10 +626,12 @@ export async function getContentById(
         if (session) {
           return {
             id: contentId,
-            title: `${course.title}: ${session.title}`,
+            title: session.title, // Just session title, not "Course: Session"
             thumbnail_url: course.thumbnailUrl,
             duration_minutes: session.duration_minutes,
             content_type: contentType,
+            course_code: course.code,
+            session_code: session.code,
           };
         }
       }
@@ -799,6 +804,7 @@ export async function getEmergencyMeditationById(
 export interface FirestoreCourseSession {
   id: string;
   courseId: string;
+  code?: string; // e.g., "CBT101M1P" -> parsed to "Module 1 Practice"
   title: string;
   description: string;
   duration_minutes: number;
@@ -808,6 +814,7 @@ export interface FirestoreCourseSession {
 
 export interface FirestoreCourse {
   id: string;
+  code?: string; // e.g., "CBT101"
   title: string;
   subtitle?: string;
   description: string;
@@ -1239,10 +1246,12 @@ export async function addToListeningHistory(
     | "sleep_meditation",
   contentTitle: string,
   durationMinutes: number,
-  contentThumbnail?: string
+  contentThumbnail?: string,
+  courseCode?: string,
+  sessionCode?: string
 ): Promise<string> {
   try {
-    const docRef = await addDoc(listeningHistoryCollection, {
+    const docData: Record<string, any> = {
       user_id: userId,
       content_id: contentId,
       content_type: contentType,
@@ -1250,7 +1259,17 @@ export async function addToListeningHistory(
       content_thumbnail: contentThumbnail || null,
       duration_minutes: durationMinutes,
       played_at: serverTimestamp(),
-    });
+    };
+    
+    // Add course codes for course_session content type
+    if (courseCode) {
+      docData.course_code = courseCode;
+    }
+    if (sessionCode) {
+      docData.session_code = sessionCode;
+    }
+    
+    const docRef = await addDoc(listeningHistoryCollection, docData);
     return docRef.id;
   } catch (error: any) {
     console.error("Error adding to listening history:", error);

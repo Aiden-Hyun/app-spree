@@ -186,6 +186,9 @@ export interface ListeningHistoryItem {
   content_thumbnail?: string; // Denormalized
   duration_minutes: number;
   played_at: string;
+  // For course sessions - to display code badge and module info
+  course_code?: string; // e.g., "CBT101"
+  session_code?: string; // e.g., "CBT101M1L"
 }
 
 // Statistics

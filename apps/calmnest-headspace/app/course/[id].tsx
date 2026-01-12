@@ -15,6 +15,7 @@ import { DownloadButton } from "../../src/components/DownloadButton";
 import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
 import { useNetwork } from "../../src/contexts/NetworkContext";
 import { getDownloadedContentIds, getLocalAudioPath } from "../../src/services/downloadService";
+import { buildSessionMetaInfo } from "../../src/utils/courseCodeParser";
 
 function CourseDetailScreen() {
   const router = useRouter();
@@ -99,6 +100,8 @@ function CourseDetailScreen() {
           audioPath: session.audioPath,
           title: session.title,
           courseTitle: course.title,
+          courseCode: course.code || '',
+          sessionCode: session.code || '',
           duration: String(session.duration_minutes),
           instructor: course.instructor,
           color: course.color,
@@ -146,6 +149,8 @@ function CourseDetailScreen() {
         audioPath: session.audioPath,
         title: session.title,
         courseTitle: course.title,
+        courseCode: course.code || '',
+        sessionCode: session.code || '',
         duration: String(session.duration_minutes),
         instructor: course.instructor,
         color: course.color,
@@ -191,7 +196,15 @@ function CourseDetailScreen() {
                     <Ionicons name="school" size={48} color={course.color} />
                   </View>
                 )}
+                {course.code && (
+                  <View style={styles.courseCodeBadge}>
+                    <Text style={styles.courseCodeText}>{course.code}</Text>
+                  </View>
+                )}
                 <Text style={styles.courseTitle}>{course.title}</Text>
+                {course.subtitle && (
+                  <Text style={styles.courseSubtitle}>{course.subtitle}</Text>
+                )}
                 <View style={styles.courseMeta}>
                   <View style={styles.metaItem}>
                     <Ionicons
@@ -280,6 +293,11 @@ function CourseDetailScreen() {
                     )}
                     <View style={styles.sessionInfo}>
                       <Text style={styles.sessionTitle}>{session.title}</Text>
+                      {session.code && course.code && (
+                        <Text style={styles.sessionCodeInfo}>
+                          {buildSessionMetaInfo(session.code, course.code)}
+                        </Text>
+                      )}
                       <Text style={styles.sessionDescription} numberOfLines={1}>
                         {session.description}
                       </Text>
@@ -411,10 +429,30 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       borderRadius: 16,
       marginBottom: theme.spacing.lg,
     },
+    courseCodeBadge: {
+      backgroundColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.08)",
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.xs,
+      borderRadius: theme.borderRadius.full,
+      marginBottom: theme.spacing.sm,
+    },
+    courseCodeText: {
+      fontFamily: theme.fonts.ui.bold,
+      fontSize: 12,
+      color: isDark ? theme.colors.sleepTextMuted : theme.colors.textMuted,
+      letterSpacing: 1,
+    },
     courseTitle: {
       fontFamily: theme.fonts.display.semiBold,
       fontSize: 28,
       color: isDark ? theme.colors.sleepText : theme.colors.text,
+      textAlign: "center",
+      marginBottom: theme.spacing.xs,
+    },
+    courseSubtitle: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 15,
+      color: isDark ? theme.colors.sleepTextMuted : theme.colors.textLight,
       textAlign: "center",
       marginBottom: theme.spacing.sm,
     },
@@ -488,6 +526,12 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 15,
       color: isDark ? theme.colors.sleepText : theme.colors.text,
+      marginBottom: 2,
+    },
+    sessionCodeInfo: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: isDark ? 'rgba(255,255,255,0.5)' : theme.colors.textMuted,
       marginBottom: 2,
     },
     sessionDescription: {

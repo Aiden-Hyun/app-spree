@@ -21,6 +21,8 @@ export interface ContentCardProps {
   fallbackIcon?: keyof typeof Ionicons.glyphMap;
   fallbackColor?: string;
   meta?: string; // e.g., "10 min" or "3 tracks"
+  code?: string; // e.g., "CBT101", "ACT101" - displayed as badge
+  subtitle?: string; // e.g., "Module 1 Lesson" - displayed below code badge
   onPress: () => void;
   // For sleep page only (uses sleep-specific colors)
   darkMode?: boolean;
@@ -32,6 +34,8 @@ export function ContentCard({
   fallbackIcon = "musical-notes",
   fallbackColor,
   meta,
+  code,
+  subtitle,
   onPress,
   darkMode = false,
 }: ContentCardProps) {
@@ -82,6 +86,16 @@ export function ContentCard({
           </View>
         )}
       </View>
+      {code && (
+        <View style={[styles.codeBadge, { backgroundColor: hexToRgba(accentColor, 0.15) }]}>
+          <Text style={[styles.codeText, { color: accentColor }]}>{code}</Text>
+        </View>
+      )}
+      {subtitle && (
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      )}
       <Text style={styles.title}>
         {title}
       </Text>
@@ -125,6 +139,28 @@ const createStyles = (
       alignItems: "center",
       justifyContent: "center",
     },
+    codeBadge: {
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: 3,
+      borderRadius: theme.borderRadius.full,
+      marginTop: theme.spacing.sm,
+    },
+    codeText: {
+      fontFamily: theme.fonts.ui.bold,
+      fontSize: 10,
+      letterSpacing: 0.5,
+    },
+    subtitle: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 11,
+      color: isSleepPage
+        ? theme.colors.sleepTextMuted
+        : isRegularDark
+        ? theme.colors.textLight
+        : theme.colors.textMuted,
+      textAlign: "center",
+      marginTop: 2,
+    },
     title: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 15,
@@ -135,7 +171,7 @@ const createStyles = (
         ? theme.colors.text
         : theme.colors.text,
       textAlign: "center",
-      marginTop: theme.spacing.md,
+      marginTop: theme.spacing.xs,
     },
     meta: {
       fontFamily: theme.fonts.ui.regular,

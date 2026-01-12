@@ -177,6 +177,7 @@ function MeditateScreen() {
                     thumbnailUrl={course.thumbnailUrl}
                     fallbackIcon="school"
                     fallbackColor={course.color}
+                    code={course.code}
                     meta={`${course.sessionCount} sessions`}
                     onPress={() => handleCoursePress(course)}
                   />

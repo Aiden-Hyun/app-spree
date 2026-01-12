@@ -168,11 +168,11 @@ export default function RootLayout() {
         <NetworkProvider>
           <SleepTimerProvider>
             <OfflineNavigator>
-              <RootNavigator />
+        <RootNavigator />
             </OfflineNavigator>
           </SleepTimerProvider>
         </NetworkProvider>
-      </AuthProvider>
+    </AuthProvider>
     </ThemeProvider>
   );
 }
