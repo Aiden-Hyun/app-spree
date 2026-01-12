@@ -184,13 +184,6 @@ function SleepStoryPlayerScreen() {
 
   const narratorData = story?.narrator ? getNarratorByName(story.narrator) : undefined;
 
-  const sleepTimerButton = (
-    <TouchableOpacity style={styles.timerButton}>
-      <Ionicons name="moon-outline" size={20} color={theme.colors.sleepTextMuted} />
-      <Text style={styles.timerButtonText}>Set Sleep Timer</Text>
-    </TouchableOpacity>
-  );
-
   return (
     <MediaPlayer
       category={story?.category || 'bedtime story'}
@@ -209,7 +202,6 @@ function SleepStoryPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading story..."
-      footerContent={sleepTimerButton}
       contentId={id}
       contentType="bedtime_story"
     />
@@ -248,20 +240,6 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 16,
       color: theme.colors.sleepBackground,
-    },
-    timerButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing.sm,
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.lg,
-      backgroundColor: "rgba(255,255,255,0.05)",
-      borderRadius: theme.borderRadius.lg,
-    },
-    timerButtonText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
-      color: theme.colors.sleepTextMuted,
     },
   });
 

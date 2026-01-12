@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { ProtectedRoute } from '../../../src/components/ProtectedRoute';
 import { MediaPlayer } from '../../../src/components/MediaPlayer';
 import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
@@ -220,13 +219,6 @@ function SeriesChapterPlayerScreen() {
     });
   };
 
-  const sleepTimerButton = (
-          <TouchableOpacity style={styles.timerButton}>
-            <Ionicons name="moon-outline" size={20} color={theme.colors.sleepTextMuted} />
-            <Text style={styles.timerButtonText}>Set Sleep Timer</Text>
-          </TouchableOpacity>
-  );
-
   return (
     <MediaPlayer
       category={seriesTitle || 'Series'}
@@ -244,7 +236,6 @@ function SeriesChapterPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading chapter..."
-      footerContent={sleepTimerButton}
       onPrevious={hasPrevious ? handlePrevious : undefined}
       onNext={hasNext ? handleNext : undefined}
       hasPrevious={hasPrevious}
@@ -259,22 +250,9 @@ function SeriesChapterPlayerScreen() {
   );
 }
 
-const createStyles = (theme: Theme) =>
+const createStyles = (_theme: Theme) =>
   StyleSheet.create({
-    timerButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.sm,
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.lg,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-      borderRadius: theme.borderRadius.lg,
-    },
-    timerButtonText: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 14,
-      color: theme.colors.sleepTextMuted,
-    },
+    // No additional styles needed - MediaPlayer handles everything
   });
 
 export default function SeriesChapterPlayer() {

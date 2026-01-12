@@ -15,7 +15,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AudioPlayer } from './AudioPlayer';
 import { BackgroundAudioPicker } from './BackgroundAudioPicker';
+import { SleepTimerPicker } from './SleepTimerPicker';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSleepTimer, formatTimerDisplay } from '../contexts/SleepTimerContext';
 import { Theme } from '../theme';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useBackgroundAudio } from '../hooks/useBackgroundAudio';
@@ -146,6 +148,10 @@ export function MediaPlayer({
   const [isDownloadedState, setIsDownloadedState] = useState(false);
   const [isDownloadingState, setIsDownloadingState] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+
+  // Sleep timer state
+  const [showSleepTimerPicker, setShowSleepTimerPicker] = useState(false);
+  const sleepTimer = useSleepTimer();
 
   // Playback progress tracking
   const lastSaveTime = useRef(0);
@@ -279,6 +285,26 @@ export function MediaPlayer({
       backgroundAudio.cleanup();
     };
   }, []);
+
+  // Register audio player with sleep timer for fade-out effect
+  useEffect(() => {
+    sleepTimer.registerAudioPlayer({
+      setVolume: (volume: number) => {
+        if (audioPlayer.player) {
+          audioPlayer.player.volume = volume;
+        }
+      },
+      pause: () => {
+        audioPlayer.pause();
+        // Also pause background audio
+        backgroundAudio.pause();
+      },
+    });
+
+    return () => {
+      sleepTimer.unregisterAudioPlayer();
+    };
+  }, [audioPlayer.player, sleepTimer]);
 
   // Reset auto-play trigger flag when track changes
   useEffect(() => {
@@ -439,6 +465,21 @@ export function MediaPlayer({
           </TouchableOpacity>
           
           <View style={styles.headerRight}>
+            {/* Sleep Timer Button */}
+            <TouchableOpacity
+              onPress={() => setShowSleepTimerPicker(true)}
+              style={[
+                styles.headerButton,
+                sleepTimer.isActive && styles.headerButtonActive,
+              ]}
+            >
+              <Ionicons
+                name="timer-outline"
+                size={20}
+                color={sleepTimer.isActive ? '#7DAFB4' : 'white'}
+              />
+            </TouchableOpacity>
+
             {/* Background Audio Button */}
             {enableBackgroundAudio && (
               <TouchableOpacity
@@ -480,6 +521,19 @@ export function MediaPlayer({
             <Ionicons name="musical-notes" size={14} color="rgba(255,255,255,0.7)" />
             <Text style={styles.backgroundIndicatorText}>
               {currentBackgroundSound.title}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Sleep Timer Indicator */}
+        {sleepTimer.isActive && (
+          <TouchableOpacity
+            style={styles.sleepTimerIndicator}
+            onPress={() => setShowSleepTimerPicker(true)}
+          >
+            <Ionicons name="timer-outline" size={14} color="#7DAFB4" />
+            <Text style={styles.sleepTimerIndicatorText}>
+              {sleepTimer.isFadingOut ? 'Fading out...' : formatTimerDisplay(sleepTimer.remainingSeconds)}
             </Text>
           </TouchableOpacity>
         )}
@@ -715,6 +769,12 @@ export function MediaPlayer({
           onVolumeChange={backgroundAudio.setVolume}
           onToggleEnabled={backgroundAudio.setEnabled}
         />
+
+        {/* Sleep Timer Picker Modal */}
+        <SleepTimerPicker
+          visible={showSleepTimerPicker}
+          onClose={() => setShowSleepTimerPicker(false)}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -794,6 +854,23 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.medium,
       fontSize: 12,
       color: 'rgba(255, 255, 255, 0.7)',
+    },
+    sleepTimerIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      backgroundColor: 'rgba(125, 175, 180, 0.15)',
+      borderRadius: 16,
+      alignSelf: 'center',
+      marginTop: 4,
+    },
+    sleepTimerIndicatorText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: '#7DAFB4',
     },
     content: {
       flex: 1,

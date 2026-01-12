@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { NetworkProvider } from '../src/contexts/NetworkContext';
+import { SleepTimerProvider } from '../src/contexts/SleepTimerContext';
 import { useFonts } from '../src/hooks/useFonts';
 import { lightColors } from '../src/theme';
 import { OfflineNavigator } from '../src/components/OfflineNavigator';
@@ -165,9 +166,11 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <NetworkProvider>
-          <OfflineNavigator>
-            <RootNavigator />
-          </OfflineNavigator>
+          <SleepTimerProvider>
+            <OfflineNavigator>
+              <RootNavigator />
+            </OfflineNavigator>
+          </SleepTimerProvider>
         </NetworkProvider>
       </AuthProvider>
     </ThemeProvider>
