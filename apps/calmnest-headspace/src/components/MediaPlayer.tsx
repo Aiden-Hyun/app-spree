@@ -80,6 +80,9 @@ export interface MediaPlayerProps {
   parentId?: string;
   parentTitle?: string;
   audioPath?: string;
+
+  // Skip restoring saved position (e.g., when autoplay triggers next track)
+  skipRestore?: boolean;
 }
 
 export function MediaPlayer({
@@ -112,6 +115,7 @@ export function MediaPlayer({
   parentId,
   parentTitle,
   audioPath,
+  skipRestore = false,
 }: MediaPlayerProps) {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
@@ -302,10 +306,16 @@ export function MediaPlayer({
     }
   }, [autoPlayEnabled, hasNext, onNext, audioPlayer.progress, audioPlayer.isPlaying, audioPlayer.duration]);
 
-  // Restore playback position on mount
+  // Restore playback position on mount (skip if coming from autoplay)
   useEffect(() => {
     async function restorePosition() {
       if (!user?.uid || !contentId || hasRestoredPosition.current) return;
+      
+      // Skip restoring if this is an autoplay navigation
+      if (skipRestore) {
+        hasRestoredPosition.current = true;
+        return;
+      }
       
       const progress = await getPlaybackProgress(user.uid, contentId);
       if (progress && progress.position_seconds > 5) {
@@ -325,7 +335,7 @@ export function MediaPlayer({
       }
     }
     restorePosition();
-  }, [user?.uid, contentId, audioPlayer.duration]);
+  }, [user?.uid, contentId, audioPlayer.duration, skipRestore]);
 
   // Reset restore flag when content changes
   useEffect(() => {

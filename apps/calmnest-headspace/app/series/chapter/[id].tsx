@@ -254,6 +254,7 @@ function SeriesChapterPlayerScreen() {
       audioUrl={currentAudioUrl}
       audioPath={audioPath}
       parentTitle={seriesTitle}
+      skipRestore={autoPlay === 'true'}
     />
   );
 }

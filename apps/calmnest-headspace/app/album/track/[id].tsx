@@ -238,6 +238,7 @@ function AlbumTrackPlayerScreen() {
       audioUrl={currentAudioUrl}
       audioPath={audioPath}
       parentTitle={albumTitle}
+      skipRestore={autoPlay === 'true'}
     />
   );
 }

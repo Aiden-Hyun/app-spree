@@ -253,6 +253,7 @@ function CourseSessionPlayerScreen() {
       audioUrl={currentAudioUrl}
       audioPath={audioPath}
       parentTitle={courseTitle}
+      skipRestore={autoPlay === 'true'}
     />
   );
 }
