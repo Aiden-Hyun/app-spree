@@ -5,7 +5,7 @@ import {
   StyleSheet,
   FlatList,
   ScrollView,
-  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -13,64 +13,135 @@ import { Ionicons } from '@expo/vector-icons';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
+import { SkeletonListItem } from '../../src/components/Skeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import {
-  getTechniques,
-  getTechniqueMeditations,
-  FirestoreTechnique,
-  FirestoreTechniqueMeditation,
+  getMeditations,
+  getMeditationsByTechnique,
 } from '../../src/services/firestoreService';
+import { GuidedMeditation, MeditationTechnique } from '../../src/types';
+
+// Technique categories defined as constants (not fetched from Firebase)
+const techniqueCategories: {
+  id: MeditationTechnique | 'all';
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  description: string;
+}[] = [
+  {
+    id: 'all',
+    label: 'All',
+    icon: 'grid-outline',
+    color: '#6B7280',
+    description: 'Browse all meditation techniques',
+  },
+  {
+    id: 'breathing',
+    label: 'Breathing',
+    icon: 'fitness-outline',
+    color: '#7DAFB4',
+    description: 'Focus on your breath to calm the mind and body. Breathing techniques help reduce stress and increase mindfulness.',
+  },
+  {
+    id: 'body-scan',
+    label: 'Body Scan',
+    icon: 'body-outline',
+    color: '#8B9F82',
+    description: 'Progressively relax each part of your body. Body scans help you become aware of physical sensations and release tension.',
+  },
+  {
+    id: 'visualization',
+    label: 'Visualization',
+    icon: 'eye-outline',
+    color: '#B4A7C7',
+    description: 'Use mental imagery to create calm, peaceful scenes. Visualization helps manifest positive outcomes and reduce anxiety.',
+  },
+  {
+    id: 'loving-kindness',
+    label: 'Loving Kindness',
+    icon: 'heart-outline',
+    color: '#D4A5A5',
+    description: 'Cultivate compassion for yourself and others. This practice increases feelings of warmth and connection.',
+  },
+  {
+    id: 'mindfulness',
+    label: 'Mindfulness',
+    icon: 'leaf-outline',
+    color: '#A8B4C4',
+    description: 'Stay present in the moment without judgment. Mindfulness helps you observe thoughts and feelings with acceptance.',
+  },
+  {
+    id: 'grounding',
+    label: 'Grounding',
+    icon: 'earth-outline',
+    color: '#C4A77D',
+    description: 'Connect with the present moment through your senses. Grounding techniques help during moments of anxiety or dissociation.',
+  },
+  {
+    id: 'progressive-relaxation',
+    label: 'Progressive Relaxation',
+    icon: 'pulse-outline',
+    color: '#7B8FA1',
+    description: 'Tense and release muscle groups systematically. This technique is great for physical tension and sleep preparation.',
+  },
+];
 
 function TechniquesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ technique?: string }>();
   const { theme, isDark } = useTheme();
   const [selectedTechnique, setSelectedTechnique] = useState<string>(params.technique || 'all');
-  const [techniques, setTechniques] = useState<FirestoreTechnique[]>([]);
-  const [allMeditations, setAllMeditations] = useState<FirestoreTechniqueMeditation[]>([]);
+  const [meditations, setMeditations] = useState<GuidedMeditation[]>([]);
   const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   useEffect(() => {
-    async function loadContent() {
+    loadMeditations();
+  }, [selectedTechnique]);
+
+  const loadMeditations = async () => {
+    try {
       setLoading(true);
-      const [techniquesData, meditationsData] = await Promise.all([
-        getTechniques(),
-        getTechniqueMeditations()
-      ]);
-      setTechniques(techniquesData);
-      setAllMeditations(meditationsData);
+      const data = selectedTechnique === 'all'
+        ? await getMeditations()
+        : await getMeditationsByTechnique(selectedTechnique);
+      setMeditations(data);
+    } catch (error) {
+      console.error('Failed to load meditations:', error);
+    } finally {
       setLoading(false);
     }
-    loadContent();
-  }, []);
-
-  const filteredMeditations = useMemo(() => {
-    if (selectedTechnique === 'all') return allMeditations;
-    return allMeditations.filter(m => m.techniqueId === selectedTechnique);
-  }, [selectedTechnique, allMeditations]);
-
-  const handleMeditationPress = (meditation: FirestoreTechniqueMeditation) => {
-    router.push(
-      `/meditations/technique/${meditation.id}?audioPath=${encodeURIComponent(meditation.audioPath)}&title=${encodeURIComponent(meditation.title)}&description=${encodeURIComponent(meditation.description)}&duration=${meditation.duration_minutes}&instructor=${encodeURIComponent(meditation.instructor)}&technique=${meditation.techniqueId}&color=${encodeURIComponent(meditation.color)}&thumbnailUrl=${encodeURIComponent(meditation.thumbnailUrl || '')}`
-    );
   };
 
-  const renderMeditationItem = ({ item, index }: { item: FirestoreTechniqueMeditation; index: number }) => (
+  const handleMeditationPress = (meditation: GuidedMeditation) => {
+    router.push({
+      pathname: '/meditation/[id]',
+      params: { id: meditation.id },
+    });
+  };
+
+  const currentTechnique = techniqueCategories.find(t => t.id === selectedTechnique);
+
+  const renderMeditationItem = ({ item, index }: { item: GuidedMeditation; index: number }) => (
     <AnimatedView delay={100 + index * 30} duration={300}>
       <AnimatedPressable
         onPress={() => handleMeditationPress(item)}
         style={styles.meditationCard}
       >
-        <View style={[styles.meditationIcon, { backgroundColor: `${item.color}20` }]}>
-          <Ionicons
-            name={techniques.find((t) => t.id === item.techniqueId)?.icon as keyof typeof Ionicons.glyphMap || 'leaf'}
-            size={24}
-            color={item.color}
-          />
-        </View>
+        {item.thumbnailUrl ? (
+          <Image source={{ uri: item.thumbnailUrl }} style={styles.meditationImage} />
+        ) : (
+          <View style={[styles.meditationIcon, { backgroundColor: `${currentTechnique?.color || theme.colors.primary}20` }]}>
+            <Ionicons
+              name={currentTechnique?.icon || 'leaf'}
+              size={24}
+              color={currentTechnique?.color || theme.colors.primary}
+            />
+          </View>
+        )}
         <View style={styles.meditationInfo}>
           <Text style={styles.meditationTitle} numberOfLines={1}>
             {item.title}
@@ -83,9 +154,15 @@ function TechniquesScreen() {
               <Ionicons name="time-outline" size={12} color={theme.colors.textMuted} />
               <Text style={styles.meditationMeta}>{item.duration_minutes} min</Text>
             </View>
+            {item.instructor && (
+              <View style={styles.meditationMetaItem}>
+                <Ionicons name="person-outline" size={12} color={theme.colors.textMuted} />
+                <Text style={styles.meditationMeta}>{item.instructor}</Text>
+              </View>
+            )}
             <View style={styles.meditationMetaItem}>
-              <Ionicons name="person-outline" size={12} color={theme.colors.textMuted} />
-              <Text style={styles.meditationMeta}>{item.instructor}</Text>
+              <Ionicons name="fitness-outline" size={12} color={theme.colors.textMuted} />
+              <Text style={styles.meditationMeta}>{item.difficulty_level}</Text>
             </View>
           </View>
         </View>
@@ -95,16 +172,6 @@ function TechniquesScreen() {
       </AnimatedPressable>
     </AnimatedView>
   );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -124,49 +191,31 @@ function TechniquesScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterList}
         >
-          <AnimatedPressable
-            onPress={() => setSelectedTechnique('all')}
-            style={[
-              styles.filterChip,
-              selectedTechnique === 'all' && styles.filterChipSelected,
-            ]}
-          >
-            <Ionicons
-              name="grid-outline"
-              size={16}
-              color={selectedTechnique === 'all' ? 'white' : theme.colors.textLight}
-            />
-            <Text
-              style={[
-                styles.filterChipText,
-                selectedTechnique === 'all' && styles.filterChipTextSelected,
-              ]}
-            >
-              All
-            </Text>
-          </AnimatedPressable>
-          {techniques.map((technique) => (
+          {techniqueCategories.map((technique) => (
             <AnimatedPressable
               key={technique.id}
               onPress={() => setSelectedTechnique(technique.id)}
               style={[
                 styles.filterChip,
                 selectedTechnique === technique.id && styles.filterChipSelected,
-                selectedTechnique === technique.id && { backgroundColor: technique.color },
+                selectedTechnique === technique.id && {
+                  borderColor: technique.color,
+                  backgroundColor: `${technique.color}15`,
+                },
               ]}
             >
               <Ionicons
-                name={technique.icon as keyof typeof Ionicons.glyphMap}
+                name={technique.icon}
                 size={16}
-                color={selectedTechnique === technique.id ? 'white' : theme.colors.textLight}
+                color={selectedTechnique === technique.id ? technique.color : theme.colors.textLight}
               />
               <Text
                 style={[
                   styles.filterChipText,
-                  selectedTechnique === technique.id && styles.filterChipTextSelected,
+                  selectedTechnique === technique.id && { color: technique.color },
                 ]}
               >
-                {technique.title}
+                {technique.label}
               </Text>
             </AnimatedPressable>
           ))}
@@ -174,28 +223,45 @@ function TechniquesScreen() {
       </View>
 
       {/* Description for selected technique */}
-      {selectedTechnique !== 'all' && (
+      {selectedTechnique !== 'all' && currentTechnique && (
         <AnimatedView delay={50} duration={300}>
           <View style={styles.descriptionContainer}>
             <Text style={styles.descriptionText}>
-              {techniques.find((t) => t.id === selectedTechnique)?.longDescription}
+              {currentTechnique.description}
             </Text>
           </View>
         </AnimatedView>
       )}
 
       {/* Meditations List */}
-      {filteredMeditations.length === 0 ? (
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          {[0, 1, 2, 3, 4].map((_, index) => (
+            <AnimatedView key={index} delay={index * 50} duration={300}>
+              <SkeletonListItem
+                style={{
+                  marginBottom: theme.spacing.sm,
+                  marginHorizontal: theme.spacing.lg,
+                }}
+              />
+            </AnimatedView>
+          ))}
+        </View>
+      ) : meditations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
             <Ionicons name="leaf-outline" size={48} color={theme.colors.textMuted} />
           </View>
           <Text style={styles.emptyText}>No meditations found</Text>
-          <Text style={styles.emptySubtext}>Check back soon for new content</Text>
+          <Text style={styles.emptySubtext}>
+            {selectedTechnique !== 'all'
+              ? `No ${currentTechnique?.label || ''} meditations available yet`
+              : 'Check back soon for new content'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={filteredMeditations}
+          data={meditations}
           keyExtractor={(item) => item.id}
           renderItem={renderMeditationItem}
           contentContainerStyle={styles.listContent}
@@ -250,19 +316,18 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       paddingVertical: theme.spacing.sm,
       borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.surface,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
       gap: 6,
       ...theme.shadows.sm,
     },
     filterChipSelected: {
-      backgroundColor: theme.colors.primary,
+      borderWidth: 1.5,
     },
     filterChipText: {
       fontFamily: theme.fonts.ui.medium,
       fontSize: 13,
       color: theme.colors.textLight,
-    },
-    filterChipTextSelected: {
-      color: 'white',
     },
     descriptionContainer: {
       paddingHorizontal: theme.spacing.lg,
@@ -273,6 +338,9 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontSize: 14,
       color: theme.colors.textLight,
       lineHeight: 20,
+    },
+    loadingContainer: {
+      paddingTop: theme.spacing.lg,
     },
     emptyContainer: {
       flex: 1,
@@ -322,6 +390,12 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    meditationImage: {
+      width: 56,
+      height: 56,
+      borderRadius: 16,
+      resizeMode: 'cover',
+    },
     meditationInfo: {
       flex: 1,
       marginLeft: theme.spacing.md,
@@ -352,6 +426,7 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 11,
       color: theme.colors.textMuted,
+      textTransform: 'capitalize',
     },
     meditationChevron: {
       width: 32,
@@ -370,4 +445,3 @@ export default function Techniques() {
     </ProtectedRoute>
   );
 }
-

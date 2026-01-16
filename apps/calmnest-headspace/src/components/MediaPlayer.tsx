@@ -233,8 +233,8 @@ export function MediaPlayer({
     async function fetchNarratorPhoto() {
       if (instructor && !instructorPhotoUrl) {
         const narrator = await getNarratorByName(instructor);
-        if (narrator?.profileUrl) {
-          setNarratorPhotoUrl(narrator.profileUrl);
+        if (narrator?.photoUrl) {
+          setNarratorPhotoUrl(narrator.photoUrl);
         }
       }
     }

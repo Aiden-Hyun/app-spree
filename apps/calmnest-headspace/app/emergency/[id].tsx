@@ -5,7 +5,6 @@ import { MediaPlayer } from "../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
 import { useAuth } from "../../src/contexts/AuthContext";
 import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
-import { getNarratorByName } from "../../src/constants/narratorData";
 import {
   addToListeningHistory,
   toggleFavorite,
@@ -24,18 +23,27 @@ function adjustColor(hex: string, percent: number): string {
 }
 
 function EmergencyPlayerScreen() {
-  const { id, title, description, duration, audioPath, color, icon, narrator, thumbnailUrl } =
-    useLocalSearchParams<{
-      id: string;
-      title: string;
-      description: string;
-      duration: string;
-      audioPath: string;
-      color: string;
-      icon: string;
-      narrator: string;
-      thumbnailUrl?: string;
-    }>();
+  const {
+    id,
+    title,
+    description,
+    duration,
+    audioPath,
+    color,
+    icon,
+    narrator,
+    thumbnailUrl,
+  } = useLocalSearchParams<{
+    id: string;
+    title: string;
+    description: string;
+    duration: string;
+    audioPath: string;
+    color: string;
+    icon: string;
+    narrator: string;
+    thumbnailUrl?: string;
+  }>();
 
   const router = useRouter();
   const { user } = useAuth();
@@ -152,14 +160,12 @@ function EmergencyPlayerScreen() {
   const gradientColors: [string, string] = [bgColor, adjustColor(bgColor, 20)];
 
   const instructorName = narrator || "Guide";
-  const narratorData = getNarratorByName(instructorName);
 
   return (
     <MediaPlayer
       category="emergency"
       title={title || "Emergency Relief"}
       instructor={instructorName}
-      instructorPhotoUrl={narratorData?.photoUrl}
       description={description || "Quick relief for moments of distress"}
       durationMinutes={parseInt(duration) || 4}
       gradientColors={gradientColors}

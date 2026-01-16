@@ -10,8 +10,7 @@ import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { getMeditationById, addToListeningHistory, toggleFavorite, isFavorite, createSession } from '../../src/services/firestoreService';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getAudioUrl } from '../../src/constants/audioFiles';
-import { getNarratorByName } from '../../src/constants/narratorData';
+import { getAudioUrl, getAudioUrlFromPath } from '../../src/constants/audioFiles';
 import { Theme } from '../../src/theme';
 import { GuidedMeditation } from '../../src/types';
 
@@ -62,18 +61,12 @@ function MeditationPlayerScreen() {
     async function loadMeditationAudio() {
       if (!meditation) return;
       
-      // Try to get audio URL from audio_file key
-      if (meditation.audio_file) {
-        const audioUrl = await getAudioUrl(meditation.audio_file);
+      // Use the new audioPath field
+      if (meditation.audioPath) {
+        const audioUrl = await getAudioUrlFromPath(meditation.audioPath);
         if (audioUrl) {
           audioPlayer.loadAudio(audioUrl);
-          return;
         }
-      }
-      
-      // Fallback to direct audio_url
-      if (meditation.audio_url) {
-        audioPlayer.loadAudio(meditation.audio_url);
       }
     }
     
@@ -144,15 +137,16 @@ function MeditationPlayerScreen() {
           'meditation',
           meditation.title,
           meditation.duration_minutes,
-          meditation.thumbnail_url
+          meditation.thumbnailUrl
         );
       }
     }
   };
 
   const getGradientColors = (): [string, string] => {
-    const category = meditation?.category || 'focus';
-    switch (category) {
+    // Use the first theme if available
+    const primaryTheme = meditation?.themes?.[0] || 'focus';
+    switch (primaryTheme) {
       case 'sleep':
         return ['#1A1D29', '#2A2D3E'];
       case 'stress':
@@ -186,20 +180,18 @@ function MeditationPlayerScreen() {
   }
 
   const instructorName = meditation?.instructor || 'Guide';
-  const narrator = getNarratorByName(instructorName);
 
   return (
     <MediaPlayer
-      category={meditation?.category || 'meditation'}
+      category={meditation?.themes?.[0] || 'meditation'}
       title={meditation?.title || 'Loading...'}
       instructor={instructorName}
-      instructorPhotoUrl={narrator?.photoUrl}
       description={meditation?.description || ''}
       durationMinutes={meditation?.duration_minutes || 0}
       difficultyLevel={meditation?.difficulty_level}
       gradientColors={getGradientColors()}
       artworkIcon="leaf"
-      artworkThumbnailUrl={meditation?.thumbnail_url}
+      artworkThumbnailUrl={meditation?.thumbnailUrl}
       isFavorited={isFavoritedState}
       isLoading={loading}
       audioPlayer={audioPlayer}

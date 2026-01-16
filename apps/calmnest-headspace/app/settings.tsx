@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -15,11 +15,72 @@ const themeModes: { id: ThemeMode; label: string; icon: string }[] = [
 
 function SettingsScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, deleteAccount } = useAuth();
   const { theme, themeMode, setThemeMode } = useTheme();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Determine auth provider
+  const providerData = user?.providerData || [];
+  const isEmailProvider = providerData.some(p => p.providerId === 'password');
+  const isGoogleProvider = providerData.some(p => p.providerId === 'google.com');
+  const isAppleProvider = providerData.some(p => p.providerId === 'apple.com');
+
+  const handleDeleteAccount = () => {
+    if (isEmailProvider) {
+      // Email users need to enter password
+      Alert.prompt(
+        'Delete Account',
+        'This action is permanent and cannot be undone. All your data will be deleted.\n\nEnter your password to confirm:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async (password) => {
+              if (!password) {
+                Alert.alert('Error', 'Password is required');
+                return;
+              }
+              await performDeleteAccount(password);
+            },
+          },
+        ],
+        'secure-text'
+      );
+    } else {
+      // Google/Apple users will be prompted to re-authenticate
+      Alert.alert(
+        'Delete Account',
+        `This action is permanent and cannot be undone. All your data will be deleted.\n\nYou will be asked to sign in with ${isGoogleProvider ? 'Google' : isAppleProvider ? 'Apple' : 'your account'} to confirm.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => performDeleteAccount(),
+          },
+        ]
+      );
+    }
+  };
+
+  const performDeleteAccount = async (password?: string) => {
+    setIsDeleting(true);
+    try {
+      await deleteAccount(password);
+      // User will be automatically signed out and redirected
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to delete account. Please try again.'
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -127,14 +188,38 @@ function SettingsScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
           </TouchableOpacity>
-          </View>
-        </View>
+      </View>
+    </View>
 
         {/* Sign Out */}
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
+
+        {/* Danger Zone */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, styles.dangerSectionTitle]}>Danger Zone</Text>
+          <View style={[styles.card, styles.dangerCard]}>
+            <TouchableOpacity 
+              style={styles.deleteAccountButton}
+              onPress={handleDeleteAccount}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color={theme.colors.error} />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+                  <Text style={styles.deleteAccountText}>Delete Account</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.deleteWarning}>
+              This will permanently delete your account and all associated data.
+            </Text>
+          </View>
+        </View>
 
         {/* Version */}
         <Text style={styles.version}>CalmNest v1.0.0</Text>
@@ -170,10 +255,10 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
     headerSpacer: {
       width: 40,
     },
-    container: {
-      flex: 1,
+  container: {
+    flex: 1,
       padding: theme.spacing.lg,
-    },
+  },
   section: {
       marginBottom: theme.spacing.xl,
   },
@@ -281,6 +366,33 @@ const createStyles = (theme: ReturnType<typeof import('../src/theme').createThem
       color: theme.colors.textMuted,
       textAlign: 'center',
       marginBottom: theme.spacing.xxl,
+    },
+    dangerSectionTitle: {
+      color: theme.colors.error,
+    },
+    dangerCard: {
+      borderWidth: 1,
+      borderColor: `${theme.colors.error}30`,
+    },
+    deleteAccountButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: theme.spacing.md,
+      gap: theme.spacing.sm,
+    },
+    deleteAccountText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 16,
+      color: theme.colors.error,
+    },
+    deleteWarning: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: theme.spacing.sm,
     },
 });
 

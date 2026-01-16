@@ -14,10 +14,10 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { SkeletonListItem } from "../../src/components/Skeleton";
-import { getMeditations } from "../../src/services/firestoreService";
+import { getMeditations, getMeditationsByTheme } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
-import { GuidedMeditation, MeditationCategory } from "../../src/types";
+import { GuidedMeditation } from "../../src/types";
 
 const themeCategories = [
   { id: "all", label: "All", icon: "grid-outline" as const, color: "#6B7280" },
@@ -58,12 +58,6 @@ const themeCategories = [
     color: "#D4A5A5",
   },
   {
-    id: "body-scan",
-    label: "Body Scan",
-    icon: "body-outline" as const,
-    color: "#7DAFB4",
-  },
-  {
     id: "loving-kindness",
     label: "Loving Kindness",
     icon: "heart-circle-outline" as const,
@@ -90,11 +84,9 @@ function AllMeditationsScreen() {
   const loadMeditations = async () => {
     try {
       setLoading(true);
-      const category =
-        selectedCategory === "all"
-          ? undefined
-          : (selectedCategory as MeditationCategory);
-      const data = await getMeditations(category);
+      const data = selectedCategory === "all"
+        ? await getMeditations()
+        : await getMeditationsByTheme(selectedCategory);
       setMeditations(data);
     } catch (error) {
       console.error("Failed to load meditations:", error);
@@ -126,9 +118,9 @@ function AllMeditationsScreen() {
         onPress={() => handleMeditationPress(item)}
         style={styles.sessionCard}
       >
-        {item.thumbnail_url ? (
+        {item.thumbnailUrl ? (
           <Image
-            source={{ uri: item.thumbnail_url }}
+            source={{ uri: item.thumbnailUrl }}
             style={styles.sessionImage}
           />
         ) : (

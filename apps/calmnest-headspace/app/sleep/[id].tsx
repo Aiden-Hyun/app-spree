@@ -11,7 +11,6 @@ import { useTheme } from "../../src/contexts/ThemeContext";
 import { getBedtimeStoryById, addToListeningHistory, toggleFavorite, isFavorite, createSession } from "../../src/services/firestoreService";
 import { useAuth } from "../../src/contexts/AuthContext";
 import { getAudioUrl } from "../../src/constants/audioFiles";
-import { getNarratorByName } from "../../src/constants/narratorData";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
 
@@ -182,14 +181,11 @@ function SleepStoryPlayerScreen() {
     );
   }
 
-  const narratorData = story?.narrator ? getNarratorByName(story.narrator) : undefined;
-
   return (
     <MediaPlayer
       category={story?.category || 'bedtime story'}
       title={story?.title || 'Loading...'}
       instructor={story?.narrator}
-      instructorPhotoUrl={narratorData?.photoUrl}
       description={story?.description}
       durationMinutes={story?.duration_minutes || 0}
       gradientColors={["#1A1D29", "#2A2D3E"]}

@@ -12,12 +12,11 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import { 
   getEmergencyMeditations, 
-  getTechniques, 
   getCourses,
   FirestoreEmergencyMeditation,
-  FirestoreTechnique,
   FirestoreCourse
 } from '../../src/services/firestoreService';
+import { MeditationTechnique } from '../../src/types';
 
 const themeCategories = [
   { id: 'focus', label: 'Focus', icon: 'eye-outline' as const, color: '#8B9F82' },
@@ -37,11 +36,25 @@ const therapyCategories = [
   { id: 'somatic', label: 'Somatic', fullName: 'Body-Based Therapy', icon: 'body-outline' as const, color: '#A78BFA' },
 ];
 
+// Technique categories (constants, not fetched from Firebase)
+const techniqueCategories: {
+  id: MeditationTechnique;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+}[] = [
+  { id: 'breathing', label: 'Breathing', icon: 'fitness-outline', color: '#7DAFB4' },
+  { id: 'body-scan', label: 'Body Scan', icon: 'body-outline', color: '#8B9F82' },
+  { id: 'visualization', label: 'Visualization', icon: 'eye-outline', color: '#B4A7C7' },
+  { id: 'loving-kindness', label: 'Loving Kindness', icon: 'heart-outline', color: '#D4A5A5' },
+  { id: 'mindfulness', label: 'Mindfulness', icon: 'leaf-outline', color: '#A8B4C4' },
+  { id: 'grounding', label: 'Grounding', icon: 'earth-outline', color: '#C4A77D' },
+];
+
 function MeditateScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
   const [emergencyMeditations, setEmergencyMeditations] = useState<FirestoreEmergencyMeditation[]>([]);
-  const [techniques, setTechniques] = useState<FirestoreTechnique[]>([]);
   const [courses, setCourses] = useState<FirestoreCourse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,13 +63,11 @@ function MeditateScreen() {
   useEffect(() => {
     async function loadContent() {
       setLoading(true);
-      const [emergencyData, techniquesData, coursesData] = await Promise.all([
+      const [emergencyData, coursesData] = await Promise.all([
         getEmergencyMeditations(),
-        getTechniques(),
         getCourses()
       ]);
       setEmergencyMeditations(emergencyData);
-      setTechniques(techniquesData);
       setCourses(coursesData);
       setLoading(false);
     }
@@ -94,10 +105,10 @@ function MeditateScreen() {
     });
   };
 
-  const handleTechniquePress = (technique: FirestoreTechnique) => {
+  const handleTechniquePress = (techniqueId: MeditationTechnique) => {
     router.push({
       pathname: '/meditations/techniques',
-      params: { technique: technique.id },
+      params: { technique: techniqueId },
     });
   };
 
@@ -332,32 +343,34 @@ function MeditateScreen() {
                   size={16}
                   color={theme.colors.primary}
                 />
-                    </View>
-                  </AnimatedPressable>
-                </AnimatedView>
+              </View>
+            </AnimatedPressable>
+          </AnimatedView>
 
           <AnimatedView delay={550} duration={400}>
-            {loading ? (
-              renderSkeletonCards(3)
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cardsScroll}
-              >
-                {techniques.map((technique) => (
-                  <ContentCard
-                    key={technique.id}
-                    title={technique.title}
-                    thumbnailUrl={technique.thumbnailUrl}
-                    fallbackIcon={technique.icon as keyof typeof Ionicons.glyphMap}
-                    fallbackColor={technique.color}
-                    meta={technique.description}
-                    onPress={() => handleTechniquePress(technique)}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cardsScroll}
+            >
+              {techniqueCategories.map((technique) => (
+                <AnimatedPressable
+                  key={technique.id}
+                  onPress={() => handleTechniquePress(technique.id)}
+                  style={styles.themeCard}
+                >
+                  <View
+                    style={[
+                      styles.themeIconContainer,
+                      { backgroundColor: `${technique.color}20` },
+                    ]}
+                  >
+                    <Ionicons name={technique.icon} size={24} color={technique.color} />
+                  </View>
+                  <Text style={styles.themeLabel}>{technique.label}</Text>
+                </AnimatedPressable>
+              ))}
+            </ScrollView>
           </AnimatedView>
         </View>
       </ScrollView>

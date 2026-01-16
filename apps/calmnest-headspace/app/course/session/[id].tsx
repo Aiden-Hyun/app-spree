@@ -8,7 +8,6 @@ import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
-import { getNarratorByName } from '../../../src/constants/narratorData';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { getLocalAudioPath } from '../../../src/services/downloadService';
 import { buildSessionMetaInfo } from '../../../src/utils/courseCodeParser';
@@ -52,7 +51,6 @@ function CourseSessionPlayerScreen() {
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
-  const narratorData = instructor ? getNarratorByName(instructor) : undefined;
 
   // Parse sessions for prev/next navigation
   const sessions: SessionItem[] = useMemo(() => {
@@ -247,7 +245,6 @@ function CourseSessionPlayerScreen() {
       category={courseTitle || 'Course'}
       title={title || 'Loading...'}
       instructor={instructor}
-      instructorPhotoUrl={narratorData?.photoUrl}
       metaInfo={metaInfo}
       durationMinutes={parseInt(duration) || 0}
       gradientColors={gradientColors}

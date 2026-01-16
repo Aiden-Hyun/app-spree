@@ -8,11 +8,16 @@ import {
   signOut,
   GoogleAuthProvider,
   OAuthProvider,
-  signInWithCredential
+  signInWithCredential,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
 } from "firebase/auth";
 import { auth } from "../firebase";
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import * as AppleAuthentication from "expo-apple-authentication";
+import { deleteUserAccount } from "../services/firestoreService";
+import { deleteAllDownloads } from "../services/downloadService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Configure Google Sign In
 GoogleSignin.configure({
@@ -29,6 +34,7 @@ interface AuthContextType {
   signInWithApple: () => Promise<void>;
   isAppleSignInAvailable: boolean;
   logout: () => Promise<void>;
+  deleteAccount: (password?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -141,6 +147,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut(auth);
   };
 
+  const deleteAccount = async (password?: string) => {
+    if (!user) {
+      throw new Error("No user is currently signed in");
+    }
+
+    const userId = user.uid;
+    const providerData = user.providerData;
+    const isEmailProvider = providerData.some(p => p.providerId === "password");
+    const isGoogleProvider = providerData.some(p => p.providerId === "google.com");
+    const isAppleProvider = providerData.some(p => p.providerId === "apple.com");
+
+    try {
+      // Re-authenticate based on sign-in method
+      if (isEmailProvider && password) {
+        // Re-authenticate with email/password
+        const credential = EmailAuthProvider.credential(user.email!, password);
+        await reauthenticateWithCredential(user, credential);
+      } else if (isGoogleProvider) {
+        // Re-authenticate with Google
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const signInResult = await GoogleSignin.signIn();
+        const idToken = signInResult.data?.idToken;
+        if (!idToken) {
+          throw new Error("Failed to get Google token for re-authentication");
+        }
+        const googleCredential = GoogleAuthProvider.credential(idToken);
+        await reauthenticateWithCredential(user, googleCredential);
+      } else if (isAppleProvider) {
+        // Re-authenticate with Apple
+        const appleCredential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+        const { identityToken } = appleCredential;
+        if (!identityToken) {
+          throw new Error("Failed to get Apple token for re-authentication");
+        }
+        const provider = new OAuthProvider("apple.com");
+        const oauthCredential = provider.credential({ idToken: identityToken });
+        await reauthenticateWithCredential(user, oauthCredential);
+      } else if (!isEmailProvider && !isGoogleProvider && !isAppleProvider) {
+        // Unknown provider - try to proceed anyway (might fail)
+        console.warn("Unknown auth provider, attempting deletion without re-auth");
+      }
+
+      // Delete all user data from Firestore
+      await deleteUserAccount(userId);
+
+      // Clear downloaded content
+      await deleteAllDownloads();
+
+      // Clear AsyncStorage preferences
+      const keysToKeep = ["@theme_mode"]; // Keep theme preference
+      const allKeys = await AsyncStorage.getAllKeys();
+      const keysToRemove = allKeys.filter(key => !keysToKeep.includes(key));
+      if (keysToRemove.length > 0) {
+        await AsyncStorage.multiRemove(keysToRemove);
+      }
+
+      // Sign out from Google if applicable
+      try {
+        await GoogleSignin.signOut();
+      } catch {
+        // Ignore
+      }
+
+      // Delete the Firebase Auth account
+      await user.delete();
+
+      console.log("Account deleted successfully");
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      // Re-throw with user-friendly message
+      if (error.code === "auth/requires-recent-login") {
+        throw new Error("Please sign out and sign back in, then try again.");
+      }
+      if (error.code === "auth/wrong-password") {
+        throw new Error("Incorrect password. Please try again.");
+      }
+      throw error;
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -150,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithApple,
     isAppleSignInAvailable,
     logout,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -49,18 +49,15 @@ export interface GuidedMeditation {
   title: string;
   description: string;
   duration_minutes: number;
-  audio_url?: string;
-  audio_file?: string; // Key for local audio asset (see audioFiles.ts)
-  thumbnail_url?: string;
-  category: MeditationCategory;
+  audioPath: string;
+  thumbnailUrl?: string;
+  themes: MeditationTheme[];      // Multiple themes allowed
+  techniques: MeditationTechnique[]; // Multiple techniques allowed
   difficulty_level: "beginner" | "intermediate" | "advanced";
   instructor?: string;
-  is_premium: boolean;
-  tags?: string[];
-  created_at: string;
 }
 
-export type MeditationCategory = 
+export type MeditationTheme = 
   | "focus"
   | "stress"
   | "anxiety"
@@ -68,8 +65,19 @@ export type MeditationCategory =
   | "relationships"
   | "self-esteem"
   | "gratitude"
-  | "body-scan"
   | "loving-kindness";
+
+export type MeditationTechnique =
+  | "breathing"
+  | "body-scan"
+  | "visualization"
+  | "loving-kindness"
+  | "mindfulness"
+  | "grounding"
+  | "progressive-relaxation";
+
+// Keep for backwards compatibility
+export type MeditationCategory = MeditationTheme;
 
 export interface MeditationProgram {
   id: string;

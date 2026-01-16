@@ -7,7 +7,6 @@ import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
-import { getNarratorByName } from '../../../src/constants/narratorData';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { getLocalAudioPath } from '../../../src/services/downloadService';
 import { Theme } from '../../../src/theme';
@@ -46,7 +45,6 @@ function SeriesChapterPlayerScreen() {
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
-  const narratorData = narrator ? getNarratorByName(narrator) : undefined;
 
   // Parse chapters for prev/next navigation
   const chapters: ChapterItem[] = useMemo(() => {
@@ -224,7 +222,6 @@ function SeriesChapterPlayerScreen() {
       category={seriesTitle || 'Series'}
       title={title || 'Loading...'}
       instructor={narrator}
-      instructorPhotoUrl={narratorData?.photoUrl}
       durationMinutes={parseInt(duration) || 0}
       gradientColors={theme.gradients.sleepyNight as [string, string]}
       artworkIcon="book"

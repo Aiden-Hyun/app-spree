@@ -24,7 +24,6 @@ import {
   DailyQuote,
   UserFavorite,
   ListeningHistoryItem,
-  MeditationCategory,
 } from "../types";
 
 // Collection references
@@ -40,19 +39,12 @@ const usersCollection = collection(db, "users");
 
 // ==================== MEDITATIONS ====================
 
-export async function getMeditations(
-  category?: MeditationCategory
-): Promise<GuidedMeditation[]> {
+/**
+ * Get all guided meditations
+ */
+export async function getMeditations(): Promise<GuidedMeditation[]> {
   try {
-    let q = category
-      ? query(
-          meditationsCollection,
-          where("category", "==", category),
-          orderBy("created_at", "desc")
-        )
-      : query(meditationsCollection, orderBy("created_at", "desc"));
-
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(meditationsCollection);
     return snapshot.docs.map(
       (doc) =>
         ({
@@ -66,16 +58,69 @@ export async function getMeditations(
   }
 }
 
+/**
+ * Get meditations filtered by theme (uses array-contains for themes array)
+ */
+export async function getMeditationsByTheme(
+  theme: string
+): Promise<GuidedMeditation[]> {
+  try {
+    const q = query(
+      meditationsCollection,
+      where("themes", "array-contains", theme)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        } as GuidedMeditation)
+    );
+  } catch (error) {
+    console.error("Error fetching meditations by theme:", error);
+    return [];
+  }
+}
+
+/**
+ * Get meditations filtered by technique (uses array-contains for techniques array)
+ */
+export async function getMeditationsByTechnique(
+  technique: string
+): Promise<GuidedMeditation[]> {
+  try {
+    const q = query(
+      meditationsCollection,
+      where("techniques", "array-contains", technique)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        } as GuidedMeditation)
+    );
+  } catch (error) {
+    console.error("Error fetching meditations by technique:", error);
+    return [];
+  }
+}
+
+/**
+ * Get a single meditation by ID
+ */
 export async function getMeditationById(
   id: string
 ): Promise<GuidedMeditation | null> {
   try {
-    const docRef = doc(db, "guided_meditations", id);
+    const docRef = doc(meditationsCollection, id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
     return { id: docSnap.id, ...docSnap.data() } as GuidedMeditation;
   } catch (error) {
-    console.error("Error fetching meditation:", error);
+    console.error("Error fetching meditation by id:", error);
     return null;
   }
 }
@@ -899,74 +944,6 @@ export async function getCourseById(
   }
 }
 
-// ==================== TECHNIQUES ====================
-
-export interface FirestoreTechnique {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-  longDescription?: string;
-  thumbnailUrl?: string;
-}
-
-export async function getTechniques(): Promise<FirestoreTechnique[]> {
-  try {
-    const snapshot = await getDocs(collection(db, "techniques"));
-    return snapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as FirestoreTechnique)
-    );
-  } catch (error) {
-    console.error("Error fetching techniques:", error);
-    return [];
-  }
-}
-
-export interface FirestoreTechniqueMeditation {
-  id: string;
-  title: string;
-  description: string;
-  duration_minutes: number;
-  techniqueId: string;
-  instructor: string;
-  audioPath: string;
-  color: string;
-  thumbnailUrl?: string;
-}
-
-export async function getTechniqueMeditations(): Promise<
-  FirestoreTechniqueMeditation[]
-> {
-  try {
-    const snapshot = await getDocs(collection(db, "technique_meditations"));
-    return snapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as FirestoreTechniqueMeditation)
-    );
-  } catch (error) {
-    console.error("Error fetching technique meditations:", error);
-    return [];
-  }
-}
-
-export async function getTechniqueMeditationsByTechniqueId(
-  techniqueId: string
-): Promise<FirestoreTechniqueMeditation[]> {
-  try {
-    const q = query(
-      collection(db, "technique_meditations"),
-      where("techniqueId", "==", techniqueId)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as FirestoreTechniqueMeditation)
-    );
-  } catch (error) {
-    console.error("Error fetching technique meditations by technique:", error);
-    return [];
-  }
-}
-
 // ==================== SERIES ====================
 
 export interface FirestoreSeriesChapter {
@@ -1325,9 +1302,8 @@ export async function getListeningHistory(
 export interface FirestoreNarrator {
   id: string;
   name: string;
-  bio: string;
-  profileUrl: string;
-  specialties: string[];
+  bio?: string;
+  photoUrl: string;
 }
 
 // Cache for narrator data
@@ -1376,7 +1352,7 @@ export async function getNarratorByName(
 
 export function getNarratorProfileUrl(name: string): string | null {
   const cached = narratorCache.get(name.toLowerCase());
-  return cached?.profileUrl || null;
+  return cached?.photoUrl || null;
 }
 
 // ==================== PLAYBACK PROGRESS ====================
@@ -1525,5 +1501,51 @@ export async function isContentCompleted(
   } catch (error) {
     console.error("Error checking content completion:", error);
     return false;
+  }
+}
+
+// ==================== ACCOUNT DELETION ====================
+
+/**
+ * Delete all user data from Firestore
+ * Called before deleting the Firebase Auth account
+ */
+export async function deleteUserAccount(userId: string): Promise<void> {
+  console.log(`Starting account deletion for user: ${userId}`);
+  
+  try {
+    // Helper function to delete all docs matching a query
+    const deleteCollection = async (
+      collectionRef: ReturnType<typeof collection>,
+      fieldName: string
+    ) => {
+      const q = query(collectionRef, where(fieldName, "==", userId));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map((docSnapshot) =>
+        deleteDoc(docSnapshot.ref)
+      );
+      await Promise.all(deletePromises);
+      console.log(`Deleted ${snapshot.docs.length} docs from ${collectionRef.path}`);
+    };
+
+    // Delete from all user-specific collections
+    await deleteCollection(favoritesCollection, "user_id");
+    await deleteCollection(listeningHistoryCollection, "user_id");
+    await deleteCollection(sessionsCollection, "user_id");
+    await deleteCollection(playbackProgressCollection, "user_id");
+    await deleteCollection(completedContentCollection, "user_id");
+
+    // Delete the user document itself
+    const userDocRef = doc(usersCollection, userId);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+      await deleteDoc(userDocRef);
+      console.log("Deleted user document");
+    }
+
+    console.log("Account deletion complete");
+  } catch (error) {
+    console.error("Error deleting user account data:", error);
+    throw error;
   }
 }
