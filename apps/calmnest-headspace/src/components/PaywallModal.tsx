@@ -1,0 +1,434 @@
+import React, { useState, useMemo } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  Pressable,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../contexts/AuthContext";
+import { useSubscription, PurchasesPackage } from "../contexts/SubscriptionContext";
+import { AccountPromptModal } from "./AccountPromptModal";
+import { Theme } from "../theme";
+
+interface PaywallModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+const FEATURES = [
+  { icon: "infinite-outline", text: "Unlimited meditations & courses" },
+  { icon: "moon-outline", text: "All sleep content & stories" },
+  { icon: "musical-notes-outline", text: "Full music & sound library" },
+  { icon: "cloud-download-outline", text: "Offline downloads" },
+  { icon: "sparkles-outline", text: "New content weekly" },
+];
+
+export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps) {
+  const { theme, isDark } = useTheme();
+  const { isAnonymous } = useAuth();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const { currentOffering, purchasePackage, restorePurchases, isLoading } = useSubscription();
+  const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [showAccountPrompt, setShowAccountPrompt] = useState(false);
+
+  // Get monthly and annual packages from offering
+  const monthlyPackage = currentOffering?.monthly;
+  const annualPackage = currentOffering?.annual;
+
+  // Calculate savings for annual
+  const annualSavings = useMemo(() => {
+    if (!monthlyPackage || !annualPackage) return null;
+    const monthlyPrice = monthlyPackage.product.price;
+    const annualPrice = annualPackage.product.price;
+    const yearlyIfMonthly = monthlyPrice * 12;
+    const savings = Math.round(((yearlyIfMonthly - annualPrice) / yearlyIfMonthly) * 100);
+    return savings > 0 ? savings : null;
+  }, [monthlyPackage, annualPackage]);
+
+  const handlePurchase = async () => {
+    if (!selectedPackage) return;
+
+    setIsPurchasing(true);
+    const success = await purchasePackage(selectedPackage);
+    setIsPurchasing(false);
+
+    if (success) {
+      onSuccess?.();
+      onClose();
+      // Show account prompt for anonymous users after successful purchase
+      if (isAnonymous) {
+        setShowAccountPrompt(true);
+      }
+    }
+  };
+
+  const handleRestore = async () => {
+    setIsPurchasing(true);
+    const success = await restorePurchases();
+    setIsPurchasing(false);
+
+    if (success) {
+      onSuccess?.();
+      onClose();
+    }
+  };
+
+  const formatPrice = (pkg: PurchasesPackage | undefined, period: string) => {
+    if (!pkg) return "...";
+    return `${pkg.product.priceString}/${period}`;
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Close button */}
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Ionicons name="close" size={24} color={theme.colors.textLight} />
+        </TouchableOpacity>
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero */}
+          <View style={styles.hero}>
+            <LinearGradient
+              colors={[theme.colors.primaryLight, theme.colors.primary]}
+              style={styles.iconContainer}
+            >
+              <Ionicons name="leaf" size={48} color="#fff" />
+            </LinearGradient>
+            <Text style={styles.title}>Unlock CalmNest Premium</Text>
+            <Text style={styles.subtitle}>
+              Get unlimited access to all meditations, sleep content, and more.
+            </Text>
+          </View>
+
+          {/* Features */}
+          <View style={styles.featuresContainer}>
+            {FEATURES.map((feature, index) => (
+              <View key={index} style={styles.featureRow}>
+                <View style={styles.featureIcon}>
+                  <Ionicons
+                    name={feature.icon as any}
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <Text style={styles.featureText}>{feature.text}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Subscription options */}
+          <View style={styles.optionsContainer}>
+            {/* Annual */}
+            {annualPackage && (
+              <Pressable
+                style={[
+                  styles.optionCard,
+                  selectedPackage?.identifier === annualPackage.identifier &&
+                    styles.optionCardSelected,
+                ]}
+                onPress={() => setSelectedPackage(annualPackage)}
+              >
+                {annualSavings && (
+                  <View style={styles.savingsBadge}>
+                    <Text style={styles.savingsText}>Save {annualSavings}%</Text>
+                  </View>
+                )}
+                <View style={styles.optionContent}>
+                  <View>
+                    <Text style={styles.optionTitle}>Annual</Text>
+                    <Text style={styles.optionPrice}>
+                      {formatPrice(annualPackage, "year")}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.radioOuter,
+                      selectedPackage?.identifier === annualPackage.identifier &&
+                        styles.radioOuterSelected,
+                    ]}
+                  >
+                    {selectedPackage?.identifier === annualPackage.identifier && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            )}
+
+            {/* Monthly */}
+            {monthlyPackage && (
+              <Pressable
+                style={[
+                  styles.optionCard,
+                  selectedPackage?.identifier === monthlyPackage.identifier &&
+                    styles.optionCardSelected,
+                ]}
+                onPress={() => setSelectedPackage(monthlyPackage)}
+              >
+                <View style={styles.optionContent}>
+                  <View>
+                    <Text style={styles.optionTitle}>Monthly</Text>
+                    <Text style={styles.optionPrice}>
+                      {formatPrice(monthlyPackage, "month")}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.radioOuter,
+                      selectedPackage?.identifier === monthlyPackage.identifier &&
+                        styles.radioOuterSelected,
+                    ]}
+                  >
+                    {selectedPackage?.identifier === monthlyPackage.identifier && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Bottom actions */}
+        <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[
+              styles.purchaseButton,
+              (!selectedPackage || isPurchasing) && styles.purchaseButtonDisabled,
+            ]}
+            onPress={handlePurchase}
+            disabled={!selectedPackage || isPurchasing}
+          >
+            {isPurchasing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.purchaseButtonText}>
+                {selectedPackage ? "Subscribe Now" : "Select a Plan"}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={handleRestore}
+            disabled={isPurchasing}
+          >
+            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.legalText}>
+            Cancel anytime. Subscription auto-renews until cancelled.
+          </Text>
+        </View>
+      </View>
+
+      {/* Account prompt for anonymous users after purchase */}
+      <AccountPromptModal
+        visible={showAccountPrompt}
+        onClose={() => setShowAccountPrompt(false)}
+      />
+    </Modal>
+  );
+}
+
+const createStyles = (theme: Theme, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    closeButton: {
+      position: "absolute",
+      top: 16,
+      right: 16,
+      zIndex: 10,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      ...theme.shadows.sm,
+    },
+    scrollContent: {
+      paddingHorizontal: 24,
+      paddingTop: 60,
+      paddingBottom: 24,
+    },
+    hero: {
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    iconContainer: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 24,
+    },
+    title: {
+      fontFamily: theme.fonts.display.bold,
+      fontSize: 28,
+      color: theme.colors.text,
+      textAlign: "center",
+      marginBottom: 12,
+    },
+    subtitle: {
+      fontFamily: theme.fonts.body.regular,
+      fontSize: 16,
+      color: theme.colors.textLight,
+      textAlign: "center",
+      lineHeight: 24,
+      paddingHorizontal: 16,
+    },
+    featuresContainer: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
+      padding: 20,
+      marginBottom: 24,
+      ...theme.shadows.sm,
+    },
+    featureRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    featureIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: `${theme.colors.primary}15`,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 16,
+    },
+    featureText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 15,
+      color: theme.colors.text,
+      flex: 1,
+    },
+    optionsContainer: {
+      gap: 12,
+    },
+    optionCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      padding: 20,
+      borderWidth: 2,
+      borderColor: "transparent",
+      ...theme.shadows.sm,
+    },
+    optionCardSelected: {
+      borderColor: theme.colors.primary,
+      backgroundColor: `${theme.colors.primary}08`,
+    },
+    optionContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    optionTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 18,
+      color: theme.colors.text,
+      marginBottom: 4,
+    },
+    optionPrice: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 15,
+      color: theme.colors.textLight,
+    },
+    savingsBadge: {
+      position: "absolute",
+      top: -10,
+      right: 16,
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    savingsText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 12,
+      color: "#fff",
+    },
+    radioOuter: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.colors.gray[300],
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    radioOuterSelected: {
+      borderColor: theme.colors.primary,
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: theme.colors.primary,
+    },
+    bottomContainer: {
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.gray[200],
+      backgroundColor: theme.colors.background,
+    },
+    purchaseButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: theme.borderRadius.lg,
+      paddingVertical: 18,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    purchaseButtonDisabled: {
+      backgroundColor: theme.colors.gray[300],
+    },
+    purchaseButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 17,
+      color: "#fff",
+    },
+    restoreButton: {
+      paddingVertical: 12,
+      alignItems: "center",
+    },
+    restoreButtonText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 15,
+      color: theme.colors.primary,
+    },
+    legalText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      textAlign: "center",
+      marginTop: 8,
+    },
+  });

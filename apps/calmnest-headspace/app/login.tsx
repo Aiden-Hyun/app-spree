@@ -30,6 +30,7 @@ export default function LoginScreen() {
   const {
     signUp,
     signIn,
+    signInAnonymously,
     signInWithGoogle,
     signInWithApple,
     isAppleSignInAvailable,
@@ -125,6 +126,15 @@ export default function LoginScreen() {
       Alert.alert("Error", error.message);
     } finally {
       setAppleLoading(false);
+    }
+  };
+
+  const handleSkipLogin = async () => {
+    try {
+      await signInAnonymously();
+      router.replace("/(tabs)/home");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
@@ -344,6 +354,16 @@ export default function LoginScreen() {
           </AnimatedView>
         </View>
       </ScrollView>
+
+      {/* Skip/Close Button - rendered AFTER ScrollView to ensure it's on top */}
+      <View style={styles.skipButton}>
+        <AnimatedPressable
+          onPress={handleSkipLogin}
+          style={styles.skipButtonInner}
+        >
+          <Ionicons name="close" size={24} color={theme.colors.textMuted} />
+        </AnimatedPressable>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -353,6 +373,26 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    skipButton: {
+      position: "absolute",
+      top: 60,
+      right: 20,
+      zIndex: 100,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      elevation: 10,
+      ...theme.shadows.sm,
+    },
+    skipButtonInner: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
     },
     scrollContent: {
       flexGrow: 1,

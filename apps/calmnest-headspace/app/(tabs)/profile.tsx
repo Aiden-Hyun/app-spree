@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,8 +8,10 @@ import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { Skeleton } from '../../src/components/Skeleton';
+import { PaywallModal } from '../../src/components/PaywallModal';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { useStats } from '../../src/hooks/useStats';
 import { Theme } from '../../src/theme';
 
@@ -25,6 +27,8 @@ function ProfileScreen() {
   const { user, logout } = useAuth();
   const { theme, isDark } = useTheme();
   const { stats, loading } = useStats();
+  const { isPremium, restorePurchases } = useSubscription();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
   const avatarGradient = theme.gradients.sage as [string, string];
@@ -75,6 +79,49 @@ function ProfileScreen() {
             Meditating since {getMemberSince()}
           </Text>
         </View>
+        </AnimatedView>
+
+        {/* Subscription Status */}
+        <AnimatedView delay={50} duration={500}>
+          {isPremium ? (
+            <View style={styles.premiumBanner}>
+              <LinearGradient
+                colors={[theme.colors.primaryLight, theme.colors.primary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.premiumBannerGradient}
+              >
+                <View style={styles.premiumBannerContent}>
+                  <View style={styles.premiumBannerLeft}>
+                    <Ionicons name="sparkles" size={24} color="#fff" />
+                    <View>
+                      <Text style={styles.premiumBannerTitle}>Premium Member</Text>
+                      <Text style={styles.premiumBannerSubtitle}>Unlimited access to all content</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={28} color="#fff" />
+                </View>
+              </LinearGradient>
+            </View>
+          ) : (
+            <AnimatedPressable 
+              onPress={() => setShowPaywall(true)}
+              style={styles.upgradeBanner}
+            >
+              <View style={styles.upgradeBannerContent}>
+                <View style={styles.upgradeBannerLeft}>
+                  <View style={styles.upgradeBannerIcon}>
+                    <Ionicons name="leaf" size={24} color={theme.colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.upgradeBannerTitle}>Upgrade to Premium</Text>
+                    <Text style={styles.upgradeBannerSubtitle}>Unlock all meditations & more</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={theme.colors.primary} />
+              </View>
+            </AnimatedPressable>
+          )}
         </AnimatedView>
 
         {/* Your Sanctuary Card */}
@@ -256,6 +303,12 @@ function ProfileScreen() {
         </View>
         </AnimatedView>
       </ScrollView>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -483,6 +536,76 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: 4,
+  },
+  // Premium/Upgrade banner styles
+  premiumBanner: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    overflow: 'hidden',
+  },
+  premiumBannerGradient: {
+    padding: theme.spacing.lg,
+  },
+  premiumBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  premiumBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  premiumBannerTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 16,
+    color: '#fff',
+  },
+  premiumBannerSubtitle: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+  },
+  upgradeBanner: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    ...theme.shadows.sm,
+  },
+  upgradeBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing.lg,
+  },
+  upgradeBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  upgradeBannerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: `${theme.colors.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upgradeBannerTitle: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  upgradeBannerSubtitle: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 13,
+    color: theme.colors.textLight,
+    marginTop: 2,
   },
 });
 

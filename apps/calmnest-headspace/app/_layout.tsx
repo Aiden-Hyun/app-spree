@@ -5,6 +5,7 @@ import { AuthProvider } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { NetworkProvider } from '../src/contexts/NetworkContext';
 import { SleepTimerProvider } from '../src/contexts/SleepTimerContext';
+import { SubscriptionProvider } from '../src/contexts/SubscriptionContext';
 import { useFonts } from '../src/hooks/useFonts';
 import { lightColors } from '../src/theme';
 import { OfflineNavigator } from '../src/components/OfflineNavigator';
@@ -49,6 +50,7 @@ function RootNavigator() {
             title: 'Welcome',
             headerShown: false,
             animation: 'none',
+            presentation: 'fullScreenModal',
           }} 
         />
         <Stack.Screen 
@@ -165,14 +167,16 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <NetworkProvider>
-          <SleepTimerProvider>
-            <OfflineNavigator>
-        <RootNavigator />
-            </OfflineNavigator>
-          </SleepTimerProvider>
-        </NetworkProvider>
-    </AuthProvider>
+        <SubscriptionProvider>
+          <NetworkProvider>
+            <SleepTimerProvider>
+              <OfflineNavigator>
+                <RootNavigator />
+              </OfflineNavigator>
+            </SleepTimerProvider>
+          </NetworkProvider>
+        </SubscriptionProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { TabBarButton } from '../../src/components/TabBarButton';
 
 export default function TabLayout() {
   const { theme } = useTheme();
@@ -16,12 +17,16 @@ export default function TabLayout() {
   const screenOptions = useMemo(() => ({
     tabBarActiveTintColor: theme.colors.primary,
     tabBarInactiveTintColor: theme.colors.textMuted,
+    tabBarButton: TabBarButton,
     tabBarStyle: {
       backgroundColor: theme.colors.surface,
       borderTopWidth: 0,
       paddingBottom: bottomPadding,
       paddingTop: 8,
       height: tabBarHeight,
+      // Ensure tab bar is above content and not covered by overlays
+      zIndex: 100,
+      elevation: 100,
       ...theme.shadows.md,
     },
     tabBarLabelStyle: {

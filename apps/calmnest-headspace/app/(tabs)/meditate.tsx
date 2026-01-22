@@ -8,7 +8,9 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { ContentCard } from '../../src/components/ContentCard';
 import { Skeleton } from '../../src/components/Skeleton';
+import { PaywallModal } from '../../src/components/PaywallModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { Theme } from '../../src/theme';
 import { 
   getEmergencyMeditations, 
@@ -54,9 +56,11 @@ const techniqueCategories: {
 function MeditateScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [emergencyMeditations, setEmergencyMeditations] = useState<FirestoreEmergencyMeditation[]>([]);
   const [courses, setCourses] = useState<FirestoreCourse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -89,6 +93,11 @@ function MeditateScreen() {
   };
 
   const handleEmergencyPress = (meditation: FirestoreEmergencyMeditation) => {
+    // Check isFree field from Firestore
+    if (!meditation.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
     router.push({
       pathname: '/emergency/[id]',
       params: {
@@ -181,7 +190,7 @@ function MeditateScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.cardsScroll}
               >
-                {courses.map((course) => (
+                {courses.map((course, index) => (
                   <ContentCard
                     key={course.id}
                     title={course.title}
@@ -320,6 +329,7 @@ function MeditateScreen() {
                     fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
                     fallbackColor={meditation.color}
                     meta={`${meditation.duration_minutes} min`}
+                    isPremium={!meditation.isFree}
                     onPress={() => handleEmergencyPress(meditation)}
                   />
                 ))}
@@ -374,6 +384,12 @@ function MeditateScreen() {
           </AnimatedView>
         </View>
       </ScrollView>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }

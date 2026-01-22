@@ -9,6 +9,7 @@ import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { ContentCard } from "../../src/components/ContentCard";
 import { Skeleton } from "../../src/components/Skeleton";
+import { PaywallModal } from "../../src/components/PaywallModal";
 import { 
   getBedtimeStories, 
   getSleepMeditations, 
@@ -17,16 +18,19 @@ import {
   FirestoreSeries
 } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
+import { useSubscription } from "../../src/contexts/SubscriptionContext";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
 
 function SleepScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [bedtimeStories, setBedtimeStories] = useState<BedtimeStory[]>([]);
   const [sleepMeditations, setSleepMeditations] = useState<FirestoreSleepMeditation[]>([]);
   const [series, setSeries] = useState<FirestoreSeries[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -79,7 +83,26 @@ function SleepScreen() {
   };
 
   const handleSeriesPress = (seriesItem: FirestoreSeries) => {
+    // Allow browsing series - gating happens at chapter level
     router.push(`/series/${seriesItem.id}`);
+  };
+
+  const handleStoryPress = (story: BedtimeStory) => {
+    // Check is_premium field from Firestore (inverted from isFree)
+    if (story.is_premium && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    router.push(`/sleep/${story.id}`);
+  };
+
+  const handleMeditationPress = (meditation: FirestoreSleepMeditation) => {
+    // Check isFree field from Firestore
+    if (!meditation.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    router.push(`/sleep/meditation/${meditation.id}`);
   };
 
   return (
@@ -133,6 +156,7 @@ function SleepScreen() {
                       fallbackIcon={getCategoryIcon(seriesItem.category)}
                       fallbackColor={seriesItem.color}
                       meta={`${seriesItem.chapterCount} chapters`}
+                      isPremium={true}
                       onPress={() => handleSeriesPress(seriesItem)}
                       darkMode
                     />
@@ -199,7 +223,8 @@ function SleepScreen() {
                         fallbackIcon={getCategoryIcon(story.category)}
                         fallbackColor={theme.colors.sleepAccent}
                         meta={`${story.duration_minutes} min`}
-                        onPress={() => router.push(`/sleep/${story.id}`)}
+                        isPremium={story.is_premium}
+                        onPress={() => handleStoryPress(story)}
                         darkMode
                       />
                     ))}
@@ -241,7 +266,8 @@ function SleepScreen() {
                       fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
                       fallbackColor={meditation.color}
                       meta={`${meditation.duration_minutes} min`}
-                      onPress={() => router.push(`/sleep/meditation/${meditation.id}`)}
+                      isPremium={!meditation.isFree}
+                      onPress={() => handleMeditationPress(meditation)}
                       darkMode
                     />
                   ))}
@@ -249,6 +275,12 @@ function SleepScreen() {
               </AnimatedView>
             </View>
           </ScrollView>
+
+          {/* Paywall Modal */}
+          <PaywallModal
+            visible={showPaywall}
+            onClose={() => setShowPaywall(false)}
+          />
         </SafeAreaView>
       </LinearGradient>
     </View>

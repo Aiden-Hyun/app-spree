@@ -55,6 +55,7 @@ export interface GuidedMeditation {
   techniques: MeditationTechnique[]; // Multiple techniques allowed
   difficulty_level: "beginner" | "intermediate" | "advanced";
   instructor?: string;
+  isFree?: boolean;
 }
 
 export type MeditationTheme = 

@@ -769,6 +769,7 @@ export interface FirestoreSleepMeditation {
   audioPath: string;
   thumbnailUrl?: string;
   color: string;
+  isFree?: boolean;
 }
 
 export async function getSleepMeditations(): Promise<
@@ -811,6 +812,7 @@ export interface FirestoreEmergencyMeditation {
   audioPath: string;
   narrator?: string;
   thumbnailUrl?: string;
+  isFree?: boolean;
 }
 
 export async function getEmergencyMeditations(): Promise<
@@ -855,6 +857,7 @@ export interface FirestoreCourseSession {
   duration_minutes: number;
   audioPath: string;
   order: number;
+  isFree?: boolean;
 }
 
 export interface FirestoreCourse {
@@ -953,6 +956,7 @@ export interface FirestoreSeriesChapter {
   description: string;
   duration_minutes: number;
   audioPath: string;
+  isFree?: boolean;
 }
 
 export interface FirestoreSeries {
@@ -1002,6 +1006,7 @@ export interface FirestoreAlbumTrack {
   title: string;
   duration_minutes: number;
   audioPath: string;
+  isFree?: boolean;
 }
 
 export interface FirestoreAlbum {
@@ -1052,6 +1057,7 @@ export interface FirestoreSleepSound {
   audioPath: string;
   color: string;
   thumbnailUrl?: string;
+  isFree?: boolean;
 }
 
 export async function getSleepSounds(): Promise<FirestoreSleepSound[]> {
@@ -1168,6 +1174,7 @@ export interface FirestoreMusicItem {
   color: string;
   duration_minutes?: number;
   thumbnailUrl?: string;
+  isFree?: boolean;
 }
 
 export async function getWhiteNoise(): Promise<FirestoreMusicItem[]> {

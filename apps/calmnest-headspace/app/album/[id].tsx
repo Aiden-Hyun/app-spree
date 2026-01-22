@@ -22,6 +22,8 @@ import { DownloadButton } from '../../src/components/DownloadButton';
 import { getAudioUrlFromPath } from '../../src/constants/audioFiles';
 import { useNetwork } from '../../src/contexts/NetworkContext';
 import { getDownloadedContentIds } from '../../src/services/downloadService';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../src/components/PaywallModal';
 
 function AlbumDetailScreen() {
   const router = useRouter();
@@ -29,12 +31,14 @@ function AlbumDetailScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { isOffline } = useNetwork();
+  const { isPremium: hasSubscription } = useSubscription();
   const [album, setAlbum] = useState<FirestoreAlbum | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -153,6 +157,12 @@ function AlbumDetailScreen() {
   }
 
   const handleTrackPress = (track: FirestoreAlbumTrack, index: number) => {
+    // Check isFree field from Firestore
+    if (!track.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     // Navigate to album track player
     router.push({
       pathname: '/album/track/[id]',
@@ -284,10 +294,16 @@ function AlbumDetailScreen() {
                         onDownloadComplete={() => {
                           getDownloadedContentIds('album_track').then(setDownloadedIds);
                         }}
+                        isPremiumLocked={!track.isFree && !hasSubscription}
+                        onPremiumRequired={() => setShowPaywall(true)}
                       />
                     )}
                     <View style={styles.playButton}>
-                      <Ionicons name="play" size={20} color={theme.colors.sleepAccent} />
+                      {!track.isFree && !hasSubscription ? (
+                        <Ionicons name="lock-closed" size={20} color={theme.colors.sleepTextMuted} />
+                      ) : (
+                        <Ionicons name="play" size={20} color={theme.colors.sleepAccent} />
+                      )}
                     </View>
                   </AnimatedPressable>
                 </AnimatedView>
@@ -303,6 +319,12 @@ function AlbumDetailScreen() {
           <Ionicons name="chevron-back" size={24} color={theme.colors.sleepText} />
         </AnimatedPressable>
       </SafeAreaView>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </View>
   );
 }

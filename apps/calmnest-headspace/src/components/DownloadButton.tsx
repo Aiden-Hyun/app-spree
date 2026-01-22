@@ -27,6 +27,10 @@ interface DownloadButtonProps {
   onDownloadComplete?: () => void;
   /** When this changes, the download status is re-checked */
   refreshKey?: number | string;
+  /** If provided and returns true, the download will be blocked and this callback will be invoked instead */
+  onPremiumRequired?: () => void;
+  /** Whether this content requires premium (used with onPremiumRequired) */
+  isPremiumLocked?: boolean;
 }
 
 export function DownloadButton({
@@ -38,6 +42,8 @@ export function DownloadButton({
   darkMode = false,
   onDownloadComplete,
   refreshKey,
+  onPremiumRequired,
+  isPremiumLocked = false,
 }: DownloadButtonProps) {
   const { theme, isDark } = useTheme();
   const [downloaded, setDownloaded] = useState(false);
@@ -58,6 +64,12 @@ export function DownloadButton({
   };
 
   const handlePress = async () => {
+    // Check if content is premium-locked and user doesn't have access
+    if (isPremiumLocked && onPremiumRequired) {
+      onPremiumRequired();
+      return;
+    }
+
     if (downloaded) {
       // Already downloaded - could show options menu for delete
       // For now, do nothing (or could toggle delete)

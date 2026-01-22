@@ -16,6 +16,8 @@ import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
 import { useNetwork } from "../../src/contexts/NetworkContext";
 import { getDownloadedContentIds, getLocalAudioPath } from "../../src/services/downloadService";
 import { buildSessionMetaInfo } from "../../src/utils/courseCodeParser";
+import { useSubscription } from "../../src/contexts/SubscriptionContext";
+import { PaywallModal } from "../../src/components/PaywallModal";
 
 function CourseDetailScreen() {
   const router = useRouter();
@@ -23,12 +25,14 @@ function CourseDetailScreen() {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
   const { isOffline } = useNetwork();
+  const { isPremium: hasSubscription } = useSubscription();
   const [course, setCourse] = useState<FirestoreCourse | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -141,6 +145,12 @@ function CourseDetailScreen() {
 
   const handleSessionPress = (session: FirestoreCourseSession, index: number) => {
     if (!course) return;
+    
+    // Check isFree field from Firestore
+    if (!session.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
     
     router.push({
       pathname: '/course/session/[id]',
@@ -348,10 +358,16 @@ function CourseDetailScreen() {
                         onDownloadComplete={() => {
                           getDownloadedContentIds('course_session').then(setDownloadedIds);
                         }}
+                        isPremiumLocked={!session.isFree && !hasSubscription}
+                        onPremiumRequired={() => setShowPaywall(true)}
                       />
                     )}
                     <View style={styles.playButton}>
-                      <Ionicons name="play" size={20} color={course.color} />
+                      {!session.isFree && !hasSubscription ? (
+                        <Ionicons name="lock-closed" size={20} color={isDark ? theme.colors.sleepTextMuted : theme.colors.textMuted} />
+                      ) : (
+                        <Ionicons name="play" size={20} color={course.color} />
+                      )}
                     </View>
                   </AnimatedPressable>
                 </AnimatedView>
@@ -378,6 +394,12 @@ function CourseDetailScreen() {
           />
         </AnimatedPressable>
       </SafeAreaView>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </View>
   );
 }

@@ -18,6 +18,8 @@ import { getMeditations, getMeditationsByTheme } from "../../src/services/firest
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
 import { GuidedMeditation } from "../../src/types";
+import { useSubscription } from "../../src/contexts/SubscriptionContext";
+import { PaywallModal } from "../../src/components/PaywallModal";
 
 const themeCategories = [
   { id: "all", label: "All", icon: "grid-outline" as const, color: "#6B7280" },
@@ -69,11 +71,13 @@ function AllMeditationsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string }>();
   const { theme, isDark } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [selectedCategory, setSelectedCategory] = useState<string>(
     params.category || "all"
   );
   const [meditations, setMeditations] = useState<GuidedMeditation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -96,6 +100,11 @@ function AllMeditationsScreen() {
   };
 
   const handleMeditationPress = (meditation: GuidedMeditation) => {
+    // Check isFree field from Firestore
+    if (!meditation.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
     router.push({
       pathname: "/meditation/[id]",
       params: { id: meditation.id },
@@ -167,11 +176,19 @@ function AllMeditationsScreen() {
           </View>
         </View>
         <View style={styles.sessionChevron}>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={theme.colors.textMuted}
-          />
+          {!item.isFree && !hasSubscription ? (
+            <Ionicons
+              name="lock-closed"
+              size={18}
+              color={theme.colors.textMuted}
+            />
+          ) : (
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={theme.colors.textMuted}
+            />
+          )}
         </View>
       </AnimatedPressable>
     </AnimatedView>
@@ -279,6 +296,12 @@ function AllMeditationsScreen() {
           )}
         />
       )}
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }

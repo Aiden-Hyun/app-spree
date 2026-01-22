@@ -21,6 +21,8 @@ import {
   getMeditationsByTechnique,
 } from '../../src/services/firestoreService';
 import { GuidedMeditation, MeditationTechnique } from '../../src/types';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../src/components/PaywallModal';
 
 // Technique categories defined as constants (not fetched from Firebase)
 const techniqueCategories: {
@@ -92,9 +94,11 @@ function TechniquesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ technique?: string }>();
   const { theme, isDark } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [selectedTechnique, setSelectedTechnique] = useState<string>(params.technique || 'all');
   const [meditations, setMeditations] = useState<GuidedMeditation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -117,6 +121,11 @@ function TechniquesScreen() {
   };
 
   const handleMeditationPress = (meditation: GuidedMeditation) => {
+    // Check isFree field from Firestore
+    if (!meditation.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
     router.push({
       pathname: '/meditation/[id]',
       params: { id: meditation.id },
@@ -167,7 +176,11 @@ function TechniquesScreen() {
           </View>
         </View>
         <View style={styles.meditationChevron}>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          {!item.isFree && !hasSubscription ? (
+            <Ionicons name="lock-closed" size={18} color={theme.colors.textMuted} />
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          )}
         </View>
       </AnimatedPressable>
     </AnimatedView>
@@ -269,6 +282,12 @@ function TechniquesScreen() {
           ItemSeparatorComponent={() => <View style={{ height: theme.spacing.sm }} />}
         />
       )}
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }

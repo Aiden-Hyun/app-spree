@@ -7,7 +7,9 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { ContentCard } from "../../src/components/ContentCard";
+import { PaywallModal } from "../../src/components/PaywallModal";
 import { useTheme } from "../../src/contexts/ThemeContext";
+import { useSubscription } from "../../src/contexts/SubscriptionContext";
 import { Theme } from "../../src/theme";
 import {
   getSleepSounds,
@@ -23,12 +25,14 @@ import {
 function MusicScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [sleepSounds, setSleepSounds] = useState<FirestoreSleepSound[]>([]);
   const [whiteNoise, setWhiteNoise] = useState<FirestoreMusicItem[]>([]);
   const [music, setMusic] = useState<FirestoreMusicItem[]>([]);
   const [asmr, setAsmr] = useState<FirestoreMusicItem[]>([]);
   const [albums, setAlbums] = useState<FirestoreAlbum[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -52,11 +56,17 @@ function MusicScreen() {
     loadContent();
   }, []);
 
-  const handleSoundPress = (soundId: string) => {
-    router.push(`/music/${soundId}`);
+  const handleSoundPress = (sound: FirestoreMusicItem | FirestoreSleepSound) => {
+    // Check isFree field from Firestore
+    if (!sound.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    router.push(`/music/${sound.id}`);
   };
 
   const handleAlbumPress = (album: FirestoreAlbum) => {
+    // Allow browsing albums - gating happens at track level
     router.push(`/album/${album.id}`);
   };
 
@@ -118,7 +128,8 @@ function MusicScreen() {
               fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
               fallbackColor={sound.color}
               meta={sound.duration_minutes ? `${sound.duration_minutes} min` : undefined}
-              onPress={() => handleSoundPress(sound.id)}
+              isPremium={!sound.isFree}
+              onPress={() => handleSoundPress(sound)}
             />
           </AnimatedView>
         ))}
@@ -166,7 +177,8 @@ function MusicScreen() {
               thumbnailUrl={sound.thumbnailUrl}
               fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
               fallbackColor={sound.color}
-              onPress={() => handleSoundPress(sound.id)}
+              isPremium={!sound.isFree}
+              onPress={() => handleSoundPress(sound)}
             />
           </AnimatedView>
         ))}
@@ -231,6 +243,7 @@ function MusicScreen() {
                   fallbackIcon={getCategoryIcon(album.category)}
                   fallbackColor={album.color}
                   meta={`${album.trackCount} tracks`}
+                  isPremium={true}
                       onPress={() => handleAlbumPress(album)}
                 />
                   </AnimatedView>
@@ -253,6 +266,12 @@ function MusicScreen() {
             {/* Bottom spacing */}
             <View style={{ height: 40 }} />
           </ScrollView>
+
+          {/* Paywall Modal */}
+          <PaywallModal
+            visible={showPaywall}
+            onClose={() => setShowPaywall(false)}
+          />
         </SafeAreaView>
   );
 }

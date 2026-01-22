@@ -3,6 +3,7 @@ import { View, Text, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AnimatedPressable } from "./AnimatedPressable";
 import { useTheme } from "../contexts/ThemeContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 import { Theme } from "../theme";
 
 // Helper to convert hex color to rgba with opacity
@@ -26,6 +27,8 @@ export interface ContentCardProps {
   onPress: () => void;
   // For sleep page only (uses sleep-specific colors)
   darkMode?: boolean;
+  // Premium content - shows lock icon when true and user doesn't have subscription
+  isPremium?: boolean;
 }
 
 export function ContentCard({
@@ -38,13 +41,18 @@ export function ContentCard({
   subtitle,
   onPress,
   darkMode = false,
+  isPremium = false,
 }: ContentCardProps) {
   const { theme, isDark } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
 
   // darkMode prop = Sleep page (always use sleep colors)
   // isDark = system/app dark mode (use regular dark colors)
   const isSleepPage = darkMode;
   const isRegularDark = isDark && !darkMode;
+
+  // Show lock if content is premium and user doesn't have subscription
+  const showLock = isPremium && !hasSubscription;
 
   const styles = React.useMemo(
     () => createStyles(theme, isSleepPage, isRegularDark),
@@ -83,6 +91,11 @@ export function ContentCard({
             ]}
           >
             <Ionicons name={fallbackIcon} size={40} color={accentColor} />
+          </View>
+        )}
+        {showLock && (
+          <View style={styles.lockBadge}>
+            <Ionicons name="lock-closed" size={12} color="#fff" />
           </View>
         )}
       </View>
@@ -129,6 +142,18 @@ const createStyles = (
       height: THUMBNAIL_HEIGHT,
       borderRadius: theme.borderRadius.lg,
       overflow: "hidden",
+      position: "relative",
+    },
+    lockBadge: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      alignItems: "center",
+      justifyContent: "center",
     },
     thumbnail: {
       width: "100%",

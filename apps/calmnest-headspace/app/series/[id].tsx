@@ -22,6 +22,8 @@ import { DownloadButton } from '../../src/components/DownloadButton';
 import { getAudioUrlFromPath } from '../../src/constants/audioFiles';
 import { useNetwork } from '../../src/contexts/NetworkContext';
 import { getDownloadedContentIds } from '../../src/services/downloadService';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../src/components/PaywallModal';
 
 function SeriesDetailScreen() {
   const router = useRouter();
@@ -29,12 +31,14 @@ function SeriesDetailScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { isOffline } = useNetwork();
+  const { isPremium: hasSubscription } = useSubscription();
   const [series, setSeries] = useState<FirestoreSeries | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
   const hasAutoOpened = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -153,6 +157,12 @@ function SeriesDetailScreen() {
   }
 
   const handleChapterPress = (chapter: FirestoreSeriesChapter, index: number) => {
+    // Check isFree field from Firestore
+    if (!chapter.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     // Navigate to series chapter player with the audioPath and narrator
     router.push({
       pathname: '/series/chapter/[id]',
@@ -287,10 +297,16 @@ function SeriesDetailScreen() {
                         onDownloadComplete={() => {
                           getDownloadedContentIds('series_chapter').then(setDownloadedIds);
                         }}
+                        isPremiumLocked={!chapter.isFree && !hasSubscription}
+                        onPremiumRequired={() => setShowPaywall(true)}
                       />
                     )}
                     <View style={styles.playButton}>
-                      <Ionicons name="play" size={20} color={theme.colors.sleepAccent} />
+                      {!chapter.isFree && !hasSubscription ? (
+                        <Ionicons name="lock-closed" size={20} color={theme.colors.sleepTextMuted} />
+                      ) : (
+                        <Ionicons name="play" size={20} color={theme.colors.sleepAccent} />
+                      )}
                     </View>
                   </AnimatedPressable>
                 </AnimatedView>
@@ -306,6 +322,12 @@ function SeriesDetailScreen() {
           <Ionicons name="chevron-back" size={24} color={theme.colors.sleepText} />
         </AnimatedPressable>
       </SafeAreaView>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </View>
   );
 }

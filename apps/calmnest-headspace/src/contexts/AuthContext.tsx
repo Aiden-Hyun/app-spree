@@ -6,11 +6,14 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  signInAnonymously as firebaseSignInAnonymously,
+  linkWithCredential,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithCredential,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  AuthCredential,
 } from "firebase/auth";
 import { auth } from "../firebase";
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
@@ -28,10 +31,13 @@ GoogleSignin.configure({
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isAnonymous: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInAnonymously: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
+  linkAnonymousAccount: (credential: AuthCredential) => Promise<void>;
   isAppleSignInAvailable: boolean;
   logout: () => Promise<void>;
   deleteAccount: (password?: string) => Promise<void>;
@@ -66,6 +72,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const signInAnonymously = async () => {
+    await firebaseSignInAnonymously(auth);
+  };
+
+  const linkAnonymousAccount = async (credential: AuthCredential) => {
+    if (!user) {
+      throw new Error("No user is currently signed in");
+    }
+    if (!user.isAnonymous) {
+      throw new Error("User is not anonymous");
+    }
+    await linkWithCredential(user, credential);
   };
 
   const signInWithGoogle = async () => {
@@ -235,10 +255,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     loading,
+    isAnonymous: user?.isAnonymous ?? false,
     signUp,
     signIn,
+    signInAnonymously,
     signInWithGoogle,
     signInWithApple,
+    linkAnonymousAccount,
     isAppleSignInAvailable,
     logout,
     deleteAccount,
