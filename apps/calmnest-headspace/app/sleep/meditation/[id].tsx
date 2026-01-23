@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,7 +24,7 @@ function SleepMeditationPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
   const [meditation, setMeditation] = useState<FirestoreSleepMeditation | null>(
     null
   );
@@ -106,6 +106,19 @@ function SleepMeditationPlayerScreen() {
   const handleToggleFavorite = async () => {
     if (!user || !meditation) return;
 
+    // Prompt anonymous users to sign in
+    if (isAnonymous) {
+      Alert.alert(
+        'Sign In Required',
+        'Create an account to save favorites and sync across devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
+
     const previousState = isFavoritedState;
     setIsFavoritedState(!previousState);
 
@@ -130,7 +143,7 @@ function SleepMeditationPlayerScreen() {
       audioPlayer.play();
 
       // Track listening history on first play
-      if (!hasTrackedPlay && user && meditation) {
+      if (!hasTrackedPlay && user && meditation && !isAnonymous) {
         setHasTrackedPlay(true);
         await addToListeningHistory(
           user.uid,

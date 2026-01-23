@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ProtectedRoute } from '../../../src/components/ProtectedRoute';
@@ -12,6 +12,8 @@ import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markC
 import { getLocalAudioPath } from '../../../src/services/downloadService';
 import { buildSessionMetaInfo } from '../../../src/utils/courseCodeParser';
 import { Theme } from '../../../src/theme';
+import { useSubscription } from '../../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../../src/components/PaywallModal';
 
 interface SessionItem {
   id: string;
@@ -21,6 +23,7 @@ interface SessionItem {
   duration_minutes: number;
   dayNumber: number;
   description?: string;
+  isFree?: boolean;
 }
 
 function CourseSessionPlayerScreen() {
@@ -41,13 +44,15 @@ function CourseSessionPlayerScreen() {
   }>();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
+  const { isPremium: hasSubscription } = useSubscription();
   
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
@@ -151,7 +156,7 @@ function CourseSessionPlayerScreen() {
       audioPlayer.play();
       
       // Track listening history on first play
-      if (!hasTrackedPlay && user && id && title) {
+      if (!hasTrackedPlay && user && id && title && !isAnonymous) {
         setHasTrackedPlay(true);
         await addToListeningHistory(
           user.uid,
@@ -170,6 +175,19 @@ function CourseSessionPlayerScreen() {
   const handleToggleFavorite = async () => {
     if (!user || !id) return;
     
+    // Prompt anonymous users to sign in
+    if (isAnonymous) {
+      Alert.alert(
+        'Sign In Required',
+        'Create an account to save favorites and sync across devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
+    
     // Optimistic update
     const previousState = isFavoritedState;
     setIsFavoritedState(!previousState);
@@ -187,6 +205,13 @@ function CourseSessionPlayerScreen() {
   const handlePrevious = () => {
     if (!hasPrevious) return;
     const prevSession = sessions[currentIdx - 1];
+    
+    // Check if previous session is locked
+    if (!prevSession.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     audioPlayer.cleanup();
     router.replace({
       pathname: '/course/session/[id]',
@@ -210,6 +235,13 @@ function CourseSessionPlayerScreen() {
   const handleNext = () => {
     if (!hasNext) return;
     const nextSession = sessions[currentIdx + 1];
+    
+    // Check if next session is locked
+    if (!nextSession.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     audioPlayer.cleanup();
     router.replace({
       pathname: '/course/session/[id]',
@@ -241,33 +273,39 @@ function CourseSessionPlayerScreen() {
     : undefined;
 
   return (
-    <MediaPlayer
-      category={courseTitle || 'Course'}
-      title={title || 'Loading...'}
-      instructor={instructor}
-      metaInfo={metaInfo}
-      durationMinutes={parseInt(duration) || 0}
-      gradientColors={gradientColors}
-      artworkIcon="school"
-      artworkThumbnailUrl={thumbnailUrl}
-      isFavorited={isFavoritedState}
-      isLoading={loading}
-      audioPlayer={audioPlayer}
-      onBack={handleGoBack}
-      onToggleFavorite={handleToggleFavorite}
-      onPlayPause={handlePlayPause}
-      loadingText="Loading session..."
-      onPrevious={hasPrevious ? handlePrevious : undefined}
-      onNext={hasNext ? handleNext : undefined}
-      hasPrevious={hasPrevious}
-      hasNext={hasNext}
-      contentId={id}
-      contentType="course_session"
-      audioUrl={currentAudioUrl}
-      audioPath={audioPath}
-      parentTitle={courseTitle}
-      skipRestore={autoPlay === 'true'}
-    />
+    <>
+      <MediaPlayer
+        category={courseTitle || 'Course'}
+        title={title || 'Loading...'}
+        instructor={instructor}
+        metaInfo={metaInfo}
+        durationMinutes={parseInt(duration) || 0}
+        gradientColors={gradientColors}
+        artworkIcon="school"
+        artworkThumbnailUrl={thumbnailUrl}
+        isFavorited={isFavoritedState}
+        isLoading={loading}
+        audioPlayer={audioPlayer}
+        onBack={handleGoBack}
+        onToggleFavorite={handleToggleFavorite}
+        onPlayPause={handlePlayPause}
+        loadingText="Loading session..."
+        onPrevious={hasPrevious ? handlePrevious : undefined}
+        onNext={hasNext ? handleNext : undefined}
+        hasPrevious={hasPrevious}
+        hasNext={hasNext}
+        contentId={id}
+        contentType="course_session"
+        audioUrl={currentAudioUrl}
+        audioPath={audioPath}
+        parentTitle={courseTitle}
+        skipRestore={autoPlay === 'true'}
+      />
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
+    </>
   );
 }
 

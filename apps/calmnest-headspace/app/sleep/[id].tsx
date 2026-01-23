@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +18,7 @@ function SleepStoryPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
   const [story, setStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
@@ -112,6 +112,19 @@ function SleepStoryPlayerScreen() {
   const handleToggleFavorite = async () => {
     if (!user || !story) return;
     
+    // Prompt anonymous users to sign in
+    if (isAnonymous) {
+      Alert.alert(
+        'Sign In Required',
+        'Create an account to save favorites and sync across devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
+    
     // Optimistic update
     const previousState = isFavoritedState;
     setIsFavoritedState(!previousState);
@@ -133,7 +146,7 @@ function SleepStoryPlayerScreen() {
       audioPlayer.play();
       
       // Track listening history on first play
-      if (!hasTrackedPlay && user && story) {
+      if (!hasTrackedPlay && user && story && !isAnonymous) {
         setHasTrackedPlay(true);
         await addToListeningHistory(
           user.uid,

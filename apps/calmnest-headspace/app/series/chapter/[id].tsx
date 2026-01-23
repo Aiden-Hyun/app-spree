@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ProtectedRoute } from '../../../src/components/ProtectedRoute';
 import { MediaPlayer } from '../../../src/components/MediaPlayer';
@@ -10,6 +10,8 @@ import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { getLocalAudioPath } from '../../../src/services/downloadService';
 import { Theme } from '../../../src/theme';
+import { useSubscription } from '../../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../../src/components/PaywallModal';
 
 interface ChapterItem {
   id: string;
@@ -18,6 +20,7 @@ interface ChapterItem {
   duration_minutes: number;
   chapterNumber: number;
   description?: string;
+  isFree?: boolean;
 }
 
 function SeriesChapterPlayerScreen() {
@@ -35,13 +38,15 @@ function SeriesChapterPlayerScreen() {
   }>();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
+  const { isPremium: hasSubscription } = useSubscription();
   
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
@@ -145,7 +150,7 @@ function SeriesChapterPlayerScreen() {
       audioPlayer.play();
       
       // Track listening history on first play
-      if (!hasTrackedPlay && user && id && title) {
+      if (!hasTrackedPlay && user && id && title && !isAnonymous) {
         setHasTrackedPlay(true);
         await addToListeningHistory(
           user.uid,
@@ -161,6 +166,19 @@ function SeriesChapterPlayerScreen() {
 
   const handleToggleFavorite = async () => {
     if (!user || !id) return;
+    
+    // Prompt anonymous users to sign in
+    if (isAnonymous) {
+      Alert.alert(
+        'Sign In Required',
+        'Create an account to save favorites and sync across devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
     
     // Optimistic update
     const previousState = isFavoritedState;
@@ -179,6 +197,13 @@ function SeriesChapterPlayerScreen() {
   const handlePrevious = () => {
     if (!hasPrevious) return;
     const prevChapter = chapters[currentIdx - 1];
+    
+    // Check if previous chapter is locked
+    if (!prevChapter.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     audioPlayer.cleanup();
     router.replace({
       pathname: '/series/chapter/[id]',
@@ -199,6 +224,13 @@ function SeriesChapterPlayerScreen() {
   const handleNext = () => {
     if (!hasNext) return;
     const nextChapter = chapters[currentIdx + 1];
+    
+    // Check if next chapter is locked
+    if (!nextChapter.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     audioPlayer.cleanup();
     router.replace({
       pathname: '/series/chapter/[id]',
@@ -218,32 +250,38 @@ function SeriesChapterPlayerScreen() {
   };
 
   return (
-    <MediaPlayer
-      category={seriesTitle || 'Series'}
-      title={title || 'Loading...'}
-      instructor={narrator}
-      durationMinutes={parseInt(duration) || 0}
-      gradientColors={theme.gradients.sleepyNight as [string, string]}
-      artworkIcon="book"
-      artworkThumbnailUrl={thumbnailUrl}
-      isFavorited={isFavoritedState}
-      isLoading={loading}
-      audioPlayer={audioPlayer}
-      onBack={handleGoBack}
-      onToggleFavorite={handleToggleFavorite}
-      onPlayPause={handlePlayPause}
-      loadingText="Loading chapter..."
-      onPrevious={hasPrevious ? handlePrevious : undefined}
-      onNext={hasNext ? handleNext : undefined}
-      hasPrevious={hasPrevious}
-      hasNext={hasNext}
-      contentId={id}
-      contentType="series_chapter"
-      audioUrl={currentAudioUrl}
-      audioPath={audioPath}
-      parentTitle={seriesTitle}
-      skipRestore={autoPlay === 'true'}
-    />
+    <>
+      <MediaPlayer
+        category={seriesTitle || 'Series'}
+        title={title || 'Loading...'}
+        instructor={narrator}
+        durationMinutes={parseInt(duration) || 0}
+        gradientColors={theme.gradients.sleepyNight as [string, string]}
+        artworkIcon="book"
+        artworkThumbnailUrl={thumbnailUrl}
+        isFavorited={isFavoritedState}
+        isLoading={loading}
+        audioPlayer={audioPlayer}
+        onBack={handleGoBack}
+        onToggleFavorite={handleToggleFavorite}
+        onPlayPause={handlePlayPause}
+        loadingText="Loading chapter..."
+        onPrevious={hasPrevious ? handlePrevious : undefined}
+        onNext={hasNext ? handleNext : undefined}
+        hasPrevious={hasPrevious}
+        hasNext={hasNext}
+        contentId={id}
+        contentType="series_chapter"
+        audioUrl={currentAudioUrl}
+        audioPath={audioPath}
+        parentTitle={seriesTitle}
+        skipRestore={autoPlay === 'true'}
+      />
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
+    </>
   );
 }
 

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
@@ -40,10 +41,11 @@ import { DailyQuote, ListeningHistoryItem } from '../../src/types';
 import { getDownloadedContent, DownloadedContent } from '../../src/services/downloadService';
 
 function HomeScreen() {
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
   const { theme, isDark } = useTheme();
   const router = useRouter();
   const { stats, loading: statsLoading } = useStats();
+  const { restorePurchases } = useSubscription();
   const [quote, setQuote] = useState<DailyQuote | null>(null);
   const [recentlyPlayed, setRecentlyPlayed] = useState<ListeningHistoryItem[]>([]);
   const [favorites, setFavorites] = useState<ResolvedContent[]>([]);
@@ -62,6 +64,26 @@ function HomeScreen() {
   const sleepMeditationsDataRef = useRef<FirestoreSleepMeditation[]>([]);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  
+  // Generate a consistent random nickname for anonymous users based on their UID
+  const generateGuestNickname = (uid: string): string => {
+    const adjectives = [
+      'Calm', 'Peaceful', 'Serene', 'Gentle', 'Mindful', 'Tranquil', 'Zen',
+      'Cozy', 'Dreamy', 'Blissful', 'Mellow', 'Quiet', 'Still', 'Soft',
+      'Happy', 'Bright', 'Sunny', 'Warm', 'Kind', 'Sweet', 'Lovely'
+    ];
+    const animals = [
+      'Panda', 'Koala', 'Bunny', 'Owl', 'Fox', 'Bear', 'Deer', 'Dove',
+      'Swan', 'Cloud', 'Moon', 'Star', 'Wave', 'Breeze', 'Leaf', 'Lotus',
+      'Butterfly', 'Dolphin', 'Seal', 'Otter', 'Sloth', 'Cat', 'Penguin'
+    ];
+    // Use UID to generate consistent indices
+    const hash = uid.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const adjIndex = hash % adjectives.length;
+    const animalIndex = (hash * 7) % animals.length;
+    return `${adjectives[adjIndex]} ${animals[animalIndex]}`;
+  };
+
   const displayName = useMemo(() => {
     const directName =
       user?.displayName ||
@@ -69,8 +91,15 @@ function HomeScreen() {
     if (directName) return directName;
 
     const emailPrefix = user?.email?.split('@')[0];
-    return emailPrefix || 'Friend';
-  }, [user]);
+    if (emailPrefix) return emailPrefix;
+    
+    // For anonymous users, generate a fun random nickname
+    if (isAnonymous && user?.uid) {
+      return generateGuestNickname(user.uid);
+    }
+    
+    return 'Friend';
+  }, [user, isAnonymous]);
 
   // Reload data when screen comes into focus
   useFocusEffect(
@@ -89,6 +118,7 @@ function HomeScreen() {
     if (!user) return;
     
     try {
+      // For anonymous users, skip fetching personalized data (history & favorites)
       const [
         quoteData, 
         historyData, 
@@ -104,8 +134,8 @@ function HomeScreen() {
         sleepMeditationsResult
       ] = await Promise.all([
         getTodayQuote(),
-        getListeningHistory(user.uid, 10),
-        getFavoritesWithDetails(user.uid),
+        isAnonymous ? Promise.resolve([]) : getListeningHistory(user.uid, 10),
+        isAnonymous ? Promise.resolve([]) : getFavoritesWithDetails(user.uid),
         getSeries(),
         getAlbums(),
         getCourses(),
@@ -466,13 +496,20 @@ function HomeScreen() {
         {/* Header */}
         <AnimatedView delay={0} duration={400}>
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerLeft}>
             <Text style={styles.greeting}>
               {getGreeting()} {getGreetingEmoji()}
             </Text>
             <Text style={styles.userName}>
               {displayName}
             </Text>
+            {isAnonymous && (
+              <AnimatedPressable onPress={restorePurchases} style={styles.restoreLink}>
+                <Text style={styles.restoreLinkText}>
+                  Already subscribed? <Text style={styles.restoreLinkUnderline}>Restore purchase</Text>
+                </Text>
+              </AnimatedPressable>
+            )}
           </View>
             <AnimatedPressable 
               onPress={() => router.push('/settings')}
@@ -485,12 +522,24 @@ function HomeScreen() {
 
         {/* Recently Played Section */}
         <View style={styles.section}>
-        <AnimatedView delay={100} duration={400}>
+          <AnimatedView delay={100} duration={400}>
             <Text style={styles.sectionTitle}>Recently Played</Text>
           </AnimatedView>
           
           <AnimatedView delay={150} duration={400}>
-              {loading ? (
+            {isAnonymous ? (
+              <AnimatedPressable
+                onPress={() => router.push('/login')}
+                style={styles.signInPromptInline}
+              >
+                <Text style={styles.signInPromptInlineText}>
+                  Sign in to track your listening history
+                </Text>
+                <View style={styles.signInPromptInlineButton}>
+                  <Text style={styles.signInPromptInlineButtonText}>Sign In</Text>
+                </View>
+              </AnimatedPressable>
+            ) : loading ? (
               renderSkeletonCards()
             ) : recentlyPlayed.length > 0 ? (
               <FlatList
@@ -508,13 +557,25 @@ function HomeScreen() {
         </View>
 
         {/* Favorites Section */}
-          <View style={styles.section}>
+        <View style={styles.section}>
           <AnimatedView delay={200} duration={400}>
             <Text style={styles.sectionTitle}>Favorites</Text>
           </AnimatedView>
           
           <AnimatedView delay={250} duration={400}>
-          {loading ? (
+            {isAnonymous ? (
+              <AnimatedPressable
+                onPress={() => router.push('/login')}
+                style={styles.signInPromptInline}
+              >
+                <Text style={styles.signInPromptInlineText}>
+                  Sign in to save your favorites
+                </Text>
+                <View style={styles.signInPromptInlineButton}>
+                  <Text style={styles.signInPromptInlineButtonText}>Sign In</Text>
+                </View>
+              </AnimatedPressable>
+            ) : loading ? (
               renderSkeletonCards()
             ) : favorites.length > 0 ? (
               <FlatList
@@ -528,8 +589,8 @@ function HomeScreen() {
             ) : (
               renderEmptyState("Tap the heart icon to save favorites")
             )}
-            </AnimatedView>
-          </View>
+          </AnimatedView>
+        </View>
 
         {/* Your Journey Section */}
         <View style={styles.section}>
@@ -647,6 +708,21 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     fontSize: 26,
     color: theme.colors.text,
     letterSpacing: -0.3,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  restoreLink: {
+    marginTop: 6,
+  },
+  restoreLinkText: {
+    fontFamily: theme.fonts.ui.regular,
+    fontSize: 13,
+    color: theme.colors.textMuted,
+  },
+  restoreLinkUnderline: {
+    textDecorationLine: 'underline',
+    color: theme.colors.primary,
   },
   settingsButton: {
       width: 44,
@@ -789,6 +865,83 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: theme.colors.textLight,
       marginTop: theme.spacing.sm,
   },
+    signInPromptCard: {
+      marginHorizontal: theme.spacing.lg,
+      marginTop: theme.spacing.md,
+      marginBottom: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
+      padding: theme.spacing.xl,
+      alignItems: 'center',
+      ...theme.shadows.md,
+    },
+    signInPromptIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: `${theme.colors.primary}15`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    signInPromptTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 18,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm,
+    },
+    signInPromptText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textLight,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.md,
+    },
+    signInPromptButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.xl,
+      borderRadius: theme.borderRadius.lg,
+      gap: theme.spacing.sm,
+    },
+    signInPromptButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 15,
+      color: theme.colors.textOnPrimary,
+    },
+    signInPromptInline: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.colors.surface,
+      marginHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+      borderRadius: theme.borderRadius.lg,
+      ...theme.shadows.sm,
+    },
+    signInPromptInlineText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      flex: 1,
+      marginRight: theme.spacing.md,
+    },
+    signInPromptInlineButton: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+    },
+    signInPromptInlineButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 13,
+      color: theme.colors.textOnPrimary,
+    },
 });
 
 export default function Home() {

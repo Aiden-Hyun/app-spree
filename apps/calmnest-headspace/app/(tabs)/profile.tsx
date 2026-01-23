@@ -24,7 +24,7 @@ const milestones = [
 
 function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isAnonymous } = useAuth();
   const { theme, isDark } = useTheme();
   const { stats, loading } = useStats();
   const { isPremium, restorePurchases } = useSubscription();
@@ -32,6 +32,50 @@ function ProfileScreen() {
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
   const avatarGradient = theme.gradients.sage as [string, string];
+
+  // Generate a consistent random nickname for anonymous users based on their UID
+  const generateGuestNickname = (uid: string): string => {
+    const adjectives = [
+      'Calm', 'Peaceful', 'Serene', 'Gentle', 'Mindful', 'Tranquil', 'Zen',
+      'Cozy', 'Dreamy', 'Blissful', 'Mellow', 'Quiet', 'Still', 'Soft',
+      'Happy', 'Bright', 'Sunny', 'Warm', 'Kind', 'Sweet', 'Lovely'
+    ];
+    const animals = [
+      'Panda', 'Koala', 'Bunny', 'Owl', 'Fox', 'Bear', 'Deer', 'Dove',
+      'Swan', 'Cloud', 'Moon', 'Star', 'Wave', 'Breeze', 'Leaf', 'Lotus',
+      'Butterfly', 'Dolphin', 'Seal', 'Otter', 'Sloth', 'Cat', 'Penguin'
+    ];
+    const hash = uid.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const adjIndex = hash % adjectives.length;
+    const animalIndex = (hash * 7) % animals.length;
+    return `${adjectives[adjIndex]} ${animals[animalIndex]}`;
+  };
+
+  const displayName = useMemo(() => {
+    const directName =
+      user?.displayName ||
+      user?.providerData?.find((provider) => provider.displayName)?.displayName;
+    if (directName) return directName;
+
+    const emailPrefix = user?.email?.split('@')[0];
+    if (emailPrefix) return emailPrefix;
+    
+    // For anonymous users, generate a fun random nickname
+    if (isAnonymous && user?.uid) {
+      return generateGuestNickname(user.uid);
+    }
+    
+    return 'Friend';
+  }, [user, isAnonymous]);
+
+  const avatarInitial = useMemo(() => {
+    if (user?.email) return user.email.charAt(0).toUpperCase();
+    if (isAnonymous && user?.uid) {
+      const nickname = generateGuestNickname(user.uid);
+      return nickname.charAt(0);
+    }
+    return 'G';
+  }, [user, isAnonymous]);
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -68,12 +112,12 @@ function ProfileScreen() {
               style={styles.avatar}
             >
               <Text style={styles.avatarText}>
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
+                {avatarInitial}
               </Text>
             </LinearGradient>
           </View>
           <Text style={styles.userName}>
-            {user?.email?.split('@')[0] || 'Friend'}
+            {displayName}
           </Text>
           <Text style={styles.memberSince}>
             Meditating since {getMemberSince()}

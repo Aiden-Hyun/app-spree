@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { Alert } from "react-native";
 
-// RevenueCat API Key
-const REVENUECAT_API_KEY = "test_FiyfeUoTUlwFgkqOtFmirqxkwZJ";
+// RevenueCat API Key (Apple/iOS)
+const REVENUECAT_API_KEY = "appl_JhsFtEMqcEsdxXadtbKkjhXGoZT";
 
 // Entitlement ID configured in RevenueCat dashboard
-const PREMIUM_ENTITLEMENT_ID = "premium";
+const PREMIUM_ENTITLEMENT_ID = "CalmNest Premium";
 
 // Lazy load RevenueCat to prevent crash when native modules aren't available
 let Purchases: any = null;
@@ -95,7 +95,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
         // Fetch offerings
         await fetchOfferings();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error initializing RevenueCat:", error);
         setIsLoading(false);
       }
@@ -149,7 +149,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       if (offerings.current) {
         setCurrentOffering(offerings.current);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching offerings:", error);
     }
   };

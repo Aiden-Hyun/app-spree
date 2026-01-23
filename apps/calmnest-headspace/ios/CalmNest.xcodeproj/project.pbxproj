@@ -10,6 +10,7 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		760F38C248803BBF12EA236C /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EC4D6B4CB55A172871703CF /* ExpoModulesProvider.swift */; };
+		7A924E8E2F21F9C900317020 /* Products.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 7A924E8D2F21F9C900317020 /* Products.storekit */; };
 		80DE52D970311AEC04834F67 /* libPods-CalmNest.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 563F762A199A73AA1089068C /* libPods-CalmNest.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		ED81819E291EF3B7B6799506 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6B55AF0AA3144DFD2C8B645F /* PrivacyInfo.xcprivacy */; };
@@ -24,6 +25,7 @@
 		563F762A199A73AA1089068C /* libPods-CalmNest.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CalmNest.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		68FC10032F4F8C8A5D8F6D93 /* Pods-CalmNest.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.release.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.release.xcconfig"; sourceTree = "<group>"; };
 		6B55AF0AA3144DFD2C8B645F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = CalmNest/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7A924E8D2F21F9C900317020 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = CalmNest/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C8800267F72DE62A045729F9 /* Pods-CalmNest.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.debug.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.debug.xcconfig"; sourceTree = "<group>"; };
@@ -93,6 +95,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				7A924E8D2F21F9C900317020 /* Products.storekit */,
 				13B07FAE1A68108700A75B9A /* CalmNest */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -195,6 +198,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
+				7A924E8E2F21F9C900317020 /* Products.storekit in Resources */,
 				ED81819E291EF3B7B6799506 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

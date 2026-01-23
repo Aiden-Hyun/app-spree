@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ProtectedRoute } from '../../../src/components/ProtectedRoute';
 import { MediaPlayer } from '../../../src/components/MediaPlayer';
@@ -8,6 +9,8 @@ import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
 import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
 import { getLocalAudioPath } from '../../../src/services/downloadService';
+import { useSubscription } from '../../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../../src/components/PaywallModal';
 
 interface TrackItem {
   id: string;
@@ -15,6 +18,7 @@ interface TrackItem {
   title: string;
   duration_minutes: number;
   trackNumber: number;
+  isFree?: boolean;
 }
 
 function AlbumTrackPlayerScreen() {
@@ -32,13 +36,15 @@ function AlbumTrackPlayerScreen() {
   }>();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
+  const { isPremium: hasSubscription } = useSubscription();
 
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const audioPlayer = useAudioPlayer();
 
@@ -141,7 +147,7 @@ function AlbumTrackPlayerScreen() {
       audioPlayer.play();
       
       // Track listening history on first play
-      if (!hasTrackedPlay && user && id && title) {
+      if (!hasTrackedPlay && user && id && title && !isAnonymous) {
         setHasTrackedPlay(true);
         await addToListeningHistory(
           user.uid,
@@ -157,6 +163,19 @@ function AlbumTrackPlayerScreen() {
 
   const handleToggleFavorite = async () => {
     if (!user || !id) return;
+    
+    // Prompt anonymous users to sign in
+    if (isAnonymous) {
+      Alert.alert(
+        'Sign In Required',
+        'Create an account to save favorites and sync across devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
     
     // Optimistic update
     const previousState = isFavoritedState;
@@ -175,6 +194,13 @@ function AlbumTrackPlayerScreen() {
   const handlePrevious = () => {
     if (!hasPrevious) return;
     const prevTrack = tracks[currentIdx - 1];
+    
+    // Check if previous track is locked
+    if (!prevTrack.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     audioPlayer.cleanup();
     router.replace({
       pathname: '/album/track/[id]',
@@ -195,6 +221,13 @@ function AlbumTrackPlayerScreen() {
   const handleNext = () => {
     if (!hasNext) return;
     const nextTrack = tracks[currentIdx + 1];
+    
+    // Check if next track is locked
+    if (!nextTrack.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    
     audioPlayer.cleanup();
     router.replace({
       pathname: '/album/track/[id]',
@@ -214,32 +247,38 @@ function AlbumTrackPlayerScreen() {
   };
 
   return (
-    <MediaPlayer
-      category={albumTitle || 'Album'}
-      title={title || 'Loading...'}
-      instructor={artist}
-      durationMinutes={parseInt(duration) || 0}
-      gradientColors={theme.gradients.sleepyNight as [string, string]}
-      artworkIcon="musical-notes"
-      artworkThumbnailUrl={thumbnailUrl}
-      isFavorited={isFavoritedState}
-      isLoading={loading}
-      audioPlayer={audioPlayer}
-      onBack={handleGoBack}
-      onToggleFavorite={handleToggleFavorite}
-      onPlayPause={handlePlayPause}
-      loadingText="Loading track..."
-      onPrevious={hasPrevious ? handlePrevious : undefined}
-      onNext={hasNext ? handleNext : undefined}
-      hasPrevious={hasPrevious}
-      hasNext={hasNext}
-      contentId={id}
-      contentType="album_track"
-      audioUrl={currentAudioUrl}
-      audioPath={audioPath}
-      parentTitle={albumTitle}
-      skipRestore={autoPlay === 'true'}
-    />
+    <>
+      <MediaPlayer
+        category={albumTitle || 'Album'}
+        title={title || 'Loading...'}
+        instructor={artist}
+        durationMinutes={parseInt(duration) || 0}
+        gradientColors={theme.gradients.sleepyNight as [string, string]}
+        artworkIcon="musical-notes"
+        artworkThumbnailUrl={thumbnailUrl}
+        isFavorited={isFavoritedState}
+        isLoading={loading}
+        audioPlayer={audioPlayer}
+        onBack={handleGoBack}
+        onToggleFavorite={handleToggleFavorite}
+        onPlayPause={handlePlayPause}
+        loadingText="Loading track..."
+        onPrevious={hasPrevious ? handlePrevious : undefined}
+        onNext={hasNext ? handleNext : undefined}
+        hasPrevious={hasPrevious}
+        hasNext={hasNext}
+        contentId={id}
+        contentType="album_track"
+        audioUrl={currentAudioUrl}
+        audioPath={audioPath}
+        parentTitle={albumTitle}
+        skipRestore={autoPlay === 'true'}
+      />
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
+    </>
   );
 }
 

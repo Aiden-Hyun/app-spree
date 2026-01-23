@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../src/components/MediaPlayer";
@@ -46,7 +47,7 @@ function EmergencyPlayerScreen() {
   }>();
 
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
   const [loading, setLoading] = useState(true);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
@@ -120,6 +121,19 @@ function EmergencyPlayerScreen() {
   const handleToggleFavorite = async () => {
     if (!user || !id) return;
 
+    // Prompt anonymous users to sign in
+    if (isAnonymous) {
+      Alert.alert(
+        'Sign In Required',
+        'Create an account to save favorites and sync across devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
+
     // Optimistic update
     const previousState = isFavoritedState;
     setIsFavoritedState(!previousState);
@@ -141,7 +155,7 @@ function EmergencyPlayerScreen() {
       audioPlayer.play();
 
       // Track listening history on first play
-      if (!hasTrackedPlay && user && id && title) {
+      if (!hasTrackedPlay && user && id && title && !isAnonymous) {
         setHasTrackedPlay(true);
         await addToListeningHistory(
           user.uid,

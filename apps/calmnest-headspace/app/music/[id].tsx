@@ -31,7 +31,7 @@ function SoundPlayerScreen() {
   const { id, category } = useLocalSearchParams<{ id: string; category?: string }>();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, isAnonymous } = useAuth();
   
   const [sound, setSound] = useState<SoundData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -156,7 +156,7 @@ function SoundPlayerScreen() {
     }
     
     // Track listening history on first play
-    if (!hasTrackedPlay && user && sound && id) {
+    if (!hasTrackedPlay && user && sound && id && !isAnonymous) {
       setHasTrackedPlay(true);
       await addToListeningHistory(
         user.uid,
