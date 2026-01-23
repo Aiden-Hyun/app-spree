@@ -11,10 +11,9 @@ import { Skeleton } from '../../src/components/Skeleton';
 import { PaywallModal } from '../../src/components/PaywallModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { useContentPreload } from '../../src/contexts/ContentPreloadContext';
 import { Theme } from '../../src/theme';
 import { 
-  getEmergencyMeditations, 
-  getCourses,
   FirestoreEmergencyMeditation,
   FirestoreCourse
 } from '../../src/services/firestoreService';
@@ -57,26 +56,15 @@ function MeditateScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
   const { isPremium: hasSubscription } = useSubscription();
-  const [emergencyMeditations, setEmergencyMeditations] = useState<FirestoreEmergencyMeditation[]>([]);
-  const [courses, setCourses] = useState<FirestoreCourse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { meditateContent } = useContentPreload();
+  
+  // Use preloaded data
+  const emergencyMeditations = meditateContent.emergencyMeditations;
+  const courses = meditateContent.courses;
+  
   const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
-
-  useEffect(() => {
-    async function loadContent() {
-      setLoading(true);
-      const [emergencyData, coursesData] = await Promise.all([
-        getEmergencyMeditations(),
-        getCourses()
-      ]);
-      setEmergencyMeditations(emergencyData);
-      setCourses(coursesData);
-      setLoading(false);
-    }
-    loadContent();
-  }, []);
 
   const handleThemePress = (categoryId: string) => {
     router.push({
@@ -182,28 +170,24 @@ function MeditateScreen() {
           </AnimatedView>
 
           <AnimatedView delay={150} duration={400}>
-            {loading ? (
-              renderSkeletonCards(3)
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cardsScroll}
-              >
-                {courses.map((course, index) => (
-                  <ContentCard
-                    key={course.id}
-                    title={course.title}
-                    thumbnailUrl={course.thumbnailUrl}
-                    fallbackIcon="school"
-                    fallbackColor={course.color}
-                    code={course.code}
-                    meta={`${course.sessionCount} sessions`}
-                    onPress={() => handleCoursePress(course)}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cardsScroll}
+            >
+              {courses.map((course) => (
+                <ContentCard
+                  key={course.id}
+                  title={course.title}
+                  thumbnailUrl={course.thumbnailUrl}
+                  fallbackIcon="school"
+                  fallbackColor={course.color}
+                  code={course.code}
+                  meta={`${course.sessionCount} sessions`}
+                  onPress={() => handleCoursePress(course)}
+                />
+              ))}
+            </ScrollView>
           </AnimatedView>
         </View>
 
@@ -313,28 +297,24 @@ function MeditateScreen() {
             </AnimatedView>
 
           <AnimatedView delay={450} duration={400}>
-            {loading ? (
-              renderSkeletonCards(3)
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cardsScroll}
-              >
-                {emergencyMeditations.map((meditation) => (
-                  <ContentCard
-                    key={meditation.id}
-                    title={meditation.title}
-                    thumbnailUrl={meditation.thumbnailUrl}
-                    fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
-                    fallbackColor={meditation.color}
-                    meta={`${meditation.duration_minutes} min`}
-                    isPremium={!meditation.isFree}
-                    onPress={() => handleEmergencyPress(meditation)}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cardsScroll}
+            >
+              {emergencyMeditations.map((meditation) => (
+                <ContentCard
+                  key={meditation.id}
+                  title={meditation.title}
+                  thumbnailUrl={meditation.thumbnailUrl}
+                  fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
+                  fallbackColor={meditation.color}
+                  meta={`${meditation.duration_minutes} min`}
+                  isPremium={!meditation.isFree}
+                  onPress={() => handleEmergencyPress(meditation)}
+                />
+              ))}
+            </ScrollView>
           </AnimatedView>
         </View>
 

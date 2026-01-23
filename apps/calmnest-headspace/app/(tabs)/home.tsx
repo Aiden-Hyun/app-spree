@@ -7,27 +7,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { useContentPreload } from '../../src/contexts/ContentPreloadContext';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { ContentCard } from '../../src/components/ContentCard';
 import { Skeleton } from '../../src/components/Skeleton';
 import { useStats } from '../../src/hooks/useStats';
-import { parseSessionCode, formatCourseCode } from '../../src/utils/courseCodeParser';
+import { parseSessionCode } from '../../src/utils/courseCodeParser';
 import { 
-  getTodayQuote, 
-  getListeningHistory, 
-  getFavoritesWithDetails,
   ResolvedContent,
   getSeries,
   getAlbums,
   getCourses,
-  getEmergencyMeditations,
-  getSleepSounds,
-  getWhiteNoise,
-  getMusic,
-  getAsmr,
-  getSleepMeditations,
   FirestoreSeries,
   FirestoreAlbum,
   FirestoreCourse,
@@ -37,8 +29,7 @@ import {
   FirestoreSleepMeditation,
 } from '../../src/services/firestoreService';
 import { Theme } from '../../src/theme';
-import { DailyQuote, ListeningHistoryItem } from '../../src/types';
-import { getDownloadedContent, DownloadedContent } from '../../src/services/downloadService';
+import { ListeningHistoryItem } from '../../src/types';
 
 function HomeScreen() {
   const { user, isAnonymous } = useAuth();
@@ -46,13 +37,18 @@ function HomeScreen() {
   const router = useRouter();
   const { stats, loading: statsLoading } = useStats();
   const { restorePurchases } = useSubscription();
-  const [quote, setQuote] = useState<DailyQuote | null>(null);
-  const [recentlyPlayed, setRecentlyPlayed] = useState<ListeningHistoryItem[]>([]);
-  const [favorites, setFavorites] = useState<ResolvedContent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [downloadedContent, setDownloadedContent] = useState<DownloadedContent[]>([]);
+  const { homeContent, meditateContent, sleepContent, musicContent, refreshHome } = useContentPreload();
   
-  // Content data from Firestore
+  // Use preloaded data
+  const quote = homeContent.quote;
+  const recentlyPlayed = homeContent.recentlyPlayed;
+  const favorites = homeContent.favorites;
+  const downloadedContent = homeContent.downloads;
+  
+  // Refreshing state for pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Content data from preload context (for lookups)
   const seriesDataRef = useRef<FirestoreSeries[]>([]);
   const albumsDataRef = useRef<FirestoreAlbum[]>([]);
   const coursesDataRef = useRef<FirestoreCourse[]>([]);
@@ -62,6 +58,21 @@ function HomeScreen() {
   const musicDataRef = useRef<FirestoreMusicItem[]>([]);
   const asmrDataRef = useRef<FirestoreMusicItem[]>([]);
   const sleepMeditationsDataRef = useRef<FirestoreSleepMeditation[]>([]);
+  
+  // Sync preloaded data to refs for navigation lookups
+  useFocusEffect(
+    useCallback(() => {
+      seriesDataRef.current = sleepContent.series;
+      emergencyDataRef.current = meditateContent.emergencyMeditations;
+      coursesDataRef.current = meditateContent.courses;
+      sleepSoundsDataRef.current = musicContent.sleepSounds;
+      whiteNoiseDataRef.current = musicContent.whiteNoise;
+      musicDataRef.current = musicContent.music;
+      asmrDataRef.current = musicContent.asmr;
+      albumsDataRef.current = musicContent.albums;
+      sleepMeditationsDataRef.current = sleepContent.sleepMeditations;
+    }, [sleepContent, meditateContent, musicContent])
+  );
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
   
@@ -101,79 +112,13 @@ function HomeScreen() {
     return 'Friend';
   }, [user, isAnonymous]);
 
-  // Reload data when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-    loadHomeData();
-    loadDownloads();
-    }, [user])
-  );
-
-  const loadDownloads = async () => {
-    const downloads = await getDownloadedContent();
-    setDownloadedContent(downloads);
-  };
-
-  const loadHomeData = async () => {
+  // Refresh home data on pull-to-refresh or focus (for favorites/history updates)
+  const handleRefresh = useCallback(async () => {
     if (!user) return;
-    
-    try {
-      // For anonymous users, skip fetching personalized data (history & favorites)
-      const [
-        quoteData, 
-        historyData, 
-        favoritesData,
-        seriesResult,
-        albumsResult,
-        coursesResult,
-        emergencyResult,
-        sleepSoundsResult,
-        whiteNoiseResult,
-        musicResult,
-        asmrResult,
-        sleepMeditationsResult
-      ] = await Promise.all([
-        getTodayQuote(),
-        isAnonymous ? Promise.resolve([]) : getListeningHistory(user.uid, 10),
-        isAnonymous ? Promise.resolve([]) : getFavoritesWithDetails(user.uid),
-        getSeries(),
-        getAlbums(),
-        getCourses(),
-        getEmergencyMeditations(),
-        getSleepSounds(),
-        getWhiteNoise(),
-        getMusic(),
-        getAsmr(),
-        getSleepMeditations()
-      ]);
-      setQuote(quoteData);
-      setRecentlyPlayed(historyData);
-      
-      // Store content data in refs
-      seriesDataRef.current = seriesResult;
-      albumsDataRef.current = albumsResult;
-      coursesDataRef.current = coursesResult;
-      emergencyDataRef.current = emergencyResult;
-      sleepSoundsDataRef.current = sleepSoundsResult;
-      whiteNoiseDataRef.current = whiteNoiseResult;
-      musicDataRef.current = musicResult;
-      asmrDataRef.current = asmrResult;
-      sleepMeditationsDataRef.current = sleepMeditationsResult;
-      
-      // Deduplicate favorites by content id
-      const seenIds = new Set<string>();
-      const uniqueFavorites = favoritesData.filter(fav => {
-        if (seenIds.has(fav.id)) return false;
-        seenIds.add(fav.id);
-        return true;
-      });
-      setFavorites(uniqueFavorites);
-    } catch (error) {
-      console.error('Error loading home data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setRefreshing(true);
+    await refreshHome(user.uid, isAnonymous);
+    setRefreshing(false);
+  }, [user, isAnonymous, refreshHome]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -455,15 +400,15 @@ function HomeScreen() {
       : undefined;
     
     return (
-      <ContentCard
-        title={item.title}
-        thumbnailUrl={item.thumbnail_url}
-        fallbackIcon={getContentIcon(item.content_type)}
+    <ContentCard
+      title={item.title}
+      thumbnailUrl={item.thumbnail_url}
+      fallbackIcon={getContentIcon(item.content_type)}
         code={courseCode}
         subtitle={moduleInfo}
-        meta={`${item.duration_minutes} min`}
-        onPress={() => navigateToContent(item.id, item.content_type)}
-      />
+      meta={`${item.duration_minutes} min`}
+      onPress={() => navigateToContent(item.id, item.content_type)}
+    />
     );
   }, []);
 
@@ -522,7 +467,7 @@ function HomeScreen() {
 
         {/* Recently Played Section */}
         <View style={styles.section}>
-          <AnimatedView delay={100} duration={400}>
+        <AnimatedView delay={100} duration={400}>
             <Text style={styles.sectionTitle}>Recently Played</Text>
           </AnimatedView>
           
@@ -539,8 +484,6 @@ function HomeScreen() {
                   <Text style={styles.signInPromptInlineButtonText}>Sign In</Text>
                 </View>
               </AnimatedPressable>
-            ) : loading ? (
-              renderSkeletonCards()
             ) : recentlyPlayed.length > 0 ? (
               <FlatList
                 horizontal
@@ -557,7 +500,7 @@ function HomeScreen() {
         </View>
 
         {/* Favorites Section */}
-        <View style={styles.section}>
+          <View style={styles.section}>
           <AnimatedView delay={200} duration={400}>
             <Text style={styles.sectionTitle}>Favorites</Text>
           </AnimatedView>
@@ -575,8 +518,6 @@ function HomeScreen() {
                   <Text style={styles.signInPromptInlineButtonText}>Sign In</Text>
                 </View>
               </AnimatedPressable>
-            ) : loading ? (
-              renderSkeletonCards()
             ) : favorites.length > 0 ? (
               <FlatList
                 horizontal
@@ -589,8 +530,8 @@ function HomeScreen() {
             ) : (
               renderEmptyState("Tap the heart icon to save favorites")
             )}
-          </AnimatedView>
-        </View>
+            </AnimatedView>
+          </View>
 
         {/* Your Journey Section */}
         <View style={styles.section}>
@@ -659,13 +600,9 @@ function HomeScreen() {
                 <Text style={styles.quoteEmoji}>✨</Text>
                   </View>
               <Text style={styles.quoteLabel}>Daily Inspiration</Text>
-              {loading ? (
-                <Skeleton height={20} width="80%" style={{ alignSelf: 'center' }} />
-              ) : (
-                <Text style={styles.quoteText}>
-                  {quote?.text || "Take a breath. You're exactly where you need to be."}
-                </Text>
-              )}
+              <Text style={styles.quoteText}>
+                {quote?.text || "Take a breath. You're exactly where you need to be."}
+              </Text>
               {quote?.author && (
                 <Text style={styles.quoteAuthor}>— {quote.author}</Text>
               )}
@@ -941,7 +878,7 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 13,
       color: theme.colors.textOnPrimary,
-    },
+  },
 });
 
 export default function Home() {

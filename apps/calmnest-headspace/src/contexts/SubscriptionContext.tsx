@@ -82,8 +82,34 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
         setIsAvailable(true);
 
-        if (__DEV__ && LOG_LEVEL) {
-          Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+        if (LOG_LEVEL) {
+          // Use WARN level to reduce noise from expected configuration issues (simulator, pending review)
+          Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.WARN : LOG_LEVEL.ERROR);
+        }
+
+        // Set custom log handler to filter expected configuration errors
+        if (__DEV__ && Purchases.setLogHandler) {
+          Purchases.setLogHandler((logLevel: any, message: string) => {
+            // Filter out expected configuration errors (empty offerings, products pending review)
+            const isExpectedConfigError = 
+              message.includes('why-are-offerings-empty') ||
+              message.includes('None of the products registered') ||
+              message.includes('configuration');
+            
+            if (isExpectedConfigError) {
+              // Silently ignore expected configuration issues
+              return;
+            }
+            
+            // Log other messages normally
+            if (logLevel === 'ERROR') {
+              console.error('[RevenueCat]', message);
+            } else if (logLevel === 'WARN') {
+              console.warn('[RevenueCat]', message);
+            } else {
+              console.log('[RevenueCat]', message);
+            }
+          });
         }
 
         // Configure with API key
@@ -148,9 +174,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       const offerings = await Purchases.getOfferings();
       if (offerings.current) {
         setCurrentOffering(offerings.current);
+      } else if (__DEV__) {
+        // Expected in simulator without StoreKit Config - just log a warning
+        console.log("[RevenueCat] No offerings available. This is expected on simulator without StoreKit Configuration or if products are pending Apple review.");
       }
     } catch (error: any) {
-      console.error("Error fetching offerings:", error);
+      // Don't spam console.error for expected configuration issues
+      if (__DEV__) {
+        // Configuration errors are expected on simulator - log as info instead
+        if (error.code === '23' || error.message?.includes('configuration')) {
+          console.log("[RevenueCat] Offerings not available - likely running on simulator without StoreKit Config or products pending Apple review.");
+        } else {
+          console.warn("Error fetching offerings:", error.message);
+        }
+      }
     }
   };
 

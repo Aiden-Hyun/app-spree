@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useRouter, usePathname } from 'expo-router';
+import { useRouter, usePathname, useRootNavigationState } from 'expo-router';
 import { useNetwork } from '../contexts/NetworkContext';
 
 interface OfflineNavigatorProps {
@@ -13,14 +13,18 @@ interface OfflineNavigatorProps {
 export function OfflineNavigator({ children }: OfflineNavigatorProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const rootNavigationState = useRootNavigationState();
   const { isOffline, isLoading } = useNetwork();
   const previousPathRef = useRef<string | null>(null);
   const isOnDownloadsPage = pathname === '/downloads' || pathname.startsWith('/downloads/');
   const hasNavigatedToOffline = useRef(false);
+  
+  // Check if navigation is ready before attempting to navigate
+  const navigationReady = rootNavigationState?.key != null;
 
   useEffect(() => {
-    // Don't do anything while loading initial network state
-    if (isLoading) return;
+    // Don't do anything while loading initial network state or navigation isn't ready
+    if (isLoading || !navigationReady) return;
 
     if (isOffline && !isOnDownloadsPage) {
       // Store current path before navigating to downloads
@@ -37,7 +41,7 @@ export function OfflineNavigator({ children }: OfflineNavigatorProps) {
       }
       previousPathRef.current = null;
     }
-  }, [isOffline, isLoading, isOnDownloadsPage, pathname]);
+  }, [isOffline, isLoading, isOnDownloadsPage, pathname, navigationReady]);
 
   return <>{children}</>;
 }

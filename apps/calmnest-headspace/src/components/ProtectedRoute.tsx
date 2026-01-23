@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useRootNavigationState } from 'expo-router';
+import { LoadingScreen } from './LoadingScreen';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,19 +10,20 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
+
+  // Check if navigation is ready before attempting to navigate
+  const navigationReady = rootNavigationState?.key != null;
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Only navigate when auth is done, no user, AND navigation is ready
+    if (!loading && !user && navigationReady) {
       router.replace('/login');
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, navigationReady]);
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+    return <LoadingScreen message="Checking authentication..." />;
   }
 
   if (!user) {
@@ -31,16 +32,3 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   return <>{children}</>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-  },
-});

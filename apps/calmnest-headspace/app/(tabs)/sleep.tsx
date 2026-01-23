@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -11,14 +11,12 @@ import { ContentCard } from "../../src/components/ContentCard";
 import { Skeleton } from "../../src/components/Skeleton";
 import { PaywallModal } from "../../src/components/PaywallModal";
 import { 
-  getBedtimeStories, 
-  getSleepMeditations, 
-  getSeries,
   FirestoreSleepMeditation,
   FirestoreSeries
 } from "../../src/services/firestoreService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { useSubscription } from "../../src/contexts/SubscriptionContext";
+import { useContentPreload } from "../../src/contexts/ContentPreloadContext";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
 
@@ -26,35 +24,16 @@ function SleepScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { isPremium: hasSubscription } = useSubscription();
-  const [bedtimeStories, setBedtimeStories] = useState<BedtimeStory[]>([]);
-  const [sleepMeditations, setSleepMeditations] = useState<FirestoreSleepMeditation[]>([]);
-  const [series, setSeries] = useState<FirestoreSeries[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { sleepContent } = useContentPreload();
+  
+  // Use preloaded data
+  const bedtimeStories = sleepContent.bedtimeStories;
+  const sleepMeditations = sleepContent.sleepMeditations;
+  const series = sleepContent.series;
+  
   const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
-
-  useEffect(() => {
-    loadSleepContent();
-  }, []);
-
-  const loadSleepContent = async () => {
-    try {
-      setLoading(true);
-      const [stories, meditations, seriesData] = await Promise.all([
-        getBedtimeStories(),
-        getSleepMeditations(),
-        getSeries()
-      ]);
-      setBedtimeStories(stories);
-      setSleepMeditations(meditations);
-      setSeries(seriesData);
-    } catch (error) {
-      console.error("Failed to load sleep content:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getTimeGreeting = () => {
     const hour = new Date().getHours();
@@ -184,53 +163,27 @@ function SleepScreen() {
                 </AnimatedPressable>
               </AnimatedView>
 
-              {loading ? (
-                <AnimatedView delay={250} duration={400}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.cardsScroll}
-                  >
-                    {[0, 1, 2].map((i) => (
-                      <View key={i} style={styles.skeletonCard}>
-                        <Skeleton
-                          height={120}
-                          borderRadius={theme.borderRadius.lg}
-                          style={{ marginBottom: theme.spacing.sm }}
-                        />
-                        <Skeleton
-                          height={14}
-                          width="80%"
-                          style={{ marginBottom: 4 }}
-                        />
-                        <Skeleton height={12} width="50%" />
-                      </View>
-                    ))}
-                  </ScrollView>
-                </AnimatedView>
-              ) : (
-                <AnimatedView delay={250} duration={400}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.cardsScroll}
-                  >
-                    {bedtimeStories.map((story) => (
-                      <ContentCard
-                        key={story.id}
-                        title={story.title}
-                        thumbnailUrl={story.thumbnail_url}
-                        fallbackIcon={getCategoryIcon(story.category)}
-                        fallbackColor={theme.colors.sleepAccent}
-                        meta={`${story.duration_minutes} min`}
-                        isPremium={story.is_premium}
-                        onPress={() => handleStoryPress(story)}
-                        darkMode
-                      />
-                    ))}
-                  </ScrollView>
-                </AnimatedView>
-              )}
+              <AnimatedView delay={250} duration={400}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.cardsScroll}
+                >
+                  {bedtimeStories.map((story) => (
+                    <ContentCard
+                      key={story.id}
+                      title={story.title}
+                      thumbnailUrl={story.thumbnail_url}
+                      fallbackIcon={getCategoryIcon(story.category)}
+                      fallbackColor={theme.colors.sleepAccent}
+                      meta={`${story.duration_minutes} min`}
+                      isPremium={story.is_premium}
+                      onPress={() => handleStoryPress(story)}
+                      darkMode
+                    />
+                  ))}
+                </ScrollView>
+              </AnimatedView>
             </View>
 
             {/* Sleep Meditations */}

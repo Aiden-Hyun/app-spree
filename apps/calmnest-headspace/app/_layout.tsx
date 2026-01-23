@@ -6,6 +6,8 @@ import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { NetworkProvider } from '../src/contexts/NetworkContext';
 import { SleepTimerProvider } from '../src/contexts/SleepTimerContext';
 import { SubscriptionProvider } from '../src/contexts/SubscriptionContext';
+import { ContentPreloadProvider } from '../src/contexts/ContentPreloadContext';
+import { PreloadGate } from '../src/components/PreloadGate';
 import { useFonts } from '../src/hooks/useFonts';
 import { lightColors } from '../src/theme';
 import { OfflineNavigator } from '../src/components/OfflineNavigator';
@@ -168,13 +170,17 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <SubscriptionProvider>
-          <NetworkProvider>
-            <SleepTimerProvider>
-              <OfflineNavigator>
-                <RootNavigator />
-              </OfflineNavigator>
-            </SleepTimerProvider>
-          </NetworkProvider>
+          <ContentPreloadProvider>
+            <NetworkProvider>
+              <SleepTimerProvider>
+                <OfflineNavigator>
+                  <PreloadGate>
+                    <RootNavigator />
+                  </PreloadGate>
+                </OfflineNavigator>
+              </SleepTimerProvider>
+            </NetworkProvider>
+          </ContentPreloadProvider>
         </SubscriptionProvider>
       </AuthProvider>
     </ThemeProvider>

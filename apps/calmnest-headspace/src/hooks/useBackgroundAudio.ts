@@ -115,13 +115,7 @@ export function useBackgroundAudio() {
   
   // Clear loading state when audio is loaded and not buffering
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBackgroundAudio.ts:clearLoading',message:'Clear loading effect triggered',data:{loadingSoundId,isLoaded:status.isLoaded,isBuffering:status.isBuffering,urlMatch:currentAudioUrl===loadingUrlRef.current,loadingUrlRef:loadingUrlRef.current?.slice(-30)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3,H5'})}).catch(()=>{});
-    // #endregion
     if (loadingSoundId && status.isLoaded && !status.isBuffering && currentAudioUrl === loadingUrlRef.current) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBackgroundAudio.ts:clearLoadingInner',message:'CLEARING loading state and setting ready',data:{loadingSoundId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       // Small delay to ensure audio is truly ready
       const timer = setTimeout(() => {
         const soundIdToReady = loadingSoundId;
@@ -145,15 +139,9 @@ export function useBackgroundAudio() {
     // Start timeout when we have a selected sound that's not ready yet
     if (selectedSoundId && !readySoundId && !hasError && currentAudioUrl) {
       const targetSoundId = selectedSoundId;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBackgroundAudio.ts:timeout',message:'Starting error timeout',data:{targetSoundId,readySoundId,hasError},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'TIMEOUT'})}).catch(()=>{});
-      // #endregion
       const timer = setTimeout(() => {
         // Check if this sound is still not ready (use ref for current value)
         if (readySoundIdRef.current !== targetSoundId) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBackgroundAudio.ts:timeoutFired',message:'Timeout fired - setting error',data:{targetSoundId,currentReadySoundId:readySoundIdRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'TIMEOUT'})}).catch(()=>{});
-          // #endregion
           // If still not ready after 8 seconds, mark as error
           setHasError(true);
           setLoadingSoundId(null);
@@ -258,17 +246,9 @@ export function useBackgroundAudio() {
     }
   }, [player]);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBackgroundAudio.ts:status',message:'Audio status check',data:{isLoaded:status.isLoaded,isBuffering:status.isBuffering,playing:status.playing,selectedSoundId,readySoundId,currentAudioUrl:currentAudioUrl?.slice(-30),hasError,loadingSoundId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H4'})}).catch(()=>{});
-  // #endregion
-
   // Audio is ready only when THE SELECTED SOUND has been loaded and confirmed ready
   // This prevents showing checkmark from stale audio state
   const isAudioReady = readySoundId !== null && readySoundId === selectedSoundId && !hasError;
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBackgroundAudio.ts:isAudioReady',message:'isAudioReady calculated',data:{isAudioReady,readySoundId,selectedSoundId,hasError},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-  // #endregion
 
   // Determine if the selected sound should show as loading
   // It's loading if: we have a selected sound AND it's not ready yet AND no error

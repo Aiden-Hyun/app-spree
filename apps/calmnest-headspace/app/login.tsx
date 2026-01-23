@@ -98,7 +98,7 @@ export default function LoginScreen() {
         );
       } else {
         await signIn(email, password);
-        router.replace("/(tabs)/home");
+        // Navigation handled automatically by PreloadGate after auth state change
       }
     } catch (error: any) {
       Alert.alert("Error", error.message);
@@ -109,7 +109,7 @@ export default function LoginScreen() {
     try {
       setGoogleLoading(true);
       await signInWithGoogle();
-      router.replace("/(tabs)/home");
+      // Navigation handled automatically by PreloadGate after auth state change
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -121,7 +121,7 @@ export default function LoginScreen() {
     try {
       setAppleLoading(true);
       await signInWithApple();
-      router.replace("/(tabs)/home");
+      // Navigation handled automatically by PreloadGate after auth state change
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -132,7 +132,7 @@ export default function LoginScreen() {
   const handleSkipLogin = async () => {
     try {
       await signInAnonymously();
-      router.replace("/(tabs)/home");
+      // Navigation handled automatically by PreloadGate after auth state change
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }

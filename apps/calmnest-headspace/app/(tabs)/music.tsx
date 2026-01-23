@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,13 +10,9 @@ import { ContentCard } from "../../src/components/ContentCard";
 import { PaywallModal } from "../../src/components/PaywallModal";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { useSubscription } from "../../src/contexts/SubscriptionContext";
+import { useContentPreload } from "../../src/contexts/ContentPreloadContext";
 import { Theme } from "../../src/theme";
 import {
-  getSleepSounds,
-  getWhiteNoise,
-  getMusic,
-  getAsmr,
-  getAlbums,
   FirestoreSleepSound,
   FirestoreMusicItem,
   FirestoreAlbum,
@@ -26,35 +22,18 @@ function MusicScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
   const { isPremium: hasSubscription } = useSubscription();
-  const [sleepSounds, setSleepSounds] = useState<FirestoreSleepSound[]>([]);
-  const [whiteNoise, setWhiteNoise] = useState<FirestoreMusicItem[]>([]);
-  const [music, setMusic] = useState<FirestoreMusicItem[]>([]);
-  const [asmr, setAsmr] = useState<FirestoreMusicItem[]>([]);
-  const [albums, setAlbums] = useState<FirestoreAlbum[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { musicContent } = useContentPreload();
+  
+  // Use preloaded data
+  const sleepSounds = musicContent.sleepSounds;
+  const whiteNoise = musicContent.whiteNoise;
+  const music = musicContent.music;
+  const asmr = musicContent.asmr;
+  const albums = musicContent.albums;
+  
   const [showPaywall, setShowPaywall] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
-
-  useEffect(() => {
-    async function loadContent() {
-      setLoading(true);
-      const [sleepData, whiteData, musicData, asmrData, albumsData] = await Promise.all([
-        getSleepSounds(),
-        getWhiteNoise(),
-        getMusic(),
-        getAsmr(),
-        getAlbums()
-      ]);
-      setSleepSounds(sleepData);
-      setWhiteNoise(whiteData);
-      setMusic(musicData);
-      setAsmr(asmrData);
-      setAlbums(albumsData);
-      setLoading(false);
-    }
-    loadContent();
-  }, []);
 
   const handleSoundPress = (sound: FirestoreMusicItem | FirestoreSleepSound) => {
     // Check isFree field from Firestore
@@ -185,16 +164,6 @@ function MusicScreen() {
       </ScrollView>
     </View>
   );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
         <SafeAreaView style={styles.safeArea}>
