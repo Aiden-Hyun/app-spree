@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ProtectedRoute } from '../../../src/components/ProtectedRoute';
 import { MediaPlayer } from '../../../src/components/MediaPlayer';
 import { useAudioPlayer } from '../../../src/hooks/useAudioPlayer';
+import { usePlayerBehavior } from '../../../src/hooks/usePlayerBehavior';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { getAudioUrlFromPath } from '../../../src/constants/audioFiles';
-import { addToListeningHistory, toggleFavorite, isFavorite, createSession, markContentCompleted } from '../../../src/services/firestoreService';
+import { markContentCompleted } from '../../../src/services/firestoreService';
 import { getLocalAudioPath } from '../../../src/services/downloadService';
 import { useSubscription } from '../../../src/contexts/SubscriptionContext';
 import { PaywallModal } from '../../../src/components/PaywallModal';
@@ -36,17 +36,33 @@ function AlbumTrackPlayerScreen() {
   }>();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user, isAnonymous } = useAuth();
+  const { user } = useAuth();
   const { isPremium: hasSubscription } = useSubscription();
 
   const [loading, setLoading] = useState(true);
-  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
-  const [hasTrackedSession, setHasTrackedSession] = useState(false);
-  const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
   const [showPaywall, setShowPaywall] = useState(false);
+  const hasTrackedCompletion = useRef(false);
 
   const audioPlayer = useAudioPlayer();
+  const durationMinutes = parseInt(duration) || 0;
+
+  // Use the shared player behavior hook
+  const {
+    isFavorited,
+    userRating,
+    onToggleFavorite,
+    onPlayPause,
+    onRate,
+    onReport,
+  } = usePlayerBehavior({
+    contentId: id,
+    contentType: "album_track",
+    audioPlayer,
+    title: `${albumTitle}: ${title}`,
+    durationMinutes,
+    thumbnailUrl,
+  });
 
   // Parse tracks for prev/next navigation
   const tracks: TrackItem[] = useMemo(() => {
@@ -62,16 +78,10 @@ function AlbumTrackPlayerScreen() {
   const hasPrevious = tracks.length > 0 && currentIdx > 0;
   const hasNext = tracks.length > 0 && currentIdx < tracks.length - 1;
 
-  // Check if favorited on load
+  // Reset completion tracking when content changes
   useEffect(() => {
-    async function checkFavorite() {
-      if (user && id) {
-        const favorited = await isFavorite(user.uid, id);
-        setIsFavoritedState(favorited);
-      }
-    }
-    checkFavorite();
-  }, [user, id]);
+    hasTrackedCompletion.current = false;
+  }, [id]);
 
   useEffect(() => {
     async function loadTrackAudio() {
@@ -108,87 +118,30 @@ function AlbumTrackPlayerScreen() {
     }
   }, [autoPlay, loading, audioPlayer.duration]);
 
-  // Track session for stats when user completes 80% of audio
+  // Track track completion at 80%
   useEffect(() => {
-    async function trackSession() {
+    async function trackCompletion() {
       if (
-        !hasTrackedSession &&
+        !hasTrackedCompletion.current &&
         user &&
         id &&
         audioPlayer.progress >= 0.8 &&
         audioPlayer.duration > 0
       ) {
-        setHasTrackedSession(true);
+        hasTrackedCompletion.current = true;
         try {
-          await createSession({
-            user_id: user.uid,
-            duration_minutes: parseInt(duration) || 0,
-            session_type: 'album_track',
-          });
-          // Mark this track as completed
           await markContentCompleted(user.uid, id, 'album_track');
         } catch (error) {
-          console.error('Failed to track session:', error);
+          console.error('Failed to mark track completed:', error);
         }
       }
     }
-    trackSession();
-  }, [audioPlayer.progress, hasTrackedSession, user, id, duration]);
+    trackCompletion();
+  }, [audioPlayer.progress, user, id]);
 
   const handleGoBack = () => {
     audioPlayer.cleanup();
     router.back();
-  };
-
-  const handlePlayPause = async () => {
-    if (audioPlayer.isPlaying) {
-      audioPlayer.pause();
-    } else {
-      audioPlayer.play();
-      
-      // Track listening history on first play
-      if (!hasTrackedPlay && user && id && title && !isAnonymous) {
-        setHasTrackedPlay(true);
-        await addToListeningHistory(
-          user.uid,
-          id,
-          'album_track',
-          `${albumTitle}: ${title}`,
-          parseInt(duration) || 0,
-          undefined
-        );
-      }
-    }
-  };
-
-  const handleToggleFavorite = async () => {
-    if (!user || !id) return;
-    
-    // Prompt anonymous users to sign in
-    if (isAnonymous) {
-      Alert.alert(
-        'Sign In Required',
-        'Create an account to save favorites and sync across devices.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/login') },
-        ]
-      );
-      return;
-    }
-    
-    // Optimistic update
-    const previousState = isFavoritedState;
-    setIsFavoritedState(!previousState);
-    
-    try {
-      const newFavorited = await toggleFavorite(user.uid, id, 'album_track');
-      if (newFavorited !== !previousState) {
-        setIsFavoritedState(newFavorited);
-      }
-    } catch {
-      setIsFavoritedState(previousState);
-    }
   };
 
   const handlePrevious = () => {
@@ -252,16 +205,16 @@ function AlbumTrackPlayerScreen() {
         category={albumTitle || 'Album'}
         title={title || 'Loading...'}
         instructor={artist}
-        durationMinutes={parseInt(duration) || 0}
+        durationMinutes={durationMinutes}
         gradientColors={theme.gradients.sleepyNight as [string, string]}
         artworkIcon="musical-notes"
         artworkThumbnailUrl={thumbnailUrl}
-        isFavorited={isFavoritedState}
+        isFavorited={isFavorited}
         isLoading={loading}
         audioPlayer={audioPlayer}
         onBack={handleGoBack}
-        onToggleFavorite={handleToggleFavorite}
-        onPlayPause={handlePlayPause}
+        onToggleFavorite={onToggleFavorite}
+        onPlayPause={onPlayPause}
         loadingText="Loading track..."
         onPrevious={hasPrevious ? handlePrevious : undefined}
         onNext={hasNext ? handleNext : undefined}
@@ -273,6 +226,9 @@ function AlbumTrackPlayerScreen() {
         audioPath={audioPath}
         parentTitle={albumTitle}
         skipRestore={autoPlay === 'true'}
+        userRating={userRating}
+        onRate={onRate}
+        onReport={onReport}
       />
       <PaywallModal
         visible={showPaywall}

@@ -16,6 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AudioPlayer } from './AudioPlayer';
 import { BackgroundAudioPicker } from './BackgroundAudioPicker';
 import { SleepTimerPicker } from './SleepTimerPicker';
+import { ReportModal } from './ReportModal';
+import { RatingType, ReportCategory } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSleepTimer, formatTimerDisplay } from '../contexts/SleepTimerContext';
 import { Theme } from '../theme';
@@ -86,6 +88,11 @@ export interface MediaPlayerProps {
 
   // Skip restoring saved position (e.g., when autoplay triggers next track)
   skipRestore?: boolean;
+
+  // Rating and report
+  userRating?: RatingType | null;
+  onRate?: (rating: RatingType) => Promise<RatingType | null>;
+  onReport?: (category: ReportCategory, description?: string) => Promise<boolean>;
 }
 
 export function MediaPlayer({
@@ -120,6 +127,9 @@ export function MediaPlayer({
   parentTitle,
   audioPath,
   skipRestore = false,
+  userRating,
+  onRate,
+  onReport,
 }: MediaPlayerProps) {
   const { theme, isDark } = useTheme();
   const { user } = useAuth();
@@ -154,6 +164,9 @@ export function MediaPlayer({
   // Sleep timer state
   const [showSleepTimerPicker, setShowSleepTimerPicker] = useState(false);
   const sleepTimer = useSleepTimer();
+
+  // Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Playback progress tracking
   const lastSaveTime = useRef(0);
@@ -502,7 +515,7 @@ export function MediaPlayer({
                 />
               </TouchableOpacity>
             )}
-            
+
             {/* Favorite Button */}
             <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
               <Ionicons
@@ -511,6 +524,16 @@ export function MediaPlayer({
                 color={isFavorited ? '#FF6B6B' : 'white'}
               />
             </TouchableOpacity>
+
+            {/* Report Button */}
+            {onReport && (
+              <TouchableOpacity
+                onPress={() => setShowReportModal(true)}
+                style={styles.headerButton}
+              >
+                <Ionicons name="flag-outline" size={20} color="white" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -635,37 +658,92 @@ export function MediaPlayer({
 
             {/* Previous/Next Navigation */}
             {(onPrevious || onNext) && (
-              <View style={styles.trackNavigation}>
-                <TouchableOpacity
-                  style={[styles.trackNavButton, !hasPrevious && styles.trackNavButtonDisabled]}
-                  onPress={hasPrevious ? onPrevious : undefined}
-                  disabled={!hasPrevious}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="play-skip-back"
-                    size={16}
-                    color={hasPrevious ? 'white' : 'rgba(255,255,255,0.3)'}
-                  />
-                  <Text style={[styles.trackNavText, !hasPrevious && styles.trackNavTextDisabled]}>
-                    Prev
-                  </Text>
-                </TouchableOpacity>
+              <View style={styles.trackNavigationContainer}>
+                {/* Row 1: Prev / Next */}
+                <View style={styles.trackNavigation}>
+                  <TouchableOpacity
+                    style={[styles.trackNavButton, !hasPrevious && styles.trackNavButtonDisabled]}
+                    onPress={hasPrevious ? onPrevious : undefined}
+                    disabled={!hasPrevious}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="play-skip-back"
+                      size={16}
+                      color={hasPrevious ? 'white' : 'rgba(255,255,255,0.3)'}
+                    />
+                    <Text style={[styles.trackNavText, !hasPrevious && styles.trackNavTextDisabled]}>
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
 
-                {/* Center Controls: Auto-play & Download */}
-                <View style={styles.centerControls}>
+                  <TouchableOpacity
+                    style={[styles.trackNavButton, !hasNext && styles.trackNavButtonDisabled]}
+                    onPress={hasNext ? onNext : undefined}
+                    disabled={!hasNext}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.trackNavText, !hasNext && styles.trackNavTextDisabled]}>
+                      Next
+                    </Text>
+                    <Ionicons
+                      name="play-skip-forward"
+                      size={16}
+                      color={hasNext ? 'white' : 'rgba(255,255,255,0.3)'}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Row 2: Actions (Like, Dislike, Autoplay, Download) */}
+                <View style={styles.actionControls}>
+                  {/* Like Button */}
+                  {onRate && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        userRating === 'like' && styles.actionButtonLiked,
+                      ]}
+                      onPress={() => onRate('like')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={userRating === 'like' ? 'thumbs-up' : 'thumbs-up-outline'}
+                        size={18}
+                        color={userRating === 'like' ? '#4CAF50' : 'rgba(255,255,255,0.7)'}
+                      />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Dislike Button */}
+                  {onRate && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        userRating === 'dislike' && styles.actionButtonDisliked,
+                      ]}
+                      onPress={() => onRate('dislike')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={userRating === 'dislike' ? 'thumbs-down' : 'thumbs-down-outline'}
+                        size={18}
+                        color={userRating === 'dislike' ? '#FF6B6B' : 'rgba(255,255,255,0.7)'}
+                      />
+                    </TouchableOpacity>
+                  )}
+
                   {/* Auto-play Toggle */}
                   <TouchableOpacity
-                    style={[styles.toggleButton, autoPlayEnabled && styles.toggleButtonActive]}
+                    style={[styles.actionButton, autoPlayEnabled && styles.actionButtonActive]}
                     onPress={toggleAutoPlay}
                     activeOpacity={0.7}
                   >
                     <Ionicons
                       name={autoPlayEnabled ? 'play-forward-circle' : 'play-forward-circle-outline'}
-                      size={16}
+                      size={18}
                       color={autoPlayEnabled ? 'white' : 'rgba(255,255,255,0.7)'}
                     />
-                    <Text style={[styles.toggleText, autoPlayEnabled && styles.toggleTextActive]}>
+                    <Text style={[styles.actionText, autoPlayEnabled && styles.actionTextActive]}>
                       Autoplay
                     </Text>
                   </TouchableOpacity>
@@ -674,9 +752,9 @@ export function MediaPlayer({
                   {!isOffline && contentId && contentType && audioUrl && (
                     <TouchableOpacity
                       style={[
-                        styles.toggleButton,
-                        isDownloadedState && styles.toggleButtonActive,
-                        isDownloadingState && styles.toggleButtonDownloading,
+                        styles.actionButton,
+                        isDownloadedState && styles.actionButtonActive,
+                        isDownloadingState && styles.actionButtonDownloading,
                       ]}
                       onPress={handleDownload}
                       activeOpacity={0.7}
@@ -685,16 +763,16 @@ export function MediaPlayer({
                       {isDownloadingState ? (
                         <>
                           <ActivityIndicator size={14} color="white" />
-                          <Text style={styles.toggleTextActive}>{downloadProgress}%</Text>
+                          <Text style={styles.actionTextActive}>{downloadProgress}%</Text>
                         </>
                       ) : (
                         <>
                           <Ionicons
                             name={isDownloadedState ? 'checkmark-circle' : 'cloud-download-outline'}
-                            size={16}
-                            color={isDownloadedState ? '#4CAF50' : 'white'}
+                            size={18}
+                            color={isDownloadedState ? '#4CAF50' : 'rgba(255,255,255,0.7)'}
                           />
-                          <Text style={[styles.toggleText, isDownloadedState ? styles.toggleTextDownloaded : styles.toggleTextActive]}>
+                          <Text style={[styles.actionText, isDownloadedState && styles.actionTextDownloaded]}>
                             {isDownloadedState ? 'Saved' : 'Download'}
                           </Text>
                         </>
@@ -702,56 +780,79 @@ export function MediaPlayer({
                     </TouchableOpacity>
                   )}
                 </View>
-
-                <TouchableOpacity
-                  style={[styles.trackNavButton, !hasNext && styles.trackNavButtonDisabled]}
-                  onPress={hasNext ? onNext : undefined}
-                  disabled={!hasNext}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.trackNavText, !hasNext && styles.trackNavTextDisabled]}>
-                    Next
-                  </Text>
-                  <Ionicons
-                    name="play-skip-forward"
-                    size={16}
-                    color={hasNext ? 'white' : 'rgba(255,255,255,0.3)'}
-                  />
-                </TouchableOpacity>
               </View>
             )}
 
-            {/* Standalone Download Button (for content without prev/next) */}
-            {!(onPrevious || onNext) && !isOffline && contentId && contentType && audioUrl && (
+            {/* Standalone Controls (for content without prev/next) */}
+            {!(onPrevious || onNext) && (
               <View style={styles.standaloneDownload}>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    isDownloadedState && styles.toggleButtonActive,
-                    isDownloadingState && styles.toggleButtonDownloading,
-                  ]}
-                  onPress={handleDownload}
-                  activeOpacity={0.7}
-                  disabled={isDownloadingState || isDownloadedState}
-                >
-                  {isDownloadingState ? (
-                    <>
-                      <ActivityIndicator size={14} color="white" />
-                      <Text style={styles.toggleTextActive}>{downloadProgress}%</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons
-                        name={isDownloadedState ? 'checkmark-circle' : 'cloud-download-outline'}
-                        size={18}
-                        color={isDownloadedState ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
-                      />
-                      <Text style={[styles.toggleText, isDownloadedState && styles.toggleTextDownloaded]}>
-                        {isDownloadedState ? 'Saved' : 'Download'}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                {/* Like Button */}
+                {onRate && (
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      userRating === 'like' && styles.toggleButtonLiked,
+                    ]}
+                    onPress={() => onRate('like')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={userRating === 'like' ? 'thumbs-up' : 'thumbs-up-outline'}
+                      size={16}
+                      color={userRating === 'like' ? '#4CAF50' : 'rgba(255,255,255,0.7)'}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Dislike Button */}
+                {onRate && (
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      userRating === 'dislike' && styles.toggleButtonDisliked,
+                    ]}
+                    onPress={() => onRate('dislike')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={userRating === 'dislike' ? 'thumbs-down' : 'thumbs-down-outline'}
+                      size={16}
+                      color={userRating === 'dislike' ? '#FF6B6B' : 'rgba(255,255,255,0.7)'}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Download Button */}
+                {!isOffline && contentId && contentType && audioUrl && (
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      isDownloadedState && styles.toggleButtonActive,
+                      isDownloadingState && styles.toggleButtonDownloading,
+                    ]}
+                    onPress={handleDownload}
+                    activeOpacity={0.7}
+                    disabled={isDownloadingState || isDownloadedState}
+                  >
+                    {isDownloadingState ? (
+                      <>
+                        <ActivityIndicator size={14} color="white" />
+                        <Text style={styles.toggleTextActive}>{downloadProgress}%</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={isDownloadedState ? 'checkmark-circle' : 'cloud-download-outline'}
+                          size={18}
+                          color={isDownloadedState ? '#4CAF50' : 'rgba(255,255,255,0.5)'}
+                        />
+                        <Text style={[styles.toggleText, isDownloadedState && styles.toggleTextDownloaded]}>
+                          {isDownloadedState ? 'Saved' : 'Download'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -780,6 +881,16 @@ export function MediaPlayer({
           visible={showSleepTimerPicker}
           onClose={() => setShowSleepTimerPicker(false)}
         />
+
+        {/* Report Modal */}
+        {onReport && (
+          <ReportModal
+            visible={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            onSubmit={onReport}
+            contentTitle={title}
+          />
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -834,6 +945,12 @@ const createStyles = (theme: Theme) =>
     },
     headerButtonActive: {
       backgroundColor: 'rgba(125, 175, 180, 0.25)',
+    },
+    headerButtonLiked: {
+      backgroundColor: 'rgba(76, 175, 80, 0.25)',
+    },
+    headerButtonDisliked: {
+      backgroundColor: 'rgba(255, 107, 107, 0.25)',
     },
     favoriteButton: {
       width: 44,
@@ -993,19 +1110,22 @@ const createStyles = (theme: Theme) =>
       fontSize: 14,
       color: 'rgba(255, 255, 255, 0.7)',
     },
+    trackNavigationContainer: {
+      marginTop: theme.spacing.lg,
+      gap: 12,
+    },
     trackNavigation: {
       flexDirection: 'row',
-      justifyContent: 'space-evenly',
+      justifyContent: 'center',
       alignItems: 'center',
-      marginTop: theme.spacing.lg,
-      paddingHorizontal: 4,
+      gap: 16,
     },
     trackNavButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 3,
-      paddingVertical: 8,
-      paddingHorizontal: 10,
+      gap: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
       borderRadius: theme.borderRadius.full,
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
@@ -1014,28 +1134,68 @@ const createStyles = (theme: Theme) =>
     },
     trackNavText: {
       fontFamily: theme.fonts.ui.medium,
-      fontSize: 12,
+      fontSize: 13,
       color: 'white',
     },
     trackNavTextDisabled: {
       color: 'rgba(255, 255, 255, 0.3)',
     },
-    centerControls: {
+    actionControls: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+    },
+    actionButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 5,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
+    actionButtonActive: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    actionButtonLiked: {
+      backgroundColor: 'rgba(76, 175, 80, 0.25)',
+    },
+    actionButtonDisliked: {
+      backgroundColor: 'rgba(255, 107, 107, 0.25)',
+    },
+    actionButtonDownloading: {
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    actionText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.7)',
+    },
+    actionTextActive: {
+      color: 'white',
+    },
+    actionTextDownloaded: {
+      color: '#4CAF50',
+    },
+    // Keep old toggle styles for standalone section
     toggleButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 3,
+      gap: 5,
       paddingVertical: 8,
-      paddingHorizontal: 8,
+      paddingHorizontal: 12,
       borderRadius: theme.borderRadius.full,
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
     toggleButtonActive: {
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    toggleButtonLiked: {
+      backgroundColor: 'rgba(76, 175, 80, 0.25)',
+    },
+    toggleButtonDisliked: {
+      backgroundColor: 'rgba(255, 107, 107, 0.25)',
     },
     toggleButtonDownloading: {
       backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -1052,7 +1212,10 @@ const createStyles = (theme: Theme) =>
       color: '#4CAF50',
     },
     standaloneDownload: {
+      flexDirection: 'row',
+      justifyContent: 'center',
       alignItems: 'center',
+      gap: 8,
       marginTop: theme.spacing.lg,
     },
   });

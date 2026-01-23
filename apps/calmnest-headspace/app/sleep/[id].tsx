@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,9 +7,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
+import { usePlayerBehavior } from "../../src/hooks/usePlayerBehavior";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { getBedtimeStoryById, addToListeningHistory, toggleFavorite, isFavorite, createSession } from "../../src/services/firestoreService";
-import { useAuth } from "../../src/contexts/AuthContext";
+import { getBedtimeStoryById } from "../../src/services/firestoreService";
 import { getAudioUrl } from "../../src/constants/audioFiles";
 import { Theme } from "../../src/theme";
 import { BedtimeStory } from "../../src/types";
@@ -18,27 +18,29 @@ function SleepStoryPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user, isAnonymous } = useAuth();
   const [story, setStory] = useState<BedtimeStory | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
-  const [hasTrackedSession, setHasTrackedSession] = useState(false);
-  const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
 
-  // Check if favorited on load
-  useEffect(() => {
-    async function checkFavorite() {
-      if (user && id) {
-        const favorited = await isFavorite(user.uid, id as string);
-        setIsFavoritedState(favorited);
-      }
-    }
-    checkFavorite();
-  }, [user, id]);
+  // Use the shared player behavior hook
+  const {
+    isFavorited,
+    userRating,
+    onToggleFavorite,
+    onPlayPause,
+    onRate,
+    onReport,
+  } = usePlayerBehavior({
+    contentId: id as string,
+    contentType: "bedtime_story",
+    audioPlayer,
+    title: story?.title,
+    durationMinutes: story?.duration_minutes,
+    thumbnailUrl: story?.thumbnail_url,
+  });
 
   useEffect(() => {
     async function loadStory() {
@@ -82,85 +84,9 @@ function SleepStoryPlayerScreen() {
     loadStoryAudio();
   }, [story]);
 
-  // Track session for stats when user completes 80% of audio
-  useEffect(() => {
-    async function trackSession() {
-      if (
-        !hasTrackedSession &&
-        user &&
-        story &&
-        audioPlayer.progress >= 0.8 &&
-        audioPlayer.duration > 0
-      ) {
-        setHasTrackedSession(true);
-        try {
-          await createSession({
-            user_id: user.uid,
-            duration_minutes: story.duration_minutes,
-            session_type: 'bedtime_story',
-          });
-        } catch (error) {
-          console.error('Failed to track session:', error);
-        }
-      }
-    }
-    trackSession();
-  }, [audioPlayer.progress, hasTrackedSession, user, story]);
-
   const handleGoBack = () => {
     audioPlayer.cleanup();
     router.back();
-  };
-
-  const handleToggleFavorite = async () => {
-    if (!user || !story) return;
-    
-    // Prompt anonymous users to sign in
-    if (isAnonymous) {
-      Alert.alert(
-        'Sign In Required',
-        'Create an account to save favorites and sync across devices.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/login') },
-        ]
-      );
-      return;
-    }
-    
-    // Optimistic update
-    const previousState = isFavoritedState;
-    setIsFavoritedState(!previousState);
-    
-    try {
-      const newFavorited = await toggleFavorite(user.uid, story.id, 'bedtime_story');
-      if (newFavorited !== !previousState) {
-        setIsFavoritedState(newFavorited);
-      }
-    } catch {
-      setIsFavoritedState(previousState);
-    }
-  };
-
-  const handlePlayPause = async () => {
-    if (audioPlayer.isPlaying) {
-      audioPlayer.pause();
-    } else {
-      audioPlayer.play();
-      
-      // Track listening history on first play
-      if (!hasTrackedPlay && user && story && !isAnonymous) {
-        setHasTrackedPlay(true);
-        await addToListeningHistory(
-          user.uid,
-          story.id,
-          'bedtime_story',
-          story.title,
-          story.duration_minutes,
-          story.thumbnail_url
-        );
-      }
-    }
   };
 
   const getCategoryIcon = (): keyof typeof Ionicons.glyphMap => {
@@ -207,17 +133,20 @@ function SleepStoryPlayerScreen() {
       gradientColors={["#1A1D29", "#2A2D3E"]}
       artworkIcon={getCategoryIcon()}
       artworkThumbnailUrl={story?.thumbnail_url}
-      isFavorited={isFavoritedState}
+      isFavorited={isFavorited}
       isLoading={loading}
       audioPlayer={audioPlayer}
       onBack={handleGoBack}
-      onToggleFavorite={handleToggleFavorite}
-      onPlayPause={handlePlayPause}
+      onToggleFavorite={onToggleFavorite}
+      onPlayPause={onPlayPause}
       loadingText="Loading story..."
       contentId={id as string}
       contentType="bedtime_story"
       audioUrl={audioUrl}
       audioPath={story?.audio_file}
+      userRating={userRating}
+      onRate={onRate}
+      onReport={onReport}
     />
   );
 }

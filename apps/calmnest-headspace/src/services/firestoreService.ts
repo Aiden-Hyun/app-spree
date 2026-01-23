@@ -24,6 +24,8 @@ import {
   DailyQuote,
   UserFavorite,
   ListeningHistoryItem,
+  RatingType,
+  ReportCategory,
 } from "../types";
 
 // Collection references
@@ -36,6 +38,8 @@ const quotesCollection = collection(db, "daily_quotes");
 const favoritesCollection = collection(db, "user_favorites");
 const listeningHistoryCollection = collection(db, "listening_history");
 const usersCollection = collection(db, "users");
+const contentRatingsCollection = collection(db, "content_ratings");
+const contentReportsCollection = collection(db, "content_reports");
 
 // ==================== MEDITATIONS ====================
 
@@ -1554,5 +1558,117 @@ export async function deleteUserAccount(userId: string): Promise<void> {
   } catch (error) {
     console.error("Error deleting user account data:", error);
     throw error;
+  }
+}
+
+// ==================== CONTENT RATINGS ====================
+
+/**
+ * Get user's rating for a specific content
+ */
+export async function getUserRating(
+  userId: string,
+  contentId: string
+): Promise<RatingType | null> {
+  try {
+    const q = query(
+      contentRatingsCollection,
+      where("user_id", "==", userId),
+      where("content_id", "==", contentId)
+    );
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return null;
+    }
+
+    return snapshot.docs[0].data().rating as RatingType;
+  } catch (error) {
+    console.error("Error getting user rating:", error);
+    return null;
+  }
+}
+
+/**
+ * Set or toggle user's rating for content
+ * If same rating exists, removes it (toggle off)
+ * If different rating exists, updates it
+ * If no rating exists, creates one
+ */
+export async function setContentRating(
+  userId: string,
+  contentId: string,
+  contentType: string,
+  rating: RatingType
+): Promise<RatingType | null> {
+  try {
+    const q = query(
+      contentRatingsCollection,
+      where("user_id", "==", userId),
+      where("content_id", "==", contentId)
+    );
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const existingDoc = snapshot.docs[0];
+      const existingRating = existingDoc.data().rating as RatingType;
+
+      if (existingRating === rating) {
+        // Same rating - toggle off (remove)
+        await deleteDoc(existingDoc.ref);
+        return null;
+      } else {
+        // Different rating - update
+        await setDoc(existingDoc.ref, {
+          user_id: userId,
+          content_id: contentId,
+          content_type: contentType,
+          rating: rating,
+          rated_at: serverTimestamp(),
+        });
+        return rating;
+      }
+    } else {
+      // No rating exists - create new
+      await addDoc(contentRatingsCollection, {
+        user_id: userId,
+        content_id: contentId,
+        content_type: contentType,
+        rating: rating,
+        rated_at: serverTimestamp(),
+      });
+      return rating;
+    }
+  } catch (error) {
+    console.error("Error setting content rating:", error);
+    return null;
+  }
+}
+
+// ==================== CONTENT REPORTS ====================
+
+/**
+ * Submit a report for content
+ */
+export async function reportContent(
+  userId: string,
+  contentId: string,
+  contentType: string,
+  category: ReportCategory,
+  description?: string
+): Promise<boolean> {
+  try {
+    await addDoc(contentReportsCollection, {
+      user_id: userId,
+      content_id: contentId,
+      content_type: contentType,
+      category: category,
+      description: description || null,
+      reported_at: serverTimestamp(),
+    });
+    return true;
+  } catch (error) {
+    console.error("Error reporting content:", error);
+    return false;
   }
 }

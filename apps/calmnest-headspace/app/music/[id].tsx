@@ -21,15 +21,20 @@ import {
   FirestoreSleepSound,
   FirestoreMusicItem,
   createSession,
+  getUserRating,
+  setContentRating,
+  reportContent,
 } from '../../src/services/firestoreService';
 import { Theme } from '../../src/theme';
+import { RatingType, ReportCategory } from '../../src/types';
+import { ReportModal } from '../../src/components/ReportModal';
 
 type SoundData = FirestoreSleepSound | FirestoreMusicItem;
 
 const DEFAULT_TIMER_MINUTES = 45;
 
 function SoundPlayerScreen() {
-  const { id, category } = useLocalSearchParams<{ id: string; category?: string }>();
+  const { id } = useLocalSearchParams<{ id: string; category?: string }>();
   const router = useRouter();
   const { theme } = useTheme();
   const { user, isAnonymous } = useAuth();
@@ -42,6 +47,8 @@ function SoundPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
+  const [userRating, setUserRating] = useState<RatingType | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayer = useAudioPlayer();
@@ -66,19 +73,19 @@ function SoundPlayerScreen() {
           getAsmr(),
         ]);
     
-    // Search in all data sources
+        // Search in all data sources
         const allSounds: SoundData[] = [
           ...sleepSounds,
           ...whiteNoise,
           ...music,
           ...asmr,
-    ];
+        ];
     
         const foundSound = allSounds.find((s) => s.id === id);
     
-    if (foundSound) {
-      setSound(foundSound);
-    }
+        if (foundSound) {
+          setSound(foundSound);
+        }
       } catch (error) {
         console.error('Error fetching sound:', error);
       } finally {
@@ -88,6 +95,17 @@ function SoundPlayerScreen() {
     
     fetchSound();
   }, [id]);
+
+  // Load user rating on mount
+  useEffect(() => {
+    async function loadUserRating() {
+      if (user && id) {
+        const rating = await getUserRating(user.uid, id);
+        setUserRating(rating);
+      }
+    }
+    loadUserRating();
+  }, [user, id]);
 
   // Load audio when sound is found
   useEffect(() => {
@@ -170,7 +188,7 @@ function SoundPlayerScreen() {
         undefined
       );
     }
-  }, [audioPlayer, timerMinutes, hasTrackedPlay, user, sound, id]);
+  }, [audioPlayer, timerMinutes, hasTrackedPlay, user, sound, id, isAnonymous]);
 
   const handlePause = useCallback(() => {
     audioPlayer.pause();
@@ -197,6 +215,35 @@ function SoundPlayerScreen() {
       }
     }
   }, [audioPlayer.isPlaying]);
+
+  const handleRate = async (rating: RatingType): Promise<RatingType | null> => {
+    if (!user || !id) return null;
+
+    // Calculate expected new state optimistically
+    const previousRating = userRating;
+    const optimisticRating = previousRating === rating ? null : rating;
+    
+    // Optimistic update
+    setUserRating(optimisticRating);
+
+    try {
+      const serverRating = await setContentRating(user.uid, id, "sound", rating);
+      // Sync with server response in case of mismatch
+      if (serverRating !== optimisticRating) {
+        setUserRating(serverRating);
+      }
+      return serverRating;
+    } catch {
+      // Revert on error
+      setUserRating(previousRating);
+      return previousRating;
+    }
+  };
+
+  const handleReport = async (category: ReportCategory, description?: string): Promise<boolean> => {
+    if (!user || !id) return false;
+    return await reportContent(user.uid, id, "sound", category, description);
+  };
 
   const handleGoBack = useCallback(() => {
     audioPlayer.cleanup();
@@ -245,25 +292,66 @@ function SoundPlayerScreen() {
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea} edges={['top']}>
-          {/* Header with Back and Download */}
+          {/* Header with Back, Rating, Report, and Download */}
           <View style={styles.header}>
             <AnimatedPressable onPress={handleGoBack} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color={theme.colors.sleepText} />
             </AnimatedPressable>
-            {audioUrl && sound && (
-              <DownloadButton
-                contentId={id}
-                contentType="sound"
-                audioUrl={audioUrl}
-                metadata={{
-                  title: sound.title,
-                  duration_minutes: timerMinutes || 30,
-                  audioPath: sound.audioPath,
-                }}
-                size={24}
-                darkMode={true}
-              />
-            )}
+            <View style={styles.headerRight}>
+              {/* Like Button */}
+              <AnimatedPressable
+                onPress={() => handleRate('like')}
+                style={[
+                  styles.headerButton,
+                  userRating === 'like' && styles.headerButtonLiked,
+                ]}
+              >
+                <Ionicons
+                  name={userRating === 'like' ? 'thumbs-up' : 'thumbs-up-outline'}
+                  size={20}
+                  color={userRating === 'like' ? '#4CAF50' : theme.colors.sleepText}
+                />
+              </AnimatedPressable>
+
+              {/* Dislike Button */}
+              <AnimatedPressable
+                onPress={() => handleRate('dislike')}
+                style={[
+                  styles.headerButton,
+                  userRating === 'dislike' && styles.headerButtonDisliked,
+                ]}
+              >
+                <Ionicons
+                  name={userRating === 'dislike' ? 'thumbs-down' : 'thumbs-down-outline'}
+                  size={20}
+                  color={userRating === 'dislike' ? '#FF6B6B' : theme.colors.sleepText}
+                />
+              </AnimatedPressable>
+
+              {/* Report Button */}
+              <AnimatedPressable
+                onPress={() => setShowReportModal(true)}
+                style={styles.headerButton}
+              >
+                <Ionicons name="flag-outline" size={20} color={theme.colors.sleepText} />
+              </AnimatedPressable>
+
+              {/* Download Button */}
+              {audioUrl && sound && (
+                <DownloadButton
+                  contentId={id}
+                  contentType="sound"
+                  audioUrl={audioUrl}
+                  metadata={{
+                    title: sound.title,
+                    duration_minutes: timerMinutes || 30,
+                    audioPath: sound.audioPath,
+                  }}
+                  size={24}
+                  darkMode={true}
+                />
+              )}
+            </View>
           </View>
 
           {/* Sound Player */}
@@ -284,6 +372,14 @@ function SoundPlayerScreen() {
               iconColor={sound.color}
             />
           </View>
+
+          {/* Report Modal */}
+          <ReportModal
+            visible={showReportModal}
+            onClose={() => setShowReportModal(false)}
+            onSubmit={handleReport}
+            contentTitle={sound.title}
+          />
         </SafeAreaView>
       </LinearGradient>
     </View>
@@ -301,13 +397,13 @@ const createStyles = (theme: Theme) =>
     safeArea: {
       flex: 1,
     },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+    },
     backButton: {
       width: 44,
       height: 44,
@@ -315,6 +411,25 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.sleepSurface,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.sleepSurface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerButtonLiked: {
+      backgroundColor: 'rgba(76, 175, 80, 0.25)',
+    },
+    headerButtonDisliked: {
+      backgroundColor: 'rgba(255, 107, 107, 0.25)',
     },
     playerContainer: {
       flex: 1,
@@ -340,4 +455,3 @@ export default function SoundPlayerPage() {
     </ProtectedRoute>
   );
 }
-

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,15 +7,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../../src/hooks/useAudioPlayer";
+import { usePlayerBehavior } from "../../../src/hooks/usePlayerBehavior";
 import { useTheme } from "../../../src/contexts/ThemeContext";
-import { useAuth } from "../../../src/contexts/AuthContext";
 import {
-  addToListeningHistory,
-  toggleFavorite,
-  isFavorite,
   getSleepMeditationById,
   FirestoreSleepMeditation,
-  createSession,
 } from "../../../src/services/firestoreService";
 import { getAudioUrlFromPath } from "../../../src/constants/audioFiles";
 import { Theme } from "../../../src/theme";
@@ -24,18 +20,29 @@ function SleepMeditationPlayerScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
-  const { user, isAnonymous } = useAuth();
-  const [meditation, setMeditation] = useState<FirestoreSleepMeditation | null>(
-    null
-  );
+  const [meditation, setMeditation] = useState<FirestoreSleepMeditation | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
-  const [hasTrackedSession, setHasTrackedSession] = useState(false);
-  const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
+
+  // Use the shared player behavior hook
+  const {
+    isFavorited,
+    userRating,
+    onToggleFavorite,
+    onPlayPause,
+    onRate,
+    onReport,
+  } = usePlayerBehavior({
+    contentId: id as string,
+    contentType: "sleep_meditation",
+    audioPlayer,
+    title: meditation?.title,
+    durationMinutes: meditation?.duration_minutes,
+    thumbnailUrl: meditation?.thumbnailUrl,
+  });
 
   // Fetch meditation from Firestore
   useEffect(() => {
@@ -48,17 +55,6 @@ function SleepMeditationPlayerScreen() {
     }
     loadMeditation();
   }, [id]);
-
-  // Check if favorited on load
-  useEffect(() => {
-    async function checkFavorite() {
-      if (user && id) {
-        const favorited = await isFavorite(user.uid, id as string);
-        setIsFavoritedState(favorited);
-      }
-    }
-    checkFavorite();
-  }, [user, id]);
 
   // Load audio when meditation is found
   useEffect(() => {
@@ -75,88 +71,9 @@ function SleepMeditationPlayerScreen() {
     loadAudio();
   }, [meditation]);
 
-  // Track session for stats when user completes 80% of audio
-  useEffect(() => {
-    async function trackSession() {
-      if (
-        !hasTrackedSession &&
-        user &&
-        meditation &&
-        audioPlayer.progress >= 0.8 &&
-        audioPlayer.duration > 0
-      ) {
-        setHasTrackedSession(true);
-        try {
-          await createSession({
-            user_id: user.uid,
-            duration_minutes: meditation.duration_minutes,
-            session_type: "sleep_meditation",
-          });
-        } catch (error) {
-          console.error("Failed to track session:", error);
-        }
-      }
-    }
-    trackSession();
-  }, [audioPlayer.progress, hasTrackedSession, user, meditation]);
-
   const handleGoBack = () => {
     audioPlayer.cleanup();
     router.back();
-  };
-
-  const handleToggleFavorite = async () => {
-    if (!user || !meditation) return;
-
-    // Prompt anonymous users to sign in
-    if (isAnonymous) {
-      Alert.alert(
-        'Sign In Required',
-        'Create an account to save favorites and sync across devices.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/login') },
-        ]
-      );
-      return;
-    }
-
-    const previousState = isFavoritedState;
-    setIsFavoritedState(!previousState);
-
-    try {
-      const newFavorited = await toggleFavorite(
-        user.uid,
-        meditation.id,
-        "sleep_meditation"
-      );
-      if (newFavorited !== !previousState) {
-        setIsFavoritedState(newFavorited);
-      }
-    } catch {
-      setIsFavoritedState(previousState);
-    }
-  };
-
-  const handlePlayPause = async () => {
-    if (audioPlayer.isPlaying) {
-      audioPlayer.pause();
-    } else {
-      audioPlayer.play();
-
-      // Track listening history on first play
-      if (!hasTrackedPlay && user && meditation && !isAnonymous) {
-        setHasTrackedPlay(true);
-        await addToListeningHistory(
-          user.uid,
-          meditation.id,
-          "sleep_meditation",
-          meditation.title,
-          meditation.duration_minutes,
-          meditation.thumbnailUrl
-        );
-      }
-    }
   };
 
   // Error state - meditation not found
@@ -195,17 +112,20 @@ function SleepMeditationPlayerScreen() {
         (meditation?.icon as keyof typeof Ionicons.glyphMap) || "moon"
       }
       artworkThumbnailUrl={meditation?.thumbnailUrl}
-      isFavorited={isFavoritedState}
+      isFavorited={isFavorited}
       isLoading={loading}
       audioPlayer={audioPlayer}
       onBack={handleGoBack}
-      onToggleFavorite={handleToggleFavorite}
-      onPlayPause={handlePlayPause}
+      onToggleFavorite={onToggleFavorite}
+      onPlayPause={onPlayPause}
       loadingText="Loading meditation..."
       contentId={id as string}
       contentType="sleep_meditation"
       audioUrl={audioUrl}
       audioPath={meditation?.audioPath}
+      userRating={userRating}
+      onRate={onRate}
+      onReport={onReport}
     />
   );
 }

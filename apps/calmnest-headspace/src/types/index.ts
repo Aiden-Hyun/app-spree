@@ -213,3 +213,27 @@ export interface UserStats {
   yearly_minutes: number[];
   mood_improvement: number;
 }
+
+// Content Ratings (Like/Dislike)
+export type RatingType = "like" | "dislike";
+
+export interface ContentRating {
+  id: string;
+  user_id: string;
+  content_id: string;
+  content_type: string;
+  rating: RatingType;
+  rated_at: string;
+}
+
+// Content Reports
+export type ReportCategory = "audio_issue" | "wrong_content" | "inappropriate" | "other";
+
+export interface ContentReport {
+  id: string;
+  user_id: string;
+  content_id: string;
+  content_type: string;
+  category: ReportCategory;
+  reported_at: string;
+}

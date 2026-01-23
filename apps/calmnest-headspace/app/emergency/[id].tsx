@@ -1,17 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { MediaPlayer } from "../../src/components/MediaPlayer";
 import { useAudioPlayer } from "../../src/hooks/useAudioPlayer";
-import { useAuth } from "../../src/contexts/AuthContext";
+import { usePlayerBehavior } from "../../src/hooks/usePlayerBehavior";
 import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
-import {
-  addToListeningHistory,
-  toggleFavorite,
-  isFavorite,
-  createSession,
-} from "../../src/services/firestoreService";
 
 // Helper to lighten a hex color
 function adjustColor(hex: string, percent: number): string {
@@ -47,26 +40,30 @@ function EmergencyPlayerScreen() {
   }>();
 
   const router = useRouter();
-  const { user, isAnonymous } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
-  const [hasTrackedSession, setHasTrackedSession] = useState(false);
-  const [isFavoritedState, setIsFavoritedState] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const audioPlayer = useAudioPlayer();
+  const durationMinutes = parseInt(duration) || 4;
 
-  // Check if favorited on load
-  useEffect(() => {
-    async function checkFavorite() {
-      if (user && id) {
-        const favorited = await isFavorite(user.uid, id);
-        setIsFavoritedState(favorited);
-      }
-    }
-    checkFavorite();
-  }, [user, id]);
+  // Use the shared player behavior hook
+  const {
+    isFavorited,
+    userRating,
+    onToggleFavorite,
+    onPlayPause,
+    onRate,
+    onReport,
+  } = usePlayerBehavior({
+    contentId: id,
+    contentType: "emergency",
+    audioPlayer,
+    title,
+    durationMinutes,
+    thumbnailUrl,
+  });
 
+  // Load audio
   useEffect(() => {
     async function loadAudio() {
       if (!audioPath) {
@@ -90,114 +87,39 @@ function EmergencyPlayerScreen() {
     loadAudio();
   }, [audioPath]);
 
-  // Track session for stats when user completes 80% of audio
-  useEffect(() => {
-    async function trackSession() {
-      if (
-        !hasTrackedSession &&
-        user &&
-        id &&
-        audioPlayer.progress >= 0.8 &&
-        audioPlayer.duration > 0
-      ) {
-        setHasTrackedSession(true);
-        try {
-          await createSession({
-            user_id: user.uid,
-            duration_minutes: parseInt(duration) || 4,
-            session_type: "emergency",
-          });
-        } catch (error) {
-          console.error("Failed to track session:", error);
-        }
-      }
-    }
-    trackSession();
-  }, [audioPlayer.progress, hasTrackedSession, user, id, duration]);
-
   const handleGoBack = () => {
     audioPlayer.cleanup();
     router.back();
-  };
-
-  const handleToggleFavorite = async () => {
-    if (!user || !id) return;
-
-    // Prompt anonymous users to sign in
-    if (isAnonymous) {
-      Alert.alert(
-        'Sign In Required',
-        'Create an account to save favorites and sync across devices.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/login') },
-        ]
-      );
-      return;
-    }
-
-    // Optimistic update
-    const previousState = isFavoritedState;
-    setIsFavoritedState(!previousState);
-
-    try {
-      const newFavorited = await toggleFavorite(user.uid, id, "emergency");
-      if (newFavorited !== !previousState) {
-        setIsFavoritedState(newFavorited);
-      }
-    } catch {
-      setIsFavoritedState(previousState);
-    }
-  };
-
-  const handlePlayPause = async () => {
-    if (audioPlayer.isPlaying) {
-      audioPlayer.pause();
-    } else {
-      audioPlayer.play();
-
-      // Track listening history on first play
-      if (!hasTrackedPlay && user && id && title && !isAnonymous) {
-        setHasTrackedPlay(true);
-        await addToListeningHistory(
-          user.uid,
-          id,
-          "emergency",
-          title,
-          parseInt(duration) || 4,
-          undefined
-        );
-      }
-    }
   };
 
   // Parse the color from params or use default
   const bgColor = color || "#E57373";
   const gradientColors: [string, string] = [bgColor, adjustColor(bgColor, 20)];
 
-  const instructorName = narrator || "Guide";
-
   return (
     <MediaPlayer
       category="emergency"
       title={title || "Emergency Relief"}
-      instructor={instructorName}
+      instructor={narrator || "Guide"}
       description={description || "Quick relief for moments of distress"}
-      durationMinutes={parseInt(duration) || 4}
+      durationMinutes={durationMinutes}
       gradientColors={gradientColors}
       artworkIcon={(icon as any) || "flash"}
       artworkThumbnailUrl={thumbnailUrl}
-      isFavorited={isFavoritedState}
+      isFavorited={isFavorited}
       isLoading={loading}
       audioPlayer={audioPlayer}
       onBack={handleGoBack}
-      onToggleFavorite={handleToggleFavorite}
-      onPlayPause={handlePlayPause}
+      onToggleFavorite={onToggleFavorite}
+      onPlayPause={onPlayPause}
       loadingText="Loading..."
       contentId={id}
       contentType="emergency"
       audioUrl={audioUrl}
       audioPath={audioPath}
+      userRating={userRating}
+      onRate={onRate}
+      onReport={onReport}
     />
   );
 }
