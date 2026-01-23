@@ -52,6 +52,7 @@ function EmergencyPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const audioPlayer = useAudioPlayer();
 
@@ -74,9 +75,10 @@ function EmergencyPlayerScreen() {
       }
 
       try {
-        const audioUrl = await getAudioUrlFromPath(audioPath);
-        if (audioUrl) {
-          audioPlayer.loadAudio(audioUrl);
+        const url = await getAudioUrlFromPath(audioPath);
+        if (url) {
+          setAudioUrl(url);
+          audioPlayer.loadAudio(url);
         }
       } catch (error) {
         console.error("Failed to load emergency audio:", error);
@@ -194,6 +196,8 @@ function EmergencyPlayerScreen() {
       loadingText="Loading..."
       contentId={id}
       contentType="emergency"
+      audioUrl={audioUrl}
+      audioPath={audioPath}
     />
   );
 }

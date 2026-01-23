@@ -7,9 +7,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
+import { DownloadButton } from "../../src/components/DownloadButton";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { getSleepSounds, FirestoreSleepSound } from "../../src/services/firestoreService";
+import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
+import { getDownloadedContentIds } from "../../src/services/downloadService";
 import { Theme } from "../../src/theme";
+import { useSubscription } from "../../src/contexts/SubscriptionContext";
+import { PaywallModal } from "../../src/components/PaywallModal";
 
 type SleepSoundCategory = 'rain' | 'water' | 'fire' | 'wind' | 'nature' | 'ambient';
 
@@ -28,9 +33,14 @@ const categoryLabels: Record<SleepSoundCategory | 'all', string> = {
 function NatureSoundsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [selectedCategory, setSelectedCategory] = useState<SleepSoundCategory | 'all'>('all');
   const [sounds, setSounds] = useState<FirestoreSleepSound[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -41,6 +51,21 @@ function NatureSoundsScreen() {
         setLoading(true);
         const data = await getSleepSounds();
         setSounds(data);
+
+        // Load audio URLs for all sounds
+        const urls = new Map<string, string>();
+        for (const sound of data) {
+          if (sound.audioPath) {
+            const url = await getAudioUrlFromPath(sound.audioPath);
+            if (url) urls.set(sound.id, url);
+          }
+        }
+        setAudioUrls(urls);
+
+        // Load downloaded IDs
+        const ids = await getDownloadedContentIds('sound');
+        setDownloadedIds(ids);
+        setRefreshKey(prev => prev + 1);
       } catch (error) {
         console.error('Error fetching sounds:', error);
       } finally {
@@ -81,6 +106,26 @@ function NatureSoundsScreen() {
           <Text style={styles.soundTitle}>{item.title}</Text>
           <Text style={styles.soundDescription}>{item.description}</Text>
         </View>
+        {audioUrls.get(item.id) && (
+          <DownloadButton
+            contentId={item.id}
+            contentType="sound"
+            audioUrl={audioUrls.get(item.id)!}
+            metadata={{
+              title: item.title,
+              duration_minutes: 30,
+              audioPath: item.audioPath,
+            }}
+            size={20}
+            darkMode={true}
+            refreshKey={refreshKey}
+            onDownloadComplete={() => {
+              getDownloadedContentIds('sound').then(setDownloadedIds);
+            }}
+            isPremiumLocked={!item.isFree && !hasSubscription}
+            onPremiumRequired={() => setShowPaywall(true)}
+          />
+        )}
         <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
       </AnimatedPressable>
     </AnimatedView>
@@ -146,6 +191,12 @@ function NatureSoundsScreen() {
           )}
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </View>
   );
 }

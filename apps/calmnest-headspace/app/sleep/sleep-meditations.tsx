@@ -13,15 +13,25 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
+import { DownloadButton } from '../../src/components/DownloadButton';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import { getSleepMeditations, FirestoreSleepMeditation } from '../../src/services/firestoreService';
+import { getAudioUrlFromPath } from '../../src/constants/audioFiles';
+import { getDownloadedContentIds } from '../../src/services/downloadService';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../src/components/PaywallModal';
 
 function SleepMeditationsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [meditations, setMeditations] = useState<FirestoreSleepMeditation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -30,6 +40,21 @@ function SleepMeditationsScreen() {
       setLoading(true);
       const data = await getSleepMeditations();
       setMeditations(data);
+
+      // Load audio URLs for all meditations
+      const urls = new Map<string, string>();
+      for (const meditation of data) {
+        if (meditation.audioPath) {
+          const url = await getAudioUrlFromPath(meditation.audioPath);
+          if (url) urls.set(meditation.id, url);
+        }
+      }
+      setAudioUrls(urls);
+
+      // Load downloaded IDs
+      const ids = await getDownloadedContentIds('sleep_meditation');
+      setDownloadedIds(ids);
+      setRefreshKey(prev => prev + 1);
       setLoading(false);
     }
     loadMeditations();
@@ -70,6 +95,27 @@ function SleepMeditationsScreen() {
             </View>
           </View>
         </View>
+        {audioUrls.get(item.id) && (
+          <DownloadButton
+            contentId={item.id}
+            contentType="sleep_meditation"
+            audioUrl={audioUrls.get(item.id)!}
+            metadata={{
+              title: item.title,
+              duration_minutes: item.duration_minutes,
+              thumbnailUrl: item.thumbnailUrl,
+              audioPath: item.audioPath,
+            }}
+            size={20}
+            darkMode={true}
+            refreshKey={refreshKey}
+            onDownloadComplete={() => {
+              getDownloadedContentIds('sleep_meditation').then(setDownloadedIds);
+            }}
+            isPremiumLocked={!item.isFree && !hasSubscription}
+            onPremiumRequired={() => setShowPaywall(true)}
+          />
+        )}
         <View style={styles.meditationChevron}>
           <Ionicons name="chevron-forward" size={20} color={theme.colors.sleepTextMuted} />
         </View>
@@ -119,6 +165,12 @@ function SleepMeditationsScreen() {
           )}
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </View>
   );
 }

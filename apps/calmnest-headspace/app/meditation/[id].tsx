@@ -24,6 +24,7 @@ function MeditationPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
@@ -63,9 +64,10 @@ function MeditationPlayerScreen() {
       
       // Use the new audioPath field
       if (meditation.audioPath) {
-        const audioUrl = await getAudioUrlFromPath(meditation.audioPath);
-        if (audioUrl) {
-          audioPlayer.loadAudio(audioUrl);
+        const url = await getAudioUrlFromPath(meditation.audioPath);
+        if (url) {
+          setAudioUrl(url);
+          audioPlayer.loadAudio(url);
         }
       }
     }
@@ -212,8 +214,10 @@ function MeditationPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading meditation..."
-      contentId={id}
-      contentType="meditation"
+      contentId={id as string}
+      contentType="guided_meditation"
+      audioUrl={audioUrl}
+      audioPath={meditation?.audioPath}
     />
   );
 }

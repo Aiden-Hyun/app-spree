@@ -32,6 +32,7 @@ function SleepMeditationPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
@@ -64,9 +65,10 @@ function SleepMeditationPlayerScreen() {
     async function loadAudio() {
       if (!meditation?.audioPath) return;
 
-      const audioUrl = await getAudioUrlFromPath(meditation.audioPath);
-      if (audioUrl) {
-        audioPlayer.loadAudio(audioUrl);
+      const url = await getAudioUrlFromPath(meditation.audioPath);
+      if (url) {
+        setAudioUrl(url);
+        audioPlayer.loadAudio(url);
       }
     }
 
@@ -200,8 +202,10 @@ function SleepMeditationPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading meditation..."
-      contentId={id}
+      contentId={id as string}
       contentType="sleep_meditation"
+      audioUrl={audioUrl}
+      audioPath={meditation?.audioPath}
     />
   );
 }

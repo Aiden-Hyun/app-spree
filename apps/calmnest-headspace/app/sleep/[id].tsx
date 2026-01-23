@@ -24,6 +24,7 @@ function SleepStoryPlayerScreen() {
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
   const [isFavoritedState, setIsFavoritedState] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
   const audioPlayer = useAudioPlayer();
@@ -63,15 +64,17 @@ function SleepStoryPlayerScreen() {
 
       // Try to get audio URL from audio_file key
       if (story.audio_file) {
-        const audioUrl = await getAudioUrl(story.audio_file);
-        if (audioUrl) {
-          audioPlayer.loadAudio(audioUrl);
+        const url = await getAudioUrl(story.audio_file);
+        if (url) {
+          setAudioUrl(url);
+          audioPlayer.loadAudio(url);
           return;
         }
       }
 
       // Fallback to direct audio_url
       if (story.audio_url) {
+        setAudioUrl(story.audio_url);
         audioPlayer.loadAudio(story.audio_url);
       }
     }
@@ -211,8 +214,10 @@ function SleepStoryPlayerScreen() {
       onToggleFavorite={handleToggleFavorite}
       onPlayPause={handlePlayPause}
       loadingText="Loading story..."
-      contentId={id}
+      contentId={id as string}
       contentType="bedtime_story"
+      audioUrl={audioUrl}
+      audioPath={story?.audio_file}
     />
   );
 }

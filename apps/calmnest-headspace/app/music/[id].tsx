@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { SoundPlayer } from '../../src/components/SoundPlayer';
+import { DownloadButton } from '../../src/components/DownloadButton';
 import { useAudioPlayer } from '../../src/hooks/useAudioPlayer';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -40,6 +41,7 @@ function SoundPlayerScreen() {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [hasTrackedPlay, setHasTrackedPlay] = useState(false);
   const [hasTrackedSession, setHasTrackedSession] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayer = useAudioPlayer();
@@ -92,9 +94,10 @@ function SoundPlayerScreen() {
     async function loadSoundAudio() {
       if (!sound?.audioPath) return;
       
-      const audioUrl = await getAudioUrlFromPath(sound.audioPath);
-      if (audioUrl) {
-        await audioPlayer.loadAudio(audioUrl);
+      const url = await getAudioUrlFromPath(sound.audioPath);
+      if (url) {
+        setAudioUrl(url);
+        await audioPlayer.loadAudio(url);
         // Enable looping by default for ambient sounds
         audioPlayer.setLoop(true);
       }
@@ -242,11 +245,25 @@ function SoundPlayerScreen() {
         style={styles.gradient}
       >
         <SafeAreaView style={styles.safeArea} edges={['top']}>
-          {/* Back Button */}
+          {/* Header with Back and Download */}
           <View style={styles.header}>
             <AnimatedPressable onPress={handleGoBack} style={styles.backButton}>
               <Ionicons name="chevron-back" size={24} color={theme.colors.sleepText} />
             </AnimatedPressable>
+            {audioUrl && sound && (
+              <DownloadButton
+                contentId={id}
+                contentType="sound"
+                audioUrl={audioUrl}
+                metadata={{
+                  title: sound.title,
+                  duration_minutes: timerMinutes || 30,
+                  audioPath: sound.audioPath,
+                }}
+                size={24}
+                darkMode={true}
+              />
+            )}
           </View>
 
           {/* Sound Player */}
@@ -284,12 +301,13 @@ const createStyles = (theme: Theme) =>
     safeArea: {
       flex: 1,
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: theme.spacing.lg,
-      paddingVertical: theme.spacing.md,
-    },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
     backButton: {
       width: 44,
       height: 44,

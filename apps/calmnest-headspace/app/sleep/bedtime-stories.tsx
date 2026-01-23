@@ -14,10 +14,15 @@ import { ProtectedRoute } from '../../src/components/ProtectedRoute';
 import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { SkeletonListItem } from '../../src/components/Skeleton';
+import { DownloadButton } from '../../src/components/DownloadButton';
 import { getBedtimeStories } from '../../src/services/firestoreService';
+import { getAudioUrl } from '../../src/constants/audioFiles';
+import { getDownloadedContentIds } from '../../src/services/downloadService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { Theme } from '../../src/theme';
 import { BedtimeStory } from '../../src/types';
+import { useSubscription } from '../../src/contexts/SubscriptionContext';
+import { PaywallModal } from '../../src/components/PaywallModal';
 
 const categories = [
   { id: 'all', label: 'All', icon: 'grid-outline' as const },
@@ -31,9 +36,14 @@ const categories = [
 function BedtimeStoriesScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { isPremium: hasSubscription } = useSubscription();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [stories, setStories] = useState<BedtimeStory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -46,6 +56,23 @@ function BedtimeStoriesScreen() {
       setLoading(true);
       const data = await getBedtimeStories();
       setStories(data);
+
+      // Load audio URLs for all stories
+      const urls = new Map<string, string>();
+      for (const story of data) {
+        if (story.audio_file) {
+          const url = await getAudioUrl(story.audio_file);
+          if (url) urls.set(story.id, url);
+        } else if (story.audio_url) {
+          urls.set(story.id, story.audio_url);
+        }
+      }
+      setAudioUrls(urls);
+
+      // Load downloaded IDs
+      const ids = await getDownloadedContentIds('bedtime_story');
+      setDownloadedIds(ids);
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Failed to load bedtime stories:', error);
     } finally {
@@ -114,6 +141,27 @@ function BedtimeStoriesScreen() {
             </View>
           </View>
         </View>
+        {audioUrls.get(item.id) && (
+          <DownloadButton
+            contentId={item.id}
+            contentType="bedtime_story"
+            audioUrl={audioUrls.get(item.id)!}
+            metadata={{
+              title: item.title,
+              duration_minutes: item.duration_minutes,
+              thumbnailUrl: item.thumbnail_url,
+              audioPath: item.audio_file,
+            }}
+            size={20}
+            darkMode={true}
+            refreshKey={refreshKey}
+            onDownloadComplete={() => {
+              getDownloadedContentIds('bedtime_story').then(setDownloadedIds);
+            }}
+            isPremiumLocked={!item.isFree && !hasSubscription}
+            onPremiumRequired={() => setShowPaywall(true)}
+          />
+        )}
         <View style={styles.storyChevron}>
           <Ionicons name="chevron-forward" size={20} color={theme.colors.sleepTextMuted} />
         </View>
@@ -213,6 +261,12 @@ function BedtimeStoriesScreen() {
           )}
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </View>
   );
 }

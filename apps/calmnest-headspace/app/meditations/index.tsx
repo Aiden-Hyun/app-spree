@@ -14,7 +14,10 @@ import { ProtectedRoute } from "../../src/components/ProtectedRoute";
 import { AnimatedView } from "../../src/components/AnimatedView";
 import { AnimatedPressable } from "../../src/components/AnimatedPressable";
 import { SkeletonListItem } from "../../src/components/Skeleton";
+import { DownloadButton } from "../../src/components/DownloadButton";
 import { getMeditations, getMeditationsByTheme } from "../../src/services/firestoreService";
+import { getAudioUrlFromPath } from "../../src/constants/audioFiles";
+import { getDownloadedContentIds } from "../../src/services/downloadService";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { Theme } from "../../src/theme";
 import { GuidedMeditation } from "../../src/types";
@@ -78,6 +81,9 @@ function AllMeditationsScreen() {
   const [meditations, setMeditations] = useState<GuidedMeditation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [audioUrls, setAudioUrls] = useState<Map<string, string>>(new Map());
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -92,6 +98,21 @@ function AllMeditationsScreen() {
         ? await getMeditations()
         : await getMeditationsByTheme(selectedCategory);
       setMeditations(data);
+
+      // Load audio URLs for all meditations
+      const urls = new Map<string, string>();
+      for (const meditation of data) {
+        if (meditation.audioPath) {
+          const url = await getAudioUrlFromPath(meditation.audioPath);
+          if (url) urls.set(meditation.id, url);
+        }
+      }
+      setAudioUrls(urls);
+
+      // Load downloaded IDs
+      const ids = await getDownloadedContentIds('guided_meditation');
+      setDownloadedIds(ids);
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error("Failed to load meditations:", error);
     } finally {
@@ -175,6 +196,27 @@ function AllMeditationsScreen() {
             )}
           </View>
         </View>
+        {audioUrls.get(item.id) && (
+          <DownloadButton
+            contentId={item.id}
+            contentType="guided_meditation"
+            audioUrl={audioUrls.get(item.id)!}
+            metadata={{
+              title: item.title,
+              duration_minutes: item.duration_minutes,
+              thumbnailUrl: item.thumbnailUrl,
+              audioPath: item.audioPath,
+            }}
+            size={20}
+            darkMode={false}
+            refreshKey={refreshKey}
+            onDownloadComplete={() => {
+              getDownloadedContentIds('guided_meditation').then(setDownloadedIds);
+            }}
+            isPremiumLocked={!item.isFree && !hasSubscription}
+            onPremiumRequired={() => setShowPaywall(true)}
+          />
+        )}
         <View style={styles.sessionChevron}>
           {!item.isFree && !hasSubscription ? (
             <Ionicons
