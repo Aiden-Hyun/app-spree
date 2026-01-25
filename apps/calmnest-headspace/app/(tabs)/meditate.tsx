@@ -13,10 +13,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { useContentPreload } from '../../src/contexts/ContentPreloadContext';
 import { Theme } from '../../src/theme';
-import { 
-  FirestoreEmergencyMeditation,
-  FirestoreCourse
-} from '../../src/services/firestoreService';
+import { FirestoreCourse } from '../../src/services/firestoreService';
 import { MeditationTechnique } from '../../src/types';
 
 const themeCategories = [
@@ -59,7 +56,6 @@ function MeditateScreen() {
   const { meditateContent } = useContentPreload();
   
   // Use preloaded data
-  const emergencyMeditations = meditateContent.emergencyMeditations;
   const courses = meditateContent.courses;
   
   const [showPaywall, setShowPaywall] = useState(false);
@@ -77,28 +73,6 @@ function MeditateScreen() {
     router.push({
       pathname: '/meditations/therapies',
       params: { therapy: therapyId },
-    });
-  };
-
-  const handleEmergencyPress = (meditation: FirestoreEmergencyMeditation) => {
-    // Check isFree field from Firestore
-    if (!meditation.isFree && !hasSubscription) {
-      setShowPaywall(true);
-      return;
-    }
-    router.push({
-      pathname: '/emergency/[id]',
-      params: {
-        id: meditation.id,
-        title: meditation.title,
-        description: meditation.description,
-        duration: meditation.duration_minutes.toString(),
-        audioPath: meditation.audioPath,
-        color: meditation.color,
-        icon: meditation.icon,
-        narrator: meditation.narrator || '',
-        thumbnailUrl: meditation.thumbnailUrl || '',
-      },
     });
   };
 
@@ -191,55 +165,9 @@ function MeditateScreen() {
           </AnimatedView>
         </View>
 
-        {/* Browse by Theme */}
-        <View style={styles.section}>
-          <AnimatedView delay={200} duration={400}>
-            <AnimatedPressable
-              onPress={() => router.push('/meditations')}
-              style={styles.sectionHeader}
-            >
-              <Text style={styles.sectionTitle}>Browse by Theme</Text>
-              <View style={styles.seeAllContainer}>
-                <Text style={styles.seeAllText}>See all</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={theme.colors.primary}
-                />
-              </View>
-            </AnimatedPressable>
-          </AnimatedView>
-
-          <AnimatedView delay={250} duration={400}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.cardsScroll}
-            >
-              {themeCategories.map((cat) => (
-                <AnimatedPressable
-                  key={cat.id}
-                  onPress={() => handleThemePress(cat.id)}
-                  style={styles.themeCard}
-                >
-                  <View
-                style={[
-                      styles.themeIconContainer,
-                      { backgroundColor: `${cat.color}20` },
-                ]}
-              >
-                    <Ionicons name={cat.icon} size={24} color={cat.color} />
-                  </View>
-                <Text style={styles.themeLabel}>{cat.label}</Text>
-                </AnimatedPressable>
-              ))}
-            </ScrollView>
-              </AnimatedView>
-        </View>
-
         {/* Browse by Therapies */}
         <View style={styles.section}>
-          <AnimatedView delay={300} duration={400}>
+          <AnimatedView delay={200} duration={400}>
             <AnimatedPressable
               onPress={() => router.push('/meditations/therapies')}
               style={styles.sectionHeader}
@@ -256,7 +184,7 @@ function MeditateScreen() {
             </AnimatedPressable>
           </AnimatedView>
 
-          <AnimatedView delay={350} duration={400}>
+          <AnimatedView delay={250} duration={400}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -284,43 +212,9 @@ function MeditateScreen() {
           </AnimatedView>
         </View>
 
-        {/* Emergency */}
-        <View style={styles.section}>
-          <AnimatedView delay={400} duration={400}>
-            <View style={styles.sectionHeaderNoLink}>
-              <View style={styles.emergencyTitleRow}>
-                <Ionicons name="flash" size={20} color="#E57373" />
-                <Text style={styles.sectionTitle}>Emergency</Text>
-            </View>
-              <Text style={styles.sectionSubtitle}>Quick relief in 1-3 minutes</Text>
-            </View>
-            </AnimatedView>
-
-          <AnimatedView delay={450} duration={400}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.cardsScroll}
-            >
-              {emergencyMeditations.map((meditation) => (
-                <ContentCard
-                  key={meditation.id}
-                  title={meditation.title}
-                  thumbnailUrl={meditation.thumbnailUrl}
-                  fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
-                  fallbackColor={meditation.color}
-                  meta={`${meditation.duration_minutes} min`}
-                  isPremium={!meditation.isFree}
-                  onPress={() => handleEmergencyPress(meditation)}
-                />
-              ))}
-            </ScrollView>
-          </AnimatedView>
-        </View>
-
         {/* Browse by Techniques */}
         <View style={styles.section}>
-          <AnimatedView delay={500} duration={400}>
+          <AnimatedView delay={300} duration={400}>
             <AnimatedPressable
               onPress={() => router.push('/meditations/techniques')}
               style={styles.sectionHeader}
@@ -337,7 +231,7 @@ function MeditateScreen() {
             </AnimatedPressable>
           </AnimatedView>
 
-          <AnimatedView delay={550} duration={400}>
+          <AnimatedView delay={350} duration={400}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -358,6 +252,52 @@ function MeditateScreen() {
                     <Ionicons name={technique.icon} size={24} color={technique.color} />
                   </View>
                   <Text style={styles.themeLabel}>{technique.label}</Text>
+                </AnimatedPressable>
+              ))}
+            </ScrollView>
+          </AnimatedView>
+        </View>
+
+        {/* Browse by Theme */}
+        <View style={styles.section}>
+          <AnimatedView delay={400} duration={400}>
+            <AnimatedPressable
+              onPress={() => router.push('/meditations')}
+              style={styles.sectionHeader}
+            >
+              <Text style={styles.sectionTitle}>Browse by Theme</Text>
+              <View style={styles.seeAllContainer}>
+                <Text style={styles.seeAllText}>See all</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={theme.colors.primary}
+                />
+              </View>
+            </AnimatedPressable>
+          </AnimatedView>
+
+          <AnimatedView delay={450} duration={400}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.cardsScroll}
+            >
+              {themeCategories.map((cat) => (
+                <AnimatedPressable
+                  key={cat.id}
+                  onPress={() => handleThemePress(cat.id)}
+                  style={styles.themeCard}
+                >
+                  <View
+                    style={[
+                      styles.themeIconContainer,
+                      { backgroundColor: `${cat.color}20` },
+                    ]}
+                  >
+                    <Ionicons name={cat.icon} size={24} color={cat.color} />
+                  </View>
+                  <Text style={styles.themeLabel}>{cat.label}</Text>
                 </AnimatedPressable>
               ))}
             </ScrollView>
@@ -417,11 +357,6 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     paddingHorizontal: theme.spacing.lg,
       marginBottom: theme.spacing.md,
     },
-    emergencyTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-  },
   sectionTitle: {
     fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,

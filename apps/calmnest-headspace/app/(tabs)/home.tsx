@@ -13,6 +13,7 @@ import { AnimatedView } from '../../src/components/AnimatedView';
 import { AnimatedPressable } from '../../src/components/AnimatedPressable';
 import { ContentCard } from '../../src/components/ContentCard';
 import { Skeleton } from '../../src/components/Skeleton';
+import { PaywallModal } from '../../src/components/PaywallModal';
 import { useStats } from '../../src/hooks/useStats';
 import { parseSessionCode } from '../../src/utils/courseCodeParser';
 import { 
@@ -36,7 +37,7 @@ function HomeScreen() {
   const { theme, isDark } = useTheme();
   const router = useRouter();
   const { stats, loading: statsLoading } = useStats();
-  const { restorePurchases } = useSubscription();
+  const { restorePurchases, isPremium: hasSubscription } = useSubscription();
   const { homeContent, meditateContent, sleepContent, musicContent, refreshHome } = useContentPreload();
   
   // Use preloaded data
@@ -47,6 +48,10 @@ function HomeScreen() {
   
   // Refreshing state for pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  
+  // Emergency meditations from preloaded data
+  const emergencyMeditations = meditateContent.emergencyMeditations;
   
   // Content data from preload context (for lookups)
   const seriesDataRef = useRef<FirestoreSeries[]>([]);
@@ -134,6 +139,27 @@ function HomeScreen() {
     if (hour < 17) return '☀️';
     if (hour < 21) return '🌿';
     return '🌙';
+  };
+
+  const handleEmergencyPress = (meditation: FirestoreEmergencyMeditation) => {
+    if (!meditation.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    router.push({
+      pathname: '/emergency/[id]',
+      params: {
+        id: meditation.id,
+        title: meditation.title,
+        description: meditation.description,
+        duration: meditation.duration_minutes.toString(),
+        audioPath: meditation.audioPath,
+        color: meditation.color,
+        icon: meditation.icon,
+        narrator: meditation.narrator || '',
+        thumbnailUrl: meditation.thumbnailUrl || '',
+      },
+    });
   };
 
   const renderStreakDots = () => {
@@ -533,13 +559,47 @@ function HomeScreen() {
             </AnimatedView>
           </View>
 
-        {/* Your Journey Section */}
+        {/* Emergency Section */}
         <View style={styles.section}>
           <AnimatedView delay={300} duration={400}>
+            <View style={styles.emergencyHeader}>
+              <View style={styles.emergencyTitleRow}>
+                <Ionicons name="flash" size={20} color="#E57373" />
+                <Text style={styles.emergencyTitle}>Emergency</Text>
+              </View>
+              <Text style={styles.emergencySubtitle}>Quick relief in 1-3 minutes</Text>
+            </View>
+          </AnimatedView>
+
+          <AnimatedView delay={350} duration={400}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+            >
+              {emergencyMeditations.map((meditation) => (
+                <ContentCard
+                  key={meditation.id}
+                  title={meditation.title}
+                  thumbnailUrl={meditation.thumbnailUrl}
+                  fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
+                  fallbackColor={meditation.color}
+                  meta={`${meditation.duration_minutes} min`}
+                  isPremium={!meditation.isFree}
+                  onPress={() => handleEmergencyPress(meditation)}
+                />
+              ))}
+            </ScrollView>
+          </AnimatedView>
+        </View>
+
+        {/* Your Journey Section */}
+        <View style={styles.section}>
+          <AnimatedView delay={400} duration={400}>
           <Text style={styles.sectionTitle}>Your Journey</Text>
           </AnimatedView>
           
-          <AnimatedView delay={350} duration={400}>
+          <AnimatedView delay={450} duration={400}>
             {statsLoading ? (
               <View style={styles.journeyCard}>
                 <View style={styles.streakRow}>
@@ -588,7 +648,7 @@ function HomeScreen() {
         </View>
 
         {/* Inspirational Quote Section */}
-          <AnimatedView delay={400} duration={400}>
+          <AnimatedView delay={500} duration={400}>
           <View style={styles.quoteCard}>
             <LinearGradient
               colors={intentionGradient}
@@ -610,6 +670,12 @@ function HomeScreen() {
           </View>
         </AnimatedView>
       </ScrollView>
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -679,6 +745,26 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
       paddingHorizontal: theme.spacing.lg,
+    },
+    emergencyHeader: {
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+    },
+    emergencyTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    emergencyTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 18,
+      color: theme.colors.text,
+    },
+    emergencySubtitle: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 13,
+      color: theme.colors.textLight,
+      marginTop: 4,
     },
     horizontalListContent: {
       paddingHorizontal: theme.spacing.lg,
