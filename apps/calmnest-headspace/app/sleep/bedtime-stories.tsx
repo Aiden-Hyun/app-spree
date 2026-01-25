@@ -103,6 +103,10 @@ function BedtimeStoriesScreen() {
   };
 
   const handleStoryPress = (story: BedtimeStory) => {
+    if (!story.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
     router.push(`/sleep/${story.id}`);
   };
 
@@ -163,7 +167,11 @@ function BedtimeStoriesScreen() {
           />
         )}
         <View style={styles.storyChevron}>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.sleepTextMuted} />
+          {!item.isFree && !hasSubscription ? (
+            <Ionicons name="lock-closed" size={18} color={theme.colors.sleepTextMuted} />
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.sleepTextMuted} />
+          )}
         </View>
       </AnimatedPressable>
     </AnimatedView>

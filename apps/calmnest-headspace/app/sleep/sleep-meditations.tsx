@@ -61,6 +61,10 @@ function SleepMeditationsScreen() {
   }, []);
 
   const handleMeditationPress = (meditation: FirestoreSleepMeditation) => {
+    if (!meditation.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
     router.push(`/sleep/meditation/${meditation.id}`);
   };
 
@@ -117,7 +121,11 @@ function SleepMeditationsScreen() {
           />
         )}
         <View style={styles.meditationChevron}>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.sleepTextMuted} />
+          {!item.isFree && !hasSubscription ? (
+            <Ionicons name="lock-closed" size={18} color={theme.colors.sleepTextMuted} />
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.sleepTextMuted} />
+          )}
         </View>
       </AnimatedPressable>
     </AnimatedView>

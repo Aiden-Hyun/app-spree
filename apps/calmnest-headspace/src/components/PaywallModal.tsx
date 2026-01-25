@@ -37,14 +37,28 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
   const { isAnonymous } = useAuth();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
-  const { currentOffering, purchasePackage, restorePurchases, isLoading } = useSubscription();
+  const { currentOffering, purchasePackage, restorePurchases, isLoading, isAvailable } = useSubscription();
   const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [showAccountPrompt, setShowAccountPrompt] = useState(false);
 
   // Get monthly and annual packages from offering
-  const monthlyPackage = currentOffering?.monthly;
-  const annualPackage = currentOffering?.annual;
+  // Try standard package identifiers first, then fall back to searching availablePackages
+  const monthlyPackage = currentOffering?.monthly || 
+    currentOffering?.availablePackages?.find(p => 
+      p.identifier === '$rc_monthly' || 
+      p.identifier.toLowerCase().includes('monthly')
+    );
+  const annualPackage = currentOffering?.annual || 
+    currentOffering?.availablePackages?.find(p => 
+      p.identifier === '$rc_annual' || 
+      p.identifier.toLowerCase().includes('annual') ||
+      p.identifier.toLowerCase().includes('yearly')
+    );
+  
+  // Check if offerings are available
+  const hasPackages = monthlyPackage || annualPackage;
+  const isLoadingOfferings = isLoading && !currentOffering;
 
   // Calculate savings for annual
   const annualSavings = useMemo(() => {
@@ -138,6 +152,31 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
 
           {/* Subscription options */}
           <View style={styles.optionsContainer}>
+            {/* Loading State */}
+            {isLoadingOfferings && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Loading subscription plans...</Text>
+              </View>
+            )}
+
+            {/* No Products Available */}
+            {!isLoadingOfferings && !hasPackages && (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color={theme.colors.textMuted} />
+                <Text style={styles.errorTitle}>Plans Unavailable</Text>
+                <Text style={styles.errorText}>
+                  Subscription plans are temporarily unavailable. Please try again later or contact support.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.retryButton}
+                  onPress={onClose}
+                >
+                  <Text style={styles.retryButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Annual */}
             {annualPackage && (
               <Pressable
@@ -331,6 +370,50 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     optionsContainer: {
       gap: 12,
+    },
+    loadingContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 40,
+      gap: 16,
+    },
+    loadingText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 15,
+      color: theme.colors.textLight,
+    },
+    errorContainer: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 32,
+      paddingHorizontal: 24,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
+      gap: 12,
+    },
+    errorTitle: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 18,
+      color: theme.colors.text,
+    },
+    errorText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textLight,
+      textAlign: "center",
+      lineHeight: 20,
+    },
+    retryButton: {
+      marginTop: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 24,
+      backgroundColor: theme.colors.primary,
+      borderRadius: theme.borderRadius.md,
+    },
+    retryButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 14,
+      color: "#fff",
     },
     optionCard: {
       backgroundColor: theme.colors.surface,

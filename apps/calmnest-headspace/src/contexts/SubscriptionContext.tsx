@@ -172,22 +172,29 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     if (!Purchases) return;
     try {
       const offerings = await Purchases.getOfferings();
+      
+      // Debug logging to help diagnose offering issues
+      console.log("[RevenueCat] Offerings response:", {
+        hasOfferings: !!offerings,
+        hasCurrent: !!offerings?.current,
+        currentIdentifier: offerings?.current?.identifier,
+        availablePackagesCount: offerings?.current?.availablePackages?.length || 0,
+        packageIdentifiers: offerings?.current?.availablePackages?.map((p: any) => p.identifier) || [],
+        allOfferingIds: Object.keys(offerings?.all || {}),
+      });
+      
       if (offerings.current) {
         setCurrentOffering(offerings.current);
-      } else if (__DEV__) {
-        // Expected in simulator without StoreKit Config - just log a warning
-        console.log("[RevenueCat] No offerings available. This is expected on simulator without StoreKit Configuration or if products are pending Apple review.");
+      } else if (offerings.all && Object.keys(offerings.all).length > 0) {
+        // If no "current" offering but other offerings exist, use the first one
+        const firstOfferingKey = Object.keys(offerings.all)[0];
+        console.log("[RevenueCat] No current offering set, using first available:", firstOfferingKey);
+        setCurrentOffering(offerings.all[firstOfferingKey]);
+      } else {
+        console.log("[RevenueCat] No offerings available. Check RevenueCat dashboard: ensure products are added to an offering and the offering is set as 'Current'.");
       }
     } catch (error: any) {
-      // Don't spam console.error for expected configuration issues
-      if (__DEV__) {
-        // Configuration errors are expected on simulator - log as info instead
-        if (error.code === '23' || error.message?.includes('configuration')) {
-          console.log("[RevenueCat] Offerings not available - likely running on simulator without StoreKit Config or products pending Apple review.");
-        } else {
-          console.warn("Error fetching offerings:", error.message);
-        }
-      }
+      console.log("[RevenueCat] Error fetching offerings:", error.message, error.code);
     }
   };
 

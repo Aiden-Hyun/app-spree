@@ -80,14 +80,18 @@ function NatureSoundsScreen() {
     return sounds.filter(s => s.category === selectedCategory);
   }, [selectedCategory, sounds]);
 
-  const handleSoundPress = (soundId: string) => {
-    router.push(`/music/${soundId}`);
+  const handleSoundPress = (sound: FirestoreSleepSound) => {
+    if (!sound.isFree && !hasSubscription) {
+      setShowPaywall(true);
+      return;
+    }
+    router.push(`/music/${sound.id}`);
   };
 
   const renderItem = ({ item, index }: { item: FirestoreSleepSound; index: number }) => (
     <AnimatedView delay={index * 50} duration={400}>
       <AnimatedPressable
-        onPress={() => handleSoundPress(item.id)}
+        onPress={() => handleSoundPress(item)}
         style={styles.soundCard}
       >
         <View
@@ -126,7 +130,11 @@ function NatureSoundsScreen() {
             onPremiumRequired={() => setShowPaywall(true)}
           />
         )}
-        <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
+        {!item.isFree && !hasSubscription ? (
+          <Ionicons name="lock-closed" size={24} color={theme.colors.sleepTextMuted} />
+        ) : (
+          <Ionicons name="play-circle-outline" size={32} color={theme.colors.sleepTextMuted} />
+        )}
       </AnimatedPressable>
     </AnimatedView>
   );
