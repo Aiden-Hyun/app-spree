@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme, ThemeMode } from '../src/contexts/ThemeContext';
+import { useSubscription } from '../src/contexts/SubscriptionContext';
 import { ProtectedRoute } from '../src/components/ProtectedRoute';
 
 const themeModes: { id: ThemeMode; label: string; icon: string }[] = [
@@ -15,8 +16,9 @@ const themeModes: { id: ThemeMode; label: string; icon: string }[] = [
 
 function SettingsScreen() {
   const router = useRouter();
-  const { user, logout, deleteAccount } = useAuth();
+  const { user, logout, deleteAccount, isAnonymous } = useAuth();
   const { theme, themeMode, setThemeMode } = useTheme();
+  const { isPremium } = useSubscription();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -98,13 +100,42 @@ function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.card}>
-          <View style={styles.settingItem}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
-            <Text style={styles.settingLabel}>Email</Text>
+            {isAnonymous ? (
+              <>
+                <View style={styles.settingItem}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="person-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.settingLabel}>Status</Text>
+                  </View>
+                  <Text style={styles.settingValue}>Guest</Text>
+                </View>
+                <View style={styles.divider} />
+                <TouchableOpacity 
+                  style={styles.actionItem}
+                  onPress={() => router.push('/login')}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons 
+                      name={isPremium ? "link-outline" : "log-in-outline"} 
+                      size={20} 
+                      color={theme.colors.primary} 
+                    />
+                    <Text style={[styles.settingLabel, { color: theme.colors.primary }]}>
+                      {isPremium ? "Link Account" : "Sign In"}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
+                  <Text style={styles.settingLabel}>Email</Text>
+                </View>
+                <Text style={styles.settingValue}>{user?.email}</Text>
               </View>
-            <Text style={styles.settingValue}>{user?.email}</Text>
-            </View>
+            )}
           </View>
         </View>
         
@@ -191,35 +222,39 @@ function SettingsScreen() {
       </View>
     </View>
 
-        {/* Sign Out */}
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
+        {/* Sign Out - only show for authenticated users */}
+        {!isAnonymous && (
+          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+            <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
+            <Text style={styles.logoutText}>Sign Out</Text>
+          </TouchableOpacity>
+        )}
 
-        {/* Danger Zone */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, styles.dangerSectionTitle]}>Danger Zone</Text>
-          <View style={[styles.card, styles.dangerCard]}>
-            <TouchableOpacity 
-              style={styles.deleteAccountButton}
-              onPress={handleDeleteAccount}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <ActivityIndicator size="small" color={theme.colors.error} />
-              ) : (
-                <>
-                  <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
-                  <Text style={styles.deleteAccountText}>Delete Account</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <Text style={styles.deleteWarning}>
-              This will permanently delete your account and all associated data.
-            </Text>
+        {/* Danger Zone - only show for authenticated users */}
+        {!isAnonymous && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.dangerSectionTitle]}>Danger Zone</Text>
+            <View style={[styles.card, styles.dangerCard]}>
+              <TouchableOpacity 
+                style={styles.deleteAccountButton}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={theme.colors.error} />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+                    <Text style={styles.deleteAccountText}>Delete Account</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.deleteWarning}>
+                This will permanently delete your account and all associated data.
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Version */}
         <Text style={styles.version}>CalmNest v1.0.0</Text>

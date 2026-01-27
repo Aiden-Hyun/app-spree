@@ -331,12 +331,28 @@ function ProfileScreen() {
           </AnimatedView>
         </View>
 
-        {/* Logout */}
+        {/* Sign In / Link Account (for anonymous) or Logout (for authenticated) */}
         <AnimatedView delay={700} duration={400}>
-          <AnimatedPressable style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
-          <Text style={styles.logoutText}>Log Out</Text>
-          </AnimatedPressable>
+          {isAnonymous ? (
+            <AnimatedPressable 
+              style={styles.signInButton} 
+              onPress={() => router.push('/login')}
+            >
+              <Ionicons 
+                name={isPremium ? "link-outline" : "log-in-outline"} 
+                size={20} 
+                color={theme.colors.primary} 
+              />
+              <Text style={styles.signInText}>
+                {isPremium ? "Link Account" : "Sign In"}
+              </Text>
+            </AnimatedPressable>
+          ) : (
+            <AnimatedPressable style={styles.logoutButton} onPress={logout}>
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />
+              <Text style={styles.logoutText}>Log Out</Text>
+            </AnimatedPressable>
+          )}
         </AnimatedView>
 
         {/* Footer */}
@@ -564,6 +580,23 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.semiBold,
     fontSize: 15,
     color: theme.colors.error,
+  },
+  signInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+    gap: theme.spacing.sm,
+  },
+  signInText: {
+    fontFamily: theme.fonts.ui.semiBold,
+    fontSize: 15,
+    color: theme.colors.primary,
   },
   footer: {
     alignItems: 'center',

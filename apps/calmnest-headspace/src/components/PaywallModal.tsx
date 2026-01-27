@@ -193,11 +193,15 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
                   </View>
                 )}
                 <View style={styles.optionContent}>
-                  <View>
+                  <View style={styles.optionInfo}>
                     <Text style={styles.optionTitle}>Annual</Text>
                     <Text style={styles.optionPrice}>
                       {formatPrice(annualPackage, "year")}
                     </Text>
+                    <View style={styles.trialBadge}>
+                      <Ionicons name="gift-outline" size={12} color={theme.colors.primary} />
+                      <Text style={styles.trialText}>14-day free trial</Text>
+                    </View>
                   </View>
                   <View
                     style={[
@@ -225,11 +229,15 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
                 onPress={() => setSelectedPackage(monthlyPackage)}
               >
                 <View style={styles.optionContent}>
-                  <View>
+                  <View style={styles.optionInfo}>
                     <Text style={styles.optionTitle}>Monthly</Text>
                     <Text style={styles.optionPrice}>
                       {formatPrice(monthlyPackage, "month")}
                     </Text>
+                    <View style={styles.trialBadge}>
+                      <Ionicons name="gift-outline" size={12} color={theme.colors.primary} />
+                      <Text style={styles.trialText}>7-day free trial</Text>
+                    </View>
                   </View>
                   <View
                     style={[
@@ -438,10 +446,24 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: theme.colors.text,
       marginBottom: 4,
     },
+    optionInfo: {
+      flex: 1,
+    },
     optionPrice: {
       fontFamily: theme.fonts.ui.regular,
       fontSize: 15,
       color: theme.colors.textLight,
+    },
+    trialBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 8,
+      gap: 4,
+    },
+    trialText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: theme.colors.primary,
     },
     savingsBadge: {
       position: "absolute",

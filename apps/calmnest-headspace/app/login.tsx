@@ -28,6 +28,8 @@ export default function LoginScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const {
+    user,
+    isAnonymous,
     signUp,
     signIn,
     signInAnonymously,
@@ -76,7 +78,7 @@ export default function LoginScreen() {
             duration: 500,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       ).start();
     } else {
       buttonScale.setValue(1);
@@ -94,11 +96,12 @@ export default function LoginScreen() {
         await signUp(email, password);
         Alert.alert(
           "Success",
-          "Account created! Please check your email to verify."
+          "Account created! Please check your email to verify.",
         );
+        router.replace('/home');
       } else {
         await signIn(email, password);
-        // Navigation handled automatically by PreloadGate after auth state change
+        router.replace('/home');
       }
     } catch (error: any) {
       Alert.alert("Error", error.message);
@@ -109,7 +112,7 @@ export default function LoginScreen() {
     try {
       setGoogleLoading(true);
       await signInWithGoogle();
-      // Navigation handled automatically by PreloadGate after auth state change
+      router.replace('/home');
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -121,7 +124,7 @@ export default function LoginScreen() {
     try {
       setAppleLoading(true);
       await signInWithApple();
-      // Navigation handled automatically by PreloadGate after auth state change
+      router.replace('/home');
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -130,9 +133,16 @@ export default function LoginScreen() {
   };
 
   const handleSkipLogin = async () => {
+    // If user is already signed in (anonymous or otherwise), just go back
+    if (user) {
+      router.back();
+      return;
+    }
+
     try {
       await signInAnonymously();
-      // Navigation handled automatically by PreloadGate after auth state change
+      // Navigate to main app after successful anonymous sign-in
+      router.replace('/home');
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }
@@ -142,7 +152,7 @@ export default function LoginScreen() {
     ? ([theme.colors.gray[100], theme.colors.background] as [string, string])
     : ([theme.colors.primaryLight, theme.colors.background] as [
         string,
-        string
+        string,
       ]);
 
   return (
