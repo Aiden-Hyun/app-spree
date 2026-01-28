@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { 
+import {
   User,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -14,13 +14,33 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   AuthCredential,
+  unlink,
+  updateEmail,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "../firebase";
-import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { deleteUserAccount } from "../services/firestoreService";
 import { deleteAllDownloads } from "../services/downloadService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+/**
+ * Error thrown when attempting to link a credential that's already
+ * associated with another Firebase account.
+ */
+export class CredentialCollisionError extends Error {
+  constructor(
+    public readonly pendingCredential: AuthCredential,
+    public readonly providerType: "google.com" | "apple.com" | "password"
+  ) {
+    super("This credential is already linked to another account");
+    this.name = "CredentialCollisionError";
+  }
+}
 
 // Configure Google Sign In
 GoogleSignin.configure({
@@ -41,6 +61,21 @@ interface AuthContextType {
   isAppleSignInAvailable: boolean;
   logout: () => Promise<void>;
   deleteAccount: (password?: string) => Promise<void>;
+  // New methods for credential management
+  upgradeAnonymousWithGoogle: () => Promise<void>;
+  upgradeAnonymousWithApple: () => Promise<void>;
+  upgradeAnonymousWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithPendingCredential: (credential: AuthCredential) => Promise<void>;
+  getGoogleCredential: () => Promise<AuthCredential | null>;
+  getAppleCredential: () => Promise<AuthCredential | null>;
+  linkProvider: (
+    providerType: "google.com" | "apple.com" | "password",
+    emailPassword?: { email: string; password: string }
+  ) => Promise<void>;
+  unlinkProvider: (providerId: string) => Promise<void>;
+  changeEmail: (newEmail: string, password: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  getLinkedProviders: () => string[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,6 +121,249 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("User is not anonymous");
     }
     await linkWithCredential(user, credential);
+  };
+
+  /**
+   * Get a Google credential without signing in.
+   * Useful for linking or upgrading anonymous accounts.
+   */
+  const getGoogleCredential = async (): Promise<AuthCredential | null> => {
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:getGoogleCredential:beforeSignIn',message:'About to call GoogleSignin.signIn',data:{currentUserId:auth.currentUser?.uid,isAnonymous:auth.currentUser?.isAnonymous},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const signInResult = await GoogleSignin.signIn();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:getGoogleCredential:afterSignIn',message:'GoogleSignin.signIn returned',data:{currentUserId:auth.currentUser?.uid,isAnonymous:auth.currentUser?.isAnonymous,hasIdToken:!!signInResult.data?.idToken},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      const idToken = signInResult.data?.idToken;
+      if (!idToken) return null;
+      return GoogleAuthProvider.credential(idToken);
+    } catch (err: any) {
+      if (
+        err?.code === statusCodes.SIGN_IN_CANCELLED ||
+        err?.code === "12501"
+      ) {
+        return null;
+      }
+      throw err;
+    }
+  };
+
+  /**
+   * Get an Apple credential without signing in.
+   * Useful for linking or upgrading anonymous accounts.
+   */
+  const getAppleCredential = async (): Promise<AuthCredential | null> => {
+    if (!isAppleSignInAvailable) {
+      throw new Error("Apple Sign In is not available on this device");
+    }
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const { identityToken } = credential;
+      if (!identityToken) return null;
+      const provider = new OAuthProvider("apple.com");
+      return provider.credential({ idToken: identityToken });
+    } catch (err: any) {
+      if (
+        err?.code === AppleAuthentication.AppleAuthenticationError?.CANCELED ||
+        err?.code === "ERR_CANCELED" ||
+        err?.code === "ERR_REQUEST_CANCELED"
+      ) {
+        return null;
+      }
+      throw err;
+    }
+  };
+
+  /**
+   * Upgrade anonymous account by linking Google credential.
+   * UID remains the same after successful linking.
+   * Throws CredentialCollisionError if credential belongs to another account.
+   */
+  const upgradeAnonymousWithGoogle = async (): Promise<void> => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:entry',message:'upgradeAnonymousWithGoogle called',data:{hasUser:!!user,isAnonymous:user?.isAnonymous,userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+    // #endregion
+    if (!user?.isAnonymous) {
+      throw new Error("User is not anonymous");
+    }
+    const credential = await getGoogleCredential();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:afterGetCred',message:'Got Google credential',data:{hasCredential:!!credential,userStillAnonymous:user?.isAnonymous,userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+    if (!credential) return; // User cancelled
+
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:beforeLink',message:'About to call linkWithCredential',data:{userId:user?.uid,isAnonymous:user?.isAnonymous},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      await linkWithCredential(user, credential);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:linkSuccess',message:'linkWithCredential SUCCEEDED - no collision',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:linkError',message:'linkWithCredential threw error',data:{errorCode:error?.code,errorMessage:error?.message,errorName:error?.name,fullError:JSON.stringify(error,Object.getOwnPropertyNames(error))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      if (error.code === "auth/credential-already-in-use") {
+        throw new CredentialCollisionError(credential, "google.com");
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * Upgrade anonymous account by linking Apple credential.
+   * UID remains the same after successful linking.
+   * Throws CredentialCollisionError if credential belongs to another account.
+   */
+  const upgradeAnonymousWithApple = async (): Promise<void> => {
+    if (!user?.isAnonymous) {
+      throw new Error("User is not anonymous");
+    }
+    const credential = await getAppleCredential();
+    if (!credential) return; // User cancelled
+
+    try {
+      await linkWithCredential(user, credential);
+    } catch (error: any) {
+      if (error.code === "auth/credential-already-in-use") {
+        throw new CredentialCollisionError(credential, "apple.com");
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * Upgrade anonymous account by linking email/password credential.
+   * UID remains the same after successful linking.
+   * Throws CredentialCollisionError if email is already in use.
+   */
+  const upgradeAnonymousWithEmail = async (
+    email: string,
+    password: string
+  ): Promise<void> => {
+    if (!user?.isAnonymous) {
+      throw new Error("User is not anonymous");
+    }
+    const credential = EmailAuthProvider.credential(email, password);
+
+    try {
+      await linkWithCredential(user, credential);
+    } catch (error: any) {
+      if (
+        error.code === "auth/credential-already-in-use" ||
+        error.code === "auth/email-already-in-use"
+      ) {
+        throw new CredentialCollisionError(credential, "password");
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * Sign in with a pending credential from a CredentialCollisionError.
+   * Used when user chooses to switch to the account that owns the credential.
+   */
+  const signInWithPendingCredential = async (
+    credential: AuthCredential
+  ): Promise<void> => {
+    await signInWithCredential(auth, credential);
+  };
+
+  /**
+   * Link a new provider to the current account.
+   * Throws CredentialCollisionError if credential belongs to another account.
+   */
+  const linkProvider = async (
+    providerType: "google.com" | "apple.com" | "password",
+    emailPassword?: { email: string; password: string }
+  ): Promise<void> => {
+    if (!user) {
+      throw new Error("No user is currently signed in");
+    }
+
+    let credential: AuthCredential | null = null;
+
+    if (providerType === "google.com") {
+      credential = await getGoogleCredential();
+    } else if (providerType === "apple.com") {
+      credential = await getAppleCredential();
+    } else if (providerType === "password" && emailPassword) {
+      credential = EmailAuthProvider.credential(
+        emailPassword.email,
+        emailPassword.password
+      );
+    }
+
+    if (!credential) return; // User cancelled
+
+    try {
+      await linkWithCredential(user, credential);
+    } catch (error: any) {
+      if (
+        error.code === "auth/credential-already-in-use" ||
+        error.code === "auth/email-already-in-use"
+      ) {
+        throw new CredentialCollisionError(credential, providerType);
+      }
+      throw error;
+    }
+  };
+
+  /**
+   * Unlink a provider from the current account.
+   * Throws error if trying to remove the last provider.
+   */
+  const unlinkProvider = async (providerId: string): Promise<void> => {
+    if (!user) {
+      throw new Error("No user is currently signed in");
+    }
+    const providers = user.providerData.map((p) => p.providerId);
+    if (providers.length <= 1) {
+      throw new Error("Cannot remove the last sign-in method");
+    }
+    await unlink(user, providerId);
+  };
+
+  /**
+   * Change the email address for the current account.
+   * Requires re-authentication with password.
+   */
+  const changeEmail = async (
+    newEmail: string,
+    password: string
+  ): Promise<void> => {
+    if (!user || !user.email) {
+      throw new Error("No user with email is currently signed in");
+    }
+    // Re-authenticate first
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+    // Then update email
+    await updateEmail(user, newEmail);
+  };
+
+  /**
+   * Send a password reset email.
+   */
+  const sendPasswordReset = async (email: string): Promise<void> => {
+    await sendPasswordResetEmail(auth, email);
+  };
+
+  /**
+   * Get list of linked provider IDs.
+   */
+  const getLinkedProviders = (): string[] => {
+    if (!user) return [];
+    return user.providerData.map((p) => p.providerId);
   };
 
   const signInWithGoogle = async () => {
@@ -265,6 +543,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAppleSignInAvailable,
     logout,
     deleteAccount,
+    // New methods for credential management
+    upgradeAnonymousWithGoogle,
+    upgradeAnonymousWithApple,
+    upgradeAnonymousWithEmail,
+    signInWithPendingCredential,
+    getGoogleCredential,
+    getAppleCredential,
+    linkProvider,
+    unlinkProvider,
+    changeEmail,
+    sendPasswordReset,
+    getLinkedProviders,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

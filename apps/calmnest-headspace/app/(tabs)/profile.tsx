@@ -336,7 +336,7 @@ function ProfileScreen() {
           {isAnonymous ? (
             <AnimatedPressable 
               style={styles.signInButton} 
-              onPress={() => router.push('/login')}
+              onPress={() => router.push(isPremium ? '/login?mode=link' : '/login')}
             >
               <Ionicons 
                 name={isPremium ? "link-outline" : "log-in-outline"} 

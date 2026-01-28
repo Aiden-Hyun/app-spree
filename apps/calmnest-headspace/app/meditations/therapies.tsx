@@ -79,7 +79,7 @@ export default function TherapiesScreen() {
   }>();
   const { theme, isDark } = useTheme();
   const [selectedTherapy, setSelectedTherapy] = useState(
-    initialTherapy || "all"
+    initialTherapy || "all",
   );
   const [courses, setCourses] = useState<FirestoreCourse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,12 +102,12 @@ export default function TherapiesScreen() {
     return courses.filter(
       (course) =>
         course.id.toLowerCase().includes(selectedTherapy) ||
-        course.title.toLowerCase().includes(selectedTherapy)
+        course.title.toLowerCase().includes(selectedTherapy),
     );
   }, [courses, selectedTherapy]);
 
   const selectedTherapyData = therapyCategories.find(
-    (t) => t.id === selectedTherapy
+    (t) => t.id === selectedTherapy,
   );
 
   return (
@@ -254,8 +254,20 @@ export default function TherapiesScreen() {
                   )}
                   <View style={styles.courseInfo}>
                     {course.code && (
-                      <View style={[styles.courseCodeBadge, { backgroundColor: `${course.color}20` }]}>
-                        <Text style={[styles.courseCodeText, { color: course.color }]}>{course.code}</Text>
+                      <View
+                        style={[
+                          styles.courseCodeBadge,
+                          { backgroundColor: `${course.color}20` },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.courseCodeText,
+                            { color: course.color },
+                          ]}
+                        >
+                          {course.code}
+                        </Text>
                       </View>
                     )}
                     <Text style={styles.courseTitle}>{course.title}</Text>

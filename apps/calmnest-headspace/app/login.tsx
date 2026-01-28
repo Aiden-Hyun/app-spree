@@ -14,14 +14,19 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { SvgXml } from "react-native-svg";
-import { useAuth } from "../src/contexts/AuthContext";
+import { useAuth, CredentialCollisionError } from "../src/contexts/AuthContext";
 import { useTheme } from "../src/contexts/ThemeContext";
 import { AnimatedPressable } from "../src/components/AnimatedPressable";
 import { AnimatedView } from "../src/components/AnimatedView";
-import { router } from "expo-router";
+import { CredentialCollisionModal } from "../src/components/CredentialCollisionModal";
+import { AccountSwitchWarning } from "../src/components/AccountSwitchWarning";
+import { router, useLocalSearchParams } from "expo-router";
 import { Theme } from "../src/theme";
 
 export default function LoginScreen() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isLinkMode = mode === 'link'; // true when user tapped "Link Account" from Settings
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -35,11 +40,17 @@ export default function LoginScreen() {
     signInAnonymously,
     signInWithGoogle,
     signInWithApple,
+    upgradeAnonymousWithGoogle,
+    upgradeAnonymousWithApple,
+    upgradeAnonymousWithEmail,
+    signInWithPendingCredential,
     isAppleSignInAvailable,
     loading,
   } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
+  const [collisionError, setCollisionError] = useState<CredentialCollisionError | null>(null);
+  const [showSwitchWarning, setShowSwitchWarning] = useState(false);
   const { theme, isDark } = useTheme();
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -92,6 +103,15 @@ export default function LoginScreen() {
     }
 
     try {
+      // Link mode: link email/password to anonymous account
+      if (isLinkMode && isAnonymous) {
+        await upgradeAnonymousWithEmail(email, password);
+        Alert.alert("Success", "Email linked to your account!");
+        router.replace('/home');
+        return;
+      }
+      
+      // Normal sign up/sign in
       if (isSignUp) {
         await signUp(email, password);
         Alert.alert(
@@ -104,29 +124,82 @@ export default function LoginScreen() {
         router.replace('/home');
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      // Handle collision in link mode
+      if (error instanceof CredentialCollisionError) {
+        setCollisionError(error);
+      } else {
+        Alert.alert("Error", error.message);
+      }
     }
   };
 
   const handleGoogleSignIn = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:entry',message:'Google sign-in button pressed',data:{isAnonymous,isLinkMode,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+    // #endregion
     try {
       setGoogleLoading(true);
-      await signInWithGoogle();
-      router.replace('/home');
+      
+      // Only use upgrade (link) when user explicitly tapped "Link Account" (mode=link)
+      // Otherwise, use regular sign-in which replaces the anonymous user
+      if (isLinkMode && isAnonymous) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:upgrading',message:'Link mode - using upgradeAnonymousWithGoogle',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
+        await upgradeAnonymousWithGoogle();
+        router.replace('/home');
+      } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:signIn',message:'Sign-in mode - using signInWithGoogle',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
+        await signInWithGoogle();
+        router.replace('/home');
+      }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:catch',message:'Caught error',data:{errorType:error?.constructor?.name,isCollisionError:error instanceof CredentialCollisionError,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+      // #endregion
+      if (error instanceof CredentialCollisionError) {
+        setCollisionError(error);
+      } else if (error.message) {
+        Alert.alert("Error", error.message);
+      }
     } finally {
       setGoogleLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:entry',message:'Apple sign-in button pressed',data:{isAnonymous,isLinkMode,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+    // #endregion
     try {
       setAppleLoading(true);
-      await signInWithApple();
-      router.replace('/home');
+      
+      // Only use upgrade (link) when user explicitly tapped "Link Account" (mode=link)
+      // Otherwise, use regular sign-in which replaces the anonymous user
+      if (isLinkMode && isAnonymous) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:upgrading',message:'Link mode - using upgradeAnonymousWithApple',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
+        await upgradeAnonymousWithApple();
+        router.replace('/home');
+      } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:signIn',message:'Sign-in mode - using signInWithApple',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
+        await signInWithApple();
+        router.replace('/home');
+      }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:catch',message:'Caught error',data:{errorType:error?.constructor?.name,isCollisionError:error instanceof CredentialCollisionError,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+      // #endregion
+      if (error instanceof CredentialCollisionError) {
+        setCollisionError(error);
+      } else if (error.message) {
+        Alert.alert("Error", error.message);
+      }
     } finally {
       setAppleLoading(false);
     }
@@ -145,6 +218,22 @@ export default function LoginScreen() {
       router.replace('/home');
     } catch (error: any) {
       Alert.alert("Error", error.message);
+    }
+  };
+
+  // Collision modal handlers
+  const handleCollisionSignIn = () => {
+    setShowSwitchWarning(true);
+  };
+  
+  const handleConfirmSwitch = async () => {
+    if (!collisionError?.pendingCredential) return;
+    try {
+      await signInWithPendingCredential(collisionError.pendingCredential);
+      setCollisionError(null);
+      router.replace('/home');
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to sign in");
     }
   };
 
@@ -194,10 +283,16 @@ export default function LoginScreen() {
           <AnimatedView delay={300} duration={500}>
             <View style={styles.formHeader}>
               <Text style={styles.formTitle}>
-                {isSignUp ? "Create Account" : "Welcome Back"}
+                {isLinkMode
+                  ? "Link Your Account"
+                  : isSignUp
+                  ? "Create Account"
+                  : "Welcome Back"}
               </Text>
               <Text style={styles.formSubtitle}>
-                {isSignUp
+                {isLinkMode
+                  ? "Connect a sign-in method to secure your subscription"
+                  : isSignUp
                   ? "Start your mindfulness journey today"
                   : "Continue your mindfulness journey"}
               </Text>
@@ -220,7 +315,7 @@ export default function LoginScreen() {
                       <SvgXml xml={GOOGLE_SVG_XML} width={35} height={35} />
                     </View>
                     <Text style={styles.googleButtonText}>
-                      Continue with Google
+                      {isLinkMode ? "Link with Google" : "Continue with Google"}
                     </Text>
                   </>
                 )}
@@ -243,12 +338,24 @@ export default function LoginScreen() {
                     <>
                       <Ionicons name="logo-apple" size={20} color="#fff" />
                       <Text style={styles.appleButtonText}>
-                        Continue with Apple
+                        {isLinkMode ? "Link with Apple" : "Continue with Apple"}
                       </Text>
                     </>
                   )}
                 </View>
               </AnimatedPressable>
+            </AnimatedView>
+          )}
+
+          {/* Link mode info banner */}
+          {isLinkMode && (
+            <AnimatedView delay={600} duration={500}>
+              <View style={styles.linkInfoBanner}>
+                <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+                <Text style={styles.linkInfoText}>
+                  Linking preserves your subscription and data. Choose a sign-in method you'll remember.
+                </Text>
+              </View>
             </AnimatedView>
           )}
 
@@ -263,63 +370,63 @@ export default function LoginScreen() {
 
           {/* Email / Password */}
           <AnimatedView delay={700} duration={500}>
-            <View
-              style={[
-                styles.inputContainer,
-                emailFocused && styles.inputContainerFocused,
-              ]}
-            >
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={
-                  emailFocused ? theme.colors.primary : theme.colors.textMuted
-                }
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor={theme.colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-              />
-            </View>
-          </AnimatedView>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    emailFocused && styles.inputContainerFocused,
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color={
+                      emailFocused ? theme.colors.primary : theme.colors.textMuted
+                    }
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    onFocus={() => setEmailFocused(true)}
+                    onBlur={() => setEmailFocused(false)}
+                  />
+                </View>
+              </AnimatedView>
 
-          <AnimatedView delay={800} duration={500}>
-            <View
-              style={[
-                styles.inputContainer,
-                passwordFocused && styles.inputContainerFocused,
-              ]}
-            >
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={
-                  passwordFocused
-                    ? theme.colors.primary
-                    : theme.colors.textMuted
-                }
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor={theme.colors.textMuted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-              />
-            </View>
-          </AnimatedView>
+              <AnimatedView delay={800} duration={500}>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    passwordFocused && styles.inputContainerFocused,
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={
+                      passwordFocused
+                        ? theme.colors.primary
+                        : theme.colors.textMuted
+                    }
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                  />
+                </View>
+              </AnimatedView>
 
           <AnimatedView delay={900} duration={500}>
             <AnimatedPressable
@@ -338,7 +445,11 @@ export default function LoginScreen() {
                 ) : (
                   <>
                     <Text style={styles.authButtonText}>
-                      {isSignUp ? "Create Account" : "Sign In"}
+                      {isLinkMode
+                        ? "Link with Email"
+                        : isSignUp
+                        ? "Create Account"
+                        : "Sign In"}
                     </Text>
                     <Ionicons name="arrow-forward" size={20} color="white" />
                   </>
@@ -347,21 +458,33 @@ export default function LoginScreen() {
             </AnimatedPressable>
           </AnimatedView>
 
-          <AnimatedView delay={1000} duration={500}>
-            <AnimatedPressable
-              onPress={() => setIsSignUp(!isSignUp)}
-              style={styles.switchButton}
-            >
-              <Text style={styles.switchText}>
-                {isSignUp
-                  ? "Already have an account? "
-                  : "Don't have an account? "}
-                <Text style={styles.switchTextHighlight}>
-                  {isSignUp ? "Sign In" : "Sign Up"}
+          {/* Toggle between Sign Up / Sign In - hide in link mode */}
+          {!isLinkMode && (
+            <AnimatedView delay={1000} duration={500}>
+              <AnimatedPressable
+                onPress={() => setIsSignUp(!isSignUp)}
+                style={styles.switchButton}
+              >
+                <Text style={styles.switchText}>
+                  {isSignUp
+                    ? "Already have an account? "
+                    : "Don't have an account? "}
+                  <Text style={styles.switchTextHighlight}>
+                    {isSignUp ? "Sign In" : "Sign Up"}
+                  </Text>
                 </Text>
+              </AnimatedPressable>
+            </AnimatedView>
+          )}
+          
+          {/* Link mode helper text */}
+          {isLinkMode && (
+            <AnimatedView delay={1000} duration={500}>
+              <Text style={styles.linkHelperText}>
+                Enter a new email and password to secure your account. If the email is already in use, you'll be prompted to sign in to that account instead.
               </Text>
-            </AnimatedPressable>
-          </AnimatedView>
+            </AnimatedView>
+          )}
         </View>
       </ScrollView>
 
@@ -374,6 +497,25 @@ export default function LoginScreen() {
           <Ionicons name="close" size={24} color={theme.colors.textMuted} />
         </AnimatedPressable>
       </View>
+      
+      {/* Credential collision modal */}
+      {collisionError && (
+        <CredentialCollisionModal
+          visible={!!collisionError}
+          onClose={() => setCollisionError(null)}
+          providerType={collisionError.providerType}
+          pendingCredential={collisionError.pendingCredential}
+          onSignInToOtherAccount={handleCollisionSignIn}
+          onUseDifferentMethod={() => setCollisionError(null)}
+        />
+      )}
+      
+      {/* Account switch warning */}
+      <AccountSwitchWarning
+        visible={showSwitchWarning}
+        onClose={() => setShowSwitchWarning(false)}
+        onConfirmSwitch={handleConfirmSwitch}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -582,5 +724,29 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.bold,
       fontSize: 17,
       color: "#fff",
+    },
+    linkInfoBanner: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      backgroundColor: `${theme.colors.primary}10`,
+      borderRadius: theme.borderRadius.lg,
+      padding: theme.spacing.md,
+      marginBottom: theme.spacing.lg,
+      gap: theme.spacing.sm,
+    },
+    linkInfoText: {
+      flex: 1,
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 14,
+      color: theme.colors.textLight,
+      lineHeight: 20,
+    },
+    linkHelperText: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginTop: theme.spacing.md,
     },
   });

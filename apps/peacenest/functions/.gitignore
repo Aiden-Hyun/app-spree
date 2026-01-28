@@ -1,0 +1,12 @@
+# Compiled JavaScript
+lib/
+
+# Node modules
+node_modules/
+
+# Environment variables (contains secrets)
+.env
+.env.local
+
+# Firebase
+.runtimeconfig.json

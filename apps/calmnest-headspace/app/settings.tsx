@@ -112,7 +112,7 @@ function SettingsScreen() {
                 <View style={styles.divider} />
                 <TouchableOpacity 
                   style={styles.actionItem}
-                  onPress={() => router.push('/login')}
+                  onPress={() => router.push(isPremium ? '/login?mode=link' : '/login')}
                 >
                   <View style={styles.settingLeft}>
                     <Ionicons 
@@ -128,13 +128,26 @@ function SettingsScreen() {
                 </TouchableOpacity>
               </>
             ) : (
-              <View style={styles.settingItem}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
-                  <Text style={styles.settingLabel}>Email</Text>
+              <>
+                <View style={styles.settingItem}>
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="mail-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.settingLabel}>Email</Text>
+                  </View>
+                  <Text style={styles.settingValue}>{user?.email}</Text>
                 </View>
-                <Text style={styles.settingValue}>{user?.email}</Text>
-              </View>
+                <View style={styles.divider} />
+                <TouchableOpacity
+                  style={styles.actionItem}
+                  onPress={() => router.push('/account-security')}
+                >
+                  <View style={styles.settingLeft}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.settingLabel}>Account Security</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>

@@ -1,11 +1,29 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { Alert } from "react-native";
+import { useAuth } from "./AuthContext";
+import {
+  syncRevenueCatIdentity,
+  resetRevenueCatIdentity,
+  hasPremiumEntitlement,
+  detectActiveSubscriptionOnAppleId,
+  restorePurchasesWithRecovery,
+  type CustomerInfo as ManagerCustomerInfo,
+  type RestoreResult,
+} from "../managers/AuthSubscriptionManager";
 
 // RevenueCat API Key (Apple/iOS)
 const REVENUECAT_API_KEY = "appl_JhsFtEMqcEsdxXadtbKkjhXGoZT";
 
 // Entitlement ID configured in RevenueCat dashboard
-const PREMIUM_ENTITLEMENT_ID = "CalmNest Premium";
+// IMPORTANT: Verify this matches the actual Entitlement Identifier in RevenueCat,
+// not the display name (often something simple like "premium")
+export const PREMIUM_ENTITLEMENT_ID = "CalmNest Premium";
 
 // Lazy load RevenueCat to prevent crash when native modules aren't available
 let Purchases: any = null;
@@ -39,6 +57,9 @@ interface CustomerInfo {
   entitlements: {
     active: Record<string, any>;
   };
+  activeSubscriptions: string[];
+  allExpirationDates: Record<string, string | null>;
+  allPurchaseDates: Record<string, string | null>;
 }
 
 interface PurchasesOffering {
@@ -46,6 +67,12 @@ interface PurchasesOffering {
   monthly?: PurchasesPackage;
   annual?: PurchasesPackage;
   availablePackages: PurchasesPackage[];
+}
+
+interface RestorePurchasesResult {
+  success: boolean;
+  reason?: "no_subscription" | "different_account";
+  showRecoveryWizard?: boolean;
 }
 
 interface SubscriptionContextType {
@@ -56,18 +83,27 @@ interface SubscriptionContextType {
   currentOffering: PurchasesOffering | null;
   purchasePackage: (pkg: PurchasesPackage) => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
+  restorePurchasesWithRecovery: () => Promise<RestorePurchasesResult>;
   checkSubscriptionStatus: () => Promise<void>;
+  hasActiveSubscriptionOnAppleId: () => boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
+export function SubscriptionProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
-  const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
+  const [currentOffering, setCurrentOffering] =
+    useState<PurchasesOffering | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [lastSyncedUid, setLastSyncedUid] = useState<string | null>(null);
 
   // Initialize RevenueCat
   useEffect(() => {
@@ -91,23 +127,23 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         if (__DEV__ && Purchases.setLogHandler) {
           Purchases.setLogHandler((logLevel: any, message: string) => {
             // Filter out expected configuration errors (empty offerings, products pending review)
-            const isExpectedConfigError = 
-              message.includes('why-are-offerings-empty') ||
-              message.includes('None of the products registered') ||
-              message.includes('configuration');
-            
+            const isExpectedConfigError =
+              message.includes("why-are-offerings-empty") ||
+              message.includes("None of the products registered") ||
+              message.includes("configuration");
+
             if (isExpectedConfigError) {
               // Silently ignore expected configuration issues
               return;
             }
-            
+
             // Log other messages normally
-            if (logLevel === 'ERROR') {
-              console.error('[RevenueCat]', message);
-            } else if (logLevel === 'WARN') {
-              console.warn('[RevenueCat]', message);
+            if (logLevel === "ERROR") {
+              console.error("[RevenueCat]", message);
+            } else if (logLevel === "WARN") {
+              console.warn("[RevenueCat]", message);
             } else {
-              console.log('[RevenueCat]', message);
+              console.log("[RevenueCat]", message);
             }
           });
         }
@@ -115,9 +151,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         // Configure with API key
         await Purchases.configure({ apiKey: REVENUECAT_API_KEY });
         setIsInitialized(true);
-
-        // Get initial customer info
-        await checkSubscriptionStatusInternal();
 
         // Fetch offerings
         await fetchOfferings();
@@ -129,6 +162,47 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
     initRevenueCat();
   }, []);
+
+  // Sync RevenueCat identity when Firebase user changes
+  useEffect(() => {
+    if (!isInitialized || !Purchases) return;
+
+    const syncIdentity = async () => {
+      const currentUid = user?.uid || null;
+
+      // Skip if already synced to this UID
+      if (currentUid === lastSyncedUid) return;
+
+      setIsLoading(true);
+
+      try {
+        if (currentUid) {
+          // User is logged in - sync RevenueCat to this UID
+          const info = await syncRevenueCatIdentity(currentUid);
+          if (info) {
+            setCustomerInfo(info as CustomerInfo);
+            const hasPremium =
+              typeof info.entitlements.active[PREMIUM_ENTITLEMENT_ID] !==
+              "undefined";
+            setIsPremium(hasPremium);
+          }
+          setLastSyncedUid(currentUid);
+        } else {
+          // User logged out - reset RevenueCat identity
+          await resetRevenueCatIdentity();
+          setCustomerInfo(null);
+          setIsPremium(false);
+          setLastSyncedUid(null);
+        }
+      } catch (error) {
+        console.error("Error syncing RevenueCat identity:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    syncIdentity();
+  }, [user?.uid, isInitialized, lastSyncedUid]);
 
   // Listen for customer info updates
   useEffect(() => {
@@ -224,22 +298,32 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  /**
+   * Simple restore that shows alerts. Use for basic restore flow.
+   */
   const restorePurchases = useCallback(async (): Promise<boolean> => {
     if (!Purchases) {
-      Alert.alert("Not Available", "In-app purchases are not available yet. Please rebuild the app.");
+      Alert.alert(
+        "Not Available",
+        "In-app purchases are not available yet. Please rebuild the app."
+      );
       return false;
     }
     try {
       setIsLoading(true);
       const info = await Purchases.restorePurchases();
       setCustomerInfo(info);
-      const hasPremium = typeof info.entitlements.active[PREMIUM_ENTITLEMENT_ID] !== "undefined";
+      const hasPremium =
+        typeof info.entitlements.active[PREMIUM_ENTITLEMENT_ID] !== "undefined";
       setIsPremium(hasPremium);
 
       if (hasPremium) {
         Alert.alert("Success", "Your purchases have been restored!");
       } else {
-        Alert.alert("No Purchases Found", "We couldn't find any previous purchases to restore.");
+        Alert.alert(
+          "No Purchases Found",
+          "We couldn't find any previous purchases to restore."
+        );
       }
 
       return hasPremium;
@@ -247,13 +331,61 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       console.error("Error restoring purchases:", error);
       Alert.alert(
         "Restore Failed",
-        error.message || "There was an error restoring your purchases. Please try again."
+        error.message ||
+          "There was an error restoring your purchases. Please try again."
       );
       return false;
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  /**
+   * Restore with recovery detection.
+   * Returns structured result instead of showing alerts.
+   * Use this to trigger recovery wizard when subscription belongs to different account.
+   */
+  const restorePurchasesWithRecoveryFlow =
+    useCallback(async (): Promise<RestorePurchasesResult> => {
+      if (!Purchases) {
+        return { success: false, reason: "no_subscription" };
+      }
+
+      try {
+        setIsLoading(true);
+        const result = await restorePurchasesWithRecovery();
+
+        if (result.customerInfo) {
+          setCustomerInfo(result.customerInfo as CustomerInfo);
+          const hasPremium = hasPremiumEntitlement(
+            result.customerInfo as ManagerCustomerInfo
+          );
+          setIsPremium(hasPremium);
+        }
+
+        return {
+          success: result.success,
+          reason: result.reason,
+          showRecoveryWizard: result.showRecoveryWizard,
+        };
+      } catch (error: any) {
+        console.error("Error restoring purchases with recovery:", error);
+        return { success: false, reason: "no_subscription" };
+      } finally {
+        setIsLoading(false);
+      }
+    }, []);
+
+  /**
+   * Check if there's an active subscription on the Apple ID
+   * that this account may not own.
+   */
+  const hasActiveSubscriptionOnAppleId = useCallback((): boolean => {
+    if (!customerInfo) return false;
+    return detectActiveSubscriptionOnAppleId(
+      customerInfo as ManagerCustomerInfo
+    );
+  }, [customerInfo]);
 
   const value = {
     isPremium,
@@ -263,7 +395,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     currentOffering,
     purchasePackage,
     restorePurchases,
+    restorePurchasesWithRecovery: restorePurchasesWithRecoveryFlow,
     checkSubscriptionStatus,
+    hasActiveSubscriptionOnAppleId,
   };
 
   return (
@@ -297,4 +431,9 @@ export function usePremiumAccess(isPremiumContent: boolean = false) {
 }
 
 // Re-export types for use in other files
-export type { PurchasesPackage, PurchasesOffering, CustomerInfo };
+export type {
+  PurchasesPackage,
+  PurchasesOffering,
+  CustomerInfo,
+  RestorePurchasesResult,
+};

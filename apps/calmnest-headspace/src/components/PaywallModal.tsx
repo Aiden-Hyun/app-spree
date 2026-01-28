@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,14 +8,19 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
-import { useSubscription, PurchasesPackage } from "../contexts/SubscriptionContext";
+import {
+  useSubscription,
+  PurchasesPackage,
+} from "../contexts/SubscriptionContext";
 import { AccountPromptModal } from "./AccountPromptModal";
+import { RecoveryWizard } from "./RecoveryWizard";
 import { Theme } from "../theme";
 
 interface PaywallModalProps {
@@ -32,15 +37,33 @@ const FEATURES = [
   { icon: "sparkles-outline", text: "New content weekly" },
 ];
 
-export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps) {
+export function PaywallModal({
+  visible,
+  onClose,
+  onSuccess,
+}: PaywallModalProps) {
   const { theme, isDark } = useTheme();
   const { isAnonymous } = useAuth();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
-  const { currentOffering, purchasePackage, restorePurchases, isLoading, isAvailable } = useSubscription();
-  const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
+  const {
+    currentOffering,
+    purchasePackage,
+    restorePurchasesWithRecovery,
+    isLoading,
+    hasActiveSubscriptionOnAppleId,
+    isPremium,
+  } = useSubscription();
+  const [selectedPackage, setSelectedPackage] =
+    useState<PurchasesPackage | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [showAccountPrompt, setShowAccountPrompt] = useState(false);
+  const [showRecoveryWizard, setShowRecoveryWizard] = useState(false);
+
+  // Check if we should show recovery-first UI
+  // Apple ID has active subscription but current account doesn't own it
+  const shouldShowRecoveryFirst =
+    hasActiveSubscriptionOnAppleId() && !isPremium;
 
   // Get monthly and annual packages from offering
   // Try standard package identifiers first, then fall back to searching availablePackages
@@ -89,13 +112,32 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
 
   const handleRestore = async () => {
     setIsPurchasing(true);
-    const success = await restorePurchases();
+    const result = await restorePurchasesWithRecovery();
     setIsPurchasing(false);
 
-    if (success) {
+    if (result.success) {
       onSuccess?.();
       onClose();
+    } else if (result.showRecoveryWizard) {
+      // Subscription exists on Apple ID but belongs to different account
+      setShowRecoveryWizard(true);
     }
+  };
+
+  const handleRecoverySuccess = () => {
+    setShowRecoveryWizard(false);
+    onSuccess?.();
+    onClose();
+  };
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent("Subscription Help");
+    const body = encodeURIComponent(
+      "Hi,\n\nI need help with my subscription.\n\nThank you"
+    );
+    Linking.openURL(
+      `mailto:support@calmnest.app?subject=${subject}&body=${body}`
+    );
   };
 
   const formatPrice = (pkg: PurchasesPackage | undefined, period: string) => {
@@ -150,13 +192,52 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
             ))}
           </View>
 
-          {/* Subscription options */}
+          {/* Recovery-first UI when Apple ID has subscription but current account doesn't */}
+          {shouldShowRecoveryFirst && (
+            <View style={styles.recoveryContainer}>
+              <View style={styles.recoveryIconContainer}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={48}
+                  color={theme.colors.warning}
+                />
+              </View>
+              <Text style={styles.recoveryTitle}>
+                You already have an active subscription
+              </Text>
+              <Text style={styles.recoveryDescription}>
+                This Apple ID has a CalmNest subscription, but it's linked to a
+                different account. Recover access to continue using premium
+                features.
+              </Text>
+              <TouchableOpacity
+                style={styles.recoveryButton}
+                onPress={() => setShowRecoveryWizard(true)}
+              >
+                <Ionicons name="key-outline" size={20} color="#fff" />
+                <Text style={styles.recoveryButtonText}>
+                  Recover My Subscription
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.recoveryHelpButton}
+                onPress={handleContactSupport}
+              >
+                <Text style={styles.recoveryHelpText}>Contact Support</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Subscription options - only show if not in recovery-first mode */}
+          {!shouldShowRecoveryFirst && (
           <View style={styles.optionsContainer}>
             {/* Loading State */}
             {isLoadingOfferings && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={styles.loadingText}>Loading subscription plans...</Text>
+                <Text style={styles.loadingText}>
+                  Loading subscription plans...
+                </Text>
               </View>
             )}
 
@@ -254,38 +335,46 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
               </Pressable>
             )}
           </View>
+          )}
         </ScrollView>
 
-        {/* Bottom actions */}
-        <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity
-            style={[
-              styles.purchaseButton,
-              (!selectedPackage || isPurchasing) && styles.purchaseButtonDisabled,
-            ]}
-            onPress={handlePurchase}
-            disabled={!selectedPackage || isPurchasing}
-          >
-            {isPurchasing ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.purchaseButtonText}>
-                {selectedPackage ? "Subscribe Now" : "Select a Plan"}
+        {/* Bottom actions - different for recovery-first mode */}
+        <View
+          style={[styles.bottomContainer, { paddingBottom: insets.bottom + 16 }]}
+        >
+          {!shouldShowRecoveryFirst && (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.purchaseButton,
+                  (!selectedPackage || isPurchasing) &&
+                    styles.purchaseButtonDisabled,
+                ]}
+                onPress={handlePurchase}
+                disabled={!selectedPackage || isPurchasing}
+              >
+                {isPurchasing ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.purchaseButtonText}>
+                    {selectedPackage ? "Subscribe Now" : "Select a Plan"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.restoreButton}
+                onPress={handleRestore}
+                disabled={isPurchasing}
+              >
+                <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.legalText}>
+                Cancel anytime. Subscription auto-renews until cancelled.
               </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.restoreButton}
-            onPress={handleRestore}
-            disabled={isPurchasing}
-          >
-            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.legalText}>
-            Cancel anytime. Subscription auto-renews until cancelled.
-          </Text>
+            </>
+          )}
         </View>
       </View>
 
@@ -293,6 +382,13 @@ export function PaywallModal({ visible, onClose, onSuccess }: PaywallModalProps)
       <AccountPromptModal
         visible={showAccountPrompt}
         onClose={() => setShowAccountPrompt(false)}
+      />
+
+      {/* Recovery wizard for subscription recovery */}
+      <RecoveryWizard
+        visible={showRecoveryWizard}
+        onClose={() => setShowRecoveryWizard(false)}
+        onSuccess={handleRecoverySuccess}
       />
     </Modal>
   );
@@ -535,5 +631,56 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: theme.colors.textMuted,
       textAlign: "center",
       marginTop: 8,
+    },
+    // Recovery-first styles
+    recoveryContainer: {
+      alignItems: "center",
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
+      padding: 32,
+      ...theme.shadows.sm,
+    },
+    recoveryIconContainer: {
+      marginBottom: 16,
+    },
+    recoveryTitle: {
+      fontFamily: theme.fonts.display.semiBold,
+      fontSize: 20,
+      color: theme.colors.text,
+      textAlign: "center",
+      marginBottom: 12,
+    },
+    recoveryDescription: {
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 15,
+      color: theme.colors.textLight,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: 24,
+    },
+    recoveryButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.primary,
+      borderRadius: theme.borderRadius.lg,
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      width: "100%",
+      gap: 8,
+      marginBottom: 12,
+    },
+    recoveryButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 16,
+      color: "#fff",
+    },
+    recoveryHelpButton: {
+      paddingVertical: 12,
+    },
+    recoveryHelpText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 15,
+      color: theme.colors.textMuted,
     },
   });
