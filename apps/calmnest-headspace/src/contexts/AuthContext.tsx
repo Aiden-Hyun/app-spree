@@ -35,7 +35,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export class CredentialCollisionError extends Error {
   constructor(
     public readonly pendingCredential: AuthCredential,
-    public readonly providerType: "google.com" | "apple.com" | "password"
+    public readonly providerType: "google.com" | "apple.com" | "password",
+    public readonly email: string | null = null
   ) {
     super("This credential is already linked to another account");
     this.name = "CredentialCollisionError";
@@ -198,7 +199,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:afterGetCred',message:'Got Google credential',data:{hasCredential:!!credential,userStillAnonymous:user?.isAnonymous,userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
     // #endregion
-    if (!credential) return; // User cancelled
+    if (!credential) {
+      throw new Error("User cancelled");
+    }
 
     try {
       // #region agent log
@@ -213,7 +216,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthContext.tsx:upgradeAnonymousWithGoogle:linkError',message:'linkWithCredential threw error',data:{errorCode:error?.code,errorMessage:error?.message,errorName:error?.name,fullError:JSON.stringify(error,Object.getOwnPropertyNames(error))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
       if (error.code === "auth/credential-already-in-use") {
-        throw new CredentialCollisionError(credential, "google.com");
+        // Get the email from the Google user that was just signed in
+        const googleUser = await GoogleSignin.getCurrentUser();
+        const email = googleUser?.user?.email || null;
+        throw new CredentialCollisionError(credential, "google.com", email);
       }
       throw error;
     }
@@ -228,14 +234,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user?.isAnonymous) {
       throw new Error("User is not anonymous");
     }
-    const credential = await getAppleCredential();
-    if (!credential) return; // User cancelled
+    if (!isAppleSignInAvailable) {
+      throw new Error("Apple Sign In is not available on this device");
+    }
+
+    let appleEmail: string | null = null;
+    let credential: AuthCredential;
+
+    try {
+      const appleResponse = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const { identityToken, email } = appleResponse;
+      appleEmail = email || null;
+      if (!identityToken) {
+        throw new Error("User cancelled");
+      }
+      const provider = new OAuthProvider("apple.com");
+      credential = provider.credential({ idToken: identityToken });
+    } catch (err: any) {
+      if (
+        err?.code === AppleAuthentication.AppleAuthenticationError?.CANCELED ||
+        err?.code === "ERR_CANCELED" ||
+        err?.code === "ERR_REQUEST_CANCELED"
+      ) {
+        throw new Error("User cancelled");
+      }
+      throw err;
+    }
 
     try {
       await linkWithCredential(user, credential);
     } catch (error: any) {
       if (error.code === "auth/credential-already-in-use") {
-        throw new CredentialCollisionError(credential, "apple.com");
+        throw new CredentialCollisionError(credential, "apple.com", appleEmail);
       }
       throw error;
     }
@@ -262,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error.code === "auth/credential-already-in-use" ||
         error.code === "auth/email-already-in-use"
       ) {
-        throw new CredentialCollisionError(credential, "password");
+        throw new CredentialCollisionError(credential, "password", email);
       }
       throw error;
     }
@@ -291,16 +326,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let credential: AuthCredential | null = null;
+    let providerEmail: string | null = null;
 
     if (providerType === "google.com") {
       credential = await getGoogleCredential();
+      if (credential) {
+        const googleUser = await GoogleSignin.getCurrentUser();
+        providerEmail = googleUser?.user?.email || null;
+      }
     } else if (providerType === "apple.com") {
       credential = await getAppleCredential();
+      // Apple email is not easily accessible after getAppleCredential
+      // It may be null if user chose "Hide My Email"
     } else if (providerType === "password" && emailPassword) {
       credential = EmailAuthProvider.credential(
         emailPassword.email,
         emailPassword.password
       );
+      providerEmail = emailPassword.email;
     }
 
     if (!credential) return; // User cancelled
@@ -312,7 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error.code === "auth/credential-already-in-use" ||
         error.code === "auth/email-already-in-use"
       ) {
-        throw new CredentialCollisionError(credential, providerType);
+        throw new CredentialCollisionError(credential, providerType, providerEmail);
       }
       throw error;
     }

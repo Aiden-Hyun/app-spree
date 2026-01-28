@@ -19,6 +19,7 @@ import { useTheme } from "../src/contexts/ThemeContext";
 import { AnimatedPressable } from "../src/components/AnimatedPressable";
 import { AnimatedView } from "../src/components/AnimatedView";
 import { CredentialCollisionModal } from "../src/components/CredentialCollisionModal";
+import { AccountSwitchConfirmModal } from "../src/components/AccountSwitchConfirmModal";
 import { router, useLocalSearchParams } from "expo-router";
 import { Theme } from "../src/theme";
 
@@ -42,12 +43,14 @@ export default function LoginScreen() {
     upgradeAnonymousWithGoogle,
     upgradeAnonymousWithApple,
     upgradeAnonymousWithEmail,
+    signInWithPendingCredential,
     isAppleSignInAvailable,
     loading,
   } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [collisionError, setCollisionError] = useState<CredentialCollisionError | null>(null);
+  const [showSwitchConfirm, setShowSwitchConfirm] = useState(false);
   const { theme, isDark } = useTheme();
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -158,9 +161,10 @@ export default function LoginScreen() {
       // #endregion
       if (error instanceof CredentialCollisionError) {
         setCollisionError(error);
-      } else if (error.message) {
+      } else if (error.message && error.message !== "User cancelled") {
         Alert.alert("Error", error.message);
       }
+      // User cancelled - do nothing, stay on current page
     } finally {
       setGoogleLoading(false);
     }
@@ -194,9 +198,10 @@ export default function LoginScreen() {
       // #endregion
       if (error instanceof CredentialCollisionError) {
         setCollisionError(error);
-      } else if (error.message) {
+      } else if (error.message && error.message !== "User cancelled") {
         Alert.alert("Error", error.message);
       }
+      // User cancelled - do nothing, stay on current page
     } finally {
       setAppleLoading(false);
     }
@@ -218,12 +223,27 @@ export default function LoginScreen() {
     }
   };
 
-  // Collision modal handler - navigate to login page (not link mode)
+  // Collision modal handler - show switch confirmation modal
   const handleCollisionSignIn = () => {
-    setCollisionError(null); // Close collision modal
-    // Navigate to login without link mode - user signs in normally
-    // The anonymous account is only replaced after successful sign-in
-    router.push('/login');
+    setShowSwitchConfirm(true);
+  };
+
+  // Handle confirmed account switch - auto sign in with pending credential
+  const handleConfirmSwitch = async () => {
+    if (!collisionError?.pendingCredential) return;
+    try {
+      await signInWithPendingCredential(collisionError.pendingCredential);
+      setCollisionError(null);
+      setShowSwitchConfirm(false);
+      router.replace('/home');
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to sign in");
+    }
+  };
+
+  // Cancel switch - go back to collision modal
+  const handleCancelSwitch = () => {
+    setShowSwitchConfirm(false);
   };
 
   const heroGradient = isDark
@@ -488,14 +508,26 @@ export default function LoginScreen() {
       </View>
       
       {/* Credential collision modal */}
-      {collisionError && (
+      {collisionError && !showSwitchConfirm && (
         <CredentialCollisionModal
-          visible={!!collisionError}
+          visible={!!collisionError && !showSwitchConfirm}
           onClose={() => setCollisionError(null)}
           providerType={collisionError.providerType}
           pendingCredential={collisionError.pendingCredential}
+          email={collisionError.email}
           onSignInToOtherAccount={handleCollisionSignIn}
           onUseDifferentMethod={() => setCollisionError(null)}
+        />
+      )}
+
+      {/* Account switch confirmation modal */}
+      {collisionError && showSwitchConfirm && (
+        <AccountSwitchConfirmModal
+          visible={showSwitchConfirm}
+          email={collisionError.email}
+          providerType={collisionError.providerType}
+          onConfirm={handleConfirmSwitch}
+          onCancel={handleCancelSwitch}
         />
       )}
     </KeyboardAvoidingView>
