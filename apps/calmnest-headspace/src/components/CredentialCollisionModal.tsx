@@ -159,6 +159,20 @@ export function CredentialCollisionModal({
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </Pressable>
+
+          {/* Helper text */}
+          <View style={styles.helperNote}>
+            <Ionicons
+              name="information-circle-outline"
+              size={16}
+              color={theme.colors.textMuted}
+            />
+            <Text style={styles.helperNoteText}>
+              To link this {providerName} account to your current guest subscription, 
+              you'll need to delete the existing account first. Sign in and delete the 
+              account in Settings. Contact support if you need help.
+            </Text>
+          </View>
         </View>
       </View>
     </Modal>
@@ -258,5 +272,21 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     buttonDisabled: {
       opacity: 0.6,
+    },
+    helperNote: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      backgroundColor: `${theme.colors.gray[100]}`,
+      borderRadius: theme.borderRadius.md,
+      padding: 12,
+      marginTop: 8,
+      gap: 8,
+    },
+    helperNoteText: {
+      flex: 1,
+      fontFamily: theme.fonts.ui.regular,
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      lineHeight: 17,
     },
   });

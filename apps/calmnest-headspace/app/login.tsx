@@ -19,7 +19,6 @@ import { useTheme } from "../src/contexts/ThemeContext";
 import { AnimatedPressable } from "../src/components/AnimatedPressable";
 import { AnimatedView } from "../src/components/AnimatedView";
 import { CredentialCollisionModal } from "../src/components/CredentialCollisionModal";
-import { AccountSwitchWarning } from "../src/components/AccountSwitchWarning";
 import { router, useLocalSearchParams } from "expo-router";
 import { Theme } from "../src/theme";
 
@@ -43,14 +42,12 @@ export default function LoginScreen() {
     upgradeAnonymousWithGoogle,
     upgradeAnonymousWithApple,
     upgradeAnonymousWithEmail,
-    signInWithPendingCredential,
     isAppleSignInAvailable,
     loading,
   } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [collisionError, setCollisionError] = useState<CredentialCollisionError | null>(null);
-  const [showSwitchWarning, setShowSwitchWarning] = useState(false);
   const { theme, isDark } = useTheme();
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
@@ -221,20 +218,12 @@ export default function LoginScreen() {
     }
   };
 
-  // Collision modal handlers
+  // Collision modal handler - navigate to login page (not link mode)
   const handleCollisionSignIn = () => {
-    setShowSwitchWarning(true);
-  };
-  
-  const handleConfirmSwitch = async () => {
-    if (!collisionError?.pendingCredential) return;
-    try {
-      await signInWithPendingCredential(collisionError.pendingCredential);
-      setCollisionError(null);
-      router.replace('/home');
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to sign in");
-    }
+    setCollisionError(null); // Close collision modal
+    // Navigate to login without link mode - user signs in normally
+    // The anonymous account is only replaced after successful sign-in
+    router.push('/login');
   };
 
   const heroGradient = isDark
@@ -509,13 +498,6 @@ export default function LoginScreen() {
           onUseDifferentMethod={() => setCollisionError(null)}
         />
       )}
-      
-      {/* Account switch warning */}
-      <AccountSwitchWarning
-        visible={showSwitchWarning}
-        onClose={() => setShowSwitchWarning(false)}
-        onConfirmSwitch={handleConfirmSwitch}
-      />
     </KeyboardAvoidingView>
   );
 }
