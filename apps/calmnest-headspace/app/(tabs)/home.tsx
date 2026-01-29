@@ -500,14 +500,14 @@ function HomeScreen() {
           <AnimatedView delay={150} duration={400}>
             {isAnonymous ? (
               <AnimatedPressable
-                onPress={() => router.push('/login')}
+                onPress={() => router.push(hasSubscription ? '/login?mode=link' : '/login')}
                 style={styles.signInPromptInline}
               >
                 <Text style={styles.signInPromptInlineText}>
-                  Sign in to track your listening history
+                  {hasSubscription ? "Link your account to track listening history" : "Sign in to track your listening history"}
                 </Text>
                 <View style={styles.signInPromptInlineButton}>
-                  <Text style={styles.signInPromptInlineButtonText}>Sign In</Text>
+                  <Text style={styles.signInPromptInlineButtonText}>{hasSubscription ? "Link Account" : "Sign In"}</Text>
                 </View>
               </AnimatedPressable>
             ) : recentlyPlayed.length > 0 ? (
@@ -534,14 +534,14 @@ function HomeScreen() {
           <AnimatedView delay={250} duration={400}>
             {isAnonymous ? (
               <AnimatedPressable
-                onPress={() => router.push('/login')}
+                onPress={() => router.push(hasSubscription ? '/login?mode=link' : '/login')}
                 style={styles.signInPromptInline}
               >
                 <Text style={styles.signInPromptInlineText}>
-                  Sign in to save your favorites
+                  {hasSubscription ? "Link your account to save favorites" : "Sign in to save your favorites"}
                 </Text>
                 <View style={styles.signInPromptInlineButton}>
-                  <Text style={styles.signInPromptInlineButtonText}>Sign In</Text>
+                  <Text style={styles.signInPromptInlineButtonText}>{hasSubscription ? "Link Account" : "Sign In"}</Text>
                 </View>
               </AnimatedPressable>
             ) : favorites.length > 0 ? (

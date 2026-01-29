@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import {
   isFavorite,
   toggleFavorite,
@@ -46,6 +47,7 @@ export function usePlayerBehavior({
 }: UsePlayerBehaviorProps): UsePlayerBehaviorReturn {
   const router = useRouter();
   const { user, isAnonymous } = useAuth();
+  const { isPremium } = useSubscription();
 
   // State
   const [isFavoritedState, setIsFavoritedState] = useState(false);
@@ -119,14 +121,20 @@ export function usePlayerBehavior({
   const onToggleFavorite = useCallback(async () => {
     if (!user || !contentId) return;
 
-    // Prompt anonymous users to sign in
+    // Prompt anonymous users to sign in or link account
     if (isAnonymous) {
+      const isLinkMode = isPremium;
       Alert.alert(
-        'Sign In Required',
-        'Create an account to save favorites and sync across devices.',
+        isLinkMode ? 'Link Account Required' : 'Sign In Required',
+        isLinkMode 
+          ? 'Link your account to save favorites and sync across devices.'
+          : 'Create an account to save favorites and sync across devices.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/login') },
+          { 
+            text: isLinkMode ? 'Link Account' : 'Sign In', 
+            onPress: () => router.push(isLinkMode ? '/login?mode=link' : '/login') 
+          },
         ]
       );
       return;
@@ -146,7 +154,7 @@ export function usePlayerBehavior({
       // Revert on error
       setIsFavoritedState(previousState);
     }
-  }, [user, contentId, contentType, isAnonymous, isFavoritedState, router]);
+  }, [user, contentId, contentType, isAnonymous, isPremium, isFavoritedState, router]);
 
   // Play/pause with listening history tracking
   const onPlayPause = useCallback(async () => {
