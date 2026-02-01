@@ -68,13 +68,7 @@ function MeditationPlayerScreen() {
         const url = await getAudioUrlFromPath(meditation.audioPath);
         if (url) {
           setAudioUrl(url);
-          audioPlayer.loadAudio(url, {
-            id: meditation.id,
-            title: meditation.title,
-            artist: meditation.instructor || 'CalmNest',
-            artwork: meditation.thumbnailUrl,
-            duration: (meditation.duration_minutes || 0) * 60,
-          });
+          audioPlayer.loadAudio(url);
         }
       }
     }

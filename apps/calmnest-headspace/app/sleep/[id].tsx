@@ -64,21 +64,12 @@ function SleepStoryPlayerScreen() {
     async function loadStoryAudio() {
       if (!story) return;
 
-      // Metadata for Now Playing
-      const metadata = {
-        id: story.id,
-        title: story.title,
-        artist: story.narrator || 'CalmNest',
-        artwork: story.thumbnail_url,
-        duration: (story.duration_minutes || 0) * 60,
-      };
-      
       // Try to get audio URL from audio_file key
       if (story.audio_file) {
         const url = await getAudioUrl(story.audio_file);
         if (url) {
           setAudioUrl(url);
-          audioPlayer.loadAudio(url, metadata);
+          audioPlayer.loadAudio(url);
           return;
         }
       }
@@ -86,7 +77,7 @@ function SleepStoryPlayerScreen() {
       // Fallback to direct audio_url
       if (story.audio_url) {
         setAudioUrl(story.audio_url);
-        audioPlayer.loadAudio(story.audio_url, metadata);
+        audioPlayer.loadAudio(story.audio_url);
       }
     }
 

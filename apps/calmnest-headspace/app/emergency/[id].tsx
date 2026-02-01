@@ -75,13 +75,7 @@ function EmergencyPlayerScreen() {
         const url = await getAudioUrlFromPath(audioPath);
         if (url) {
           setAudioUrl(url);
-          audioPlayer.loadAudio(url, {
-            id,
-            title: title || 'Emergency Relief',
-            artist: narrator || 'CalmNest',
-            artwork: thumbnailUrl,
-            duration: durationMinutes * 60,
-          });
+          audioPlayer.loadAudio(url);
         }
       } catch (error) {
         console.error("Failed to load emergency audio:", error);

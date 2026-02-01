@@ -91,25 +91,16 @@ function AlbumTrackPlayerScreen() {
       }
       
       try {
-        // Metadata for Now Playing
-        const metadata = {
-          id,
-          title: title || 'Track',
-          artist: artist || 'CalmNest',
-          artwork: thumbnailUrl,
-          duration: durationMinutes * 60,
-        };
-        
         // Try to use downloaded audio first, fall back to streaming
         const localPath = await getLocalAudioPath(id);
         if (localPath) {
           setCurrentAudioUrl(localPath);
-          audioPlayer.loadAudio(localPath, metadata);
+          audioPlayer.loadAudio(localPath);
         } else {
           const audioUrl = await getAudioUrlFromPath(audioPath);
           if (audioUrl) {
             setCurrentAudioUrl(audioUrl);
-            audioPlayer.loadAudio(audioUrl, metadata);
+            audioPlayer.loadAudio(audioUrl);
           }
         }
       } finally {

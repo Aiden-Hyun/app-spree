@@ -3,7 +3,6 @@ import {
   useAudioPlayer as useExpoAudioPlayer,
   useAudioPlayerStatus,
   AudioSource,
-  setAudioModeAsync,
 } from "expo-audio";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -38,24 +37,6 @@ export function useBackgroundAudio() {
   // Create audio player instance
   const player = useExpoAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
-
-  // Configure audio mode to allow mixing with TrackPlayer
-  useEffect(() => {
-    async function configureAudioMode() {
-      try {
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          shouldPlayInBackground: true,
-          shouldRouteThroughEarpiece: false,
-          // CRITICAL: Use 'mixWithOthers' so ambient sounds don't interrupt TrackPlayer
-          interruptionMode: 'mixWithOthers',
-        });
-      } catch (err) {
-        console.warn("Failed to configure background audio mode:", err);
-      }
-    }
-    configureAudioMode();
-  }, []);
 
   // Load saved preferences on mount
   useEffect(() => {

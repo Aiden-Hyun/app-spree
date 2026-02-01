@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { AuthProvider } from '../src/contexts/AuthContext';
@@ -11,7 +11,6 @@ import { PreloadGate } from '../src/components/PreloadGate';
 import { useFonts } from '../src/hooks/useFonts';
 import { lightColors } from '../src/theme';
 import { OfflineNavigator } from '../src/components/OfflineNavigator';
-import { setupTrackPlayer } from '../src/services/trackPlayerService';
 
 function LoadingScreen() {
   return (
@@ -154,21 +153,6 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const { fontsLoaded, fontError } = useFonts();
-  const [isTrackPlayerReady, setIsTrackPlayerReady] = useState(false);
-
-  // Initialize TrackPlayer ONCE on app start (FIX #1 - single bootstrap point)
-  useEffect(() => {
-    setupTrackPlayer()
-      .then((success) => {
-        setIsTrackPlayerReady(success);
-        if (!success) {
-          console.warn("TrackPlayer failed to initialize");
-        }
-      })
-      .catch((error) => {
-        console.error("TrackPlayer init error:", error);
-      });
-  }, []);
 
   // Log font errors for debugging
   useEffect(() => {

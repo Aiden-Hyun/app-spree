@@ -8,28 +8,28 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		163BAF4AEAC952105110712F /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC218BB7A585657FC5E5C5D3 /* ExpoModulesProvider.swift */; };
+		39F1F08116C41288AA70B487 /* libPods-CalmNest.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FB657F73AEC8A01D172A726D /* libPods-CalmNest.a */; };
+		3D5D9B695575AF938B3A694E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1C1331B7341B97DD4F38C610 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		5F294D0822AB62CC9F26C7B2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FE8F74BE3F93068D4A60D44E /* PrivacyInfo.xcprivacy */; };
-		708EB2010E42F901A5FABE3F /* libPods-CalmNest.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DF061AB69D84DCC2E73F3A05 /* libPods-CalmNest.a */; };
+		947D92DA3A7C5523A769F88D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6163B7E5AAD63DB67AD8240E /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		096F1014D21B554332FBCFD0 /* Pods-CalmNest.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.debug.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.debug.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* CalmNest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CalmNest.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = CalmNest/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = CalmNest/Info.plist; sourceTree = "<group>"; };
-		804A235C32C2E5314A65106B /* Pods-CalmNest.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.release.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.release.xcconfig"; sourceTree = "<group>"; };
+		1C1331B7341B97DD4F38C610 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = CalmNest/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		6163B7E5AAD63DB67AD8240E /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-CalmNest/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		7F1804C20CE4476D96F6721C /* Pods-CalmNest.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.release.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = CalmNest/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CC218BB7A585657FC5E5C5D3 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-CalmNest/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		DF061AB69D84DCC2E73F3A05 /* libPods-CalmNest.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CalmNest.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E6A1F970ADA23CF4D5DA0CC3 /* Pods-CalmNest.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CalmNest.debug.xcconfig"; path = "Target Support Files/Pods-CalmNest/Pods-CalmNest.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = CalmNest/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* CalmNest-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "CalmNest-Bridging-Header.h"; path = "CalmNest/CalmNest-Bridging-Header.h"; sourceTree = "<group>"; };
-		FE8F74BE3F93068D4A60D44E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = CalmNest/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		FB657F73AEC8A01D172A726D /* libPods-CalmNest.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CalmNest.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				708EB2010E42F901A5FABE3F /* libPods-CalmNest.a in Frameworks */,
+				39F1F08116C41288AA70B487 /* libPods-CalmNest.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				FE8F74BE3F93068D4A60D44E /* PrivacyInfo.xcprivacy */,
+				1C1331B7341B97DD4F38C610 /* PrivacyInfo.xcprivacy */,
 			);
 			name = CalmNest;
 			sourceTree = "<group>";
@@ -62,15 +62,23 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				DF061AB69D84DCC2E73F3A05 /* libPods-CalmNest.a */,
+				FB657F73AEC8A01D172A726D /* libPods-CalmNest.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		39A3757303EB853641BEA943 /* ExpoModulesProviders */ = {
+		3847F9917D062CCAFA8B92E4 /* CalmNest */ = {
 			isa = PBXGroup;
 			children = (
-				B4F0A5D191B553698BBFA1F6 /* CalmNest */,
+				6163B7E5AAD63DB67AD8240E /* ExpoModulesProvider.swift */,
+			);
+			name = CalmNest;
+			sourceTree = "<group>";
+		};
+		73238F22F859CCB3AF3BED0D /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				3847F9917D062CCAFA8B92E4 /* CalmNest */,
 			);
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
@@ -89,8 +97,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				C96095B46AF2F207F88084DC /* Pods */,
-				39A3757303EB853641BEA943 /* ExpoModulesProviders */,
+				E6172196E770DA30DC213E25 /* Pods */,
+				73238F22F859CCB3AF3BED0D /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -105,14 +113,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B4F0A5D191B553698BBFA1F6 /* CalmNest */ = {
-			isa = PBXGroup;
-			children = (
-				CC218BB7A585657FC5E5C5D3 /* ExpoModulesProvider.swift */,
-			);
-			name = CalmNest;
-			sourceTree = "<group>";
-		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -122,12 +122,13 @@
 			path = CalmNest/Supporting;
 			sourceTree = "<group>";
 		};
-		C96095B46AF2F207F88084DC /* Pods */ = {
+		E6172196E770DA30DC213E25 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				E6A1F970ADA23CF4D5DA0CC3 /* Pods-CalmNest.debug.xcconfig */,
-				804A235C32C2E5314A65106B /* Pods-CalmNest.release.xcconfig */,
+				096F1014D21B554332FBCFD0 /* Pods-CalmNest.debug.xcconfig */,
+				7F1804C20CE4476D96F6721C /* Pods-CalmNest.release.xcconfig */,
 			);
+			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -139,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "CalmNest" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				8DA8C598BD903BB52A1390D1 /* [Expo] Configure project */,
+				612291BB045C1CCD7BC171AC /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				EBF3717FDEFC099A7C323EE0 /* [CP] Embed Pods Frameworks */,
+				C8F1F74FBEBB0DE35D81714C /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -166,6 +167,8 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
+						DevelopmentTeam = "5LF39MCL5Q";
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -195,7 +198,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				5F294D0822AB62CC9F26C7B2 /* PrivacyInfo.xcprivacy in Resources */,
+				3D5D9B695575AF938B3A694E /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,6 +243,30 @@
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
+		};
+		612291BB045C1CCD7BC171AC /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/CalmNest/CalmNest.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-CalmNest/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-CalmNest/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-CalmNest/expo-configure-project.sh\"\n";
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -297,31 +324,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-CalmNest/Pods-CalmNest-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		8DA8C598BD903BB52A1390D1 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/CalmNest/CalmNest.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-CalmNest/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-CalmNest/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-CalmNest/expo-configure-project.sh\"\n";
-		};
-		EBF3717FDEFC099A7C323EE0 /* [CP] Embed Pods Frameworks */ = {
+		C8F1F74FBEBB0DE35D81714C /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -351,7 +354,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				163BAF4AEAC952105110712F /* ExpoModulesProvider.swift in Sources */,
+				947D92DA3A7C5523A769F88D /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -360,13 +363,12 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E6A1F970ADA23CF4D5DA0CC3 /* Pods-CalmNest.debug.xcconfig */;
+			baseConfigurationReference = 096F1014D21B554332FBCFD0 /* Pods-CalmNest.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CalmNest/CalmNest.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5LF39MCL5Q;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -392,18 +394,20 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+				DEVELOPMENT_TEAM = "5LF39MCL5Q";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 			};
 			name = Debug;
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 804A235C32C2E5314A65106B /* Pods-CalmNest.release.xcconfig */;
+			baseConfigurationReference = 7F1804C20CE4476D96F6721C /* Pods-CalmNest.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CalmNest/CalmNest.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 5LF39MCL5Q;
 				INFOPLIST_FILE = CalmNest/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -423,6 +427,9 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+				DEVELOPMENT_TEAM = "5LF39MCL5Q";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 			};
 			name = Release;
 		};
