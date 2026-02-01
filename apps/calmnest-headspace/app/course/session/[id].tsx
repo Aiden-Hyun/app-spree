@@ -100,16 +100,25 @@ function CourseSessionPlayerScreen() {
       }
       
       try {
+        // Metadata for Now Playing
+        const metadata = {
+          id,
+          title: title || 'Session',
+          artist: instructor || 'CalmNest',
+          artwork: thumbnailUrl,
+          duration: durationMinutes * 60,
+        };
+        
         // Try to use downloaded audio first, fall back to streaming
         const localPath = await getLocalAudioPath(id);
         if (localPath) {
           setCurrentAudioUrl(localPath);
-          audioPlayer.loadAudio(localPath);
+          audioPlayer.loadAudio(localPath, metadata);
         } else {
           const audioUrl = await getAudioUrlFromPath(audioPath);
           if (audioUrl) {
             setCurrentAudioUrl(audioUrl);
-            audioPlayer.loadAudio(audioUrl);
+            audioPlayer.loadAudio(audioUrl, metadata);
           }
         }
       } finally {

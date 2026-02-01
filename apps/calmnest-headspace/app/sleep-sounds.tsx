@@ -92,7 +92,13 @@ function SleepSoundsScreen() {
       // Play new sound
       const audioUrl = await getAudioUrlFromPath(sound.audioPath);
       if (audioUrl) {
-        await audioPlayer.loadAudio(audioUrl);
+        await audioPlayer.loadAudio(audioUrl, {
+          id: sound.id,
+          title: sound.title,
+          artist: 'CalmNest',
+          artwork: undefined,
+          duration: 30 * 60, // Default 30 min for sleep sounds
+        });
         audioPlayer.play();
         setPlayingSound(sound.id);
       }

@@ -43,7 +43,13 @@ function OfflinePlayerScreen() {
 
       setLoading(true);
       try {
-        await audioPlayer.loadAudio(currentItem.localPath);
+        await audioPlayer.loadAudio(currentItem.localPath, {
+          id: currentItem.contentId,
+          title: currentItem.title,
+          artist: 'CalmNest',
+          artwork: currentItem.thumbnailUrl,
+          duration: (currentItem.duration_minutes || 0) * 60,
+        });
         setLoading(false);
       } catch (error) {
         console.warn('Error loading offline audio:', error);

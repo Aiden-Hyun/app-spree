@@ -1547,6 +1547,9 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-track-player (4.1.2):
+    - React-Core
+    - SwiftAudioEx (= 1.1.0)
   - React-NativeModulesApple (0.81.5):
     - hermes-engine
     - React-callinvoker
@@ -2038,6 +2041,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - SwiftAudioEx (1.1.0)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2103,6 +2107,7 @@ DEPENDENCIES:
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
+  - react-native-track-player (from `../node_modules/react-native-track-player`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
   - React-perflogger (from `../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -2153,6 +2158,7 @@ SPEC REPOS:
     - PurchasesHybridCommon
     - ReachabilitySwift
     - RevenueCat
+    - SwiftAudioEx
 
 EXTERNAL SOURCES:
   EASClient:
@@ -2278,6 +2284,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-safe-area-context"
   react-native-slider:
     :path: "../node_modules/@react-native-community/slider"
+  react-native-track-player:
+    :path: "../node_modules/react-native-track-player"
   React-NativeModulesApple:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-oscompat:
@@ -2424,6 +2432,7 @@ SPEC CHECKSUMS:
   react-native-netinfo: f0a9899081c185db1de5bb2fdc1c88c202a059ac
   react-native-safe-area-context: 53f796cb6c814661bbe99fbdfd0585d07b996cdd
   react-native-slider: b76fa3dd989d25e8c2751c2a546674dfc0c2b6f8
+  react-native-track-player: 24ecd55d64da8a6471ba96484b67bc9cee6fc629
   React-NativeModulesApple: 1664340b8750d64e0ef3907c5e53d9481f74bcbd
   React-oscompat: ce47230ed20185e91de62d8c6d139ae61763d09c
   React-perflogger: b1af3cfb3f095f819b2814910000392a8e17ba9f
@@ -2461,6 +2470,7 @@ SPEC CHECKSUMS:
   RNPurchases: bf7031528a609e0e0e5e5e8f6db213e83925ebbb
   RNScreens: dd61bc3a3e6f6901ad833efa411917d44827cf51
   RNSVG: 2825ee146e0f6a16221e852299943e4cceef4528
+  SwiftAudioEx: f6aa653770f3a0d3851edaf8d834a30aee4a7646
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
 PODFILE CHECKSUM: a3c85f2656cb7f86f39b61ecc597a95753a35465

@@ -115,7 +115,13 @@ function SoundPlayerScreen() {
       const url = await getAudioUrlFromPath(sound.audioPath);
       if (url) {
         setAudioUrl(url);
-        await audioPlayer.loadAudio(url);
+        await audioPlayer.loadAudio(url, {
+          id: sound.id,
+          title: sound.title,
+          artist: 'CalmNest',
+          artwork: undefined, // Most sounds don't have artwork
+          duration: (timerMinutes || 30) * 60,
+        });
         // Enable looping by default for ambient sounds
         audioPlayer.setLoop(true);
       }
