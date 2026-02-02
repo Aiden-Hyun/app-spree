@@ -246,8 +246,14 @@ export default function LoginScreen() {
     setShowSwitchConfirm(false);
   };
 
+  // Link mode uses a blue/purple accent to visually distinguish from regular login
+  const linkAccentColor = '#6366F1'; // Indigo
+  const linkAccentLight = '#E0E7FF'; // Indigo light
+  
   const heroGradient = isDark
     ? ([theme.colors.gray[100], theme.colors.background] as [string, string])
+    : isLinkMode
+    ? ([linkAccentLight, theme.colors.background] as [string, string])
     : ([theme.colors.primaryLight, theme.colors.background] as [
         string,
         string,
@@ -272,18 +278,26 @@ export default function LoginScreen() {
         >
           <AnimatedView delay={0} duration={600}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <Ionicons name="leaf" size={40} color={theme.colors.primary} />
+              <View style={[styles.logoCircle, isLinkMode && { backgroundColor: linkAccentLight }]}>
+                <Ionicons 
+                  name={isLinkMode ? "link" : "leaf"} 
+                  size={40} 
+                  color={isLinkMode ? linkAccentColor : theme.colors.primary} 
+                />
               </View>
             </View>
           </AnimatedView>
 
           <AnimatedView delay={100} duration={600}>
-            <Text style={styles.title}>CalmNest</Text>
+            <Text style={[styles.title, isLinkMode && { color: linkAccentColor }]}>
+              {isLinkMode ? "Link Account" : "CalmNest"}
+            </Text>
           </AnimatedView>
 
           <AnimatedView delay={200} duration={600}>
-            <Text style={styles.subtitle}>Find your inner peace</Text>
+            <Text style={styles.subtitle}>
+              {isLinkMode ? "Secure your subscription" : "Find your inner peace"}
+            </Text>
           </AnimatedView>
         </LinearGradient>
 
@@ -359,8 +373,8 @@ export default function LoginScreen() {
           {/* Link mode info banner */}
           {isLinkMode && (
             <AnimatedView delay={600} duration={500}>
-              <View style={styles.linkInfoBanner}>
-                <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+              <View style={[styles.linkInfoBanner, { backgroundColor: `${linkAccentColor}15` }]}>
+                <Ionicons name="information-circle-outline" size={20} color={linkAccentColor} />
                 <Text style={styles.linkInfoText}>
                   Linking preserves your subscription and data. Choose a sign-in method you'll remember.
                 </Text>
@@ -383,13 +397,16 @@ export default function LoginScreen() {
                   style={[
                     styles.inputContainer,
                     emailFocused && styles.inputContainerFocused,
+                    emailFocused && isLinkMode && { borderColor: linkAccentColor },
                   ]}
                 >
                   <Ionicons
                     name="mail-outline"
                     size={20}
                     color={
-                      emailFocused ? theme.colors.primary : theme.colors.textMuted
+                      emailFocused 
+                        ? (isLinkMode ? linkAccentColor : theme.colors.primary) 
+                        : theme.colors.textMuted
                     }
                     style={styles.inputIcon}
                   />
@@ -412,6 +429,7 @@ export default function LoginScreen() {
                   style={[
                     styles.inputContainer,
                     passwordFocused && styles.inputContainerFocused,
+                    passwordFocused && isLinkMode && { borderColor: linkAccentColor },
                   ]}
                 >
                   <Ionicons
@@ -419,7 +437,7 @@ export default function LoginScreen() {
                     size={20}
                     color={
                       passwordFocused
-                        ? theme.colors.primary
+                        ? (isLinkMode ? linkAccentColor : theme.colors.primary)
                         : theme.colors.textMuted
                     }
                     style={styles.inputIcon}
@@ -446,6 +464,7 @@ export default function LoginScreen() {
               <Animated.View
                 style={[
                   styles.authButtonInner,
+                  isLinkMode && { backgroundColor: linkAccentColor },
                   { transform: [{ scale: buttonScale }] },
                 ]}
               >
