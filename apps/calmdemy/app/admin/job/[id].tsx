@@ -112,6 +112,31 @@ export default function JobDetailScreen() {
         </View>
       </View>
 
+      {/* Course Progress (only for course jobs) */}
+      {job.contentType === 'course' && job.courseProgress && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Course Progress</Text>
+          <View style={styles.card}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {job.status !== 'completed' && job.status !== 'failed' && (
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              )}
+              <Text style={{
+                fontFamily: 'DMSans-SemiBold',
+                fontSize: 15,
+                color: job.status === 'completed'
+                  ? theme.colors.success
+                  : job.status === 'failed'
+                    ? theme.colors.error
+                    : theme.colors.primary,
+              }}>
+                {job.courseProgress}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Job Info */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Job Details</Text>
@@ -122,22 +147,75 @@ export default function JobDetailScreen() {
           <InfoRow label="LLM Backend" value={BACKEND_LABELS[job.llmBackend] || job.llmBackend || 'Local'} />
           <InfoRow label="TTS Backend" value={BACKEND_LABELS[job.ttsBackend] || job.ttsBackend || 'Local'} />
           <InfoRow label="Content Type" value={CONTENT_TYPE_LABELS[job.contentType]} />
-          <InfoRow label="Topic" value={job.params.topic} />
+          {job.contentType === 'course' ? (
+            <>
+              <InfoRow label="Course Code" value={job.params.courseCode || ''} />
+              <InfoRow label="Course Title" value={job.params.courseTitle || ''} />
+              <InfoRow label="Subject" value={job.params.subjectLabel || ''} />
+              <InfoRow label="Audience" value={job.params.targetAudience || ''} />
+              <InfoRow label="Tone" value={job.params.tone || ''} />
+              <InfoRow label="Description" value={job.params.topic} />
+            </>
+          ) : (
+            <>
+              <InfoRow label="Topic" value={job.params.topic} />
+              <InfoRow label="Duration" value={`${job.params.duration_minutes} minutes`} />
+              {job.params.difficulty && (
+                <InfoRow label="Difficulty" value={job.params.difficulty} />
+              )}
+              {job.params.style && <InfoRow label="Style" value={job.params.style} />}
+              {job.params.technique && (
+                <InfoRow label="Technique" value={job.params.technique} />
+              )}
+            </>
+          )}
           <InfoRow label="Auto-publish" value={job.autoPublish ? 'Yes' : 'No (needs approval)'} />
-          <InfoRow label="Duration" value={`${job.params.duration_minutes} minutes`} />
-          {job.params.difficulty && (
-            <InfoRow label="Difficulty" value={job.params.difficulty} />
-          )}
-          {job.params.style && <InfoRow label="Style" value={job.params.style} />}
-          {job.params.technique && (
-            <InfoRow label="Technique" value={job.params.technique} />
-          )}
           <InfoRow label="LLM Model" value={job.llmModel} />
           <InfoRow label="TTS Model" value={job.ttsModel} />
           <InfoRow label="Voice" value={job.ttsVoice} />
           <InfoRow label="Created" value={createdDate} />
         </View>
       </View>
+
+      {/* Course Plan */}
+      {job.contentType === 'course' && job.coursePlan && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Course Plan</Text>
+          <View style={styles.card}>
+            {job.coursePlan.courseGoal && (
+              <Text style={[styles.scriptText, { marginBottom: 12 }]}>
+                {job.coursePlan.courseGoal}
+              </Text>
+            )}
+            {(job.coursePlan.modules || []).map((mod: any, i: number) => (
+              <View key={i} style={{ marginBottom: 12, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: theme.colors.gray[200], paddingTop: i > 0 ? 12 : 0 }}>
+                <Text style={{ fontFamily: 'DMSans-SemiBold', fontSize: 14, color: theme.colors.text, marginBottom: 4 }}>
+                  Module {mod.moduleNumber || i + 1}: {mod.moduleTitle}
+                </Text>
+                <Text style={{ fontFamily: 'DMSans-Regular', fontSize: 13, color: theme.colors.textMuted }}>
+                  Lesson: {mod.lessonTitle}
+                </Text>
+                <Text style={{ fontFamily: 'DMSans-Regular', fontSize: 13, color: theme.colors.textMuted }}>
+                  Practice: {mod.practiceTitle}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Course Sessions (published) */}
+      {job.contentType === 'course' && job.courseId && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Published Course</Text>
+          <View style={styles.card}>
+            <InfoRow label="Course ID" value={job.courseId} />
+            {job.courseSessionIds && (
+              <InfoRow label="Sessions" value={`${job.courseSessionIds.length} published`} />
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Custom Instructions */}
       {job.params.customInstructions && (

@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  setDoc,
   orderBy,
   query,
   where,
@@ -21,6 +22,7 @@ const breathingCollection = collection(db, 'breathing_exercises');
 const emergencyMeditationsCollection = collection(db, 'emergency_meditations');
 const coursesCollection = collection(db, 'courses');
 const courseSessionsCollection = collection(db, 'course_sessions');
+const subjectsCollection = collection(db, 'subjects');
 
 // ==================== MEDITATIONS ====================
 
@@ -291,5 +293,51 @@ export async function getCourseById(id: string): Promise<FirestoreCourse | null>
   } catch (error) {
     console.error('Error fetching course:', error);
     return null;
+  }
+}
+
+// ==================== SUBJECTS ====================
+
+export interface Subject {
+  id: string;
+  label: string;
+  fullName: string;
+  icon: string;
+  color: string;
+  description?: string;
+}
+
+export async function getSubjects(): Promise<Subject[]> {
+  try {
+    const snapshot = await getDocs(subjectsCollection);
+    return snapshot.docs.map(
+      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as Subject)
+    );
+  } catch (error) {
+    console.error('Error fetching subjects:', error);
+    return [];
+  }
+}
+
+export async function createSubject(subject: Omit<Subject, 'id'> & { id: string }): Promise<string> {
+  const docRef = doc(subjectsCollection, subject.id);
+  await setDoc(docRef, {
+    label: subject.label,
+    fullName: subject.fullName,
+    icon: subject.icon,
+    color: subject.color,
+    description: subject.description || '',
+  });
+  return subject.id;
+}
+
+export async function checkCourseCodeExists(code: string): Promise<boolean> {
+  try {
+    const q = query(coursesCollection, where('code', '==', code));
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('Error checking course code:', error);
+    return false;
   }
 }

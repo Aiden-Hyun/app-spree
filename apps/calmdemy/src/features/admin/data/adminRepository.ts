@@ -16,6 +16,14 @@ import {
 import { db, getCurrentUserId } from '../../../firebase';
 import { ContentJob, CreateJobInput, JobStatus } from '../types';
 
+// Re-export subject/course utilities from meditate repository
+export {
+  getSubjects,
+  createSubject,
+  checkCourseCodeExists,
+} from '../../meditate/data/meditateRepository';
+export type { Subject } from '../../meditate/data/meditateRepository';
+
 const jobsCollection = collection(db, 'content_jobs');
 const usersCollection = collection(db, 'users');
 
@@ -56,6 +64,11 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   // Only store title if admin provided one
   if (input.title?.trim()) {
     jobData.title = input.title.trim();
+  }
+
+  // Course jobs get extra tracking fields
+  if (input.contentType === 'course') {
+    jobData.courseProgress = 'Pending';
   }
 
   const docRef = await addDoc(jobsCollection, jobData);

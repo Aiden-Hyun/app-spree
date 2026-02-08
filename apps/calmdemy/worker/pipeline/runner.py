@@ -12,6 +12,7 @@ from .tts_converter import convert_to_audio
 from .audio_processor import post_process_audio
 from .storage_uploader import upload_audio
 from .content_publisher import publish_content
+from .course_runner import process_course_job
 
 
 def _update_status(db, job_id: str, status: str, extra: dict | None = None):
@@ -49,6 +50,11 @@ def _generate_title_from_llm(job_data: dict, script: str) -> str:
 
 def process_job(db, job_id: str, job_data: dict):
     """Run the full pipeline for one content job."""
+    # Route course jobs to the dedicated course runner
+    if job_data.get("contentType") == "course":
+        process_course_job(db, job_id, job_data)
+        return
+
     try:
         # Step 1: LLM — generate script
         _update_status(db, job_id, "llm_generating")

@@ -17,6 +17,7 @@ STORAGE_PATHS = {
     "bedtime_story": "audio/sleep/stories",
     "emergency_meditation": "audio/meditate/emergency",
     "course_session": "audio/meditate/courses",
+    "course": "audio/meditate/courses",
 }
 
 

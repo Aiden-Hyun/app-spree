@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,11 @@ import {
   getDefaultVoice,
 } from '@features/admin/constants/models';
 import { Dropdown, DropdownOption } from '@features/admin/components/Dropdown';
+import {
+  getSubjects,
+  checkCourseCodeExists,
+  Subject,
+} from '@features/admin/data/adminRepository';
 import { Theme } from '@/theme';
 
 // ==================== DROPDOWN OPTION BUILDERS ====================
@@ -42,6 +47,7 @@ const CONTENT_TYPES: FactoryContentType[] = [
   'bedtime_story',
   'emergency_meditation',
   'course_session',
+  'course',
 ];
 
 const CONTENT_TYPE_OPTIONS: DropdownOption[] = CONTENT_TYPES.map((ct) => ({
@@ -58,6 +64,17 @@ const DIFFICULTY_OPTIONS: DropdownOption[] = [
   { id: 'beginner', label: 'Beginner' },
   { id: 'intermediate', label: 'Intermediate' },
   { id: 'advanced', label: 'Advanced' },
+];
+
+const AUDIENCE_OPTIONS: DropdownOption[] = [
+  { id: 'beginner', label: 'Beginner' },
+  { id: 'intermediate', label: 'Intermediate' },
+];
+
+const TONE_OPTIONS: DropdownOption[] = [
+  { id: 'gentle', label: 'Gentle' },
+  { id: 'energetic', label: 'Energetic' },
+  { id: 'very calm', label: 'Very Calm' },
 ];
 
 // ==================== SCREEN ====================
@@ -79,6 +96,19 @@ export default function CreateContentScreen() {
   const [customInstructions, setCustomInstructions] = useState('');
   const [autoPublish, setAutoPublish] = useState(true);
 
+  // Course-specific state
+  const [courseCode, setCourseCode] = useState('');
+  const [courseTitle, setCourseTitle] = useState('');
+  const [subjectId, setSubjectId] = useState('');
+  const [targetAudience, setTargetAudience] = useState<string>('beginner');
+  const [tone, setTone] = useState<string>('gentle');
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [courseCodeError, setCourseCodeError] = useState<string | null>(null);
+  const [isCheckingCode, setIsCheckingCode] = useState(false);
+  const codeCheckTimeout = useRef<ReturnType<typeof setTimeout>>();
+
+  const isCourse = contentType === 'course';
+
   // Independent backend + model state
   const [llmBackend, setLlmBackend] = useState<JobBackend>('local');
   const [ttsBackend, setTtsBackend] = useState<JobBackend>('local');
@@ -86,6 +116,42 @@ export default function CreateContentScreen() {
   const [ttsModel, setTtsModel] = useState(getDefaultTTSModel('local'));
   const [ttsVoice, setTtsVoice] = useState(getDefaultVoice(getDefaultTTSModel('local')));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load subjects for course creation
+  useEffect(() => {
+    getSubjects().then(setSubjects).catch(console.error);
+  }, []);
+
+  const subjectOptions: DropdownOption[] = useMemo(
+    () => subjects.map((s) => ({ id: s.id, label: `${s.label} — ${s.fullName}` })),
+    [subjects]
+  );
+
+  // Course code uniqueness validation (debounced)
+  const handleCourseCodeChange = useCallback((code: string) => {
+    const upper = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    setCourseCode(upper);
+    setCourseCodeError(null);
+
+    if (codeCheckTimeout.current) clearTimeout(codeCheckTimeout.current);
+    if (!upper || upper.length < 3) return;
+
+    setIsCheckingCode(true);
+    codeCheckTimeout.current = setTimeout(async () => {
+      try {
+        const exists = await checkCourseCodeExists(upper);
+        if (exists) {
+          setCourseCodeError(`Code "${upper}" is already in use. Choose another.`);
+        } else {
+          setCourseCodeError(null);
+        }
+      } catch {
+        // Ignore check errors
+      } finally {
+        setIsCheckingCode(false);
+      }
+    }, 500);
+  }, []);
 
   // Derived options
   const llmModelOptions: DropdownOption[] = useMemo(
@@ -138,29 +204,66 @@ export default function CreateContentScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!topic.trim()) {
-      Alert.alert('Required', 'Please enter a topic.');
-      return;
+    if (isCourse) {
+      // Course-specific validation
+      if (!courseCode || courseCode.length < 3) {
+        Alert.alert('Required', 'Please enter a course code (at least 3 characters).');
+        return;
+      }
+      if (courseCodeError) {
+        Alert.alert('Invalid', courseCodeError);
+        return;
+      }
+      if (!courseTitle.trim()) {
+        Alert.alert('Required', 'Please enter a course title.');
+        return;
+      }
+      if (!subjectId) {
+        Alert.alert('Required', 'Please select a therapy subject.');
+        return;
+      }
+      if (!topic.trim()) {
+        Alert.alert('Required', 'Please enter a course description / topic.');
+        return;
+      }
+    } else {
+      if (!topic.trim()) {
+        Alert.alert('Required', 'Please enter a topic.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
     try {
+      const selectedSubject = subjects.find((s) => s.id === subjectId);
+
       const input: CreateJobInput = {
         llmBackend,
         ttsBackend,
         contentType,
         params: {
           topic: topic.trim(),
-          duration_minutes: duration,
-          style: style.trim() || undefined,
-          technique: technique.trim() || undefined,
-          difficulty,
+          duration_minutes: isCourse ? 0 : duration,
+          style: isCourse ? undefined : (style.trim() || undefined),
+          technique: isCourse ? undefined : (technique.trim() || undefined),
+          difficulty: isCourse ? undefined : difficulty as any,
           customInstructions: customInstructions.trim() || undefined,
+          // Course-specific params
+          ...(isCourse && {
+            courseCode,
+            courseTitle: courseTitle.trim(),
+            subjectId,
+            subjectLabel: selectedSubject?.label || subjectId,
+            subjectColor: selectedSubject?.color || '#6B7280',
+            subjectIcon: selectedSubject?.icon || 'school-outline',
+            targetAudience: targetAudience as any,
+            tone: tone as any,
+          }),
         },
         llmModel,
         ttsModel,
         ttsVoice,
-        title: title.trim() || undefined,
+        title: isCourse ? courseTitle.trim() : (title.trim() || undefined),
         autoPublish,
       };
 
@@ -189,73 +292,181 @@ export default function CreateContentScreen() {
         onSelect={(id) => setContentType(id as FactoryContentType)}
       />
 
-      {/* Title */}
-      <Text style={styles.sectionTitle}>Title (optional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Leave empty to auto-generate from LLM"
-        placeholderTextColor={theme.colors.textMuted}
-        value={title}
-        onChangeText={setTitle}
-      />
+      {isCourse ? (
+        <>
+          {/* ========== COURSE-SPECIFIC FIELDS ========== */}
 
-      {/* Topic */}
-      <Text style={styles.sectionTitle}>Topic</Text>
-      <TextInput
-        style={styles.input}
-        placeholder='e.g. "Body scan for anxiety relief"'
-        placeholderTextColor={theme.colors.textMuted}
-        value={topic}
-        onChangeText={setTopic}
-        multiline
-      />
+          {/* Subject */}
+          <Text style={styles.sectionTitle}>Therapy Subject</Text>
+          <Dropdown
+            options={subjectOptions}
+            selectedId={subjectId}
+            onSelect={setSubjectId}
+            placeholder="Select a therapy subject..."
+          />
 
-      {/* Duration */}
-      <Text style={styles.sectionTitle}>Duration</Text>
-      <Dropdown
-        options={DURATION_OPTIONS}
-        selectedId={String(duration)}
-        onSelect={(id) => setDuration(Number(id))}
-      />
+          {/* Course Code */}
+          <Text style={styles.sectionTitle}>Course Code</Text>
+          <View>
+            <TextInput
+              style={[
+                styles.input,
+                courseCodeError ? { borderWidth: 1, borderColor: theme.colors.error } : null,
+              ]}
+              placeholder='e.g. "CBT101"'
+              placeholderTextColor={theme.colors.textMuted}
+              value={courseCode}
+              onChangeText={handleCourseCodeChange}
+              autoCapitalize="characters"
+            />
+            {isCheckingCode && (
+              <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
+                Checking...
+              </Text>
+            )}
+            {courseCodeError && (
+              <Text style={[styles.helperText, { color: theme.colors.error }]}>
+                {courseCodeError}
+              </Text>
+            )}
+            {courseCode.length >= 3 && !courseCodeError && !isCheckingCode && (
+              <Text style={[styles.helperText, { color: theme.colors.success }]}>
+                Code available
+              </Text>
+            )}
+          </View>
 
-      {/* Difficulty */}
-      <Text style={styles.sectionTitle}>Difficulty</Text>
-      <Dropdown
-        options={DIFFICULTY_OPTIONS}
-        selectedId={difficulty}
-        onSelect={setDifficulty}
-      />
+          {/* Course Title */}
+          <Text style={styles.sectionTitle}>Course Title</Text>
+          <TextInput
+            style={styles.input}
+            placeholder='e.g. "Rethink Your Thoughts"'
+            placeholderTextColor={theme.colors.textMuted}
+            value={courseTitle}
+            onChangeText={setCourseTitle}
+          />
 
-      {/* Style & Technique */}
-      <Text style={styles.sectionTitle}>Style (optional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder='e.g. "calm", "energizing", "grounding"'
-        placeholderTextColor={theme.colors.textMuted}
-        value={style}
-        onChangeText={setStyle}
-      />
+          {/* Course Description / Topic */}
+          <Text style={styles.sectionTitle}>Course Description</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder='Describe the course goal and what it covers...'
+            placeholderTextColor={theme.colors.textMuted}
+            value={topic}
+            onChangeText={setTopic}
+            multiline
+            numberOfLines={3}
+          />
 
-      <Text style={styles.sectionTitle}>Technique (optional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder='e.g. "body_scan", "visualization"'
-        placeholderTextColor={theme.colors.textMuted}
-        value={technique}
-        onChangeText={setTechnique}
-      />
+          {/* Target Audience */}
+          <Text style={styles.sectionTitle}>Target Audience</Text>
+          <Dropdown
+            options={AUDIENCE_OPTIONS}
+            selectedId={targetAudience}
+            onSelect={setTargetAudience}
+          />
 
-      {/* Custom Instructions */}
-      <Text style={styles.sectionTitle}>Custom Instructions (optional)</Text>
-      <TextInput
-        style={[styles.input, styles.multilineInput]}
-        placeholder="Any additional guidance for the LLM..."
-        placeholderTextColor={theme.colors.textMuted}
-        value={customInstructions}
-        onChangeText={setCustomInstructions}
-        multiline
-        numberOfLines={3}
-      />
+          {/* Tone */}
+          <Text style={styles.sectionTitle}>Tone</Text>
+          <Dropdown
+            options={TONE_OPTIONS}
+            selectedId={tone}
+            onSelect={setTone}
+          />
+
+          {/* Custom Instructions */}
+          <Text style={styles.sectionTitle}>Custom Instructions (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Any additional guidance for the LLM..."
+            placeholderTextColor={theme.colors.textMuted}
+            value={customInstructions}
+            onChangeText={setCustomInstructions}
+            multiline
+            numberOfLines={3}
+          />
+
+          {/* Info Banner */}
+          <View style={[styles.infoBanner, { backgroundColor: `${theme.colors.primary}10` }]}>
+            <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} />
+            <Text style={[styles.infoBannerText, { color: theme.colors.textLight }]}>
+              This will generate 9 audio files: 1 intro + 4 modules (lesson + practice each).
+            </Text>
+          </View>
+        </>
+      ) : (
+        <>
+          {/* ========== SINGLE-ITEM FIELDS ========== */}
+
+          {/* Title */}
+          <Text style={styles.sectionTitle}>Title (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Leave empty to auto-generate from LLM"
+            placeholderTextColor={theme.colors.textMuted}
+            value={title}
+            onChangeText={setTitle}
+          />
+
+          {/* Topic */}
+          <Text style={styles.sectionTitle}>Topic</Text>
+          <TextInput
+            style={styles.input}
+            placeholder='e.g. "Body scan for anxiety relief"'
+            placeholderTextColor={theme.colors.textMuted}
+            value={topic}
+            onChangeText={setTopic}
+            multiline
+          />
+
+          {/* Duration */}
+          <Text style={styles.sectionTitle}>Duration</Text>
+          <Dropdown
+            options={DURATION_OPTIONS}
+            selectedId={String(duration)}
+            onSelect={(id) => setDuration(Number(id))}
+          />
+
+          {/* Difficulty */}
+          <Text style={styles.sectionTitle}>Difficulty</Text>
+          <Dropdown
+            options={DIFFICULTY_OPTIONS}
+            selectedId={difficulty}
+            onSelect={setDifficulty}
+          />
+
+          {/* Style & Technique */}
+          <Text style={styles.sectionTitle}>Style (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder='e.g. "calm", "energizing", "grounding"'
+            placeholderTextColor={theme.colors.textMuted}
+            value={style}
+            onChangeText={setStyle}
+          />
+
+          <Text style={styles.sectionTitle}>Technique (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder='e.g. "body_scan", "visualization"'
+            placeholderTextColor={theme.colors.textMuted}
+            value={technique}
+            onChangeText={setTechnique}
+          />
+
+          {/* Custom Instructions */}
+          <Text style={styles.sectionTitle}>Custom Instructions (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Any additional guidance for the LLM..."
+            placeholderTextColor={theme.colors.textMuted}
+            value={customInstructions}
+            onChangeText={setCustomInstructions}
+            multiline
+            numberOfLines={3}
+          />
+        </>
+      )}
 
       {/* Model Selection */}
       <View style={styles.divider} />
@@ -430,6 +641,26 @@ const createStyles = (theme: Theme) =>
     multilineInput: {
       minHeight: 80,
       textAlignVertical: 'top',
+    },
+    helperText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      marginTop: 6,
+      marginLeft: 4,
+    },
+    infoBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderRadius: 12,
+      padding: 14,
+      marginTop: 16,
+    },
+    infoBannerText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 13,
+      flex: 1,
+      lineHeight: 18,
     },
     divider: {
       height: 1,

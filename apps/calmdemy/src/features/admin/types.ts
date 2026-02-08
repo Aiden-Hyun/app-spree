@@ -62,7 +62,8 @@ export type FactoryContentType =
   | 'sleep_meditation'
   | 'bedtime_story'
   | 'emergency_meditation'
-  | 'course_session';
+  | 'course_session'
+  | 'course';
 
 export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   guided_meditation: 'Guided Meditation',
@@ -70,6 +71,7 @@ export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   bedtime_story: 'Bedtime Story',
   emergency_meditation: 'Emergency Meditation',
   course_session: 'Course Session',
+  course: 'Full Course (9 audio)',
 };
 
 // ==================== JOB PARAMS ====================
@@ -83,6 +85,16 @@ export interface ContentJobParams {
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
   category?: string;
   customInstructions?: string;
+
+  // Course-specific params (only when contentType === 'course')
+  courseCode?: string;
+  courseTitle?: string;
+  subjectId?: string;
+  subjectLabel?: string;
+  subjectColor?: string;
+  subjectIcon?: string;
+  targetAudience?: 'beginner' | 'intermediate';
+  tone?: 'gentle' | 'energetic' | 'very calm';
 }
 
 // ==================== CONTENT JOB ====================
@@ -116,6 +128,12 @@ export interface ContentJob {
   audioPath?: string;
   audioDurationSec?: number;
   publishedContentId?: string;
+
+  // Course-specific outputs
+  courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"
+  coursePlan?: Record<string, any>;
+  courseSessionIds?: string[];     // published session doc IDs
+  courseId?: string;               // published course doc ID
 
   // Metadata
   error?: string;

@@ -15,59 +15,16 @@ import { Theme } from "@/theme";
 import { AnimatedView } from "@shared/ui/AnimatedView";
 import { AnimatedPressable } from "@shared/ui/AnimatedPressable";
 import { Skeleton } from "@shared/ui/Skeleton";
-import { getCourses, FirestoreCourse } from '@/features/meditate/data/meditateRepository';
+import { getCourses, getSubjects, FirestoreCourse, Subject } from '@/features/meditate/data/meditateRepository';
 
-const therapyCategories = [
-  {
-    id: "all",
-    label: "All",
-    fullName: "All Therapies",
-    icon: "apps-outline" as const,
-    color: "#6B7280",
-  },
-  {
-    id: "cbt",
-    label: "CBT",
-    fullName: "Cognitive Behavioral Therapy",
-    icon: "bulb-outline" as const,
-    color: "#2DD4BF",
-  },
-  {
-    id: "act",
-    label: "ACT",
-    fullName: "Acceptance & Commitment",
-    icon: "hand-left-outline" as const,
-    color: "#818CF8",
-  },
-  {
-    id: "dbt",
-    label: "DBT",
-    fullName: "Dialectical Behavior Therapy",
-    icon: "git-merge-outline" as const,
-    color: "#F472B6",
-  },
-  {
-    id: "mbct",
-    label: "MBCT",
-    fullName: "Mindfulness-Based CBT",
-    icon: "infinite-outline" as const,
-    color: "#34D399",
-  },
-  {
-    id: "ifs",
-    label: "IFS",
-    fullName: "Internal Family Systems",
-    icon: "people-outline" as const,
-    color: "#FB923C",
-  },
-  {
-    id: "somatic",
-    label: "Somatic",
-    fullName: "Body-Based Therapy",
-    icon: "body-outline" as const,
-    color: "#A78BFA",
-  },
-];
+// "All" is always prepended; actual therapy subjects come from Firestore
+const ALL_CATEGORY = {
+  id: "all",
+  label: "All",
+  fullName: "All Therapies",
+  icon: "apps-outline" as const,
+  color: "#6B7280",
+};
 
 export default function TherapiesScreen() {
   const router = useRouter();
@@ -79,18 +36,26 @@ export default function TherapiesScreen() {
     initialTherapy || "all",
   );
   const [courses, setCourses] = useState<FirestoreCourse[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
+  // Combine "All" with Firestore subjects for the filter pills
+  const therapyCategories = useMemo(() => [ALL_CATEGORY, ...subjects], [subjects]);
+
   useEffect(() => {
-    async function loadCourses() {
+    async function loadData() {
       setLoading(true);
-      const data = await getCourses();
-      setCourses(data);
+      const [coursesData, subjectsData] = await Promise.all([
+        getCourses(),
+        getSubjects(),
+      ]);
+      setCourses(coursesData);
+      setSubjects(subjectsData);
       setLoading(false);
     }
-    loadCourses();
+    loadData();
   }, []);
 
   // Filter courses by therapy type (using course id prefix or a therapy field)
@@ -104,7 +69,7 @@ export default function TherapiesScreen() {
   }, [courses, selectedTherapy]);
 
   const selectedTherapyData = therapyCategories.find(
-    (t) => t.id === selectedTherapy,
+    (t: { id: string }) => t.id === selectedTherapy,
   );
 
   return (
@@ -192,7 +157,7 @@ export default function TherapiesScreen() {
                   {selectedTherapyData.fullName}
                 </Text>
                 <Text style={styles.therapyInfoDescription}>
-                  {getTherapyDescription(selectedTherapy)}
+                  {(selectedTherapyData as Subject)?.description || ''}
                 </Text>
               </View>
             </View>
@@ -310,19 +275,6 @@ export default function TherapiesScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function getTherapyDescription(therapyId: string): string {
-  const descriptions: Record<string, string> = {
-    cbt: "Learn to identify and change negative thought patterns that affect your emotions and behaviors.",
-    act: "Develop psychological flexibility through acceptance and mindfulness-based strategies.",
-    dbt: "Build skills in mindfulness, distress tolerance, emotion regulation, and interpersonal effectiveness.",
-    mbct: "Combine mindfulness practices with cognitive therapy to prevent depressive relapse.",
-    ifs: "Explore and heal different parts of yourself to achieve internal harmony and self-leadership.",
-    somatic:
-      "Connect with your body to release stored trauma and regulate your nervous system.",
-  };
-  return descriptions[therapyId] || "";
 }
 
 const createStyles = (theme: Theme, isDark: boolean) =>

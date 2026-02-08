@@ -130,6 +130,13 @@ def handle_publish_job(db, job_id: str, job_data: dict):
     """Publish a completed job that was awaiting approval."""
     from firebase_admin import firestore as fs
 
+    content_type = job_data.get("contentType", "")
+
+    # Course jobs have a dedicated publish flow
+    if content_type == "course":
+        _handle_course_publish(db, job_id, job_data)
+        return
+
     storage_path = job_data.get("audioPath", "")
     duration_sec = job_data.get("audioDurationSec", 0)
     script = job_data.get("generatedScript", "")
@@ -155,6 +162,32 @@ def handle_publish_job(db, job_id: str, job_data: dict):
         "updatedAt": fs.SERVER_TIMESTAMP,
     })
     print(f"  [publish] Job {job_id} published. Content ID: {content_id}")
+
+
+def _handle_course_publish(db, job_id: str, job_data: dict):
+    """Publish a course job that was awaiting approval."""
+    from firebase_admin import firestore as fs
+    from pipeline.course_runner import _publish_course
+
+    plan = job_data.get("coursePlan")
+    if not plan:
+        db.collection(config.JOBS_COLLECTION).document(job_id).update({
+            "status": "failed",
+            "error": "No course plan found for publishing",
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        return
+
+    # The course runner already uploaded audio; audio paths are stored in job_data
+    # But we need the audio_results dict. For manual publish, the audio paths are
+    # in the course session data. We'll re-read them.
+    # For simplicity, we mark this as not yet supported for manual course publish.
+    db.collection(config.JOBS_COLLECTION).document(job_id).update({
+        "status": "failed",
+        "error": "Manual course publishing not yet supported. Use auto-publish for courses.",
+        "updatedAt": fs.SERVER_TIMESTAMP,
+    })
+    print(f"  [publish] Course manual publish not yet supported for job {job_id}")
 
 
 # ==================== MAIN LOOP ====================
