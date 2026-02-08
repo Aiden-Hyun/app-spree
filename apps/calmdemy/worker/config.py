@@ -23,5 +23,6 @@ JOBS_COLLECTION = "content_jobs"
 # Gemini API (for 'api' backend)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Ollama (for 'local' backend)
+# Local LLM servers (for 'local' backend)
+LMSTUDIO_HOST = os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")

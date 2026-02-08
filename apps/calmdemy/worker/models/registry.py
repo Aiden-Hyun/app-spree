@@ -13,6 +13,7 @@ from .llm_gemma import GemmaAdapter
 from .llm_llama import LlamaAdapter
 from .llm_gemini_api import GeminiAPIAdapter
 from .llm_ollama import OllamaAdapter
+from .llm_lmstudio import LMStudioAdapter
 from .tts_piper import PiperAdapter
 from .tts_coqui import CoquiXTTSAdapter
 from .tts_gemini import GeminiTTSAdapter
@@ -38,6 +39,10 @@ def _ollama_factory():
     return OllamaAdapter()
 
 
+def _lmstudio_factory():
+    return LMStudioAdapter()
+
+
 # ==================== LLM REGISTRY ====================
 
 LLM_FACTORIES: dict[str, callable] = {
@@ -47,7 +52,8 @@ LLM_FACTORIES: dict[str, callable] = {
     # Gemini API models
     "gemini-2.5-flash": _gemini_flash_factory,
     "gemini-2.5-pro": _gemini_pro_factory,
-    # Local Ollama
+    # Local
+    "lmstudio-local": _lmstudio_factory,
     "ollama-local": _ollama_factory,
 }
 

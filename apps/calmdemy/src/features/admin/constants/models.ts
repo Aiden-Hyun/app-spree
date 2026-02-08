@@ -21,7 +21,13 @@ export interface VoiceOption {
 // ==================== LLM MODELS ====================
 
 export const LLM_MODELS: ModelOption[] = [
-  // Local models (Ollama) — primary
+  // Local models — primary
+  {
+    id: 'lmstudio-local',
+    label: 'LM Studio (Local)',
+    description: 'Run any model via LM Studio on your Mac',
+    backend: 'local',
+  },
   {
     id: 'ollama-local',
     label: 'Ollama (Local)',

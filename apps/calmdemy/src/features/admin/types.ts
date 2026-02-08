@@ -104,8 +104,15 @@ export interface ContentJob {
   ttsModel: string;
   ttsVoice: string;
 
+  // Title — admin can set manually; if empty, LLM auto-generates one
+  title?: string;
+
+  // Publishing control
+  autoPublish: boolean;
+
   // Pipeline outputs (filled as pipeline progresses)
   generatedScript?: string;
+  generatedTitle?: string;
   audioPath?: string;
   audioDurationSec?: number;
   publishedContentId?: string;
@@ -129,4 +136,6 @@ export interface CreateJobInput {
   llmModel: string;
   ttsModel: string;
   ttsVoice: string;
+  title?: string;
+  autoPublish: boolean;
 }

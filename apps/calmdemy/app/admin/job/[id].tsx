@@ -14,6 +14,7 @@ import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useJobDetail } from '@features/admin/hooks/useJobQueue';
 import { PipelineStepper } from '@features/admin/components/PipelineStepper';
 import { CONTENT_TYPE_LABELS, JOB_STATUS_LABELS, BACKEND_LABELS } from '@features/admin/types';
+import { publishCompletedJob } from '@features/admin/data/adminRepository';
 import { Theme } from '@/theme';
 
 export default function JobDetailScreen() {
@@ -35,6 +36,32 @@ export default function JobDetailScreen() {
       { text: 'Yes, Cancel', style: 'destructive', onPress: cancel },
     ]);
   };
+
+  const handlePublish = () => {
+    if (!job) return;
+    Alert.alert(
+      'Publish Content',
+      'This will make the content visible to users. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Publish',
+          onPress: async () => {
+            try {
+              await publishCompletedJob(job.id);
+              Alert.alert('Published', 'Content is now live.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to publish. Please try again.');
+              console.error('Publish error:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const isAwaitingApproval =
+    job?.status === 'completed' && !job.autoPublish && !job.publishedContentId;
 
   if (isLoading) {
     return (
@@ -89,10 +116,14 @@ export default function JobDetailScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Job Details</Text>
         <View style={styles.card}>
+          {(job.generatedTitle || job.title) && (
+            <InfoRow label="Title" value={job.generatedTitle || job.title || ''} />
+          )}
           <InfoRow label="LLM Backend" value={BACKEND_LABELS[job.llmBackend] || job.llmBackend || 'Local'} />
           <InfoRow label="TTS Backend" value={BACKEND_LABELS[job.ttsBackend] || job.ttsBackend || 'Local'} />
           <InfoRow label="Content Type" value={CONTENT_TYPE_LABELS[job.contentType]} />
           <InfoRow label="Topic" value={job.params.topic} />
+          <InfoRow label="Auto-publish" value={job.autoPublish ? 'Yes' : 'No (needs approval)'} />
           <InfoRow label="Duration" value={`${job.params.duration_minutes} minutes`} />
           {job.params.difficulty && (
             <InfoRow label="Difficulty" value={job.params.difficulty} />
@@ -173,6 +204,19 @@ export default function JobDetailScreen() {
         >
           <Ionicons name="refresh" size={20} color="#fff" />
           <Text style={styles.retryText}>Retry Job</Text>
+        </Pressable>
+      )}
+
+      {isAwaitingApproval && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.publishButton,
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={handlePublish}
+        >
+          <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
+          <Text style={styles.retryText}>Publish Now</Text>
         </Pressable>
       )}
 
@@ -304,6 +348,16 @@ const createStyles = (theme: Theme) =>
       fontFamily: 'DMSans-SemiBold',
       fontSize: 16,
       color: '#fff',
+    },
+    publishButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.success,
+      borderRadius: 16,
+      paddingVertical: 16,
+      gap: 10,
+      marginTop: 12,
     },
     cancelButton: {
       flexDirection: 'row',

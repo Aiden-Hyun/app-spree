@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import {
   JobBackend,
   AVAILABLE_BACKENDS,
   BACKEND_LABELS,
+  BACKEND_DESCRIPTIONS,
 } from '@features/admin/types';
 import {
   getLLMModelsForBackend,
@@ -29,7 +31,10 @@ import {
   getDefaultTTSModel,
   getDefaultVoice,
 } from '@features/admin/constants/models';
+import { Dropdown, DropdownOption } from '@features/admin/components/Dropdown';
 import { Theme } from '@/theme';
+
+// ==================== DROPDOWN OPTION BUILDERS ====================
 
 const CONTENT_TYPES: FactoryContentType[] = [
   'guided_meditation',
@@ -39,15 +44,23 @@ const CONTENT_TYPES: FactoryContentType[] = [
   'course_session',
 ];
 
-const DURATIONS = [5, 10, 15, 20, 30];
+const CONTENT_TYPE_OPTIONS: DropdownOption[] = CONTENT_TYPES.map((ct) => ({
+  id: ct,
+  label: CONTENT_TYPE_LABELS[ct],
+}));
 
-const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
+const DURATION_OPTIONS: DropdownOption[] = [5, 10, 15, 20, 30].map((d) => ({
+  id: String(d),
+  label: `${d} minutes`,
+}));
 
-const BACKEND_ICON: Record<JobBackend, string> = {
-  local: 'laptop-outline',
-  api: 'cloud-outline',
-  cloud: 'server-outline',
-};
+const DIFFICULTY_OPTIONS: DropdownOption[] = [
+  { id: 'beginner', label: 'Beginner' },
+  { id: 'intermediate', label: 'Intermediate' },
+  { id: 'advanced', label: 'Advanced' },
+];
+
+// ==================== SCREEN ====================
 
 export default function CreateContentScreen() {
   const router = useRouter();
@@ -57,12 +70,14 @@ export default function CreateContentScreen() {
 
   // Form state
   const [contentType, setContentType] = useState<FactoryContentType>('guided_meditation');
+  const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
   const [duration, setDuration] = useState(10);
   const [style, setStyle] = useState('');
   const [technique, setTechnique] = useState('');
   const [difficulty, setDifficulty] = useState<string>('beginner');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [autoPublish, setAutoPublish] = useState(true);
 
   // Independent backend + model state
   const [llmBackend, setLlmBackend] = useState<JobBackend>('local');
@@ -72,10 +87,38 @@ export default function CreateContentScreen() {
   const [ttsVoice, setTtsVoice] = useState(getDefaultVoice(getDefaultTTSModel('local')));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const availableLLMs = useMemo(() => getLLMModelsForBackend(llmBackend), [llmBackend]);
-  const availableTTS = useMemo(() => getTTSModelsForBackend(ttsBackend), [ttsBackend]);
-  const availableVoices = useMemo(() => getVoicesForTTSModel(ttsModel), [ttsModel]);
+  // Derived options
+  const llmModelOptions: DropdownOption[] = useMemo(
+    () =>
+      getLLMModelsForBackend(llmBackend).map((m) => ({
+        id: m.id,
+        label: m.label,
+        description: m.description,
+      })),
+    [llmBackend]
+  );
 
+  const ttsModelOptions: DropdownOption[] = useMemo(
+    () =>
+      getTTSModelsForBackend(ttsBackend).map((m) => ({
+        id: m.id,
+        label: m.label,
+        description: m.description,
+      })),
+    [ttsBackend]
+  );
+
+  const voiceOptions: DropdownOption[] = useMemo(
+    () =>
+      getVoicesForTTSModel(ttsModel).map((v) => ({
+        id: v.id,
+        label: v.label,
+        description: v.description,
+      })),
+    [ttsModel]
+  );
+
+  // Handlers
   const handleLLMBackendChange = (newBackend: JobBackend) => {
     setLlmBackend(newBackend);
     const defaultLLM = getDefaultLLMModel(newBackend);
@@ -89,9 +132,9 @@ export default function CreateContentScreen() {
     setTtsVoice(getDefaultVoice(defaultTTS));
   };
 
-  const handleTTSModelChange = (modelId: string) => {
-    setTtsModel(modelId);
-    setTtsVoice(getDefaultVoice(modelId));
+  const handleTTSModelChange = (id: string) => {
+    setTtsModel(id);
+    setTtsVoice(getDefaultVoice(id));
   };
 
   const handleSubmit = async () => {
@@ -117,6 +160,8 @@ export default function CreateContentScreen() {
         llmModel,
         ttsModel,
         ttsVoice,
+        title: title.trim() || undefined,
+        autoPublish,
       };
 
       await createJob(input);
@@ -129,35 +174,6 @@ export default function CreateContentScreen() {
     }
   };
 
-  const renderBackendSelector = (
-    selected: JobBackend,
-    onChange: (b: JobBackend) => void
-  ) => (
-    <View style={styles.segmentRow}>
-      {AVAILABLE_BACKENDS.map((b) => (
-        <Pressable
-          key={b}
-          style={[styles.segment, selected === b && styles.segmentActive]}
-          onPress={() => onChange(b)}
-        >
-          <Ionicons
-            name={BACKEND_ICON[b] as any}
-            size={15}
-            color={selected === b ? '#fff' : theme.colors.textMuted}
-          />
-          <Text
-            style={[
-              styles.segmentText,
-              selected === b && styles.segmentTextActive,
-            ]}
-          >
-            {BACKEND_LABELS[b]}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-
   return (
     <ScrollView
       style={styles.container}
@@ -167,24 +183,21 @@ export default function CreateContentScreen() {
     >
       {/* Content Type */}
       <Text style={styles.sectionTitle}>Content Type</Text>
-      <View style={styles.chipRow}>
-        {CONTENT_TYPES.map((ct) => (
-          <Pressable
-            key={ct}
-            style={[styles.chip, contentType === ct && styles.chipActive]}
-            onPress={() => setContentType(ct)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                contentType === ct && styles.chipTextActive,
-              ]}
-            >
-              {CONTENT_TYPE_LABELS[ct]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Dropdown
+        options={CONTENT_TYPE_OPTIONS}
+        selectedId={contentType}
+        onSelect={(id) => setContentType(id as FactoryContentType)}
+      />
+
+      {/* Title */}
+      <Text style={styles.sectionTitle}>Title (optional)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Leave empty to auto-generate from LLM"
+        placeholderTextColor={theme.colors.textMuted}
+        value={title}
+        onChangeText={setTitle}
+      />
 
       {/* Topic */}
       <Text style={styles.sectionTitle}>Topic</Text>
@@ -198,43 +211,20 @@ export default function CreateContentScreen() {
       />
 
       {/* Duration */}
-      <Text style={styles.sectionTitle}>Duration (minutes)</Text>
-      <View style={styles.chipRow}>
-        {DURATIONS.map((d) => (
-          <Pressable
-            key={d}
-            style={[styles.chip, duration === d && styles.chipActive]}
-            onPress={() => setDuration(d)}
-          >
-            <Text
-              style={[styles.chipText, duration === d && styles.chipTextActive]}
-            >
-              {d}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Text style={styles.sectionTitle}>Duration</Text>
+      <Dropdown
+        options={DURATION_OPTIONS}
+        selectedId={String(duration)}
+        onSelect={(id) => setDuration(Number(id))}
+      />
 
       {/* Difficulty */}
       <Text style={styles.sectionTitle}>Difficulty</Text>
-      <View style={styles.chipRow}>
-        {DIFFICULTIES.map((d) => (
-          <Pressable
-            key={d}
-            style={[styles.chip, difficulty === d && styles.chipActive]}
-            onPress={() => setDifficulty(d)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                difficulty === d && styles.chipTextActive,
-              ]}
-            >
-              {d.charAt(0).toUpperCase() + d.slice(1)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Dropdown
+        options={DIFFICULTY_OPTIONS}
+        selectedId={difficulty}
+        onSelect={setDifficulty}
+      />
 
       {/* Style & Technique */}
       <Text style={styles.sectionTitle}>Style (optional)</Text>
@@ -273,78 +263,90 @@ export default function CreateContentScreen() {
 
       {/* LLM Backend + Model */}
       <Text style={styles.sectionTitle}>LLM Backend</Text>
-      {renderBackendSelector(llmBackend, handleLLMBackendChange)}
-
-      <Text style={styles.sectionTitle}>LLM Model</Text>
-      <View style={styles.chipRow}>
-        {availableLLMs.map((m) => (
+      <View style={styles.segmentRow}>
+        {AVAILABLE_BACKENDS.map((b) => (
           <Pressable
-            key={m.id}
-            style={[styles.chip, llmModel === m.id && styles.chipActive]}
-            onPress={() => setLlmModel(m.id)}
+            key={b}
+            style={[styles.segment, llmBackend === b && styles.segmentActive]}
+            onPress={() => handleLLMBackendChange(b)}
           >
             <Text
               style={[
-                styles.chipText,
-                llmModel === m.id && styles.chipTextActive,
+                styles.segmentText,
+                llmBackend === b && styles.segmentTextActive,
               ]}
             >
-              {m.label}
+              {BACKEND_LABELS[b]}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      <View style={styles.sectionSpacer} />
+      <Text style={styles.sectionTitle}>LLM Model</Text>
+      <Dropdown
+        options={llmModelOptions}
+        selectedId={llmModel}
+        onSelect={setLlmModel}
+      />
 
       {/* TTS Backend + Model */}
       <Text style={styles.sectionTitle}>TTS Backend</Text>
-      {renderBackendSelector(ttsBackend, handleTTSBackendChange)}
-
-      <Text style={styles.sectionTitle}>TTS Model</Text>
-      <View style={styles.chipRow}>
-        {availableTTS.map((m) => (
+      <View style={styles.segmentRow}>
+        {AVAILABLE_BACKENDS.map((b) => (
           <Pressable
-            key={m.id}
-            style={[styles.chip, ttsModel === m.id && styles.chipActive]}
-            onPress={() => handleTTSModelChange(m.id)}
+            key={b}
+            style={[styles.segment, ttsBackend === b && styles.segmentActive]}
+            onPress={() => handleTTSBackendChange(b)}
           >
             <Text
               style={[
-                styles.chipText,
-                ttsModel === m.id && styles.chipTextActive,
+                styles.segmentText,
+                ttsBackend === b && styles.segmentTextActive,
               ]}
             >
-              {m.label}
+              {BACKEND_LABELS[b]}
             </Text>
           </Pressable>
         ))}
       </View>
 
+      <Text style={styles.sectionTitle}>TTS Model</Text>
+      <Dropdown
+        options={ttsModelOptions}
+        selectedId={ttsModel}
+        onSelect={handleTTSModelChange}
+      />
+
       {/* Voice */}
-      {availableVoices.length > 0 && (
+      {voiceOptions.length > 0 && (
         <>
           <Text style={styles.sectionTitle}>Voice</Text>
-          <View style={styles.chipRow}>
-            {availableVoices.map((v) => (
-              <Pressable
-                key={v.id}
-                style={[styles.chip, ttsVoice === v.id && styles.chipActive]}
-                onPress={() => setTtsVoice(v.id)}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    ttsVoice === v.id && styles.chipTextActive,
-                  ]}
-                >
-                  {v.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          <Dropdown
+            options={voiceOptions}
+            selectedId={ttsVoice}
+            onSelect={setTtsVoice}
+          />
         </>
       )}
+
+      {/* Auto-Publish Toggle */}
+      <View style={styles.divider} />
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleInfo}>
+          <Text style={styles.toggleLabel}>Auto-publish</Text>
+          <Text style={styles.toggleDescription}>
+            {autoPublish
+              ? 'Content will be published automatically when done'
+              : 'Content will need manual approval before publishing'}
+          </Text>
+        </View>
+        <Switch
+          value={autoPublish}
+          onValueChange={setAutoPublish}
+          trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+          thumbColor={autoPublish ? theme.colors.primary : theme.colors.gray[400]}
+        />
+      </View>
 
       {/* Submit */}
       <Pressable
@@ -393,19 +395,14 @@ const createStyles = (theme: Theme) =>
       marginBottom: 10,
       marginTop: 16,
     },
-    sectionSpacer: {
-      height: 8,
-    },
     segmentRow: {
       flexDirection: 'row',
       gap: 8,
     },
     segment: {
       flex: 1,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
       paddingVertical: 10,
       borderRadius: 10,
       backgroundColor: theme.colors.surface,
@@ -419,28 +416,6 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textMuted,
     },
     segmentTextActive: {
-      color: '#fff',
-    },
-    chipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    chip: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: theme.colors.surface,
-    },
-    chipActive: {
-      backgroundColor: theme.colors.primary,
-    },
-    chipText: {
-      fontFamily: 'DMSans-Medium',
-      fontSize: 13,
-      color: theme.colors.textMuted,
-    },
-    chipTextActive: {
       color: '#fff',
     },
     input: {
@@ -460,6 +435,27 @@ const createStyles = (theme: Theme) =>
       height: 1,
       backgroundColor: theme.colors.gray[200],
       marginVertical: 24,
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    toggleInfo: {
+      flex: 1,
+      marginRight: 16,
+    },
+    toggleLabel: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 15,
+      color: theme.colors.text,
+    },
+    toggleDescription: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      marginTop: 2,
     },
     submitButton: {
       flexDirection: 'row',

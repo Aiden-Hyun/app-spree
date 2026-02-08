@@ -28,9 +28,8 @@ def _generate_description(script: str, max_length: int = 200) -> str:
 
 
 def _generate_title(job_data: dict) -> str:
-    """Generate a display title from job params."""
+    """Generate a display title from job params (fallback only)."""
     topic = job_data.get("params", {}).get("topic", "Untitled")
-    # Capitalize first letter of each word, limit length
     title = topic.strip().title()
     if len(title) > 60:
         title = title[:57] + "..."
@@ -47,7 +46,8 @@ def publish_content(
     """Create a Firestore document in the appropriate content collection."""
     content_type = job_data.get("contentType", "guided_meditation")
     params = job_data.get("params", {})
-    title = _generate_title(job_data)
+    # Use the resolved title from the pipeline, fall back to topic-based title
+    title = job_data.get("_resolvedTitle") or _generate_title(job_data)
     description = _generate_description(script)
     duration_minutes = max(1, math.ceil(duration_sec / 60))
     voice = job_data.get("ttsVoice", "Calmdemy")

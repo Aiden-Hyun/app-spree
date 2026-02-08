@@ -33,6 +33,7 @@ from firebase_admin import credentials, firestore
 
 import config
 from pipeline.runner import process_job
+from pipeline.content_publisher import publish_content
 
 # Load .env file if present
 try:
@@ -110,6 +111,52 @@ def get_next_job(db):
     return None
 
 
+def get_next_publish_job(db):
+    """Query Firestore for completed jobs awaiting manual publish approval."""
+    jobs_ref = db.collection(config.JOBS_COLLECTION)
+    query = (
+        jobs_ref
+        .where("status", "==", "publishing")
+        .order_by("createdAt")
+        .limit(5)
+    )
+    docs = query.stream()
+    for doc in docs:
+        return doc
+    return None
+
+
+def handle_publish_job(db, job_id: str, job_data: dict):
+    """Publish a completed job that was awaiting approval."""
+    from firebase_admin import firestore as fs
+
+    storage_path = job_data.get("audioPath", "")
+    duration_sec = job_data.get("audioDurationSec", 0)
+    script = job_data.get("generatedScript", "")
+
+    if not storage_path:
+        print(f"  [publish] Job {job_id} has no audio path, cannot publish.")
+        db.collection(config.JOBS_COLLECTION).document(job_id).update({
+            "status": "failed",
+            "error": "No audio path found for publishing",
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        return
+
+    # Add the resolved title
+    resolved_title = job_data.get("generatedTitle") or job_data.get("title", "")
+    job_data_with_title = {**job_data, "_resolvedTitle": resolved_title}
+
+    content_id = publish_content(db, storage_path, duration_sec, script, job_data_with_title)
+
+    db.collection(config.JOBS_COLLECTION).document(job_id).update({
+        "status": "completed",
+        "publishedContentId": content_id,
+        "updatedAt": fs.SERVER_TIMESTAMP,
+    })
+    print(f"  [publish] Job {job_id} published. Content ID: {content_id}")
+
+
 # ==================== MAIN LOOP ====================
 
 
@@ -129,6 +176,16 @@ def main():
 
     while True:
         try:
+            # Check for jobs awaiting manual publish approval first
+            publish_doc = get_next_publish_job(db)
+            if publish_doc:
+                pub_id = publish_doc.id
+                pub_data = publish_doc.to_dict()
+                print(f"\n[local-worker] Publishing approved job: {pub_id}")
+                handle_publish_job(db, pub_id, pub_data)
+                continue
+
+            # Check for new pending jobs
             job_doc = get_next_job(db)
 
             if job_doc:

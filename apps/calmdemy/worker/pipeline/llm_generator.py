@@ -51,22 +51,29 @@ def _build_prompt(template: str, job_data: dict) -> str:
     return result
 
 
-def generate_script(job_data: dict) -> str:
-    """Generate a meditation/story script using the specified LLM."""
+def _get_llm_adapter(job_data: dict):
+    """Get (and cache) the LLM adapter for the current job."""
     global _cached_model, _cached_model_id
 
     model_id = job_data.get("llmModel", "gemma-3-12b")
-    content_type = job_data.get("contentType", "guided_meditation")
-
-    print(f"  [llm] Generating script with {model_id}...")
-
-    # Load model (reuse if same model as previous job)
     if _cached_model is None or _cached_model_id != model_id:
         if _cached_model is not None:
             _cached_model.unload()
         _cached_model = get_llm(model_id)
         _cached_model.load(config.MODEL_DIR)
         _cached_model_id = model_id
+    return _cached_model
+
+
+def generate_script(job_data: dict) -> str:
+    """Generate a meditation/story script using the specified LLM."""
+    model_id = job_data.get("llmModel", "gemma-3-12b")
+    content_type = job_data.get("contentType", "guided_meditation")
+
+    print(f"  [llm] Generating script with {model_id}...")
+
+    # Load model (reuse if same model as previous job)
+    adapter = _get_llm_adapter(job_data)
 
     # Build prompt
     template = _load_prompt_template(content_type)
@@ -77,7 +84,7 @@ def generate_script(job_data: dict) -> str:
     max_tokens = max(2048, duration * WORDS_PER_MINUTE * 2)
 
     # Generate
-    script = _cached_model.generate(prompt, max_tokens=max_tokens)
+    script = adapter.generate(prompt, max_tokens=max_tokens)
 
     # Clean up end marker if present
     for marker in ["---END---", "<end_of_script>"]:

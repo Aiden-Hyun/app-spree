@@ -1,11 +1,13 @@
 import React from 'react';
-import { Stack, Redirect } from 'expo-router';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { Stack, Redirect, useRouter } from 'expo-router';
+import { View, Text, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useAdminAuth } from '@features/admin/hooks/useAdminAuth';
 
 export default function AdminLayout() {
   const { theme } = useTheme();
+  const router = useRouter();
   const { isAdmin, isLoading } = useAdminAuth();
 
   if (isLoading) {
@@ -35,11 +37,26 @@ export default function AdminLayout() {
     >
       <Stack.Screen
         name="index"
-        options={{ title: 'Content Factory' }}
+        options={{
+          title: 'Content Factory',
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} hitSlop={8} style={{ marginRight: 8 }}>
+              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            </Pressable>
+          ),
+        }}
       />
       <Stack.Screen
         name="create"
-        options={{ title: 'Create Content', presentation: 'modal' }}
+        options={{
+          title: 'Create Content',
+          presentation: 'modal',
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} hitSlop={8}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
+            </Pressable>
+          ),
+        }}
       />
       <Stack.Screen
         name="job/[id]"

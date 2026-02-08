@@ -38,7 +38,7 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   const userId = getCurrentUserId();
   if (!userId) throw new Error('Not authenticated');
 
-  const jobData = {
+  const jobData: Record<string, any> = {
     status: 'pending' as JobStatus,
     llmBackend: input.llmBackend,
     ttsBackend: input.ttsBackend,
@@ -47,10 +47,16 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
     llmModel: input.llmModel,
     ttsModel: input.ttsModel,
     ttsVoice: input.ttsVoice,
+    autoPublish: input.autoPublish,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     createdBy: userId,
   };
+
+  // Only store title if admin provided one
+  if (input.title?.trim()) {
+    jobData.title = input.title.trim();
+  }
 
   const docRef = await addDoc(jobsCollection, jobData);
   return docRef.id;
@@ -167,6 +173,18 @@ export async function cancelJob(jobId: string): Promise<void> {
   await updateDoc(doc(jobsCollection, jobId), {
     status: 'failed',
     error: 'Cancelled by admin',
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ==================== PUBLISH COMPLETED JOB ====================
+
+export async function publishCompletedJob(jobId: string): Promise<void> {
+  // Set the job status to 'pending_publish' so the worker picks it up
+  // and runs only the publishing step.
+  await updateDoc(doc(jobsCollection, jobId), {
+    status: 'publishing',
+    autoPublish: true,
     updatedAt: serverTimestamp(),
   });
 }
