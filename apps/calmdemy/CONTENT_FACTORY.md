@@ -216,10 +216,11 @@ apps/calmdemy/worker/
 2. Poll Firestore every 15 seconds for:
    - Jobs with `status: "publishing"` (manual publish approvals) — handled first.
    - Jobs with `status: "pending"` — filtered to exclude cloud-backend jobs.
-3. When a job is found, call `process_job(db, job_id, job_data)`.
-4. If `contentType === "course"`, routes to `process_course_job()` automatically.
-5. On failure, the job is marked `failed` with the error message.
-6. Runs indefinitely until Ctrl+C.
+3. When a pending job is found, the worker **claims it atomically** (transaction) and updates status to `llm_generating` to prevent duplicate processing.
+4. When a job is claimed, call `process_job(db, job_id, job_data)`.
+5. If `contentType === "course"`, routes to `process_course_job()` automatically.
+6. On failure, the job is marked `failed` with the error message.
+7. Runs indefinitely until Ctrl+C.
 
 ### Configuration (`config.py`)
 
@@ -264,8 +265,8 @@ LLM adapters are cached globally — the model is only reloaded if the model ID 
 
 1. Split the script on `[PAUSE Xs]` markers into segments.
 2. For each text segment: call TTS adapter to synthesize a WAV file.
-3. For each pause segment: generate a silent WAV of the specified duration.
-4. Concatenate all WAV parts into a single file.
+3. For each pause segment: generate a silent WAV of the specified duration **using the same WAV params** (sample rate, channels, sample width) as the TTS output.
+4. Concatenate all WAV parts into a single file (with param validation).
 
 The TTS adapter is cached similarly to the LLM adapter.
 
@@ -315,6 +316,7 @@ Session codes are `{COURSE_CODE}{SUFFIX}`, e.g. `CBT101INT`, `CBT101M1L`, `CBT10
 ### Step 1 — Generate Course Plan
 
 The LLM is given the full `course_system_prompt.txt` plus the job params (code, title, description, therapy approach, audience, tone) and asked to return a structured JSON plan:
+ - The parser tolerates markdown fences and extra text by extracting the first JSON object if needed.
 
 ```json
 {

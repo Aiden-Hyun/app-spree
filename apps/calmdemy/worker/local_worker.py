@@ -86,8 +86,34 @@ def _is_cloud_job(job_data: dict) -> bool:
     )
 
 
+def _claim_job(db, doc_ref) -> dict | None:
+    """Atomically claim a pending job to avoid duplicate processing."""
+    from firebase_admin import firestore as fs
+
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def _tx_claim(transaction):
+        snapshot = doc_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict()
+        if data.get("status") != "pending":
+            return None
+        if _is_cloud_job(data):
+            return None
+        transaction.update(doc_ref, {
+            "status": "llm_generating",
+            "startedAt": fs.SERVER_TIMESTAMP,
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        return data
+
+    return _tx_claim(transaction)
+
+
 def get_next_job(db):
-    """Query Firestore for the oldest pending non-cloud job.
+    """Query Firestore for the oldest pending non-cloud job and claim it.
 
     Picks up any job where neither llmBackend nor ttsBackend is "cloud",
     including any combination of "local" and "api".
@@ -95,20 +121,34 @@ def get_next_job(db):
     jobs_ref = db.collection(config.JOBS_COLLECTION)
 
     # Firestore can't do "NOT EQUAL" across two fields in a compound query,
-    # so we fetch pending jobs and filter out cloud ones in Python.
-    query = (
+    # so we fetch pending jobs in batches and filter out cloud ones in Python.
+    base_query = (
         jobs_ref
         .where("status", "==", "pending")
         .order_by("createdAt")
-        .limit(10)
+        .limit(25)
     )
-    docs = query.stream()
-    for doc in docs:
-        data = doc.to_dict()
-        if not _is_cloud_job(data):
-            return doc
 
-    return None
+    last_doc = None
+    while True:
+        query = base_query
+        if last_doc is not None:
+            query = query.start_after(last_doc)
+
+        docs = list(query.stream())
+        if not docs:
+            return None
+
+        for doc in docs:
+            data = doc.to_dict()
+            if _is_cloud_job(data):
+                continue
+
+            claimed = _claim_job(db, doc.reference)
+            if claimed is not None:
+                return doc.id, claimed
+
+        last_doc = docs[-1]
 
 
 def get_next_publish_job(db):
@@ -219,11 +259,10 @@ def main():
                 continue
 
             # Check for new pending jobs
-            job_doc = get_next_job(db)
+            next_job = get_next_job(db)
 
-            if job_doc:
-                job_id = job_doc.id
-                job_data = job_doc.to_dict()
+            if next_job:
+                job_id, job_data = next_job
                 print(f"\n[local-worker] Processing job: {job_id}")
                 print(f"               Type:     {job_data.get('contentType')}")
                 print(f"               Topic:    {job_data.get('params', {}).get('topic')}")

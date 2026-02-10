@@ -116,12 +116,22 @@ def publish_content(
 
     elif content_type == "course_session":
         collection_name = "course_sessions"
+        session_code = (
+            params.get("code")
+            or params.get("sessionCode")
+            or (
+                f"{params.get('courseCode')}{params.get('sessionSuffix')}"
+                if params.get("courseCode") and params.get("sessionSuffix")
+                else ""
+            )
+        )
         doc_data = {
             "title": title,
             "description": description,
             "duration_minutes": duration_minutes,
             "audioPath": storage_path,
             "courseId": params.get("courseId", ""),
+            "code": session_code,
             "order": params.get("order", 0),
             "isFree": False,
             "generatedBy": "content-factory",

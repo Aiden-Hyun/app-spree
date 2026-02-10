@@ -151,8 +151,25 @@ Output the plan as JSON only, in this exact format (no markdown, no extra text):
 }}"""
 
 
+def _extract_json_object(text: str) -> str:
+    """Extract the first JSON object found in a string."""
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("No JSON object start found")
+    depth = 0
+    for idx in range(start, len(text)):
+        char = text[idx]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:idx + 1]
+    raise ValueError("JSON object not balanced")
+
+
 def _parse_plan(raw: str) -> dict:
-    """Parse the LLM plan output as JSON. Tolerates markdown fences."""
+    """Parse the LLM plan output as JSON. Tolerates markdown fences and extra text."""
     text = raw.strip()
     # Strip markdown code fence if present
     if text.startswith("```"):
@@ -160,7 +177,11 @@ def _parse_plan(raw: str) -> dict:
         last_fence = text.rfind("```")
         if last_fence > first_newline:
             text = text[first_newline + 1:last_fence].strip()
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        extracted = _extract_json_object(text)
+        return json.loads(extracted)
 
 
 def _build_session_script_prompt(

@@ -9,7 +9,6 @@ import os
 import re
 import tempfile
 import wave
-import struct
 import shutil
 
 from models.registry import get_tts
@@ -20,17 +19,26 @@ _cached_tts = None
 _cached_tts_id = None
 _cached_voice_id = None
 
-SAMPLE_RATE = 22050  # Standard for Piper
+DEFAULT_SAMPLE_RATE = 22050  # Standard for Piper
+DEFAULT_CHANNELS = 1
+DEFAULT_SAMPLE_WIDTH = 2  # 16-bit
 
 
-def _generate_silence(duration_sec: float, output_path: str, sample_rate: int = SAMPLE_RATE):
+def _generate_silence(
+    duration_sec: float,
+    output_path: str,
+    sample_rate: int,
+    channels: int,
+    sample_width: int,
+):
     """Generate a silent WAV file of the specified duration."""
-    num_samples = int(sample_rate * duration_sec)
+    num_frames = int(round(sample_rate * duration_sec))
+    frame_bytes = channels * sample_width
+    silence = b'\x00' * (num_frames * frame_bytes)
     with wave.open(output_path, 'w') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)  # 16-bit
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
         wf.setframerate(sample_rate)
-        silence = struct.pack('<' + 'h' * num_samples, *([0] * num_samples))
         wf.writeframes(silence)
 
 
@@ -69,7 +77,18 @@ def _concatenate_wavs(wav_paths: list[str], output_path: str):
         out.setparams(params)
         for path in wav_paths:
             with wave.open(path, 'r') as wf:
+                if wf.getparams() != params:
+                    raise ValueError(
+                        f"WAV params mismatch during concat: {path} has {wf.getparams()}, "
+                        f"expected {params}"
+                    )
                 out.writeframes(wf.readframes(wf.getnframes()))
+
+
+def _read_wav_params(wav_path: str) -> tuple[int, int, int]:
+    """Return (channels, sample_width, sample_rate) from a WAV file."""
+    with wave.open(wav_path, 'r') as wf:
+        return wf.getnchannels(), wf.getsampwidth(), wf.getframerate()
 
 
 def convert_to_audio(script: str, job_data: dict) -> str:
@@ -99,17 +118,55 @@ def convert_to_audio(script: str, job_data: dict) -> str:
     # Synthesize each segment
     tmp_dir = tempfile.mkdtemp(prefix="calmdemy_tts_")
     wav_parts = []
+    tts_params = None  # (channels, sample_width, sample_rate)
+    pending_silences: list[tuple[float, str]] = []
 
     try:
         for i, seg in enumerate(segments):
             part_path = os.path.join(tmp_dir, f"part_{i:04d}.wav")
 
             if seg["type"] == "pause":
-                _generate_silence(seg["seconds"], part_path)
+                if tts_params:
+                    channels, sample_width, sample_rate = tts_params
+                    _generate_silence(
+                        seg["seconds"],
+                        part_path,
+                        sample_rate=sample_rate,
+                        channels=channels,
+                        sample_width=sample_width,
+                    )
+                else:
+                    # Defer silence generation until we know TTS WAV params
+                    pending_silences.append((seg["seconds"], part_path))
             else:
                 _cached_tts.synthesize(seg["content"], part_path)
+                if tts_params is None:
+                    tts_params = _read_wav_params(part_path)
+                    # Backfill any leading pauses now that we know WAV params
+                    channels, sample_width, sample_rate = tts_params
+                    for seconds, pause_path in pending_silences:
+                        _generate_silence(
+                            seconds,
+                            pause_path,
+                            sample_rate=sample_rate,
+                            channels=channels,
+                            sample_width=sample_width,
+                        )
+                    pending_silences = []
 
             wav_parts.append(part_path)
+
+        if pending_silences:
+            # Script had only pauses; fall back to defaults
+            print("  [tts] No audio segments found; using default WAV params for silence.")
+            for seconds, pause_path in pending_silences:
+                _generate_silence(
+                    seconds,
+                    pause_path,
+                    sample_rate=DEFAULT_SAMPLE_RATE,
+                    channels=DEFAULT_CHANNELS,
+                    sample_width=DEFAULT_SAMPLE_WIDTH,
+                )
 
         # Concatenate all parts
         output_path = os.path.join(tmp_dir, "full_output.wav")
