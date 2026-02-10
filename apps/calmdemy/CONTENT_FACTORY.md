@@ -60,7 +60,7 @@ The Content Factory is an automated pipeline that generates audio content for th
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  LLM adapters:  Ollama | LM Studio | Gemini API        │
-│  TTS adapters:  Piper  | Gemini TTS API                 │
+│  TTS adapters:  Piper  | StyleTTS2 | Gemini TTS API      │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -206,6 +206,7 @@ apps/calmdemy/worker/
     ├── llm_llama.py         # Llama (cloud, legacy)
     ├── tts_base.py          # Abstract TTS interface
     ├── tts_piper.py         # Piper TTS adapter
+    ├── tts_styletts2.py     # StyleTTS2 adapter (local, high quality)
     ├── tts_gemini.py        # Gemini TTS API adapter
     └── tts_coqui.py         # Coqui XTTS (cloud, legacy)
 ```
@@ -404,9 +405,12 @@ Adapters are cached globally: the model is only reloaded if the model ID changes
 | Model ID | Backend | Adapter | Voices |
 |---|---|---|---|
 | `piper` | Local / Cloud | Piper CLI (ONNX) | Amy, Danny, Alba, Lessac |
+| `styletts2` | Local | StyleTTS2 (bundled) | Default StyleTTS2 voice |
 | `gemini-tts-flash` | API | Gemini 2.5 Flash TTS | Default Gemini voice |
 | `gemini-tts-pro` | API | Gemini 2.5 Pro TTS | Default Gemini Pro voice |
 | `coqui-xtts-v2` | Cloud | Coqui TTS (GPU) | Legacy — voice cloning |
+
+StyleTTS2 code is bundled under `apps/calmdemy/worker/tts_models/styletts2`.
 
 ### Piper Voices
 
@@ -416,6 +420,14 @@ Adapters are cached globally: the model is only reloaded if the model ID changes
 | `en_US-danny-low` | Danny (US Male) | Deep, soothing American male |
 | `en_GB-alba-medium` | Alba (UK Female) | Warm British female |
 | `en_US-lessac-medium` | Lessac (US Female) | Natural, expressive American female |
+
+### StyleTTS2 Voices
+
+| Voice ID | Name | Description |
+|---|---|---|
+| `styletts2-default` | StyleTTS2 Default | Default StyleTTS2 English voice |
+
+Note: StyleTTS2 pre-trained checkpoints may carry usage requirements. Verify the checkpoint license and voice permissions before production use.
 
 Piper voices are auto-downloaded from HuggingFace (`rhasspy/piper-voices`) on first use and cached in `.piper_voices/`.
 
@@ -530,7 +542,10 @@ A course creates:
   - **Ollama**: `ollama serve` (then pull a model, e.g. `ollama pull gemma3`)
   - **LM Studio**: Open LM Studio, load a model, start the server
   - **Gemini API**: Set `GEMINI_API_KEY` in `worker/.env`
-- For local TTS: `pip install piper-tts` (voices auto-download on first use)
+- For local TTS (Piper): `pip install piper-tts` (voices auto-download on first use)
+- For local TTS (StyleTTS2): `brew install espeak-ng libsndfile`
+- For local TTS (StyleTTS2): `python -m nltk.downloader punkt`
+- For local TTS (StyleTTS2): download a checkpoint into `MODEL_DIR/styletts2/checkpoints/<checkpoint_name>/`
 
 ### Setup
 
@@ -538,6 +553,23 @@ A course creates:
 cd apps/calmdemy/worker
 pip3 install -r requirements.txt
 ```
+
+### StyleTTS2 Checkpoints (Local)
+
+StyleTTS2 looks for checkpoints at `MODEL_DIR/styletts2/checkpoints/<checkpoint_name>/`.
+
+Required files:
+1. `checkpoint.pth` (or any `.pth` file)
+2. `config.yml`
+
+Helper script:
+`./scripts/setup_styletts2_checkpoint.sh <checkpoint_name> <checkpoint_url> [config_path]`
+
+Optional environment variables:
+- `STYLETTS2_DEFAULT_CHECKPOINT` (default: `ljspeech`)
+- `STYLETTS2_CHECKPOINT_FILE` (override specific `.pth` filename)
+- `STYLETTS2_DIFFUSION_STEPS` (default: `5`)
+- `STYLETTS2_EMBEDDING_SCALE` (default: `1`)
 
 ### Run
 

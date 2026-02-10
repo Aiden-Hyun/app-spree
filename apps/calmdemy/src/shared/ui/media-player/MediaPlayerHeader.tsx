@@ -15,6 +15,8 @@ interface MediaPlayerHeaderProps {
   isSleepTimerActive: boolean;
   isFavorited: boolean;
   showReportButton: boolean;
+  showFavorite: boolean;
+  showSleepTimer: boolean;
 }
 
 function MediaPlayerHeaderComponent({
@@ -29,6 +31,8 @@ function MediaPlayerHeaderComponent({
   isSleepTimerActive,
   isFavorited,
   showReportButton,
+  showFavorite,
+  showSleepTimer,
 }: MediaPlayerHeaderProps) {
   return (
     <View style={styles.header}>
@@ -37,16 +41,18 @@ function MediaPlayerHeaderComponent({
       </TouchableOpacity>
 
       <View style={styles.headerRight}>
-        <TouchableOpacity
-          onPress={onOpenSleepTimer}
-          style={[styles.headerButton, isSleepTimerActive && styles.headerButtonActive]}
-        >
-          <Ionicons
-            name="timer-outline"
-            size={20}
-            color={isSleepTimerActive ? "#7DAFB4" : "white"}
-          />
-        </TouchableOpacity>
+        {showSleepTimer && (
+          <TouchableOpacity
+            onPress={onOpenSleepTimer}
+            style={[styles.headerButton, isSleepTimerActive && styles.headerButtonActive]}
+          >
+            <Ionicons
+              name="timer-outline"
+              size={20}
+              color={isSleepTimerActive ? "#7DAFB4" : "white"}
+            />
+          </TouchableOpacity>
+        )}
 
         {enableBackgroundAudio && (
           <TouchableOpacity
@@ -61,13 +67,15 @@ function MediaPlayerHeaderComponent({
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
-          <Ionicons
-            name={isFavorited ? "heart" : "heart-outline"}
-            size={24}
-            color={isFavorited ? "#FF6B6B" : "white"}
-          />
-        </TouchableOpacity>
+        {showFavorite && (
+          <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
+            <Ionicons
+              name={isFavorited ? "heart" : "heart-outline"}
+              size={24}
+              color={isFavorited ? "#FF6B6B" : "white"}
+            />
+          </TouchableOpacity>
+        )}
 
         {showReportButton && (
           <TouchableOpacity onPress={onOpenReport} style={styles.headerButton}>

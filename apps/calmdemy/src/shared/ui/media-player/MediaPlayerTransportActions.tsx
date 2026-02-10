@@ -19,6 +19,9 @@ interface MediaPlayerTransportActionsProps {
   isDownloadingState: boolean;
   downloadProgress: number;
   onDownload: () => Promise<void>;
+  showAutoplay?: boolean;
+  showDownload?: boolean;
+  showRatings?: boolean;
 }
 
 function MediaPlayerTransportActionsComponent({
@@ -36,10 +39,13 @@ function MediaPlayerTransportActionsComponent({
   isDownloadingState,
   downloadProgress,
   onDownload,
+  showAutoplay = true,
+  showDownload = true,
+  showRatings = true,
 }: MediaPlayerTransportActionsProps) {
   const showTrackNavigation = !!(onPrevious || onNext);
 
-  const downloadButton = canDownload ? (
+  const downloadButton = showDownload && canDownload ? (
     <TouchableOpacity
       style={[
         showTrackNavigation ? styles.actionButton : styles.toggleButton,
@@ -122,7 +128,7 @@ function MediaPlayerTransportActionsComponent({
         </View>
 
         <View style={styles.actionControls}>
-          {onRate && (
+          {showRatings && onRate && (
             <TouchableOpacity
               style={[styles.actionButton, userRating === "like" && styles.actionButtonLiked]}
               onPress={() => onRate("like")}
@@ -136,7 +142,7 @@ function MediaPlayerTransportActionsComponent({
             </TouchableOpacity>
           )}
 
-          {onRate && (
+          {showRatings && onRate && (
             <TouchableOpacity
               style={[
                 styles.actionButton,
@@ -153,20 +159,22 @@ function MediaPlayerTransportActionsComponent({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={[styles.actionButton, autoPlayEnabled && styles.actionButtonActive]}
-            onPress={onToggleAutoPlay}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={autoPlayEnabled ? "play-forward-circle" : "play-forward-circle-outline"}
-              size={18}
-              color={autoPlayEnabled ? "white" : "rgba(255,255,255,0.7)"}
-            />
-            <Text style={[styles.actionText, autoPlayEnabled && styles.actionTextActive]}>
-              Autoplay
-            </Text>
-          </TouchableOpacity>
+          {showAutoplay && (
+            <TouchableOpacity
+              style={[styles.actionButton, autoPlayEnabled && styles.actionButtonActive]}
+              onPress={onToggleAutoPlay}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={autoPlayEnabled ? "play-forward-circle" : "play-forward-circle-outline"}
+                size={18}
+                color={autoPlayEnabled ? "white" : "rgba(255,255,255,0.7)"}
+              />
+              <Text style={[styles.actionText, autoPlayEnabled && styles.actionTextActive]}>
+                Autoplay
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {downloadButton}
         </View>
@@ -176,7 +184,7 @@ function MediaPlayerTransportActionsComponent({
 
   return (
     <View style={styles.standaloneDownload}>
-      {onRate && (
+      {showRatings && onRate && (
         <TouchableOpacity
           style={[styles.toggleButton, userRating === "like" && styles.toggleButtonLiked]}
           onPress={() => onRate("like")}
@@ -190,7 +198,7 @@ function MediaPlayerTransportActionsComponent({
         </TouchableOpacity>
       )}
 
-      {onRate && (
+      {showRatings && onRate && (
         <TouchableOpacity
           style={[styles.toggleButton, userRating === "dislike" && styles.toggleButtonDisliked]}
           onPress={() => onRate("dislike")}

@@ -61,6 +61,14 @@ export interface MediaPlayerProps {
   // Enable background audio feature (default: true for meditations)
   enableBackgroundAudio?: boolean;
 
+  // Admin/QA control toggles
+  showFavorite?: boolean;
+  showSleepTimer?: boolean;
+  showReport?: boolean;
+  showAutoplay?: boolean;
+  showDownload?: boolean;
+  showRatings?: boolean;
+
   // Previous/Next navigation (for collections like courses, series, albums)
   onPrevious?: () => void;
   onNext?: () => void;
@@ -118,6 +126,12 @@ export function MediaPlayer({
   loadingText = 'Loading...',
   footerContent,
   enableBackgroundAudio = true,
+  showFavorite = true,
+  showSleepTimer = true,
+  showReport = true,
+  showAutoplay = true,
+  showDownload = true,
+  showRatings = true,
   onPrevious,
   onNext,
   hasPrevious = false,
@@ -261,7 +275,9 @@ export function MediaPlayer({
           }
           isSleepTimerActive={sleepTimer.isActive}
           isFavorited={isFavorited}
-          showReportButton={!!onReport}
+          showReportButton={showReport && !!onReport}
+          showFavorite={showFavorite}
+          showSleepTimer={showSleepTimer}
         />
 
         {/* Background Audio Indicator */}
@@ -278,7 +294,7 @@ export function MediaPlayer({
         )}
 
         {/* Sleep Timer Indicator */}
-        {sleepTimer.isActive && (
+        {showSleepTimer && sleepTimer.isActive && (
           <TouchableOpacity
             style={styles.sleepTimerIndicator}
             onPress={openSleepTimerPicker}
@@ -358,6 +374,9 @@ export function MediaPlayer({
               isDownloadingState={isDownloadingState}
               downloadProgress={downloadProgress}
               onDownload={handleDownload}
+              showAutoplay={showAutoplay}
+              showDownload={showDownload}
+              showRatings={showRatings}
             />
           </View>
 
@@ -382,12 +401,12 @@ export function MediaPlayer({
 
         {/* Sleep Timer Picker Modal */}
         <SleepTimerPicker
-          visible={showSleepTimerPicker}
+          visible={showSleepTimer ? showSleepTimerPicker : false}
           onClose={closeSleepTimerPicker}
         />
 
         {/* Report Modal */}
-        {onReport && (
+        {showReport && onReport && (
           <ReportModal
             visible={showReportModal}
             onClose={closeReportModal}

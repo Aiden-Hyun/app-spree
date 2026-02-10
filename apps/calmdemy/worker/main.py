@@ -21,6 +21,7 @@ from firebase_admin import credentials, firestore
 
 import config
 from pipeline.runner import process_job
+from pipeline.worker_status import update_worker_status
 
 # ==================== INIT ====================
 
@@ -127,6 +128,7 @@ def main():
     idle_seconds = 0
 
     while True:
+        update_worker_status(db, "cloud", "cloud")
         job_doc = get_next_pending_job(db)
 
         if job_doc:

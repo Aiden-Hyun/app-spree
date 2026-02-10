@@ -27,6 +27,19 @@ def _load_prompt_template(content_type: str) -> str:
         return f.read()
 
 
+def _load_system_prompt(content_type: str) -> str:
+    """Load an optional system prompt for a content type."""
+    if content_type != "guided_meditation":
+        return ""
+    prompt_path = os.path.join(
+        os.path.dirname(__file__), "..", "guided_meditation_system_prompt.txt"
+    )
+    if not os.path.isfile(prompt_path):
+        return ""
+    with open(prompt_path, "r") as f:
+        return f.read().strip()
+
+
 def _build_prompt(template: str, job_data: dict) -> str:
     """Fill in the prompt template with job parameters."""
     params = job_data.get("params", {})
@@ -78,6 +91,9 @@ def generate_script(job_data: dict) -> str:
     # Build prompt
     template = _load_prompt_template(content_type)
     prompt = _build_prompt(template, job_data)
+    system_prompt = _load_system_prompt(content_type)
+    if system_prompt:
+        prompt = f"{system_prompt}\n\n---\n\n{prompt}"
 
     # Estimate max tokens based on duration
     duration = job_data.get("params", {}).get("duration_minutes", 10)

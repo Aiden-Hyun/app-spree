@@ -17,6 +17,7 @@ from .llm_lmstudio import LMStudioAdapter
 from .tts_piper import PiperAdapter
 from .tts_coqui import CoquiXTTSAdapter
 from .tts_gemini import GeminiTTSAdapter
+from .tts_styletts2 import StyleTTS2Adapter
 
 
 def _gemini_flash_factory():
@@ -62,6 +63,7 @@ LLM_FACTORIES: dict[str, callable] = {
 TTS_FACTORIES: dict[str, callable] = {
     # Cloud / Local
     "piper": PiperAdapter,
+    "styletts2": StyleTTS2Adapter,
     "coqui-xtts-v2": CoquiXTTSAdapter,
     # Gemini API TTS
     "gemini-tts-flash": _gemini_tts_flash_factory,
@@ -76,6 +78,7 @@ LLM_MODELS: dict[str, type[LLMBase]] = {
 
 TTS_MODELS: dict[str, type[TTSBase]] = {
     "piper": PiperAdapter,
+    "styletts2": StyleTTS2Adapter,
     "coqui-xtts-v2": CoquiXTTSAdapter,
 }
 

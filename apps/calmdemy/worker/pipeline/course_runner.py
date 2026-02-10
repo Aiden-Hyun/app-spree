@@ -406,8 +406,21 @@ def process_course_job(db, job_id: str, job_data: dict):
             })
             print(f"  [course] Course {course_code} published! ID: {course_id}")
         else:
+            preview_sessions = []
+            for session_def in SESSION_DEFS:
+                session_code = f"{course_code}{session_def['suffix']}"
+                audio = audio_results.get(session_code, {})
+                preview_sessions.append({
+                    "code": session_code,
+                    "label": session_def["label"],
+                    "title": _get_session_title(session_def, plan),
+                    "order": session_def["order"],
+                    "audioPath": audio.get("storagePath", ""),
+                    "durationSec": audio.get("durationSec", 0),
+                })
             _update_status(db, job_id, "completed", {
                 "courseProgress": "Completed (awaiting approval)",
+                "coursePreviewSessions": preview_sessions,
                 "completedAt": fs.SERVER_TIMESTAMP,
             })
             print(f"  [course] Course {course_code} done (awaiting approval).")

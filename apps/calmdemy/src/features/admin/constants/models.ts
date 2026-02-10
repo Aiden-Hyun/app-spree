@@ -72,6 +72,12 @@ export const TTS_MODELS: ModelOption[] = [
     description: 'Fast, lightweight, runs on CPU, many voices',
     backend: ['local', 'cloud'],
   },
+  {
+    id: 'styletts2',
+    label: 'StyleTTS2 (Local)',
+    description: 'High quality local TTS (MPS preferred)',
+    backend: 'local',
+  },
   // API TTS
   {
     id: 'gemini-tts-flash',
@@ -121,6 +127,13 @@ export const TTS_VOICES: VoiceOption[] = [
     label: 'Lessac (US Female)',
     ttsModel: 'piper',
     description: 'Natural, expressive American female voice',
+  },
+  // StyleTTS2 voices
+  {
+    id: 'styletts2-default',
+    label: 'StyleTTS2 Default',
+    ttsModel: 'styletts2',
+    description: 'Default StyleTTS2 English voice',
   },
   // Coqui XTTS voices (legacy)
   {

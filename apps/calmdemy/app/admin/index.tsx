@@ -10,9 +10,9 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { useJobQueue } from '@features/admin/hooks/useJobQueue';
+import { useJobQueue, useWorkerStatus } from '@features/admin/hooks/useJobQueue';
 import { JobCard } from '@features/admin/components/JobCard';
-import { JobStatus } from '@features/admin/types';
+import { JobStatus, WorkerStatus } from '@features/admin/types';
 import { Theme } from '@/theme';
 
 const FILTER_OPTIONS: { label: string; value: JobStatus | undefined }[] = [
@@ -29,11 +29,16 @@ export default function AdminDashboard() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [filter, setFilter] = useState<JobStatus | undefined>(undefined);
   const { jobs, isLoading } = useJobQueue(filter);
+  const { status: localWorker } = useWorkerStatus('local');
+  const { status: cloudWorker } = useWorkerStatus('cloud');
 
   const activeCount = jobs.filter(
     (j) => j.status !== 'completed' && j.status !== 'failed' && j.status !== 'pending'
   ).length;
   const pendingCount = jobs.filter((j) => j.status === 'pending').length;
+
+  const localState = getWorkerState(localWorker, theme);
+  const cloudState = getWorkerState(cloudWorker, theme);
 
   return (
     <View style={styles.container}>
@@ -56,6 +61,30 @@ export default function AdminDashboard() {
             {jobs.filter((j) => j.status === 'completed').length}
           </Text>
           <Text style={styles.statLabel}>Done</Text>
+        </View>
+      </View>
+
+      {/* Worker Status */}
+      <View style={styles.workerRow}>
+        <View style={[styles.workerCard, { borderColor: localState.color }]}>
+          <View style={styles.workerHeader}>
+            <Ionicons name="laptop-outline" size={18} color={localState.color} />
+            <Text style={styles.workerTitle}>Local Worker</Text>
+          </View>
+          <Text style={[styles.workerStatus, { color: localState.color }]}>
+            {localState.label}
+          </Text>
+          <Text style={styles.workerMeta}>{localState.meta}</Text>
+        </View>
+        <View style={[styles.workerCard, { borderColor: cloudState.color }]}>
+          <View style={styles.workerHeader}>
+            <Ionicons name="cloud-outline" size={18} color={cloudState.color} />
+            <Text style={styles.workerTitle}>Cloud Worker</Text>
+          </View>
+          <Text style={[styles.workerStatus, { color: cloudState.color }]}>
+            {cloudState.label}
+          </Text>
+          <Text style={styles.workerMeta}>{cloudState.meta}</Text>
         </View>
       </View>
 
@@ -126,6 +155,52 @@ export default function AdminDashboard() {
   );
 }
 
+function getWorkerState(status: WorkerStatus | null, theme: Theme) {
+  if (!status || !status.lastHeartbeat) {
+    return {
+      label: 'Offline',
+      color: theme.colors.error,
+      meta: 'No heartbeat',
+    };
+  }
+
+  const last = status.lastHeartbeat.toDate
+    ? status.lastHeartbeat.toDate().getTime()
+    : new Date(status.lastHeartbeat as any).getTime();
+
+  const ageSec = Math.max(0, (Date.now() - last) / 1000);
+  const interval = status.pollIntervalSec ?? 15;
+
+  if (ageSec <= interval * 2) {
+    return {
+      label: 'Online',
+      color: theme.colors.success,
+      meta: `Updated ${formatAge(ageSec)}`,
+    };
+  }
+  if (ageSec <= interval * 6) {
+    return {
+      label: 'Stale',
+      color: theme.colors.warning,
+      meta: `Updated ${formatAge(ageSec)}`,
+    };
+  }
+  return {
+    label: 'Offline',
+    color: theme.colors.error,
+    meta: `Last seen ${formatAge(ageSec)}`,
+  };
+}
+
+function formatAge(ageSec: number): string {
+  if (ageSec < 10) return 'just now';
+  if (ageSec < 60) return `${Math.floor(ageSec)}s ago`;
+  const minutes = Math.floor(ageSec / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
@@ -138,6 +213,40 @@ const createStyles = (theme: Theme) =>
       paddingTop: 12,
       paddingBottom: 8,
       gap: 10,
+    },
+    workerRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+      gap: 10,
+    },
+    workerCard: {
+      flex: 1,
+      borderRadius: 14,
+      padding: 12,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+    },
+    workerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    workerTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    workerStatus: {
+      fontFamily: 'DMSans-Bold',
+      fontSize: 16,
+    },
+    workerMeta: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      marginTop: 2,
     },
     statCard: {
       flex: 1,

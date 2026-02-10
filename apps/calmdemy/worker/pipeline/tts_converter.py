@@ -72,14 +72,23 @@ def _concatenate_wavs(wav_paths: list[str], output_path: str):
 
     with wave.open(wav_paths[0], 'r') as first:
         params = first.getparams()
+        expected = (params.nchannels, params.sampwidth, params.framerate, params.comptype, params.compname)
 
     with wave.open(output_path, 'w') as out:
         out.setparams(params)
         for path in wav_paths:
             with wave.open(path, 'r') as wf:
-                if wf.getparams() != params:
+                wf_params = wf.getparams()
+                current = (
+                    wf_params.nchannels,
+                    wf_params.sampwidth,
+                    wf_params.framerate,
+                    wf_params.comptype,
+                    wf_params.compname,
+                )
+                if current != expected:
                     raise ValueError(
-                        f"WAV params mismatch during concat: {path} has {wf.getparams()}, "
+                        f"WAV params mismatch during concat: {path} has {wf_params}, "
                         f"expected {params}"
                     )
                 out.writeframes(wf.readframes(wf.getnframes()))

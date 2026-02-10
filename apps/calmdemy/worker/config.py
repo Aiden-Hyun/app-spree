@@ -2,6 +2,13 @@
 
 import os
 
+# Load .env early so config defaults can pick it up.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # GCP / Firebase
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "calmnest-e910e")
 STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "calmnest-e910e.firebasestorage.app")
@@ -12,6 +19,7 @@ GCE_VM_NAME = os.getenv("GCE_VM_NAME", "calmdemy-worker")
 
 # Model paths (persistent disk mounted at /models)
 MODEL_DIR = os.getenv("MODEL_DIR", "/models")
+JOB_CACHE_DIR = os.getenv("JOB_CACHE_DIR", os.path.join(MODEL_DIR, "job_cache"))
 
 # Worker behavior
 IDLE_SHUTDOWN_MINUTES = int(os.getenv("IDLE_SHUTDOWN_MINUTES", "5"))

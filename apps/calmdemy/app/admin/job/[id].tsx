@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useJobDetail } from '@features/admin/hooks/useJobQueue';
@@ -19,9 +19,10 @@ import { Theme } from '@/theme';
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { job, isLoading, retry, cancel } = useJobDetail(id);
+  const { job, isLoading, retry, cancel, requestDelete } = useJobDetail(id);
 
   const handleRetry = () => {
     Alert.alert('Retry Job', 'Re-queue this job for processing?', [
@@ -62,6 +63,10 @@ export default function JobDetailScreen() {
 
   const isAwaitingApproval =
     job?.status === 'completed' && !job.autoPublish && !job.publishedContentId;
+  const isReviewable =
+    job?.status === 'completed' && !job.autoPublish;
+  const isDeletable =
+    job?.status === 'failed' || (job?.status === 'completed' && !job.autoPublish);
 
   if (isLoading) {
     return (
@@ -83,6 +88,38 @@ export default function JobDetailScreen() {
   const createdDate = job.createdAt?.toDate
     ? job.createdAt.toDate().toLocaleString()
     : 'Unknown';
+
+  const handleReview = () => {
+    if (!job) return;
+    router.push({
+      pathname: '/admin/job/[id]/review',
+      params: { id: job.id },
+    });
+  };
+
+  const handleDelete = () => {
+    if (!job) return;
+    Alert.alert(
+      'Delete Job',
+      'This will delete any generated audio and remove the job. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await requestDelete();
+              Alert.alert('Delete queued', 'Job will be deleted shortly.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to request delete. Please try again.');
+              console.error('Delete error:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <ScrollView
@@ -285,6 +322,19 @@ export default function JobDetailScreen() {
         </Pressable>
       )}
 
+      {isReviewable && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.reviewButton,
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={handleReview}
+        >
+          <Ionicons name="play-circle-outline" size={20} color="#fff" />
+          <Text style={styles.retryText}>Review Audio</Text>
+        </Pressable>
+      )}
+
       {isAwaitingApproval && (
         <Pressable
           style={({ pressed }) => [
@@ -295,6 +345,19 @@ export default function JobDetailScreen() {
         >
           <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
           <Text style={styles.retryText}>Publish Now</Text>
+        </Pressable>
+      )}
+
+      {isDeletable && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.deleteButton,
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={handleDelete}
+        >
+          <Ionicons name="trash-outline" size={20} color="#fff" />
+          <Text style={styles.retryText}>Delete Job</Text>
         </Pressable>
       )}
 
@@ -432,6 +495,26 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.success,
+      borderRadius: 16,
+      paddingVertical: 16,
+      gap: 10,
+      marginTop: 12,
+    },
+    reviewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.primary,
+      borderRadius: 16,
+      paddingVertical: 16,
+      gap: 10,
+      marginTop: 12,
+    },
+    deleteButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.error,
       borderRadius: 16,
       paddingVertical: 16,
       gap: 10,

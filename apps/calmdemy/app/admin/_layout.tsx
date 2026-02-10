@@ -62,6 +62,14 @@ export default function AdminLayout() {
         name="job/[id]"
         options={{ title: 'Job Details' }}
       />
+      <Stack.Screen
+        name="job/[id]/review"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="job/[id]/review/[sessionCode]"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }

@@ -33,6 +33,8 @@ from firebase_admin import credentials, firestore
 
 import config
 from pipeline.runner import process_job
+from pipeline.delete_job import process_delete_job, mark_delete_failed
+from pipeline.worker_status import update_worker_status
 from pipeline.content_publisher import publish_content
 
 # Load .env file if present
@@ -166,6 +168,47 @@ def get_next_publish_job(db):
     return None
 
 
+def _claim_delete_job(db, doc_ref) -> dict | None:
+    """Atomically claim a delete request to avoid duplicate processing."""
+    from firebase_admin import firestore as fs
+
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def _tx_claim(transaction):
+        snapshot = doc_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict()
+        if not data.get("deleteRequested"):
+            return None
+        if data.get("deleteInProgress"):
+            return None
+        transaction.update(doc_ref, {
+            "deleteInProgress": True,
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        return data
+
+    return _tx_claim(transaction)
+
+
+def get_next_delete_job(db):
+    """Query Firestore for jobs marked for deletion and claim one."""
+    jobs_ref = db.collection(config.JOBS_COLLECTION)
+    query = (
+        jobs_ref
+        .where("deleteRequested", "==", True)
+        .limit(10)
+    )
+    docs = query.stream()
+    for doc in docs:
+        claimed = _claim_delete_job(db, doc.reference)
+        if claimed is not None:
+            return doc.id, claimed
+    return None
+
+
 def handle_publish_job(db, job_id: str, job_data: dict):
     """Publish a completed job that was awaiting approval."""
     from firebase_admin import firestore as fs
@@ -249,6 +292,19 @@ def main():
 
     while True:
         try:
+            update_worker_status(db, "local", "local")
+
+            # Handle delete requests first
+            delete_job = get_next_delete_job(db)
+            if delete_job:
+                del_id, del_data = delete_job
+                print(f"\n[local-worker] Deleting job: {del_id}")
+                try:
+                    process_delete_job(db, del_id, del_data)
+                except Exception as e:
+                    mark_delete_failed(db, del_id, f"{type(e).__name__}: {e}")
+                continue
+
             # Check for jobs awaiting manual publish approval first
             publish_doc = get_next_publish_job(db)
             if publish_doc:

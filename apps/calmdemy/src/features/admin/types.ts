@@ -128,20 +128,46 @@ export interface ContentJob {
   audioPath?: string;
   audioDurationSec?: number;
   publishedContentId?: string;
+  lastCompletedStage?: JobStatus;
+  failedStage?: JobStatus;
+  resumeAvailable?: boolean;
 
   // Course-specific outputs
   courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"
   coursePlan?: Record<string, any>;
+  coursePreviewSessions?: Array<{
+    code: string;
+    label: string;
+    title: string;
+    order: number;
+    audioPath: string;
+    durationSec: number;
+  }>;
   courseSessionIds?: string[];     // published session doc IDs
   courseId?: string;               // published course doc ID
 
   // Metadata
   error?: string;
+  deleteRequested?: boolean;
+  deleteRequestedAt?: Timestamp;
+  deleteInProgress?: boolean;
+  deleteError?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   startedAt?: Timestamp;
   completedAt?: Timestamp;
   createdBy: string;
+}
+
+// ==================== WORKER STATUS ====================
+
+export interface WorkerStatus {
+  id: string;
+  workerId?: string;
+  workerType?: 'local' | 'cloud';
+  lastHeartbeat?: Timestamp;
+  updatedAt?: Timestamp;
+  pollIntervalSec?: number;
 }
 
 // ==================== CREATE JOB INPUT ====================

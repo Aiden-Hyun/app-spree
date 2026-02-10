@@ -14,7 +14,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../../../firebase';
-import { ContentJob, CreateJobInput, JobStatus } from '../types';
+import { ContentJob, CreateJobInput, JobStatus, WorkerStatus } from '../types';
 
 // Re-export subject/course utilities from meditate repository
 export {
@@ -168,6 +168,21 @@ export function subscribeToJob(
   });
 }
 
+// ==================== WORKER STATUS ====================
+
+export function subscribeToWorkerStatus(
+  workerId: 'local' | 'cloud',
+  callback: (status: WorkerStatus | null) => void
+): Unsubscribe {
+  return onSnapshot(doc(db, 'worker_status', workerId), (docSnapshot) => {
+    if (!docSnapshot.exists()) {
+      callback(null);
+      return;
+    }
+    callback({ id: docSnapshot.id, ...docSnapshot.data() } as WorkerStatus);
+  });
+}
+
 // ==================== RETRY JOB ====================
 
 export async function retryJob(jobId: string): Promise<void> {
@@ -177,6 +192,7 @@ export async function retryJob(jobId: string): Promise<void> {
     updatedAt: serverTimestamp(),
     startedAt: null,
     completedAt: null,
+    failedStage: null,
   });
 }
 
@@ -186,6 +202,18 @@ export async function cancelJob(jobId: string): Promise<void> {
   await updateDoc(doc(jobsCollection, jobId), {
     status: 'failed',
     error: 'Cancelled by admin',
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ==================== DELETE JOB ====================
+
+export async function requestDeleteJob(jobId: string): Promise<void> {
+  await updateDoc(doc(jobsCollection, jobId), {
+    deleteRequested: true,
+    deleteRequestedAt: serverTimestamp(),
+    deleteInProgress: false,
+    deleteError: null,
     updatedAt: serverTimestamp(),
   });
 }

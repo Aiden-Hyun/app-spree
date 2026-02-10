@@ -9,11 +9,20 @@ google-genai>=1.0
 # LLM inference (cloud GPU)
 transformers>=4.50
 torch>=2.6
+torchaudio
 accelerate==1.*
 
 # TTS
 piper-tts==1.*
 pathvalidate
+soundfile
+phonemizer
+librosa
+nltk
+munch
+pyyaml
+einops
+einops-exts
 
 # Audio processing
 pydub==0.25.*

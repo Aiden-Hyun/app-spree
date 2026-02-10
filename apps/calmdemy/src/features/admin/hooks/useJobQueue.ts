@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   subscribeToJobs,
   subscribeToJob,
+  subscribeToWorkerStatus,
   createContentJob,
   retryJob,
   cancelJob,
+  requestDeleteJob,
 } from '../data/adminRepository';
-import { ContentJob, CreateJobInput, JobStatus } from '../types';
+import { ContentJob, CreateJobInput, JobStatus, WorkerStatus } from '../types';
 
 // ==================== JOB LIST HOOK ====================
 
@@ -59,5 +61,25 @@ export function useJobDetail(jobId: string) {
     await cancelJob(jobId);
   }, [jobId]);
 
-  return { job, isLoading, retry, cancel };
+  const requestDelete = useCallback(async () => {
+    if (!jobId) return;
+    await requestDeleteJob(jobId);
+  }, [jobId]);
+
+  return { job, isLoading, retry, cancel, requestDelete };
+}
+
+// ==================== WORKER STATUS HOOK ====================
+
+export function useWorkerStatus(workerId: 'local' | 'cloud') {
+  const [status, setStatus] = useState<WorkerStatus | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToWorkerStatus(workerId, (next) => {
+      setStatus(next);
+    });
+    return unsubscribe;
+  }, [workerId]);
+
+  return { status };
 }
