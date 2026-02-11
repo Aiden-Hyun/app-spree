@@ -9,6 +9,14 @@ worker/service-account-key.json
 
 # Piper TTS downloaded voice models
 worker/.piper_voices/
+# Bundled TTS model repos
+worker/tts_models/
+
+# Python virtualenv
+worker/.venv/
+
+# Downloaded/cached model weights
+worker/.models/
 
 # Python cache
 __pycache__/

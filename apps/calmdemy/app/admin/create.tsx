@@ -94,6 +94,7 @@ export default function CreateContentScreen() {
   const [technique, setTechnique] = useState('');
   const [difficulty, setDifficulty] = useState<string>('beginner');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [imagePrompt, setImagePrompt] = useState('');
   const [autoPublish, setAutoPublish] = useState(true);
 
   // Course-specific state
@@ -264,6 +265,7 @@ export default function CreateContentScreen() {
         ttsModel,
         ttsVoice,
         title: isCourse ? courseTitle.trim() : (title.trim() || undefined),
+        imagePrompt: imagePrompt.trim() || undefined,
         autoPublish,
       };
 
@@ -386,6 +388,18 @@ export default function CreateContentScreen() {
             numberOfLines={3}
           />
 
+          {/* Image Prompt */}
+          <Text style={styles.sectionTitle}>Image Prompt (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Optional image prompt for the thumbnail..."
+            placeholderTextColor={theme.colors.textMuted}
+            value={imagePrompt}
+            onChangeText={setImagePrompt}
+            multiline
+            numberOfLines={3}
+          />
+
           {/* Info Banner */}
           <View style={[styles.infoBanner, { backgroundColor: `${theme.colors.primary}10` }]}>
             <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} />
@@ -462,6 +476,18 @@ export default function CreateContentScreen() {
             placeholderTextColor={theme.colors.textMuted}
             value={customInstructions}
             onChangeText={setCustomInstructions}
+            multiline
+            numberOfLines={3}
+          />
+
+          {/* Image Prompt */}
+          <Text style={styles.sectionTitle}>Image Prompt (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Optional image prompt for the thumbnail..."
+            placeholderTextColor={theme.colors.textMuted}
+            value={imagePrompt}
+            onChangeText={setImagePrompt}
             multiline
             numberOfLines={3}
           />

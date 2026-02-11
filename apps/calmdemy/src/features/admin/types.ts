@@ -6,6 +6,7 @@ export type JobStatus =
   | 'pending'
   | 'llm_generating'
   | 'qa_formatting'
+  | 'image_generating'
   | 'tts_converting'
   | 'post_processing'
   | 'uploading'
@@ -17,6 +18,7 @@ export const JOB_STATUS_ORDER: JobStatus[] = [
   'pending',
   'llm_generating',
   'qa_formatting',
+  'image_generating',
   'tts_converting',
   'post_processing',
   'uploading',
@@ -28,6 +30,7 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   pending: 'Pending',
   llm_generating: 'Generating Script',
   qa_formatting: 'Formatting',
+  image_generating: 'Generating Image',
   tts_converting: 'Converting to Audio',
   post_processing: 'Processing Audio',
   uploading: 'Uploading',
@@ -128,6 +131,10 @@ export interface ContentJob {
   audioPath?: string;
   audioDurationSec?: number;
   publishedContentId?: string;
+  imagePrompt?: string;
+  imagePath?: string;
+  thumbnailUrl?: string;
+  imageModel?: string;
   lastCompletedStage?: JobStatus;
   failedStage?: JobStatus;
   resumeAvailable?: boolean;
@@ -181,5 +188,6 @@ export interface CreateJobInput {
   ttsModel: string;
   ttsVoice: string;
   title?: string;
+  imagePrompt?: string;
   autoPublish: boolean;
 }

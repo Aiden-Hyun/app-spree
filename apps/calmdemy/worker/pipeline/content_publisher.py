@@ -51,6 +51,7 @@ def publish_content(
     description = _generate_description(script)
     duration_minutes = max(1, math.ceil(duration_sec / 60))
     voice = job_data.get("ttsVoice", "Calmdemy")
+    thumbnail_url = job_data.get("thumbnailUrl") or ""
 
     print(f"  [publish] Creating {content_type} document: {title}")
 
@@ -64,6 +65,7 @@ def publish_content(
             "description": description,
             "duration_minutes": duration_minutes,
             "audioPath": storage_path,
+            "thumbnailUrl": thumbnail_url,
             "themes": params.get("themes", []),
             "techniques": [params["technique"]] if params.get("technique") else [],
             "difficulty_level": params.get("difficulty", "beginner"),
@@ -80,6 +82,7 @@ def publish_content(
             "description": description,
             "duration_minutes": duration_minutes,
             "audioPath": storage_path,
+            "thumbnailUrl": thumbnail_url,
             "instructor": voice,
             "isFree": False,
             "generatedBy": "content-factory",
@@ -94,6 +97,7 @@ def publish_content(
             "narrator": voice,
             "duration_minutes": duration_minutes,
             "audio_url": storage_path,
+            "thumbnail_url": thumbnail_url,
             "category": params.get("category", "nature"),
             "is_premium": True,
             "isFree": False,
@@ -109,6 +113,7 @@ def publish_content(
             "duration_minutes": duration_minutes,
             "audioPath": storage_path,
             "narrator": voice,
+            "thumbnailUrl": thumbnail_url,
             "isFree": True,  # Emergency content should be free
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
@@ -133,6 +138,7 @@ def publish_content(
             "courseId": params.get("courseId", ""),
             "code": session_code,
             "order": params.get("order", 0),
+            "thumbnailUrl": thumbnail_url,
             "isFree": False,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,

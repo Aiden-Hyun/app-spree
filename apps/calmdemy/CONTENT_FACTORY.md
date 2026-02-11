@@ -53,10 +53,11 @@ The Content Factory is an automated pipeline that generates audio content for th
 │  │                                                    │   │
 │  │  1. LLM generates script                          │   │
 │  │  2. QA formats script                             │   │
-│  │  3. TTS converts to WAV                           │   │
-│  │  4. ffmpeg post-processes to MP3                   │   │
-│  │  5. Uploads MP3 to Firebase Storage               │   │
-│  │  6. Creates Firestore content document            │   │
+│  │  3. Image generates thumbnail                     │   │
+│  │  4. TTS converts to WAV                           │   │
+│  │  5. ffmpeg post-processes to MP3                   │   │
+│  │  6. Uploads MP3 to Firebase Storage               │   │
+│  │  7. Creates Firestore content document            │   │
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  LLM adapters:  Ollama | LM Studio | Gemini API        │
@@ -80,7 +81,7 @@ Every job is a document in `content_jobs`. The admin UI creates it with `status:
 
 | Field | Type | Description |
 |---|---|---|
-| `status` | string | `pending` → `llm_generating` → `qa_formatting` → `tts_converting` → `post_processing` → `uploading` → `publishing` → `completed` (or `failed`) |
+| `status` | string | `pending` → `llm_generating` → `qa_formatting` → `image_generating` → `tts_converting` → `post_processing` → `uploading` → `publishing` → `completed` (or `failed`) |
 | `llmBackend` | string | `"local"` or `"api"` |
 | `ttsBackend` | string | `"local"` or `"api"` |
 | `contentType` | string | `guided_meditation`, `sleep_meditation`, `bedtime_story`, `emergency_meditation`, `course_session`, or `course` |
@@ -95,6 +96,10 @@ Every job is a document in `content_jobs`. The admin UI creates it with `status:
 | `audioPath` | string? | Firebase Storage path of the final MP3 |
 | `audioDurationSec` | number? | Audio duration in seconds |
 | `publishedContentId` | string? | Firestore document ID of the published content |
+| `imagePrompt` | string? | Optional image prompt (admin-provided or auto-generated) |
+| `imagePath` | string? | Firebase Storage path for the thumbnail image |
+| `thumbnailUrl` | string? | Public URL for the thumbnail image |
+| `imageModel` | string? | Image model ID used for generation |
 | `courseProgress` | string? | Course jobs only — e.g. `"Script 3/9"`, `"Audio 5/9"` |
 | `coursePlan` | map? | Course jobs only — the structured course plan JSON |
 | `courseId` | string? | Course jobs only — published course document ID |
@@ -126,12 +131,12 @@ Published content lives in these collections (one per content type):
 
 | Collection | Content Type | Key Fields |
 |---|---|---|
-| `guided_meditations` | Guided Meditation | title, description, audioPath, themes, techniques, difficulty_level, instructor |
-| `sleep_meditations` | Sleep Meditation | title, description, audioPath, instructor |
-| `bedtime_stories` | Bedtime Story | title, description, audio_url, narrator, category |
-| `emergency_meditations` | Emergency Meditation | title, description, audioPath, narrator, isFree=true |
-| `course_sessions` | Course Session | title, description, audioPath, courseId, code, order |
-| `courses` | Full Course | code, title, description, color, icon, subjectId, sessionCount |
+| `guided_meditations` | Guided Meditation | title, description, audioPath, thumbnailUrl, themes, techniques, difficulty_level, instructor |
+| `sleep_meditations` | Sleep Meditation | title, description, audioPath, thumbnailUrl, instructor |
+| `bedtime_stories` | Bedtime Story | title, description, audio_url, thumbnail_url, narrator, category |
+| `emergency_meditations` | Emergency Meditation | title, description, audioPath, thumbnailUrl, narrator, isFree=true |
+| `course_sessions` | Course Session | title, description, audioPath, courseId, code, order, thumbnailUrl |
+| `courses` | Full Course | code, title, description, color, icon, subjectId, sessionCount, thumbnailUrl |
 
 ---
 
@@ -192,10 +197,11 @@ apps/calmdemy/worker/
 │   ├── course_runner.py     # Course orchestrator (9-audio jobs)
 │   ├── llm_generator.py     # Step 1: LLM script generation
 │   ├── qa_formatter.py      # Step 2: QA and formatting
-│   ├── tts_converter.py     # Step 3: TTS conversion (handles pauses)
-│   ├── audio_processor.py   # Step 4: ffmpeg normalize + encode MP3
-│   ├── storage_uploader.py  # Step 5: Upload to Firebase Storage
-│   └── content_publisher.py # Step 6: Create Firestore document
+│   ├── image_generator.py   # Step 3: Image generation (thumbnails)
+│   ├── tts_converter.py     # Step 4: TTS conversion (handles pauses)
+│   ├── audio_processor.py   # Step 5: ffmpeg normalize + encode MP3
+│   ├── storage_uploader.py  # Step 6: Upload to Firebase Storage
+│   └── content_publisher.py # Step 7: Create Firestore document
 └── models/                  # Model adapters
     ├── registry.py          # Factory for LLM/TTS adapters
     ├── llm_base.py          # Abstract LLM interface
@@ -235,6 +241,12 @@ apps/calmdemy/worker/
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `MODEL_DIR` | `/models` | Base directory for model weights |
 | `JOBS_COLLECTION` | `content_jobs` | Firestore collection name |
+| `IMAGE_MODEL_ID` | `black-forest-labs/FLUX.2-klein-4B` | Image model for thumbnails |
+| `IMAGE_WIDTH` | `1024` | Image width (px) |
+| `IMAGE_HEIGHT` | `1024` | Image height (px) |
+| `IMAGE_STEPS` | `24` | Diffusion steps |
+| `IMAGE_GUIDANCE` | `3.5` | Guidance scale |
+| `HF_TOKEN` | (empty) | Optional Hugging Face token |
 
 ---
 
@@ -262,7 +274,13 @@ LLM adapters are cached globally — the model is only reloaded if the model ID 
 4. Collapse excessive blank lines.
 5. Validate: script must have at least 50 words, otherwise error.
 
-### Step 3 — TTS Conversion (`tts_converter.py`)
+### Step 3 — Image Generation (`image_generator.py`)
+
+1. Build a thumbnail prompt (admin prompt > LLM prompt > fallback template).
+2. Generate a 1024×1024 image using FLUX.2‑klein‑4B (MPS on M‑series Mac).
+3. Upload to Firebase Storage and store `thumbnailUrl`.
+
+### Step 4 — TTS Conversion (`tts_converter.py`)
 
 1. Split the script on `[PAUSE Xs]` markers into segments.
 2. For each text segment: call TTS adapter to synthesize a WAV file.
@@ -271,14 +289,14 @@ LLM adapters are cached globally — the model is only reloaded if the model ID 
 
 The TTS adapter is cached similarly to the LLM adapter.
 
-### Step 4 — Audio Post-Processing (`audio_processor.py`)
+### Step 5 — Audio Post-Processing (`audio_processor.py`)
 
 1. Measure loudness (LUFS) using ffmpeg.
 2. If loudness deviates more than 3 LUFS from -16 target, normalize.
 3. Encode as 192kbps MP3, 44.1kHz, mono.
 4. Delete the intermediate WAV file.
 
-### Step 5 — Upload to Firebase Storage (`storage_uploader.py`)
+### Step 6 — Upload to Firebase Storage (`storage_uploader.py`)
 
 1. Determine storage path based on content type (see [Storage Conventions](#10-storage-conventions)).
 2. Generate filename: `{topic-slug}-{8-char-uuid}.mp3`.
@@ -286,7 +304,7 @@ The TTS adapter is cached similarly to the LLM adapter.
 4. Read MP3 duration using mutagen.
 5. Delete local file after upload.
 
-### Step 6 — Publish to Firestore (`content_publisher.py`)
+### Step 7 — Publish to Firestore (`content_publisher.py`)
 
 1. Create a document in the appropriate collection (see [Publishing](#11-publishing-firestore-documents)).
 2. If `autoPublish` is false, skip this step — the job is marked `completed` but no content document is created until the admin manually approves.
@@ -318,6 +336,12 @@ Session codes are `{COURSE_CODE}{SUFFIX}`, e.g. `CBT101INT`, `CBT101M1L`, `CBT10
 
 The LLM is given the full `course_system_prompt.txt` plus the job params (code, title, description, therapy approach, audience, tone) and asked to return a structured JSON plan:
  - The parser tolerates markdown fences and extra text by extracting the first JSON object if needed.
+
+### Step 1b — Generate Course Thumbnail
+
+1. Build an image prompt from course title/goal/subject (or use admin prompt).
+2. Generate a single 1024×1024 image and upload to Firebase Storage.
+3. Store `thumbnailUrl` on the course document and reuse it for sessions.
 
 ```json
 {

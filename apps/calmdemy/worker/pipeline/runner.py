@@ -11,9 +11,15 @@ from .llm_generator import generate_script
 from .qa_formatter import format_script
 from .tts_converter import convert_to_audio
 from .audio_processor import post_process_audio
-from .storage_uploader import upload_audio
+from .storage_uploader import upload_audio, upload_image
 from .content_publisher import publish_content
 from .course_runner import process_course_job
+from .image_generator import (
+    build_image_prompt,
+    generate_image,
+    DEFAULT_FALLBACK_URL,
+)
+import config
 from .job_cache import (
     ensure_cache_dir,
     load_state,
@@ -154,7 +160,59 @@ def process_job(db, job_id: str, job_data: dict):
         current_stage = "qa_formatting"
         formatted_script = format_script(script, job_data)
         _cache_update(lastCompletedStage="qa_formatting")
-        _update_status(db, job_id, "tts_converting", last_completed="qa_formatting")
+        _update_status(db, job_id, "image_generating", last_completed="qa_formatting")
+
+        # Step 2b: Image generation — thumbnail (or reuse cached)
+        current_stage = "image_generating"
+        thumbnail_url = job_data.get("thumbnailUrl") or cache_state.get("thumbnailUrl")
+        image_path = job_data.get("imagePath") or cache_state.get("imagePath")
+        image_prompt = job_data.get("imagePrompt") or cache_state.get("imagePrompt")
+
+        if thumbnail_url:
+            print("  [image] Reusing cached thumbnail URL.")
+        else:
+            if not image_prompt:
+                image_prompt = build_image_prompt(
+                    job_data,
+                    generated_title,
+                    job_data.get("params", {}).get("topic", ""),
+                    job_data.get("contentType", "guided_meditation"),
+                )
+            try:
+                local_image_path = generate_image(image_prompt)
+                image_path, thumbnail_url = upload_image(local_image_path, job_data)
+            except Exception as e:
+                print(f"  [image] Generation failed, using fallback: {e}")
+                thumbnail_url = DEFAULT_FALLBACK_URL
+                image_path = ""
+
+        job_data = {
+            **job_data,
+            "imagePrompt": image_prompt,
+            "imagePath": image_path,
+            "thumbnailUrl": thumbnail_url,
+            "imageModel": config.IMAGE_MODEL_ID,
+        }
+        _cache_update(
+            imagePrompt=image_prompt,
+            imagePath=image_path,
+            thumbnailUrl=thumbnail_url,
+            imageModel=config.IMAGE_MODEL_ID,
+            lastCompletedStage="image_generating",
+        )
+        _update_status(
+            db,
+            job_id,
+            "image_generating",
+            {
+                "imagePrompt": image_prompt,
+                "imagePath": image_path,
+                "thumbnailUrl": thumbnail_url,
+                "imageModel": config.IMAGE_MODEL_ID,
+            },
+            last_completed="qa_formatting",
+        )
+        _update_status(db, job_id, "tts_converting", last_completed="image_generating")
 
         # Step 3: TTS — convert to audio (or reuse cached)
         current_stage = "tts_converting"

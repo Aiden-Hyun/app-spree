@@ -27,7 +27,13 @@ from .llm_generator import _get_llm_adapter
 from .qa_formatter import format_script
 from .tts_converter import convert_to_audio
 from .audio_processor import post_process_audio
-from .storage_uploader import upload_audio
+from .storage_uploader import upload_audio, upload_image
+from .image_generator import (
+    build_image_prompt,
+    generate_image,
+    DEFAULT_FALLBACK_URL,
+)
+import config
 
 
 # Session definitions in order
@@ -310,6 +316,45 @@ def process_course_job(db, job_id: str, job_data: dict):
         # Save plan to job
         _update_status(db, job_id, "llm_generating", {"coursePlan": plan})
 
+        # ========== STEP 1b: Generate course thumbnail ==========
+        _update_status(db, job_id, "image_generating")
+        course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled Course"))
+        image_prompt = build_image_prompt(
+            job_data,
+            course_title,
+            params.get("topic", ""),
+            "course",
+            plan=plan,
+        )
+        has_thumbnail = bool(job_data.get("thumbnailUrl"))
+        thumbnail_url = job_data.get("thumbnailUrl") or DEFAULT_FALLBACK_URL
+        image_path = job_data.get("imagePath", "") or ""
+        if not has_thumbnail:
+            try:
+                local_image_path = generate_image(image_prompt)
+                image_path, thumbnail_url = upload_image(
+                    local_image_path,
+                    {**job_data, "contentType": "course"},
+                )
+            except Exception as e:
+                print(f"  [image] Course image generation failed, using fallback: {e}")
+                thumbnail_url = DEFAULT_FALLBACK_URL
+                image_path = ""
+
+        job_data = {
+            **job_data,
+            "imagePrompt": image_prompt,
+            "imagePath": image_path,
+            "thumbnailUrl": thumbnail_url,
+            "imageModel": config.IMAGE_MODEL_ID,
+        }
+        _update_status(db, job_id, "image_generating", {
+            "imagePrompt": image_prompt,
+            "imagePath": image_path,
+            "thumbnailUrl": thumbnail_url,
+            "imageModel": config.IMAGE_MODEL_ID,
+        })
+
         # ========== STEP 2: Generate scripts for all 9 sessions ==========
         scripts: dict[str, str] = {}
         for i, session_def in enumerate(SESSION_DEFS):
@@ -454,6 +499,7 @@ def _publish_course(
     tone = params.get("tone", "gentle")
     audience = params.get("targetAudience", "beginner")
     voice = job_data.get("ttsVoice", "Calmdemy")
+    thumbnail_url = job_data.get("thumbnailUrl") or ""
 
     # Calculate total duration
     total_duration = sum(
@@ -475,6 +521,7 @@ def _publish_course(
         "sessionCount": TOTAL_SESSIONS,
         "duration_minutes": total_minutes,
         "instructor": voice,
+        "thumbnailUrl": thumbnail_url,
         "generatedBy": "content-factory",
         "createdAt": fs.SERVER_TIMESTAMP,
     }

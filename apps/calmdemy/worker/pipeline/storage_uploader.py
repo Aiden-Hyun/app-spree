@@ -1,9 +1,10 @@
 """
-Step 5: Upload the MP3 file to Firebase Storage.
+Step 5: Upload files to Firebase Storage.
 """
 
 import os
 import uuid
+import urllib.parse
 from mutagen.mp3 import MP3
 
 from firebase_admin import storage
@@ -18,6 +19,15 @@ STORAGE_PATHS = {
     "emergency_meditation": "audio/meditate/emergency",
     "course_session": "audio/meditate/courses",
     "course": "audio/meditate/courses",
+}
+
+IMAGE_STORAGE_PATHS = {
+    "guided_meditation": "images/meditate/meditations",
+    "sleep_meditation": "images/sleep/meditations",
+    "bedtime_story": "images/sleep/stories",
+    "emergency_meditation": "images/meditate/emergency",
+    "course_session": "images/meditate/courses",
+    "course": "images/meditate/courses",
 }
 
 
@@ -83,3 +93,49 @@ def upload_audio(mp3_path: str, job_data: dict) -> tuple[str, float]:
         pass
 
     return storage_path, duration_sec
+
+
+def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
+    """
+    Upload image to Firebase Storage.
+
+    Returns (storage_path, download_url).
+    """
+    content_type = job_data.get("contentType", "guided_meditation")
+    topic = job_data.get("params", {}).get("topic", "untitled")
+
+    base_path = IMAGE_STORAGE_PATHS.get(content_type, "images/generated")
+    slug = _slugify(topic)
+    unique_id = uuid.uuid4().hex[:8]
+    filename = f"{slug}-{unique_id}.png"
+    storage_path = f"{base_path}/{filename}"
+
+    print(f"  [upload] Uploading image to: {storage_path}")
+
+    bucket = storage.bucket(config.STORAGE_BUCKET)
+    blob = bucket.blob(storage_path)
+
+    download_token = uuid.uuid4().hex
+    blob.metadata = {"firebaseStorageDownloadTokens": download_token}
+    blob.upload_from_filename(
+        image_path,
+        content_type="image/png",
+    )
+    blob.cache_control = "public, max-age=31536000"
+    blob.patch()
+
+    encoded_path = urllib.parse.quote(storage_path, safe="")
+    download_url = (
+        f"https://firebasestorage.googleapis.com/v0/b/{config.STORAGE_BUCKET}"
+        f"/o/{encoded_path}?alt=media&token={download_token}"
+    )
+
+    size_kb = os.path.getsize(image_path) / 1024
+    print(f"  [upload] Image uploaded: {size_kb:.1f} KB")
+
+    try:
+        os.remove(image_path)
+    except OSError:
+        pass
+
+    return storage_path, download_url

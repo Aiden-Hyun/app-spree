@@ -46,12 +46,17 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   const userId = getCurrentUserId();
   if (!userId) throw new Error('Not authenticated');
 
+  // Strip undefined values from params — Firestore rejects undefined in nested objects
+  const cleanParams = Object.fromEntries(
+    Object.entries(input.params).filter(([, v]) => v !== undefined)
+  );
+
   const jobData: Record<string, any> = {
     status: 'pending' as JobStatus,
     llmBackend: input.llmBackend,
     ttsBackend: input.ttsBackend,
     contentType: input.contentType,
-    params: input.params,
+    params: cleanParams,
     llmModel: input.llmModel,
     ttsModel: input.ttsModel,
     ttsVoice: input.ttsVoice,
@@ -64,6 +69,9 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   // Only store title if admin provided one
   if (input.title?.trim()) {
     jobData.title = input.title.trim();
+  }
+  if (input.imagePrompt?.trim()) {
+    jobData.imagePrompt = input.imagePrompt.trim();
   }
 
   // Course jobs get extra tracking fields
