@@ -22,6 +22,27 @@ except ImportError:
 
 import config
 
+
+def _resolve_pipeline_class(model_id: str):
+    model_lower = (model_id or "").lower()
+    if "flux.2" in model_lower:
+        try:
+            from diffusers import Flux2Pipeline
+        except Exception as e:
+            raise RuntimeError(
+                "Flux2 pipelines are not available. Install diffusers from git main."
+            ) from e
+        if "klein" in model_lower:
+            try:
+                from diffusers import Flux2KleinPipeline
+                return Flux2KleinPipeline
+            except Exception:
+                return Flux2Pipeline
+        return Flux2Pipeline
+
+    from diffusers import FluxPipeline
+    return FluxPipeline
+
 def main():
     model_id = config.IMAGE_MODEL_ID
     cache_dir = os.path.join(config.MODEL_DIR, "flux")
@@ -34,24 +55,29 @@ def main():
     print("Downloading model (this may take 10-30 minutes)...")
     print()
 
-    from diffusers import FluxPipeline
+    PipelineClass = _resolve_pipeline_class(model_id)
 
     kwargs = {
         "torch_dtype": None,  # Download only, don't care about dtype
         "cache_dir": cache_dir,
+        # Avoid meta-tensor loading paths that can break on MPS/CPU.
+        "low_cpu_mem_usage": False,
+        "device_map": None,
     }
     if config.HF_TOKEN:
         kwargs["token"] = config.HF_TOKEN
 
-    # FLUX.2-klein models are distilled — missing components must be passed as None
-    FluxPipeline.from_pretrained(
-        model_id,
-        text_encoder_2=None,
-        tokenizer_2=None,
-        image_encoder=None,
-        feature_extractor=None,
-        **kwargs,
-    )
+    extra = {}
+    if PipelineClass.__name__ == "FluxPipeline":
+        # Some flux checkpoints omit optional components.
+        extra = {
+            "text_encoder_2": None,
+            "tokenizer_2": None,
+            "image_encoder": None,
+            "feature_extractor": None,
+        }
+
+    PipelineClass.from_pretrained(model_id, **extra, **kwargs)
 
     print()
     print("Download complete! The model is now cached and ready to use.")

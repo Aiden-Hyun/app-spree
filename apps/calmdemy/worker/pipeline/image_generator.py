@@ -6,12 +6,12 @@ import os
 import tempfile
 
 import torch
-from diffusers import FluxPipeline
 from PIL import Image
 
 import config
 
 _cached_pipe = None
+_cached_pipeline_class = None
 _cached_model_id = None
 _cached_device = None
 _cached_dtype = None
@@ -33,14 +33,16 @@ def _get_dtype(device: str):
     return torch.float32
 
 
-def _load_pipe() -> FluxPipeline:
-    global _cached_pipe, _cached_model_id, _cached_device, _cached_dtype
+def _load_pipe():
+    global _cached_pipe, _cached_pipeline_class, _cached_model_id, _cached_device, _cached_dtype
 
     model_id = config.IMAGE_MODEL_ID
     device = _get_device()
     dtype = _get_dtype(device)
+    PipelineClass = _resolve_pipeline_class(model_id)
 
     if (_cached_pipe is None
+            or _cached_pipeline_class != PipelineClass
             or _cached_model_id != model_id
             or _cached_device != device
             or _cached_dtype != dtype):
@@ -48,11 +50,31 @@ def _load_pipe() -> FluxPipeline:
         kwargs = {
             "torch_dtype": dtype,
             "cache_dir": cache_dir,
+            # Avoid meta-tensor loading paths that can break on MPS/CPU.
+            "low_cpu_mem_usage": False,
+            "device_map": None,
         }
         if config.HF_TOKEN:
             kwargs["token"] = config.HF_TOKEN
 
-        pipe = FluxPipeline.from_pretrained(model_id, **kwargs)
+        try:
+            pipe = PipelineClass.from_pretrained(model_id, **kwargs)
+        except ValueError as e:
+            # Some flux checkpoints omit optional components; retry with explicit None for FluxPipeline.
+            if PipelineClass.__name__ != "FluxPipeline":
+                raise
+            msg = str(e)
+            missing = ("feature_extractor", "image_encoder", "text_encoder_2", "tokenizer_2")
+            if not any(part in msg for part in missing):
+                raise
+            pipe = PipelineClass.from_pretrained(
+                model_id,
+                text_encoder_2=None,
+                tokenizer_2=None,
+                image_encoder=None,
+                feature_extractor=None,
+                **kwargs,
+            )
         pipe.to(device)
         pipe.set_progress_bar_config(disable=True)
 
@@ -65,11 +87,34 @@ def _load_pipe() -> FluxPipeline:
             pipe.enable_vae_tiling()
 
         _cached_pipe = pipe
+        _cached_pipeline_class = PipelineClass
         _cached_model_id = model_id
         _cached_device = device
         _cached_dtype = dtype
 
     return _cached_pipe
+
+
+def _resolve_pipeline_class(model_id: str):
+    model_lower = (model_id or "").lower()
+    if "flux.2" in model_lower:
+        try:
+            from diffusers import Flux2Pipeline
+        except Exception as e:
+            raise RuntimeError(
+                "Flux2 pipelines are not available. Install diffusers from git main."
+            ) from e
+        # Flux2KleinPipeline may not exist in some diffusers builds.
+        if "klein" in model_lower:
+            try:
+                from diffusers import Flux2KleinPipeline
+                return Flux2KleinPipeline
+            except Exception:
+                return Flux2Pipeline
+        return Flux2Pipeline
+
+    from diffusers import FluxPipeline
+    return FluxPipeline
 
 
 def generate_image(

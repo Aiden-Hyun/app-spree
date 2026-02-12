@@ -2,6 +2,8 @@
 
 import os
 import subprocess
+import shutil
+import sys
 import wave
 import struct
 import urllib.request
@@ -94,7 +96,8 @@ class PiperAdapter(TTSBase):
         """Run Piper TTS to generate a WAV file from text."""
         print(f"  [piper] Synthesizing {len(text.split())} words...")
 
-        cmd = ["piper", "--output_file", output_path]
+        piper_bin = _resolve_piper_bin()
+        cmd = [piper_bin, "--output_file", output_path]
 
         if self._model_path:
             cmd.extend(["--model", self._model_path])
@@ -127,3 +130,23 @@ class PiperAdapter(TTSBase):
                 print(f"  [piper] Audio generated: {duration:.1f}s")
         except Exception:
             print("  [piper] Audio generated (duration unknown).")
+
+
+def _resolve_piper_bin() -> str:
+    """Find the piper binary even when PATH doesn't include the venv."""
+    env_override = os.environ.get("PIPER_BIN", "").strip()
+    if env_override:
+        return env_override
+
+    found = shutil.which("piper")
+    if found:
+        return found
+
+    # Fall back to venv/bin/piper next to the running interpreter
+    venv_bin = os.path.join(os.path.dirname(sys.executable), "piper")
+    if os.path.isfile(venv_bin) and os.access(venv_bin, os.X_OK):
+        return venv_bin
+
+    raise RuntimeError(
+        "Piper binary not found. Install piper-tts in the worker venv or set PIPER_BIN."
+    )

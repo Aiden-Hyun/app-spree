@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -287,6 +288,36 @@ export default function JobDetailScreen() {
         </View>
       )}
 
+      {/* Image Prompt */}
+      {job.imagePrompt && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Image Prompt</Text>
+          <View style={styles.card}>
+            <Text style={styles.scriptText}>{job.imagePrompt}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Thumbnail */}
+      {(job.thumbnailUrl || job.imagePath) && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Thumbnail</Text>
+          <View style={styles.card}>
+            {job.thumbnailUrl ? (
+              <Image source={{ uri: job.thumbnailUrl }} style={styles.thumbnailImage} />
+            ) : (
+              <Text style={styles.emptySubtext}>Thumbnail URL not available.</Text>
+            )}
+            {job.thumbnailUrl && (
+              <InfoRow label="Thumbnail URL" value={job.thumbnailUrl} />
+            )}
+            {job.imagePath && (
+              <InfoRow label="Image Path" value={job.imagePath} />
+            )}
+          </View>
+        </View>
+      )}
+
       {/* Output */}
       {job.audioPath && (
         <View style={styles.section}>
@@ -427,6 +458,12 @@ const createStyles = (theme: Theme) =>
       fontSize: 18,
       color: theme.colors.text,
     },
+    emptySubtext: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      marginBottom: 8,
+    },
     statusCard: {
       alignItems: 'center',
       paddingVertical: 20,
@@ -468,6 +505,13 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.error,
       flex: 1,
       lineHeight: 20,
+    },
+    thumbnailImage: {
+      width: '100%',
+      height: 180,
+      borderRadius: 12,
+      marginBottom: 12,
+      backgroundColor: theme.colors.gray[200],
     },
     scriptText: {
       fontFamily: 'DMSans-Regular',
