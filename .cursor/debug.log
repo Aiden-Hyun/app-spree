@@ -1,0 +1,8 @@
+{"location":"login.tsx:handleGoogleSignIn:entry","message":"Google sign-in button pressed","data":{"isAnonymous":false,"isLinkMode":false,"hasUser":false},"timestamp":1770884293113,"sessionId":"debug-session","hypothesisId":"FIX"}
+{"location":"login.tsx:handleGoogleSignIn:signIn","message":"Sign-in mode - using signInWithGoogle","data":{},"timestamp":1770884293113,"sessionId":"debug-session","hypothesisId":"FIX"}
+{"location":"AuthContext.tsx:getGoogleCredential:beforeSignIn","message":"About to call GoogleSignin.signIn","data":{},"timestamp":1770884293114,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"AuthContext.tsx:getGoogleCredential:afterSignIn","message":"GoogleSignin.signIn returned","data":{"hasIdToken":true},"timestamp":1770884299187,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"login.tsx:handleGoogleSignIn:entry","message":"Google sign-in button pressed","data":{"isAnonymous":false,"isLinkMode":false,"hasUser":false},"timestamp":1770884392285,"sessionId":"debug-session","hypothesisId":"FIX"}
+{"location":"login.tsx:handleGoogleSignIn:signIn","message":"Sign-in mode - using signInWithGoogle","data":{},"timestamp":1770884392285,"sessionId":"debug-session","hypothesisId":"FIX"}
+{"location":"AuthContext.tsx:getGoogleCredential:beforeSignIn","message":"About to call GoogleSignin.signIn","data":{},"timestamp":1770884392286,"sessionId":"debug-session","hypothesisId":"E"}
+{"location":"AuthContext.tsx:getGoogleCredential:afterSignIn","message":"GoogleSignin.signIn returned","data":{"hasIdToken":true},"timestamp":1770884398004,"sessionId":"debug-session","hypothesisId":"E"}

@@ -2,13 +2,23 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   subscribeToJobs,
   subscribeToJob,
+  subscribeToWorkerControl,
   subscribeToWorkerStatus,
   createContentJob,
   retryJob,
   cancelJob,
   requestDeleteJob,
+  setWorkerDesiredState,
+  setWorkerIdleTimeout,
 } from '../data/adminRepository';
-import { ContentJob, CreateJobInput, JobStatus, WorkerStatus } from '../types';
+import {
+  ContentJob,
+  CreateJobInput,
+  JobStatus,
+  WorkerControl,
+  WorkerDesiredState,
+  WorkerStatus,
+} from '../types';
 
 // ==================== JOB LIST HOOK ====================
 
@@ -82,4 +92,33 @@ export function useWorkerStatus(workerId: 'local' | 'cloud') {
   }, [workerId]);
 
   return { status };
+}
+
+// ==================== WORKER CONTROL HOOK ====================
+
+export function useWorkerControl(workerId: 'local' | 'cloud') {
+  const [control, setControl] = useState<WorkerControl | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToWorkerControl(workerId, (next) => {
+      setControl(next);
+    });
+    return unsubscribe;
+  }, [workerId]);
+
+  const setDesiredState = useCallback(
+    async (state: WorkerDesiredState) => {
+      await setWorkerDesiredState(workerId, state);
+    },
+    [workerId]
+  );
+
+  const setIdleTimeout = useCallback(
+    async (minutes: number) => {
+      await setWorkerIdleTimeout(workerId, minutes);
+    },
+    [workerId]
+  );
+
+  return { control, setDesiredState, setIdleTimeout };
 }

@@ -15,6 +15,10 @@ worker/tts_models/
 # Python virtualenv
 worker/.venv/
 
+# Local worker companion artifacts
+worker/logs/
+worker/.local_worker.pid
+
 # Downloaded/cached model weights
 worker/.models/
 

@@ -177,6 +177,24 @@ export interface WorkerStatus {
   pollIntervalSec?: number;
 }
 
+// ==================== WORKER CONTROL ====================
+
+export type WorkerDesiredState = 'auto' | 'running' | 'stopped';
+export type WorkerRuntimeState = 'running' | 'stopped' | 'starting' | 'stopping';
+
+export interface WorkerControl {
+  id: string;
+  desiredState?: WorkerDesiredState;
+  idleTimeoutMin?: number;
+  currentState?: WorkerRuntimeState;
+  workerPid?: number | null;
+  lastAction?: string;
+  lastError?: string | null;
+  lastChangeAt?: Timestamp;
+  requestedBy?: string;
+  requestedAt?: Timestamp;
+}
+
 // ==================== CREATE JOB INPUT ====================
 
 export interface CreateJobInput {

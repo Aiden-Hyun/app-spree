@@ -8,13 +8,21 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   limit,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../../../firebase';
-import { ContentJob, CreateJobInput, JobStatus, WorkerStatus } from '../types';
+import {
+  ContentJob,
+  CreateJobInput,
+  JobStatus,
+  WorkerControl,
+  WorkerDesiredState,
+  WorkerStatus,
+} from '../types';
 
 // Re-export subject/course utilities from meditate repository
 export {
@@ -26,6 +34,7 @@ export type { Subject } from '../../meditate/data/meditateRepository';
 
 const jobsCollection = collection(db, 'content_jobs');
 const usersCollection = collection(db, 'users');
+const workerControlCollection = collection(db, 'worker_control');
 
 // ==================== ADMIN CHECK ====================
 
@@ -189,6 +198,57 @@ export function subscribeToWorkerStatus(
     }
     callback({ id: docSnapshot.id, ...docSnapshot.data() } as WorkerStatus);
   });
+}
+
+// ==================== WORKER CONTROL ====================
+
+export function subscribeToWorkerControl(
+  workerId: 'local' | 'cloud',
+  callback: (control: WorkerControl | null) => void
+): Unsubscribe {
+  return onSnapshot(doc(workerControlCollection, workerId), (docSnapshot) => {
+    if (!docSnapshot.exists()) {
+      callback(null);
+      return;
+    }
+    callback({ id: docSnapshot.id, ...docSnapshot.data() } as WorkerControl);
+  });
+}
+
+export async function setWorkerDesiredState(
+  workerId: 'local' | 'cloud',
+  desiredState: WorkerDesiredState
+): Promise<void> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+
+  await setDoc(
+    doc(workerControlCollection, workerId),
+    {
+      desiredState,
+      requestedBy: userId,
+      requestedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function setWorkerIdleTimeout(
+  workerId: 'local' | 'cloud',
+  idleTimeoutMin: number
+): Promise<void> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+
+  await setDoc(
+    doc(workerControlCollection, workerId),
+    {
+      idleTimeoutMin,
+      requestedBy: userId,
+      requestedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
 
 // ==================== RETRY JOB ====================

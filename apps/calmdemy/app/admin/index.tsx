@@ -6,13 +6,18 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { useJobQueue, useWorkerStatus } from '@features/admin/hooks/useJobQueue';
+import {
+  useJobQueue,
+  useWorkerControl,
+  useWorkerStatus,
+} from '@features/admin/hooks/useJobQueue';
 import { JobCard } from '@features/admin/components/JobCard';
-import { JobStatus, WorkerStatus } from '@features/admin/types';
+import { JobStatus, WorkerRuntimeState, WorkerStatus } from '@features/admin/types';
 import { Theme } from '@/theme';
 
 const FILTER_OPTIONS: { label: string; value: JobStatus | undefined }[] = [
@@ -31,14 +36,24 @@ export default function AdminDashboard() {
   const { jobs, isLoading } = useJobQueue(filter);
   const { status: localWorker } = useWorkerStatus('local');
   const { status: cloudWorker } = useWorkerStatus('cloud');
+  const {
+    control: localControl,
+    setDesiredState: setLocalDesiredState,
+    setIdleTimeout: setLocalIdleTimeout,
+  } = useWorkerControl('local');
 
   const activeCount = jobs.filter(
     (j) => j.status !== 'completed' && j.status !== 'failed' && j.status !== 'pending'
   ).length;
   const pendingCount = jobs.filter((j) => j.status === 'pending').length;
 
-  const localState = getWorkerState(localWorker, theme);
+  const localState = getLocalWorkerState(localWorker, localControl, theme);
   const cloudState = getWorkerState(cloudWorker, theme);
+  const autoMode = localControl?.desiredState === 'auto';
+  const idleTimeoutMin = localControl?.idleTimeoutMin ?? 10;
+  const controlStateLabel = getControlStateLabel(localControl?.currentState);
+  const lastAction = localControl?.lastAction ?? '—';
+  const lastError = localControl?.lastError;
 
   return (
     <View style={styles.container}>
@@ -85,6 +100,89 @@ export default function AdminDashboard() {
             {cloudState.label}
           </Text>
           <Text style={styles.workerMeta}>{cloudState.meta}</Text>
+        </View>
+      </View>
+
+      {/* Local Worker Controls */}
+      <View style={styles.controlCard}>
+        <View style={styles.controlHeader}>
+          <Ionicons name="settings-outline" size={18} color={theme.colors.text} />
+          <Text style={styles.controlTitle}>Local Worker Controls</Text>
+        </View>
+
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleInfo}>
+            <Text style={styles.toggleLabel}>Auto mode</Text>
+            <Text style={styles.toggleDescription}>
+              Start when queued jobs exist, stop after idle
+            </Text>
+          </View>
+          <Switch
+            value={autoMode}
+            onValueChange={(next) =>
+              setLocalDesiredState(next ? 'auto' : 'stopped')
+            }
+            trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+            thumbColor={autoMode ? theme.colors.primary : theme.colors.gray[400]}
+          />
+        </View>
+
+        <View style={styles.controlActionsRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.controlButton,
+              { backgroundColor: theme.colors.success },
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={() => setLocalDesiredState('running')}
+          >
+            <Text style={styles.controlButtonText}>Start Now</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.controlButton,
+              { backgroundColor: theme.colors.error },
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={() => setLocalDesiredState('stopped')}
+          >
+            <Text style={styles.controlButtonText}>Stop Now</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.idleRow}>
+          <Text style={styles.idleLabel}>Idle Timeout</Text>
+          <View style={styles.idleChips}>
+            {[5, 10, 30].map((min) => (
+              <Pressable
+                key={min}
+                style={[
+                  styles.idleChip,
+                  idleTimeoutMin === min && styles.idleChipActive,
+                ]}
+                onPress={() => setLocalIdleTimeout(min)}
+              >
+                <Text
+                  style={[
+                    styles.idleChipText,
+                    idleTimeoutMin === min && styles.idleChipTextActive,
+                  ]}
+                >
+                  {min}m
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.controlMeta}>
+          <Text style={styles.metaText}>State: {controlStateLabel}</Text>
+          <Text style={styles.metaText}>Last action: {lastAction}</Text>
+          {lastError ? (
+            <Text style={[styles.metaText, styles.metaError]}>
+              Error: {lastError}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -201,6 +299,59 @@ function formatAge(ageSec: number): string {
   return `${hours}h ago`;
 }
 
+function getControlStateLabel(state?: WorkerRuntimeState): string {
+  if (!state) return 'Unknown';
+  if (state === 'running') return 'Running';
+  if (state === 'starting') return 'Starting';
+  if (state === 'stopping') return 'Stopping';
+  return 'Stopped';
+}
+
+function getLocalWorkerState(
+  status: WorkerStatus | null,
+  control: { currentState?: WorkerRuntimeState } | null,
+  theme: Theme
+) {
+  const heartbeat = getWorkerState(status, theme);
+
+  if (!control?.currentState) {
+    return heartbeat;
+  }
+
+  if (control.currentState === 'stopped') {
+    return {
+      label: 'Stopped',
+      color: theme.colors.textMuted,
+      meta: 'Stopped by control',
+    };
+  }
+  if (control.currentState === 'starting') {
+    return {
+      label: 'Starting',
+      color: theme.colors.warning,
+      meta: 'Starting worker...',
+    };
+  }
+  if (control.currentState === 'stopping') {
+    return {
+      label: 'Stopping',
+      color: theme.colors.warning,
+      meta: 'Stopping worker...',
+    };
+  }
+  if (control.currentState === 'running') {
+    if (heartbeat.label === 'Online') {
+      return { label: 'Running', color: theme.colors.success, meta: heartbeat.meta };
+    }
+    if (heartbeat.label === 'Stale') {
+      return { label: 'Running (stale)', color: theme.colors.warning, meta: heartbeat.meta };
+    }
+    return { label: 'Running (no heartbeat)', color: theme.colors.error, meta: heartbeat.meta };
+  }
+
+  return heartbeat;
+}
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
@@ -247,6 +398,110 @@ const createStyles = (theme: Theme) =>
       fontSize: 11,
       color: theme.colors.textMuted,
       marginTop: 2,
+    },
+    controlCard: {
+      marginHorizontal: 16,
+      marginBottom: 8,
+      borderRadius: 14,
+      padding: 12,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    controlHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 10,
+    },
+    controlTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    toggleInfo: {
+      flex: 1,
+      marginRight: 16,
+    },
+    toggleLabel: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    toggleDescription: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      marginTop: 2,
+    },
+    controlActionsRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 12,
+    },
+    controlButton: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    controlButtonText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: '#fff',
+    },
+    idleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 12,
+    },
+    idleLabel: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    idleChips: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    idleChip: {
+      borderRadius: 10,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    idleChipActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    idleChipText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+    },
+    idleChipTextActive: {
+      color: '#fff',
+    },
+    controlMeta: {
+      marginTop: 12,
+      gap: 4,
+    },
+    metaText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+    },
+    metaError: {
+      color: theme.colors.error,
     },
     statCard: {
       flex: 1,
