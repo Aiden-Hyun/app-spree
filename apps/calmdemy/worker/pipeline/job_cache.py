@@ -75,7 +75,19 @@ def read_text(job_id: str, filename: str) -> str | None:
 def save_artifact(job_id: str, src_path: str, dest_name: str) -> str:
     base_dir = ensure_cache_dir(job_id)
     dest_path = os.path.join(base_dir, dest_name)
-    shutil.copy2(src_path, dest_path)
+    try:
+        if os.path.exists(src_path) and os.path.exists(dest_path):
+            if os.path.samefile(src_path, dest_path):
+                return dest_path
+    except Exception:
+        # If samefile check fails (e.g., on different filesystems), fall through to copy.
+        pass
+    if os.path.abspath(src_path) == os.path.abspath(dest_path):
+        return dest_path
+    try:
+        shutil.copy2(src_path, dest_path)
+    except shutil.SameFileError:
+        return dest_path
     return dest_path
 
 

@@ -4,15 +4,17 @@ Step 4: Post-process audio — normalize loudness and encode to MP3.
 
 import os
 import subprocess
+import shutil
 import json
 
 
 def _get_loudness(wav_path: str) -> float | None:
     """Measure integrated loudness in LUFS using ffmpeg."""
     try:
+        ffmpeg_bin = _resolve_ffmpeg_bin()
         result = subprocess.run(
             [
-                "ffmpeg", "-i", wav_path,
+                ffmpeg_bin, "-i", wav_path,
                 "-af", "loudnorm=print_format=json",
                 "-f", "null", "-"
             ],
@@ -62,7 +64,8 @@ def post_process_audio(wav_path: str) -> str:
         audio_filter = None
 
     # Encode to MP3
-    cmd = ["ffmpeg", "-y", "-i", wav_path]
+    ffmpeg_bin = _resolve_ffmpeg_bin()
+    cmd = [ffmpeg_bin, "-y", "-i", wav_path]
     if audio_filter:
         cmd.extend(["-af", audio_filter])
     cmd.extend([
@@ -91,3 +94,23 @@ def post_process_audio(wav_path: str) -> str:
         pass
 
     return mp3_path
+
+
+def _resolve_ffmpeg_bin() -> str:
+    """Find ffmpeg binary; allow override via FFMPEG_BIN."""
+    env_override = os.environ.get("FFMPEG_BIN", "").strip()
+    if env_override:
+        return env_override
+
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+
+    # Common Homebrew locations
+    for path in ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+
+    raise RuntimeError(
+        "ffmpeg not found. Install it (e.g., `brew install ffmpeg`) or set FFMPEG_BIN."
+    )

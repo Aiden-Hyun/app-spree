@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [filter, setFilter] = useState<JobStatus | undefined>(undefined);
   const [optimisticState, setOptimisticState] = useState<LocalUiState | null>(null);
+  const [restartInProgress, setRestartInProgress] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(true);
   const { jobs, isLoading } = useJobQueue(filter);
   const { status: localWorker } = useWorkerStatus('local');
@@ -56,6 +57,7 @@ export default function AdminDashboard() {
   const controlStateLabel = getControlStateLabel(localControl?.currentState, optimisticState);
   const lastAction = localControl?.lastAction ?? '—';
   const lastError = localControl?.lastError;
+  const controlsDisabled = restartInProgress;
 
   React.useEffect(() => {
     if (!optimisticState || !localControl?.currentState) return;
@@ -75,6 +77,23 @@ export default function AdminDashboard() {
       setOptimisticState(null);
     }
   }, [optimisticState, localControl?.currentState]);
+
+  const handleRestart = async () => {
+    if (restartInProgress) return;
+    const wasAuto = autoMode;
+    setRestartInProgress(true);
+    try {
+      setOptimisticState('stop_clicked');
+      await setLocalDesiredState('stopped');
+      await new Promise((resolve) => setTimeout(resolve, 9000));
+      setOptimisticState('start_clicked');
+      await setLocalDesiredState(wasAuto ? 'auto' : 'running');
+    } catch {
+      setOptimisticState(null);
+    } finally {
+      setRestartInProgress(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -179,7 +198,9 @@ export default function AdminDashboard() {
                     styles.controlButton,
                     { backgroundColor: theme.colors.success },
                     pressed && { opacity: 0.85 },
+                    controlsDisabled && { opacity: 0.6 },
                   ]}
+                  disabled={controlsDisabled}
                   onPress={async () => {
                     setOptimisticState('start_clicked');
                     try {
@@ -196,7 +217,9 @@ export default function AdminDashboard() {
                     styles.controlButton,
                     { backgroundColor: theme.colors.error },
                     pressed && { opacity: 0.85 },
+                    controlsDisabled && { opacity: 0.6 },
                   ]}
+                  disabled={controlsDisabled}
                   onPress={async () => {
                     setOptimisticState('stop_clicked');
                     try {
@@ -209,6 +232,24 @@ export default function AdminDashboard() {
                   <Text style={styles.controlButtonText}>Stop Now</Text>
                 </Pressable>
               </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.controlButton,
+                  styles.controlButtonFull,
+                  styles.controlButtonRow,
+                  { backgroundColor: theme.colors.info },
+                  pressed && { opacity: 0.85 },
+                  controlsDisabled && { opacity: 0.6 },
+                ]}
+                disabled={controlsDisabled}
+                onPress={handleRestart}
+              >
+                <Ionicons name="refresh" size={16} color="#fff" />
+                <Text style={styles.controlButtonText}>
+                  {restartInProgress ? 'Restarting...' : 'Restart Worker'}
+                </Text>
+              </Pressable>
 
               <View style={styles.idleRow}>
                 <Text style={styles.idleLabel}>Idle Timeout</Text>
@@ -498,6 +539,7 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.background,
       borderWidth: 1,
       borderColor: theme.colors.gray[200],
+      minHeight: 280,
     },
     controlHeader: {
       flexDirection: 'row',
@@ -541,6 +583,14 @@ const createStyles = (theme: Theme) =>
       paddingVertical: 10,
       borderRadius: 10,
       alignItems: 'center',
+    },
+    controlButtonRow: {
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'center',
+    },
+    controlButtonFull: {
+      marginTop: 10,
     },
     controlButtonText: {
       fontFamily: 'DMSans-SemiBold',
