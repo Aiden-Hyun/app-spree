@@ -330,16 +330,11 @@ def process_course_job(db, job_id: str, job_data: dict):
         thumbnail_url = job_data.get("thumbnailUrl") or DEFAULT_FALLBACK_URL
         image_path = job_data.get("imagePath", "") or ""
         if not has_thumbnail:
-            try:
-                local_image_path = generate_image(image_prompt)
-                image_path, thumbnail_url = upload_image(
-                    local_image_path,
-                    {**job_data, "contentType": "course"},
-                )
-            except Exception as e:
-                print(f"  [image] Course image generation failed, using fallback: {e}")
-                thumbnail_url = DEFAULT_FALLBACK_URL
-                image_path = ""
+            local_image_path = generate_image(image_prompt)
+            image_path, thumbnail_url = upload_image(
+                local_image_path,
+                {**job_data, "contentType": "course"},
+            )
 
         job_data = {
             **job_data,

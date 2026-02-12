@@ -178,13 +178,8 @@ def process_job(db, job_id: str, job_data: dict):
                     job_data.get("params", {}).get("topic", ""),
                     job_data.get("contentType", "guided_meditation"),
                 )
-            try:
-                local_image_path = generate_image(image_prompt)
-                image_path, thumbnail_url = upload_image(local_image_path, job_data)
-            except Exception as e:
-                print(f"  [image] Generation failed, using fallback: {e}")
-                thumbnail_url = DEFAULT_FALLBACK_URL
-                image_path = ""
+            local_image_path = generate_image(image_prompt)
+            image_path, thumbnail_url = upload_image(local_image_path, job_data)
 
         job_data = {
             **job_data,
