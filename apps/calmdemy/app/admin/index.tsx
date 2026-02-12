@@ -33,6 +33,8 @@ export default function AdminDashboard() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [filter, setFilter] = useState<JobStatus | undefined>(undefined);
+  const [optimisticState, setOptimisticState] = useState<LocalUiState | null>(null);
+  const [overviewOpen, setOverviewOpen] = useState(true);
   const { jobs, isLoading } = useJobQueue(filter);
   const { status: localWorker } = useWorkerStatus('local');
   const { status: cloudWorker } = useWorkerStatus('cloud');
@@ -47,143 +49,210 @@ export default function AdminDashboard() {
   ).length;
   const pendingCount = jobs.filter((j) => j.status === 'pending').length;
 
-  const localState = getLocalWorkerState(localWorker, localControl, theme);
+  const localState = getLocalWorkerState(localWorker, localControl, theme, optimisticState);
   const cloudState = getWorkerState(cloudWorker, theme);
   const autoMode = localControl?.desiredState === 'auto';
   const idleTimeoutMin = localControl?.idleTimeoutMin ?? 10;
-  const controlStateLabel = getControlStateLabel(localControl?.currentState);
+  const controlStateLabel = getControlStateLabel(localControl?.currentState, optimisticState);
   const lastAction = localControl?.lastAction ?? '—';
   const lastError = localControl?.lastError;
 
+  React.useEffect(() => {
+    if (!optimisticState || !localControl?.currentState) return;
+    if (optimisticState === 'start_clicked') {
+      if (localControl.currentState === 'starting' || localControl.currentState === 'running') {
+        setOptimisticState(null);
+      }
+      return;
+    }
+    if (optimisticState === 'stop_clicked') {
+      if (localControl.currentState === 'stopping' || localControl.currentState === 'stopped') {
+        setOptimisticState(null);
+      }
+      return;
+    }
+    if (localControl.currentState !== optimisticState) {
+      setOptimisticState(null);
+    }
+  }, [optimisticState, localControl?.currentState]);
+
   return (
     <View style={styles.container}>
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={[styles.statCard, { backgroundColor: `${theme.colors.primary}15` }]}>
-          <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
-            {pendingCount}
-          </Text>
-          <Text style={styles.statLabel}>Queued</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: `${theme.colors.warning}15` }]}>
-          <Text style={[styles.statNumber, { color: theme.colors.warning }]}>
-            {activeCount}
-          </Text>
-          <Text style={styles.statLabel}>Processing</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: `${theme.colors.success}15` }]}>
-          <Text style={[styles.statNumber, { color: theme.colors.success }]}>
-            {jobs.filter((j) => j.status === 'completed').length}
-          </Text>
-          <Text style={styles.statLabel}>Done</Text>
-        </View>
-      </View>
-
-      {/* Worker Status */}
-      <View style={styles.workerRow}>
-        <View style={[styles.workerCard, { borderColor: localState.color }]}>
-          <View style={styles.workerHeader}>
-            <Ionicons name="laptop-outline" size={18} color={localState.color} />
-            <Text style={styles.workerTitle}>Local Worker</Text>
+      {/* Overview (Foldable) */}
+      <View style={styles.overviewCard}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.overviewHeader,
+            pressed && { opacity: 0.85 },
+          ]}
+          onPress={() => setOverviewOpen((prev) => !prev)}
+        >
+          <View style={styles.overviewTitleRow}>
+            <Ionicons name="grid-outline" size={18} color={theme.colors.text} />
+            <Text style={styles.overviewTitle}>Factory Overview</Text>
           </View>
-          <Text style={[styles.workerStatus, { color: localState.color }]}>
-            {localState.label}
-          </Text>
-          <Text style={styles.workerMeta}>{localState.meta}</Text>
-        </View>
-        <View style={[styles.workerCard, { borderColor: cloudState.color }]}>
-          <View style={styles.workerHeader}>
-            <Ionicons name="cloud-outline" size={18} color={cloudState.color} />
-            <Text style={styles.workerTitle}>Cloud Worker</Text>
-          </View>
-          <Text style={[styles.workerStatus, { color: cloudState.color }]}>
-            {cloudState.label}
-          </Text>
-          <Text style={styles.workerMeta}>{cloudState.meta}</Text>
-        </View>
-      </View>
-
-      {/* Local Worker Controls */}
-      <View style={styles.controlCard}>
-        <View style={styles.controlHeader}>
-          <Ionicons name="settings-outline" size={18} color={theme.colors.text} />
-          <Text style={styles.controlTitle}>Local Worker Controls</Text>
-        </View>
-
-        <View style={styles.toggleRow}>
-          <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Auto mode</Text>
-            <Text style={styles.toggleDescription}>
-              Start when queued jobs exist, stop after idle
-            </Text>
-          </View>
-          <Switch
-            value={autoMode}
-            onValueChange={(next) =>
-              setLocalDesiredState(next ? 'auto' : 'stopped')
-            }
-            trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
-            thumbColor={autoMode ? theme.colors.primary : theme.colors.gray[400]}
+          <Ionicons
+            name={overviewOpen ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color={theme.colors.textMuted}
           />
-        </View>
+        </Pressable>
 
-        <View style={styles.controlActionsRow}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.controlButton,
-              { backgroundColor: theme.colors.success },
-              pressed && { opacity: 0.85 },
-            ]}
-            onPress={() => setLocalDesiredState('running')}
-          >
-            <Text style={styles.controlButtonText}>Start Now</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.controlButton,
-              { backgroundColor: theme.colors.error },
-              pressed && { opacity: 0.85 },
-            ]}
-            onPress={() => setLocalDesiredState('stopped')}
-          >
-            <Text style={styles.controlButtonText}>Stop Now</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.idleRow}>
-          <Text style={styles.idleLabel}>Idle Timeout</Text>
-          <View style={styles.idleChips}>
-            {[5, 10, 30].map((min) => (
-              <Pressable
-                key={min}
-                style={[
-                  styles.idleChip,
-                  idleTimeoutMin === min && styles.idleChipActive,
-                ]}
-                onPress={() => setLocalIdleTimeout(min)}
-              >
-                <Text
-                  style={[
-                    styles.idleChipText,
-                    idleTimeoutMin === min && styles.idleChipTextActive,
-                  ]}
-                >
-                  {min}m
+        {overviewOpen ? (
+          <>
+            {/* Stats */}
+            <View style={styles.statsRow}>
+              <View style={[styles.statCard, { backgroundColor: `${theme.colors.primary}15` }]}>
+                <Text style={[styles.statNumber, { color: theme.colors.primary }]}>
+                  {pendingCount}
                 </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+                <Text style={styles.statLabel}>Queued</Text>
+              </View>
+              <View style={[styles.statCard, { backgroundColor: `${theme.colors.warning}15` }]}>
+                <Text style={[styles.statNumber, { color: theme.colors.warning }]}>
+                  {activeCount}
+                </Text>
+                <Text style={styles.statLabel}>Processing</Text>
+              </View>
+              <View style={[styles.statCard, { backgroundColor: `${theme.colors.success}15` }]}>
+                <Text style={[styles.statNumber, { color: theme.colors.success }]}>
+                  {jobs.filter((j) => j.status === 'completed').length}
+                </Text>
+                <Text style={styles.statLabel}>Done</Text>
+              </View>
+            </View>
 
-        <View style={styles.controlMeta}>
-          <Text style={styles.metaText}>State: {controlStateLabel}</Text>
-          <Text style={styles.metaText}>Last action: {lastAction}</Text>
-          {lastError ? (
-            <Text style={[styles.metaText, styles.metaError]}>
-              Error: {lastError}
+            {/* Worker Status */}
+            <View style={styles.workerRow}>
+              <View style={[styles.workerCard, { borderColor: localState.color }]}>
+                <View style={styles.workerHeader}>
+                  <Ionicons name="laptop-outline" size={18} color={localState.color} />
+                  <Text style={styles.workerTitle}>Local Worker</Text>
+                </View>
+                <Text style={[styles.workerStatus, { color: localState.color }]}>
+                  {localState.label}
+                </Text>
+                <Text style={styles.workerMeta}>{localState.meta}</Text>
+              </View>
+              <View style={[styles.workerCard, { borderColor: cloudState.color }]}>
+                <View style={styles.workerHeader}>
+                  <Ionicons name="cloud-outline" size={18} color={cloudState.color} />
+                  <Text style={styles.workerTitle}>Cloud Worker</Text>
+                </View>
+                <Text style={[styles.workerStatus, { color: cloudState.color }]}>
+                  {cloudState.label}
+                </Text>
+                <Text style={styles.workerMeta}>{cloudState.meta}</Text>
+              </View>
+            </View>
+
+            {/* Local Worker Controls */}
+            <View style={styles.controlCard}>
+              <View style={styles.controlHeader}>
+                <Ionicons name="settings-outline" size={18} color={theme.colors.text} />
+                <Text style={styles.controlTitle}>Local Worker Controls</Text>
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleInfo}>
+                  <Text style={styles.toggleLabel}>Auto mode</Text>
+                  <Text style={styles.toggleDescription}>
+                    Start when queued jobs exist, stop after idle
+                  </Text>
+                </View>
+                <Switch
+                  value={autoMode}
+                  onValueChange={(next) => {
+                    if (!next) setOptimisticState('stop_clicked');
+                    setLocalDesiredState(next ? 'auto' : 'stopped').catch(() => {
+                      setOptimisticState(null);
+                    });
+                  }}
+                  trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+                  thumbColor={autoMode ? theme.colors.primary : theme.colors.gray[400]}
+                />
+              </View>
+
+              <View style={styles.controlActionsRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.controlButton,
+                    { backgroundColor: theme.colors.success },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                  onPress={async () => {
+                    setOptimisticState('start_clicked');
+                    try {
+                      await setLocalDesiredState('running');
+                    } catch {
+                      setOptimisticState(null);
+                    }
+                  }}
+                >
+                  <Text style={styles.controlButtonText}>Start Now</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.controlButton,
+                    { backgroundColor: theme.colors.error },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                  onPress={async () => {
+                    setOptimisticState('stop_clicked');
+                    try {
+                      await setLocalDesiredState('stopped');
+                    } catch {
+                      setOptimisticState(null);
+                    }
+                  }}
+                >
+                  <Text style={styles.controlButtonText}>Stop Now</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.idleRow}>
+                <Text style={styles.idleLabel}>Idle Timeout</Text>
+                <View style={styles.idleChips}>
+                  {[5, 10, 30].map((min) => (
+                    <Pressable
+                      key={min}
+                      style={[
+                        styles.idleChip,
+                        idleTimeoutMin === min && styles.idleChipActive,
+                      ]}
+                      onPress={() => setLocalIdleTimeout(min)}
+                    >
+                      <Text
+                        style={[
+                          styles.idleChipText,
+                          idleTimeoutMin === min && styles.idleChipTextActive,
+                        ]}
+                      >
+                        {min}m
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.controlMeta}>
+                <Text style={styles.metaText}>State: {controlStateLabel}</Text>
+                <Text style={styles.metaText}>Last action: {lastAction}</Text>
+                {lastError ? (
+                  <Text style={[styles.metaText, styles.metaError]}>
+                    Error: {lastError}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </>
+        ) : (
+          <View style={styles.overviewCollapsedMeta}>
+            <Text style={styles.overviewCollapsedText}>
+              {pendingCount} queued · {activeCount} processing · {jobs.filter((j) => j.status === 'completed').length} done
             </Text>
-          ) : null}
-        </View>
+          </View>
+        )}
       </View>
 
       {/* Filters */}
@@ -299,47 +368,73 @@ function formatAge(ageSec: number): string {
   return `${hours}h ago`;
 }
 
-function getControlStateLabel(state?: WorkerRuntimeState): string {
-  if (!state) return 'Unknown';
-  if (state === 'running') return 'Running';
-  if (state === 'starting') return 'Starting';
-  if (state === 'stopping') return 'Stopping';
+type LocalUiState = WorkerRuntimeState | 'start_clicked' | 'stop_clicked';
+
+function getControlStateLabel(
+  state?: WorkerRuntimeState,
+  optimisticState?: LocalUiState | null
+): string {
+  const effective = optimisticState ?? state;
+  if (!effective) return 'Unknown';
+  if (effective === 'start_clicked') return 'Start now clicked';
+  if (effective === 'stop_clicked') return 'Stop now clicked';
+  if (effective === 'running') return 'Running';
+  if (effective === 'starting') return 'Starting';
+  if (effective === 'stopping') return 'Stopping';
   return 'Stopped';
 }
 
 function getLocalWorkerState(
   status: WorkerStatus | null,
   control: { currentState?: WorkerRuntimeState } | null,
-  theme: Theme
+  theme: Theme,
+  optimisticState?: LocalUiState | null
 ) {
   const heartbeat = getWorkerState(status, theme);
+  const effectiveState = optimisticState ?? control?.currentState;
 
-  if (!control?.currentState) {
+  if (!effectiveState) {
     return heartbeat;
   }
 
-  if (control.currentState === 'stopped') {
+  if (effectiveState === 'start_clicked') {
+    return {
+      label: 'Start now clicked',
+      color: theme.colors.warning,
+      meta: 'Waiting for companion...',
+    };
+  }
+
+  if (effectiveState === 'stop_clicked') {
+    return {
+      label: 'Stop now clicked',
+      color: theme.colors.warning,
+      meta: 'Waiting for companion...',
+    };
+  }
+
+  if (effectiveState === 'stopped') {
     return {
       label: 'Stopped',
       color: theme.colors.textMuted,
       meta: 'Stopped by control',
     };
   }
-  if (control.currentState === 'starting') {
+  if (effectiveState === 'starting') {
     return {
       label: 'Starting',
       color: theme.colors.warning,
       meta: 'Starting worker...',
     };
   }
-  if (control.currentState === 'stopping') {
+  if (effectiveState === 'stopping') {
     return {
       label: 'Stopping',
       color: theme.colors.warning,
       meta: 'Stopping worker...',
     };
   }
-  if (control.currentState === 'running') {
+  if (effectiveState === 'running') {
     if (heartbeat.label === 'Online') {
       return { label: 'Running', color: theme.colors.success, meta: heartbeat.meta };
     }
@@ -360,14 +455,12 @@ const createStyles = (theme: Theme) =>
     },
     statsRow: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingTop: 12,
+      paddingTop: 8,
       paddingBottom: 8,
       gap: 10,
     },
     workerRow: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
       paddingBottom: 8,
       gap: 10,
     },
@@ -400,11 +493,9 @@ const createStyles = (theme: Theme) =>
       marginTop: 2,
     },
     controlCard: {
-      marginHorizontal: 16,
-      marginBottom: 8,
       borderRadius: 14,
       padding: 12,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.background,
       borderWidth: 1,
       borderColor: theme.colors.gray[200],
     },
@@ -502,6 +593,39 @@ const createStyles = (theme: Theme) =>
     },
     metaError: {
       color: theme.colors.error,
+    },
+    overviewCard: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 8,
+      borderRadius: 16,
+      padding: 12,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    overviewHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    overviewTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    overviewTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 15,
+      color: theme.colors.text,
+    },
+    overviewCollapsedMeta: {
+      marginTop: 8,
+    },
+    overviewCollapsedText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
     },
     statCard: {
       flex: 1,
