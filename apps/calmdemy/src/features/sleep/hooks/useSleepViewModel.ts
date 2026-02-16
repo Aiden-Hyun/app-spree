@@ -1,9 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useSubscription } from '@core/providers/contexts/SubscriptionContext';
-import { useSleepContent } from './useSleepContent';
+import {
+  useBedtimeStories,
+  useSleepMeditations,
+  useSeries,
+} from '@shared/hooks/queries/useSleepQueries';
 import type { FirestoreSleepMeditation, FirestoreSeries } from '../data/sleepRepository';
 import type { BedtimeStory } from '../../../types';
 
@@ -11,11 +15,11 @@ export function useSleepViewModel() {
   const router = useRouter();
   const { theme } = useTheme();
   const { isPremium: hasSubscription } = useSubscription();
-  const { sleepContent } = useSleepContent();
 
-  const bedtimeStories = sleepContent.bedtimeStories;
-  const sleepMeditations = sleepContent.sleepMeditations;
-  const series = sleepContent.series;
+  // Use Query Hooks
+  const { data: bedtimeStories = [] } = useBedtimeStories();
+  const { data: sleepMeditations = [] } = useSleepMeditations();
+  const { data: series = [] } = useSeries();
 
   const [showPaywall, setShowPaywall] = useState(false);
 
