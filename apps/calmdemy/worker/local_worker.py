@@ -32,7 +32,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 import config
-from pipeline.runner import process_job
+from pipeline.runner import process_job, process_job_pre, process_job_tts
 from pipeline.delete_job import process_delete_job, mark_delete_failed
 from pipeline.worker_status import update_worker_status
 from pipeline.content_publisher import publish_content
@@ -88,7 +88,18 @@ def _is_cloud_job(job_data: dict) -> bool:
     )
 
 
-def _claim_job(db, doc_ref) -> dict | None:
+def _is_cloud_tts(job_data: dict) -> bool:
+    """Return True if TTS backend requires cloud GPU."""
+    return job_data.get("ttsBackend") == "cloud"
+
+
+def _parse_tts_models(value: str | None) -> set[str]:
+    if not value:
+        return set()
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
+def _claim_job(db, doc_ref, role: str, tts_allowlist: set[str]) -> dict | None:
     """Atomically claim a pending job to avoid duplicate processing."""
     from firebase_admin import firestore as fs
 
@@ -100,33 +111,44 @@ def _claim_job(db, doc_ref) -> dict | None:
         if not snapshot.exists:
             return None
         data = snapshot.to_dict()
-        if data.get("status") != "pending":
-            return None
-        if _is_cloud_job(data):
-            return None
-        transaction.update(doc_ref, {
-            "status": "llm_generating",
-            "startedAt": fs.SERVER_TIMESTAMP,
-            "updatedAt": fs.SERVER_TIMESTAMP,
-        })
+        status = data.get("status")
+        if role in ("pre", "full"):
+            if status != "pending":
+                return None
+            if _is_cloud_job(data):
+                return None
+            transaction.update(doc_ref, {
+                "status": "llm_generating",
+                "startedAt": fs.SERVER_TIMESTAMP,
+                "updatedAt": fs.SERVER_TIMESTAMP,
+            })
+        else:
+            if status != "tts_pending":
+                return None
+            if _is_cloud_tts(data):
+                return None
+            if tts_allowlist and data.get("ttsModel") not in tts_allowlist:
+                return None
+            transaction.update(doc_ref, {
+                "status": "tts_converting",
+                "updatedAt": fs.SERVER_TIMESTAMP,
+            })
         return data
 
     return _tx_claim(transaction)
 
 
-def get_next_job(db):
-    """Query Firestore for the oldest pending non-cloud job and claim it.
-
-    Picks up any job where neither llmBackend nor ttsBackend is "cloud",
-    including any combination of "local" and "api".
-    """
+def get_next_job(db, role: str, tts_allowlist: set[str]):
+    """Query Firestore for the next job this worker role should handle."""
     jobs_ref = db.collection(config.JOBS_COLLECTION)
 
+    status_filter = "pending" if role in ("pre", "full") else "tts_pending"
+
     # Firestore can't do "NOT EQUAL" across two fields in a compound query,
-    # so we fetch pending jobs in batches and filter out cloud ones in Python.
+    # so we fetch jobs in batches and filter in Python.
     base_query = (
         jobs_ref
-        .where("status", "==", "pending")
+        .where("status", "==", status_filter)
         .order_by("createdAt")
         .limit(25)
     )
@@ -143,10 +165,16 @@ def get_next_job(db):
 
         for doc in docs:
             data = doc.to_dict()
-            if _is_cloud_job(data):
-                continue
+            if role in ("pre", "full"):
+                if _is_cloud_job(data):
+                    continue
+            else:
+                if _is_cloud_tts(data):
+                    continue
+                if tts_allowlist and data.get("ttsModel") not in tts_allowlist:
+                    continue
 
-            claimed = _claim_job(db, doc.reference)
+            claimed = _claim_job(db, doc.reference, role, tts_allowlist)
             if claimed is not None:
                 return doc.id, claimed
 
@@ -222,7 +250,7 @@ def handle_publish_job(db, job_id: str, job_data: dict):
 
     storage_path = job_data.get("audioPath", "")
     duration_sec = job_data.get("audioDurationSec", 0)
-    script = job_data.get("generatedScript", "")
+    script = job_data.get("formattedScript") or job_data.get("generatedScript", "")
 
     if not storage_path:
         print(f"  [publish] Job {job_id} has no audio path, cannot publish.")
@@ -277,11 +305,24 @@ def _handle_course_publish(db, job_id: str, job_data: dict):
 
 
 def main():
+    worker_id = os.getenv("WORKER_ID", "local")
+    worker_role = os.getenv("WORKER_ROLE", "full").strip().lower()
+    if worker_role not in ("pre", "tts", "full"):
+        print(f"[local-worker] Unknown WORKER_ROLE '{worker_role}', defaulting to 'full'.")
+        worker_role = "full"
+    tts_allowlist = _parse_tts_models(os.getenv("WORKER_TTS_MODELS"))
+
     print("=" * 60)
     print("  Calmdemy Content Factory — Local Worker (primary)")
     print("=" * 60)
     print(f"  Project:       {config.PROJECT_ID}")
-    print(f"  Handles:       all non-cloud jobs (local + api)")
+    if worker_role == "pre":
+        print("  Handles:       pre stage (LLM + QA + image)")
+    elif worker_role == "tts":
+        allowlist_text = ", ".join(sorted(tts_allowlist)) if tts_allowlist else "all"
+        print(f"  Handles:       TTS stage (models: {allowlist_text})")
+    else:
+        print("  Handles:       full pipeline (legacy)")
     print(f"  Poll interval: {config.POLL_INTERVAL_SECONDS}s")
     print("=" * 60)
     print()
@@ -292,30 +333,31 @@ def main():
 
     while True:
         try:
-            update_worker_status(db, "local", "local")
+            update_worker_status(db, worker_id, "local")
 
-            # Handle delete requests first
-            delete_job = get_next_delete_job(db)
-            if delete_job:
-                del_id, del_data = delete_job
-                print(f"\n[local-worker] Deleting job: {del_id}")
-                try:
-                    process_delete_job(db, del_id, del_data)
-                except Exception as e:
-                    mark_delete_failed(db, del_id, f"{type(e).__name__}: {e}")
-                continue
+            if worker_role in ("pre", "full"):
+                # Handle delete requests first
+                delete_job = get_next_delete_job(db)
+                if delete_job:
+                    del_id, del_data = delete_job
+                    print(f"\n[local-worker] Deleting job: {del_id}")
+                    try:
+                        process_delete_job(db, del_id, del_data)
+                    except Exception as e:
+                        mark_delete_failed(db, del_id, f"{type(e).__name__}: {e}")
+                    continue
 
-            # Check for jobs awaiting manual publish approval first
-            publish_doc = get_next_publish_job(db)
-            if publish_doc:
-                pub_id = publish_doc.id
-                pub_data = publish_doc.to_dict()
-                print(f"\n[local-worker] Publishing approved job: {pub_id}")
-                handle_publish_job(db, pub_id, pub_data)
-                continue
+                # Check for jobs awaiting manual publish approval first
+                publish_doc = get_next_publish_job(db)
+                if publish_doc:
+                    pub_id = publish_doc.id
+                    pub_data = publish_doc.to_dict()
+                    print(f"\n[local-worker] Publishing approved job: {pub_id}")
+                    handle_publish_job(db, pub_id, pub_data)
+                    continue
 
             # Check for new pending jobs
-            next_job = get_next_job(db)
+            next_job = get_next_job(db, worker_role, tts_allowlist)
 
             if next_job:
                 job_id, job_data = next_job
@@ -325,12 +367,23 @@ def main():
                 print(f"               LLM:      {job_data.get('llmModel')} ({job_data.get('llmBackend', 'local')})")
                 print(f"               TTS:      {job_data.get('ttsModel')} ({job_data.get('ttsBackend', 'local')})")
 
-                process_job(db, job_id, job_data)
+                if worker_role == "pre":
+                    process_job_pre(db, job_id, job_data)
+                elif worker_role == "tts":
+                    process_job_tts(db, job_id, job_data)
+                else:
+                    process_job(db, job_id, job_data)
 
                 print(f"[local-worker] Job {job_id} finished.\n")
             else:
+                if worker_role == "tts":
+                    idle_label = "No TTS pending jobs"
+                elif worker_role == "pre":
+                    idle_label = "No pending jobs"
+                else:
+                    idle_label = "No pending jobs"
                 print(
-                    f"[local-worker] No pending jobs. "
+                    f"[local-worker] {idle_label}. "
                     f"Polling in {config.POLL_INTERVAL_SECONDS}s..."
                 )
                 time.sleep(config.POLL_INTERVAL_SECONDS)

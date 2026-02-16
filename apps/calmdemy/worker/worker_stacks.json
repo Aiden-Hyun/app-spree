@@ -1,0 +1,11 @@
+[
+  {"id": "local", "role": "pre", "venv": ".venv", "enabled": true},
+  {
+    "id": "local-tts-default",
+    "role": "tts",
+    "venv": ".venv",
+    "ttsModels": ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"],
+    "enabled": true
+  },
+  {"id": "local-tts-dms", "role": "tts", "venv": ".venv-dms", "ttsModels": ["dms"], "enabled": true}
+]

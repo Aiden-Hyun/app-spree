@@ -102,6 +102,14 @@ audio/
   - core/providers/contexts/ # New home for app-wide context implementations
 ```
 
+## Documentation Map
+
+- `FIRESTORE_SCHEMA.md` - Firestore collection inventory, access rules, and field contracts.
+- `STORAGE_LAYOUT.md` - Firebase Storage paths, encoding conventions, and invariants.
+- `src/shared/data/DATA_ACCESS.md` - Repository map, query patterns, and index guidance.
+- `scripts/SCRIPTS.md` - Script purposes, inputs, side effects, and safety notes.
+- `worker/CONTENT_FACTORY.md` - Content Factory architecture and worker pipeline.
+
 ## Architecture Migration (Legacy-Aware)
 
 This project already completed one refactor pass, so we are running a staged migration to avoid risky big-bang changes.

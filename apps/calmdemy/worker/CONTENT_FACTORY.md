@@ -61,7 +61,7 @@ The Content Factory is an automated pipeline that generates audio content for th
 │  └──────────────────────────────────────────────────┘   │
 │                                                         │
 │  LLM adapters:  Ollama | LM Studio | Gemini API        │
-│  TTS adapters:  Piper  | StyleTTS2 | Gemini TTS API      │
+│  TTS adapters:  Piper  | DMS  | StyleTTS2 | Gemini TTS API │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -81,7 +81,7 @@ Every job is a document in `content_jobs`. The admin UI creates it with `status:
 
 | Field | Type | Description |
 |---|---|---|
-| `status` | string | `pending` → `llm_generating` → `qa_formatting` → `image_generating` → `tts_converting` → `post_processing` → `uploading` → `publishing` → `completed` (or `failed`) |
+| `status` | string | `pending` → `llm_generating` → `qa_formatting` → `image_generating` → `tts_pending` → `tts_converting` → `post_processing` → `uploading` → `publishing` → `completed` (or `failed`) |
 | `llmBackend` | string | `"local"` or `"api"` |
 | `ttsBackend` | string | `"local"` or `"api"` |
 | `contentType` | string | `guided_meditation`, `sleep_meditation`, `bedtime_story`, `emergency_meditation`, `course_session`, or `course` |
@@ -92,6 +92,7 @@ Every job is a document in `content_jobs`. The admin UI creates it with `status:
 | `title` | string? | Admin-provided title (optional) |
 | `autoPublish` | boolean | If true, content is published automatically. If false, awaits manual approval. |
 | `generatedScript` | string? | The LLM-generated script text |
+| `formattedScript` | string? | QA-formatted script stored for TTS handoff |
 | `generatedTitle` | string? | LLM-generated title (if admin didn't provide one) |
 | `audioPath` | string? | Firebase Storage path of the final MP3 |
 | `audioDurationSec` | number? | Audio duration in seconds |
@@ -108,6 +109,7 @@ Every job is a document in `content_jobs`. The admin UI creates it with `status:
 | `createdAt` | timestamp | When the job was created |
 | `updatedAt` | timestamp | Last status update |
 | `startedAt` | timestamp? | When processing began |
+| `ttsPendingAt` | timestamp? | When the job entered `tts_pending` |
 | `completedAt` | timestamp? | When processing finished |
 | `createdBy` | string | Firebase Auth UID of the admin who created it |
 
@@ -212,6 +214,7 @@ apps/calmdemy/worker/
     ├── llm_llama.py         # Llama (cloud, legacy)
     ├── tts_base.py          # Abstract TTS interface
     ├── tts_piper.py         # Piper TTS adapter
+    ├── tts_dms.py           # Kyutai DMS TTS adapter (moshi)
     ├── tts_styletts2.py     # StyleTTS2 adapter (local, high quality)
     ├── tts_gemini.py        # Gemini TTS API adapter
     └── tts_coqui.py         # Coqui XTTS (cloud, legacy)
@@ -254,6 +257,10 @@ apps/calmdemy/worker/
 
 For content types: `guided_meditation`, `sleep_meditation`, `bedtime_story`, `emergency_meditation`, `course_session`.
 
+When running multi-stack local workers, the pipeline is split into **pre** (LLM + QA + image)
+and **TTS** stages. After image generation, jobs enter `tts_pending` and are picked up
+by a TTS worker with the appropriate dependency stack.
+
 ### Step 1 — LLM Script Generation (`llm_generator.py`)
 
 1. Load the prompt template from `prompts/{contentType}.txt`.
@@ -279,6 +286,8 @@ LLM adapters are cached globally — the model is only reloaded if the model ID 
 1. Build a thumbnail prompt (admin prompt > LLM prompt > fallback template).
 2. Generate a 1024×1024 image using FLUX.2‑klein‑4B (MPS on M‑series Mac).
 3. Upload to Firebase Storage and store `thumbnailUrl`.
+
+At this point, the pre worker stores `formattedScript` and sets status to `tts_pending`.
 
 ### Step 4 — TTS Conversion (`tts_converter.py`)
 
@@ -429,6 +438,7 @@ Adapters are cached globally: the model is only reloaded if the model ID changes
 | Model ID | Backend | Adapter | Voices |
 |---|---|---|---|
 | `piper` | Local / Cloud | Piper CLI (ONNX) | Amy, Danny, Alba, Lessac |
+| `dms` | Local | Kyutai DMS TTS 1.6B (moshi) | Britney, Delilah, Milo |
 | `styletts2` | Local | StyleTTS2 (bundled) | Default StyleTTS2 voice |
 | `gemini-tts-flash` | API | Gemini 2.5 Flash TTS | Default Gemini voice |
 | `gemini-tts-pro` | API | Gemini 2.5 Pro TTS | Default Gemini Pro voice |
@@ -444,6 +454,14 @@ StyleTTS2 code is bundled under `apps/calmdemy/worker/tts_models/styletts2`.
 | `en_US-danny-low` | Danny (US Male) | Deep, soothing American male |
 | `en_GB-alba-medium` | Alba (UK Female) | Warm British female |
 | `en_US-lessac-medium` | Lessac (US Female) | Natural, expressive American female |
+
+### DMS Voices
+
+| Voice ID | Name | Description |
+|---|---|---|
+| `expresso/ex03-ex01_happy_001_channel1_334s.wav` | Britney | Kyutai DMS voice (Expresso, happy) |
+| `vctk/p226_023.wav` | Delilah | Kyutai DMS voice (VCTK) |
+| `vctk/p225_023.wav` | Milo | Kyutai DMS voice (VCTK) |
 
 ### StyleTTS2 Voices
 
@@ -570,13 +588,27 @@ A course creates:
 - For local TTS (StyleTTS2): `brew install espeak-ng libsndfile`
 - For local TTS (StyleTTS2): `python -m nltk.downloader punkt`
 - For local TTS (StyleTTS2): download a checkpoint into `MODEL_DIR/styletts2/checkpoints/<checkpoint_name>/`
+- For local TTS (DMS): `pip install moshi==0.2.11 sphn` (voice embeddings auto-download)
+
+### Venv Strategy (Required for Multi-Stack)
+
+See `VENV_STRATEGY.md` for the per-stack venv setup and dependency conflict resolution.
 
 ### Setup
 
 ```bash
 cd apps/calmdemy/worker
-pip3 install -r requirements.txt
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.base.txt
+
+python3 -m venv .venv-dms
+./.venv-dms/bin/pip install -r requirements.dms.txt
 ```
+
+### Stack Configuration
+
+Multi-stack local workers are defined in `worker_stacks.json`. The companion uses this
+file to start all enabled stacks with the correct role and venv.
 
 ### StyleTTS2 Checkpoints (Local)
 
@@ -599,7 +631,7 @@ Optional environment variables:
 
 ```bash
 cd apps/calmdemy/worker
-python3 local_worker.py
+python3 local_companion.py
 ```
 
 The worker will print:

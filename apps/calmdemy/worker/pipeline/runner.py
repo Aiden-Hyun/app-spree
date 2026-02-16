@@ -7,18 +7,11 @@ import traceback
 
 from firebase_admin import firestore as fs
 
-from .llm_generator import generate_script
 from .qa_formatter import format_script
 from .tts_converter import convert_to_audio
 from .audio_processor import post_process_audio
 from .storage_uploader import upload_audio, upload_image
 from .content_publisher import publish_content
-from .course_runner import process_course_job
-from .image_generator import (
-    build_image_prompt,
-    generate_image,
-    DEFAULT_FALLBACK_URL,
-)
 import config
 from .job_cache import (
     ensure_cache_dir,
@@ -85,13 +78,7 @@ def _generate_title_from_llm(job_data: dict, script: str) -> str:
     return title
 
 
-def process_job(db, job_id: str, job_data: dict):
-    """Run the full pipeline for one content job."""
-    # Route course jobs to the dedicated course runner
-    if job_data.get("contentType") == "course":
-        process_course_job(db, job_id, job_data)
-        return
-
+def _prepare_cache(job_id: str, job_data: dict):
     cache_state = load_state(job_id) or {}
     if cache_state and not _cache_matches_job(job_data, cache_state):
         print("  [cache] Model/voice mismatch; clearing cached artifacts.")
@@ -113,139 +100,224 @@ def process_job(db, job_id: str, job_data: dict):
             return path
         return None
 
-    current_stage = "llm_generating"
+    return cache_state, _cache_update, _cache_file
+
+
+def _run_pre_stage(
+    db,
+    job_id: str,
+    job_data: dict,
+    cache_state: dict,
+    cache_update,
+    cache_file,
+    stage_tracker: dict,
+):
+    from .llm_generator import generate_script
+    from .image_generator import build_image_prompt, generate_image
+
+    # Step 1: LLM — generate script (or reuse cached)
+    stage_tracker["current"] = "llm_generating"
+    _update_status(db, job_id, "llm_generating")
+
+    script = job_data.get("generatedScript") or read_text(job_id, "generated_script.txt")
+    if not script:
+        script = generate_script(job_data)
+
+    # Persist script to cache if missing
+    script_path = cache_file("generatedScriptPath")
+    if not script_path:
+        script_path = write_text(job_id, "generated_script.txt", script)
+
+    # Step 1b: Resolve title
+    admin_title = job_data.get("title", "").strip()
+    if admin_title:
+        generated_title = admin_title
+        print(f"  [pipeline] Using admin-provided title: {generated_title}")
+    else:
+        generated_title = job_data.get("generatedTitle") or cache_state.get("generatedTitle")
+        if not generated_title:
+            print("  [pipeline] No title provided, generating from LLM...")
+            generated_title = _generate_title_from_llm(job_data, script)
+            print(f"  [pipeline] Generated title: {generated_title}")
+
+    cache_update(
+        generatedScriptPath=script_path,
+        generatedTitle=generated_title,
+        lastCompletedStage="llm_generating",
+    )
+
+    _update_status(
+        db,
+        job_id,
+        "qa_formatting",
+        {
+            "generatedScript": script,
+            "generatedTitle": generated_title,
+        },
+        last_completed="llm_generating",
+    )
+
+    # Step 2: QA — validate and format
+    stage_tracker["current"] = "qa_formatting"
+    formatted_script = format_script(script, job_data)
+    cache_update(lastCompletedStage="qa_formatting")
+    _update_status(db, job_id, "image_generating", last_completed="qa_formatting")
+
+    # Step 2b: Image generation — thumbnail (or reuse cached)
+    stage_tracker["current"] = "image_generating"
+    thumbnail_url = job_data.get("thumbnailUrl") or cache_state.get("thumbnailUrl")
+    image_path = job_data.get("imagePath") or cache_state.get("imagePath")
+    image_prompt = job_data.get("imagePrompt") or cache_state.get("imagePrompt")
+
+    if thumbnail_url:
+        print("  [image] Reusing cached thumbnail URL.")
+    else:
+        if not image_prompt:
+            image_prompt = build_image_prompt(
+                job_data,
+                generated_title,
+                job_data.get("params", {}).get("topic", ""),
+                job_data.get("contentType", "guided_meditation"),
+            )
+        local_image_path = generate_image(image_prompt)
+        image_path, thumbnail_url = upload_image(local_image_path, job_data)
+
+    job_data = {
+        **job_data,
+        "imagePrompt": image_prompt,
+        "imagePath": image_path,
+        "thumbnailUrl": thumbnail_url,
+        "imageModel": config.IMAGE_MODEL_ID,
+    }
+    cache_update(
+        imagePrompt=image_prompt,
+        imagePath=image_path,
+        thumbnailUrl=thumbnail_url,
+        imageModel=config.IMAGE_MODEL_ID,
+        lastCompletedStage="image_generating",
+    )
+
+    return formatted_script, generated_title, job_data
+
+
+def _resolve_formatted_script(job_id: str, job_data: dict) -> str:
+    formatted = job_data.get("formattedScript")
+    if formatted:
+        return formatted
+    script = job_data.get("generatedScript") or read_text(job_id, "generated_script.txt")
+    if not script:
+        raise RuntimeError("Missing generatedScript; re-run the pre stage first.")
+    return format_script(script, job_data)
+
+
+def process_job_pre(db, job_id: str, job_data: dict):
+    """Run the pre (LLM+QA+image) stages, then hand off to TTS."""
+    # Route course jobs to the dedicated course runner
+    if job_data.get("contentType") == "course":
+        from .course_runner import process_course_job
+        process_course_job(db, job_id, job_data)
+        return
+
+    cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
+    stage_tracker = {"current": "llm_generating"}
+
     try:
-        # Step 1: LLM — generate script (or reuse cached)
-        _update_status(db, job_id, "llm_generating")
-
-        script = job_data.get("generatedScript") or read_text(job_id, "generated_script.txt")
-        if not script:
-            script = generate_script(job_data)
-
-        # Persist script to cache if missing
-        script_path = _cache_file("generatedScriptPath")
-        if not script_path:
-            script_path = write_text(job_id, "generated_script.txt", script)
-
-        # Step 1b: Resolve title
-        admin_title = job_data.get("title", "").strip()
-        if admin_title:
-            generated_title = admin_title
-            print(f"  [pipeline] Using admin-provided title: {generated_title}")
-        else:
-            generated_title = job_data.get("generatedTitle") or cache_state.get("generatedTitle")
-            if not generated_title:
-                print("  [pipeline] No title provided, generating from LLM...")
-                generated_title = _generate_title_from_llm(job_data, script)
-                print(f"  [pipeline] Generated title: {generated_title}")
-
-        _cache_update(
-            generatedScriptPath=script_path,
-            generatedTitle=generated_title,
-            lastCompletedStage="llm_generating",
+        formatted_script, generated_title, job_data = _run_pre_stage(
+            db,
+            job_id,
+            job_data,
+            cache_state,
+            cache_update,
+            cache_file,
+            stage_tracker,
         )
 
         _update_status(
             db,
             job_id,
-            "qa_formatting",
+            "tts_pending",
             {
-                "generatedScript": script,
+                "formattedScript": formatted_script,
+                "imagePrompt": job_data.get("imagePrompt"),
+                "imagePath": job_data.get("imagePath"),
+                "thumbnailUrl": job_data.get("thumbnailUrl"),
+                "imageModel": job_data.get("imageModel"),
                 "generatedTitle": generated_title,
+                "ttsPendingAt": fs.SERVER_TIMESTAMP,
             },
-            last_completed="llm_generating",
+            last_completed="image_generating",
         )
 
-        # Step 2: QA — validate and format
-        current_stage = "qa_formatting"
-        formatted_script = format_script(script, job_data)
-        _cache_update(lastCompletedStage="qa_formatting")
-        _update_status(db, job_id, "image_generating", last_completed="qa_formatting")
+        print(f"  [pipeline] Job {job_id} ready for TTS.")
 
-        # Step 2b: Image generation — thumbnail (or reuse cached)
-        current_stage = "image_generating"
-        thumbnail_url = job_data.get("thumbnailUrl") or cache_state.get("thumbnailUrl")
-        image_path = job_data.get("imagePath") or cache_state.get("imagePath")
-        image_prompt = job_data.get("imagePrompt") or cache_state.get("imagePrompt")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {e}"
+        print(f"  [pipeline] Job {job_id} FAILED: {error_msg}")
+        traceback.print_exc()
+        _update_status(db, job_id, "failed", {
+            "error": error_msg,
+            "failedStage": stage_tracker["current"],
+            "resumeAvailable": has_cache(job_id),
+        })
 
-        if thumbnail_url:
-            print("  [image] Reusing cached thumbnail URL.")
-        else:
-            if not image_prompt:
-                image_prompt = build_image_prompt(
-                    job_data,
-                    generated_title,
-                    job_data.get("params", {}).get("topic", ""),
-                    job_data.get("contentType", "guided_meditation"),
-                )
-            local_image_path = generate_image(image_prompt)
-            image_path, thumbnail_url = upload_image(local_image_path, job_data)
 
-        job_data = {
-            **job_data,
-            "imagePrompt": image_prompt,
-            "imagePath": image_path,
-            "thumbnailUrl": thumbnail_url,
-            "imageModel": config.IMAGE_MODEL_ID,
-        }
-        _cache_update(
-            imagePrompt=image_prompt,
-            imagePath=image_path,
-            thumbnailUrl=thumbnail_url,
-            imageModel=config.IMAGE_MODEL_ID,
-            lastCompletedStage="image_generating",
-        )
+def process_job_tts(db, job_id: str, job_data: dict):
+    """Run the TTS + post-processing + upload + publish stages."""
+    if job_data.get("contentType") == "course":
+        raise RuntimeError("Course jobs are not supported in the TTS-only stage.")
+    cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
+    stage_tracker = {"current": "tts_converting"}
+
+    try:
+        formatted_script = _resolve_formatted_script(job_id, job_data)
+
         _update_status(
             db,
             job_id,
-            "image_generating",
+            "tts_converting",
             {
-                "imagePrompt": image_prompt,
-                "imagePath": image_path,
-                "thumbnailUrl": thumbnail_url,
-                "imageModel": config.IMAGE_MODEL_ID,
+                "formattedScript": formatted_script,
             },
-            last_completed="qa_formatting",
+            last_completed=job_data.get("lastCompletedStage") or "image_generating",
         )
-        _update_status(db, job_id, "tts_converting", last_completed="image_generating")
 
         # Step 3: TTS — convert to audio (or reuse cached)
-        current_stage = "tts_converting"
-        wav_path = _cache_file("wavPath")
+        stage_tracker["current"] = "tts_converting"
+        wav_path = cache_file("wavPath")
         if wav_path:
             print("  [cache] Reusing cached WAV.")
         else:
             wav_path = convert_to_audio(formatted_script, job_data)
             wav_path = save_artifact(job_id, wav_path, "tts_output.wav")
-            _cache_update(wavPath=wav_path)
-        _cache_update(lastCompletedStage="tts_converting")
+            cache_update(wavPath=wav_path)
+        cache_update(lastCompletedStage="tts_converting")
         _update_status(db, job_id, "post_processing", last_completed="tts_converting")
 
         # Step 4: Post-process — normalize and encode (or reuse cached)
-        current_stage = "post_processing"
-        mp3_path = _cache_file("mp3Path")
+        stage_tracker["current"] = "post_processing"
+        mp3_path = cache_file("mp3Path")
         if mp3_path:
             print("  [cache] Reusing cached MP3.")
         else:
             mp3_path = post_process_audio(wav_path)
             mp3_path = save_artifact(job_id, mp3_path, "tts_output.mp3")
-            _cache_update(mp3Path=mp3_path)
-        _cache_update(lastCompletedStage="post_processing")
+            cache_update(mp3Path=mp3_path)
+        cache_update(lastCompletedStage="post_processing")
         _update_status(db, job_id, "uploading", last_completed="post_processing")
 
         # Step 5: Upload — push to Firebase Storage (or reuse cached)
-        current_stage = "uploading"
+        stage_tracker["current"] = "uploading"
         storage_path = job_data.get("audioPath") or cache_state.get("storagePath")
         duration_sec = job_data.get("audioDurationSec") or cache_state.get("durationSec")
         if storage_path:
             print("  [cache] Reusing uploaded audio path.")
         else:
             storage_path, duration_sec = upload_audio(mp3_path, job_data)
-            _cache_update(storagePath=storage_path, durationSec=duration_sec)
+            cache_update(storagePath=storage_path, durationSec=duration_sec)
 
         # Write audioPath even before publish so a failed publish can resume
         auto_publish = job_data.get("autoPublish", True)
-        _cache_update(lastCompletedStage="uploading")
+        cache_update(lastCompletedStage="uploading")
         _update_status(
             db,
             job_id,
@@ -258,10 +330,11 @@ def process_job(db, job_id: str, job_data: dict):
         )
 
         # Step 6: Publish (or skip if auto-publish is off)
-        job_data_with_title = {**job_data, "_resolvedTitle": generated_title}
+        resolved_title = job_data.get("generatedTitle") or job_data.get("title", "")
+        job_data_with_title = {**job_data, "_resolvedTitle": resolved_title}
 
         if auto_publish:
-            current_stage = "publishing"
+            stage_tracker["current"] = "publishing"
             content_id = publish_content(
                 db, storage_path, duration_sec, formatted_script, job_data_with_title
             )
@@ -293,6 +366,132 @@ def process_job(db, job_id: str, job_data: dict):
         traceback.print_exc()
         _update_status(db, job_id, "failed", {
             "error": error_msg,
-            "failedStage": current_stage,
+            "failedStage": stage_tracker["current"],
+            "resumeAvailable": has_cache(job_id),
+        })
+
+
+def process_job(db, job_id: str, job_data: dict):
+    """Run the full pipeline for one content job."""
+    # Route course jobs to the dedicated course runner
+    if job_data.get("contentType") == "course":
+        from .course_runner import process_course_job
+        process_course_job(db, job_id, job_data)
+        return
+
+    cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
+    stage_tracker = {"current": "llm_generating"}
+
+    try:
+        formatted_script, generated_title, job_data = _run_pre_stage(
+            db,
+            job_id,
+            job_data,
+            cache_state,
+            cache_update,
+            cache_file,
+            stage_tracker,
+        )
+
+        _update_status(
+            db,
+            job_id,
+            "tts_converting",
+            {
+                "formattedScript": formatted_script,
+                "imagePrompt": job_data.get("imagePrompt"),
+                "imagePath": job_data.get("imagePath"),
+                "thumbnailUrl": job_data.get("thumbnailUrl"),
+                "imageModel": job_data.get("imageModel"),
+                "generatedTitle": generated_title,
+            },
+            last_completed="image_generating",
+        )
+
+        # Step 3: TTS — convert to audio (or reuse cached)
+        stage_tracker["current"] = "tts_converting"
+        wav_path = cache_file("wavPath")
+        if wav_path:
+            print("  [cache] Reusing cached WAV.")
+        else:
+            wav_path = convert_to_audio(formatted_script, job_data)
+            wav_path = save_artifact(job_id, wav_path, "tts_output.wav")
+            cache_update(wavPath=wav_path)
+        cache_update(lastCompletedStage="tts_converting")
+        _update_status(db, job_id, "post_processing", last_completed="tts_converting")
+
+        # Step 4: Post-process — normalize and encode (or reuse cached)
+        stage_tracker["current"] = "post_processing"
+        mp3_path = cache_file("mp3Path")
+        if mp3_path:
+            print("  [cache] Reusing cached MP3.")
+        else:
+            mp3_path = post_process_audio(wav_path)
+            mp3_path = save_artifact(job_id, mp3_path, "tts_output.mp3")
+            cache_update(mp3Path=mp3_path)
+        cache_update(lastCompletedStage="post_processing")
+        _update_status(db, job_id, "uploading", last_completed="post_processing")
+
+        # Step 5: Upload — push to Firebase Storage (or reuse cached)
+        stage_tracker["current"] = "uploading"
+        storage_path = job_data.get("audioPath") or cache_state.get("storagePath")
+        duration_sec = job_data.get("audioDurationSec") or cache_state.get("durationSec")
+        if storage_path:
+            print("  [cache] Reusing uploaded audio path.")
+        else:
+            storage_path, duration_sec = upload_audio(mp3_path, job_data)
+            cache_update(storagePath=storage_path, durationSec=duration_sec)
+
+        # Write audioPath even before publish so a failed publish can resume
+        auto_publish = job_data.get("autoPublish", True)
+        cache_update(lastCompletedStage="uploading")
+        _update_status(
+            db,
+            job_id,
+            "publishing" if auto_publish else "completed",
+            {
+                "audioPath": storage_path,
+                "audioDurationSec": duration_sec,
+            },
+            last_completed="uploading",
+        )
+
+        # Step 6: Publish (or skip if auto-publish is off)
+        job_data_with_title = {**job_data, "_resolvedTitle": generated_title}
+
+        if auto_publish:
+            stage_tracker["current"] = "publishing"
+            content_id = publish_content(
+                db, storage_path, duration_sec, formatted_script, job_data_with_title
+            )
+            _update_status(db, job_id, "completed", {
+                "audioPath": storage_path,
+                "audioDurationSec": duration_sec,
+                "publishedContentId": content_id,
+                "completedAt": fs.SERVER_TIMESTAMP,
+                "resumeAvailable": False,
+                "failedStage": None,
+            }, last_completed="publishing")
+            print(f"  [pipeline] Job {job_id} completed. Content ID: {content_id}")
+        else:
+            # Mark as completed but without publishing
+            _update_status(db, job_id, "completed", {
+                "audioPath": storage_path,
+                "audioDurationSec": duration_sec,
+                "completedAt": fs.SERVER_TIMESTAMP,
+                "resumeAvailable": False,
+                "failedStage": None,
+            }, last_completed="uploading")
+            print(f"  [pipeline] Job {job_id} completed (awaiting approval, not published).")
+
+        cleanup(job_id)
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {e}"
+        print(f"  [pipeline] Job {job_id} FAILED: {error_msg}")
+        traceback.print_exc()
+        _update_status(db, job_id, "failed", {
+            "error": error_msg,
+            "failedStage": stage_tracker["current"],
             "resumeAvailable": has_cache(job_id),
         })

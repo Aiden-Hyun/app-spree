@@ -7,6 +7,7 @@ export type JobStatus =
   | 'llm_generating'
   | 'qa_formatting'
   | 'image_generating'
+  | 'tts_pending'
   | 'tts_converting'
   | 'post_processing'
   | 'uploading'
@@ -19,6 +20,7 @@ export const JOB_STATUS_ORDER: JobStatus[] = [
   'llm_generating',
   'qa_formatting',
   'image_generating',
+  'tts_pending',
   'tts_converting',
   'post_processing',
   'uploading',
@@ -31,6 +33,7 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   llm_generating: 'Generating Script',
   qa_formatting: 'Formatting',
   image_generating: 'Generating Image',
+  tts_pending: 'Waiting for TTS',
   tts_converting: 'Converting to Audio',
   post_processing: 'Processing Audio',
   uploading: 'Uploading',
@@ -127,6 +130,7 @@ export interface ContentJob {
 
   // Pipeline outputs (filled as pipeline progresses)
   generatedScript?: string;
+  formattedScript?: string;
   generatedTitle?: string;
   audioPath?: string;
   audioDurationSec?: number;
@@ -162,6 +166,7 @@ export interface ContentJob {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   startedAt?: Timestamp;
+  ttsPendingAt?: Timestamp;
   completedAt?: Timestamp;
   createdBy: string;
 }

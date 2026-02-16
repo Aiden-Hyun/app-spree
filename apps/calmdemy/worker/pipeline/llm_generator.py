@@ -29,11 +29,9 @@ def _load_prompt_template(content_type: str) -> str:
 
 def _load_system_prompt(content_type: str) -> str:
     """Load an optional system prompt for a content type."""
-    if content_type != "guided_meditation":
-        return ""
-    prompt_path = os.path.join(
-        os.path.dirname(__file__), "..", "guided_meditation_system_prompt.txt"
-    )
+    system_dir = os.path.join(os.path.dirname(__file__), "..", "system_prompts")
+    filename = f"{content_type}_system_prompt.txt"
+    prompt_path = os.path.join(system_dir, filename)
     if not os.path.isfile(prompt_path):
         return ""
     with open(prompt_path, "r") as f:

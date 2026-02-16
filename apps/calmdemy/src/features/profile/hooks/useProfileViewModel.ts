@@ -90,6 +90,10 @@ export function useProfileViewModel() {
     router.push('/settings');
   }, [router]);
 
+  const navigateToAdmin = useCallback(() => {
+    router.push('/admin');
+  }, [router]);
+
   const navigateToLogin = useCallback(() => {
     router.push(isPremium ? '/login?mode=link' : '/login');
   }, [router, isPremium]);
@@ -117,6 +121,7 @@ export function useProfileViewModel() {
     navigateToStats,
     navigateToDownloads,
     navigateToSettings,
+    navigateToAdmin,
     navigateToLogin,
     openPaywall,
   };

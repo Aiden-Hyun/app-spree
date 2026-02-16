@@ -73,6 +73,12 @@ export const TTS_MODELS: ModelOption[] = [
     backend: ['local', 'cloud'],
   },
   {
+    id: 'dms',
+    label: 'Kyutai DMS TTS 1.6B',
+    description: 'Kyutai delayed-streams TTS (GPU recommended)',
+    backend: 'local',
+  },
+  {
     id: 'styletts2',
     label: 'StyleTTS2 (Local)',
     description: 'High quality local TTS (MPS preferred)',
@@ -127,6 +133,25 @@ export const TTS_VOICES: VoiceOption[] = [
     label: 'Lessac (US Female)',
     ttsModel: 'piper',
     description: 'Natural, expressive American female voice',
+  },
+  // DMS voices (Kyutai)
+  {
+    id: 'expresso/ex03-ex01_happy_001_channel1_334s.wav',
+    label: 'Britney',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (Expresso, happy)',
+  },
+  {
+    id: 'vctk/p226_023.wav',
+    label: 'Delilah',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+  },
+  {
+    id: 'vctk/p225_023.wav',
+    label: 'Milo',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
   },
   // StyleTTS2 voices
   {

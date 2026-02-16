@@ -33,6 +33,7 @@ from .image_generator import (
     generate_image,
     DEFAULT_FALLBACK_URL,
 )
+from .voice_utils import get_voice_display_name
 import config
 
 
@@ -76,7 +77,7 @@ def _update_progress(db, job_id: str, progress: str):
 def _load_system_prompt() -> str:
     """Load the course system prompt."""
     prompt_path = os.path.join(
-        os.path.dirname(__file__), "..", "course_system_prompt.txt"
+        os.path.dirname(__file__), "..", "system_prompts", "course_system_prompt.txt"
     )
     with open(prompt_path, "r") as f:
         return f.read()
@@ -493,7 +494,8 @@ def _publish_course(
     subject_icon = params.get("subjectIcon", "school-outline")
     tone = params.get("tone", "gentle")
     audience = params.get("targetAudience", "beginner")
-    voice = job_data.get("ttsVoice", "Calmdemy")
+    voice_id = job_data.get("ttsVoice", "Calmdemy")
+    voice = get_voice_display_name(voice_id)
     thumbnail_url = job_data.get("thumbnailUrl") or ""
 
     # Calculate total duration
@@ -516,6 +518,7 @@ def _publish_course(
         "sessionCount": TOTAL_SESSIONS,
         "duration_minutes": total_minutes,
         "instructor": voice,
+        "ttsVoiceId": voice_id,
         "thumbnailUrl": thumbnail_url,
         "generatedBy": "content-factory",
         "createdAt": fs.SERVER_TIMESTAMP,

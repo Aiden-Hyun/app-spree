@@ -2,23 +2,39 @@
 set -euo pipefail
 
 WORKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$WORKER_DIR/.venv"
-PY="$VENV_DIR/bin/python"
-REQ="$WORKER_DIR/requirements.txt"
-MARKER="$VENV_DIR/.deps_installed"
 
-if [ ! -x "$PY" ]; then
-  echo "[companion] Creating virtual environment at $VENV_DIR"
-  python3 -m venv "$VENV_DIR"
-fi
+BASE_VENV="$WORKER_DIR/.venv"
+BASE_PY="$BASE_VENV/bin/python"
+BASE_REQ="$WORKER_DIR/requirements.base.txt"
+BASE_MARKER="$BASE_VENV/.deps_installed"
 
-"$PY" -m pip install --upgrade pip >/dev/null
+DMS_VENV="$WORKER_DIR/.venv-dms"
+DMS_PY="$DMS_VENV/bin/python"
+DMS_REQ="$WORKER_DIR/requirements.dms.txt"
+DMS_MARKER="$DMS_VENV/.deps_installed"
 
-if [ ! -f "$MARKER" ] || [ "$REQ" -nt "$MARKER" ]; then
-  echo "[companion] Installing worker dependencies..."
-  "$PY" -m pip install -r "$REQ"
-  touch "$MARKER"
-fi
+ensure_venv() {
+  local venv_dir="$1"
+  local python_bin="$2"
+  local req_file="$3"
+  local marker_file="$4"
+
+  if [ ! -x "$python_bin" ]; then
+    echo "[companion] Creating virtual environment at $venv_dir"
+    python3 -m venv "$venv_dir"
+  fi
+
+  "$python_bin" -m pip install --upgrade pip >/dev/null
+
+  if [ -f "$req_file" ] && { [ ! -f "$marker_file" ] || [ "$req_file" -nt "$marker_file" ]; }; then
+    echo "[companion] Installing dependencies from $req_file..."
+    "$python_bin" -m pip install -r "$req_file"
+    touch "$marker_file"
+  fi
+}
+
+ensure_venv "$BASE_VENV" "$BASE_PY" "$BASE_REQ" "$BASE_MARKER"
+ensure_venv "$DMS_VENV" "$DMS_PY" "$DMS_REQ" "$DMS_MARKER"
 
 echo "[companion] Starting local companion..."
-exec "$PY" "$WORKER_DIR/local_companion.py"
+exec "$BASE_PY" "$WORKER_DIR/local_companion.py"

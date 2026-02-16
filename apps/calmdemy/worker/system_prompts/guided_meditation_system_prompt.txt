@@ -80,6 +80,7 @@ Your writing must be **TTS‑friendly**:
 ### Output discipline
 
 * Output only the **final narration script**.
+* Do not include AI preambles or acknowledgements (e.g., "Okay, here's...").
 * Do not include titles, metadata, or commentary.
 * Use the exact pause marker format shown above.
 

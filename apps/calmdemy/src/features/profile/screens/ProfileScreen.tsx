@@ -9,6 +9,7 @@ import { Skeleton } from '@shared/ui/Skeleton';
 import { PaywallModal } from '@shared/ui/PaywallModal';
 import { Theme } from '../../../theme';
 import { useProfileViewModel } from '@features/profile/hooks/useProfileViewModel';
+import { useAdminAuth } from '@features/admin/hooks/useAdminAuth';
 
 const milestones = [
   { id: 'week', icon: 'leaf-outline' as const, label: 'First Week', days: 7, description: 'Planted the seed', color: '#8B9F82' },
@@ -37,9 +38,11 @@ export function ProfileScreen() {
     navigateToStats,
     navigateToDownloads,
     navigateToSettings,
+    navigateToAdmin,
     navigateToLogin,
     openPaywall,
   } = useProfileViewModel();
+  const { isAdmin } = useAdminAuth();
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
   const nextMilestone = getNextMilestone(milestones);
@@ -250,6 +253,20 @@ export function ProfileScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
               </AnimatedPressable>
+
+              {isAdmin && (
+                <>
+                  <View style={styles.actionDivider} />
+
+                  <AnimatedPressable onPress={navigateToAdmin} style={styles.actionItem}>
+                    <View style={styles.actionLeft}>
+                      <Ionicons name="hammer-outline" size={20} color={theme.colors.text} />
+                      <Text style={styles.actionLabel}>Content Factory</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+                  </AnimatedPressable>
+                </>
+              )}
               
               <View style={styles.actionDivider} />
               

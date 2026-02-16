@@ -13,6 +13,7 @@ import { ResolvedContent } from '../data/homeRepository';
 import { Theme } from '../../../theme';
 import { ListeningHistoryItem } from '../../../types';
 import { useHomeViewModel } from '@features/home/hooks/useHomeViewModel';
+import { useAdminAuth } from '@features/admin/hooks/useAdminAuth';
 
 export function HomeScreen() {
   const {
@@ -40,6 +41,7 @@ export function HomeScreen() {
     getThumbnailForContent,
     intentionGradient,
   } = useHomeViewModel();
+  const { isAdmin } = useAdminAuth();
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
@@ -165,6 +167,9 @@ export function HomeScreen() {
             <Text style={styles.userName}>
               {displayName}
             </Text>
+            {isAdmin && (
+              <Text style={styles.adminLabel}>Admin account</Text>
+            )}
             {isAnonymous && (
               <AnimatedPressable onPress={restorePurchases} style={styles.restoreLink}>
                 <Text style={styles.restoreLinkText}>
@@ -402,6 +407,14 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     fontSize: 26,
     color: theme.colors.text,
     letterSpacing: -0.3,
+  },
+  adminLabel: {
+    fontFamily: theme.fonts.ui.medium,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   headerLeft: {
     flex: 1,

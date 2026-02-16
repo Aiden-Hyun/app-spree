@@ -23,6 +23,7 @@ import { Theme } from '@/theme';
 const FILTER_OPTIONS: { label: string; value: JobStatus | undefined }[] = [
   { label: 'All', value: undefined },
   { label: 'Pending', value: 'pending' },
+  { label: 'TTS Pending', value: 'tts_pending' },
   { label: 'Active', value: 'llm_generating' },
   { label: 'Completed', value: 'completed' },
   { label: 'Failed', value: 'failed' },
@@ -46,9 +47,15 @@ export default function AdminDashboard() {
   } = useWorkerControl('local');
 
   const activeCount = jobs.filter(
-    (j) => j.status !== 'completed' && j.status !== 'failed' && j.status !== 'pending'
+    (j) =>
+      j.status !== 'completed' &&
+      j.status !== 'failed' &&
+      j.status !== 'pending' &&
+      j.status !== 'tts_pending'
   ).length;
-  const pendingCount = jobs.filter((j) => j.status === 'pending').length;
+  const pendingCount = jobs.filter(
+    (j) => j.status === 'pending' || j.status === 'tts_pending'
+  ).length;
 
   const localState = getLocalWorkerState(localWorker, localControl, theme, optimisticState);
   const cloudState = getWorkerState(cloudWorker, theme);

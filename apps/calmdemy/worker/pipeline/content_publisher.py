@@ -7,6 +7,7 @@ Each content type maps to its own Firestore collection with the appropriate sche
 import math
 
 from firebase_admin import firestore as fs
+from .voice_utils import get_voice_display_name
 
 
 def _generate_description(script: str, max_length: int = 200) -> str:
@@ -50,7 +51,8 @@ def publish_content(
     title = job_data.get("_resolvedTitle") or _generate_title(job_data)
     description = _generate_description(script)
     duration_minutes = max(1, math.ceil(duration_sec / 60))
-    voice = job_data.get("ttsVoice", "Calmdemy")
+    voice_id = job_data.get("ttsVoice", "Calmdemy")
+    voice = get_voice_display_name(voice_id)
     thumbnail_url = job_data.get("thumbnailUrl") or ""
 
     print(f"  [publish] Creating {content_type} document: {title}")
@@ -70,6 +72,7 @@ def publish_content(
             "techniques": [params["technique"]] if params.get("technique") else [],
             "difficulty_level": params.get("difficulty", "beginner"),
             "instructor": voice,
+            "ttsVoiceId": voice_id,
             "isFree": False,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
@@ -84,6 +87,7 @@ def publish_content(
             "audioPath": storage_path,
             "thumbnailUrl": thumbnail_url,
             "instructor": voice,
+            "ttsVoiceId": voice_id,
             "isFree": False,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
@@ -95,6 +99,7 @@ def publish_content(
             "title": title,
             "description": description,
             "narrator": voice,
+            "ttsVoiceId": voice_id,
             "duration_minutes": duration_minutes,
             "audio_url": storage_path,
             "thumbnail_url": thumbnail_url,
@@ -113,6 +118,7 @@ def publish_content(
             "duration_minutes": duration_minutes,
             "audioPath": storage_path,
             "narrator": voice,
+            "ttsVoiceId": voice_id,
             "thumbnailUrl": thumbnail_url,
             "isFree": True,  # Emergency content should be free
             "generatedBy": "content-factory",
