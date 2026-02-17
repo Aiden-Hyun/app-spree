@@ -1,16 +1,16 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { useMeditateContent } from './useMeditateContent';
+import { useCourses } from '@shared/hooks/queries/useMeditateQueries';
 import type { FirestoreCourse } from '../data/meditateRepository';
 import type { MeditationTechnique } from '../../../types';
 
 export function useMeditateViewModel() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
-  const { meditateContent } = useMeditateContent();
 
-  const courses = meditateContent.courses;
+  // Use Query Hook
+  const { data: courses = [] } = useCourses();
 
   const [showPaywall, setShowPaywall] = useState(false);
 
