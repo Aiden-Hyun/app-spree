@@ -1,16 +1,22 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@core/providers/contexts/AuthContext';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useSubscription } from '@core/providers/contexts/SubscriptionContext';
-import { useHomeContent } from './useHomeContent';
-import { useMeditateContent } from '../../meditate/hooks/useMeditateContent';
-import { useSleepContent } from '../../sleep/hooks/useSleepContent';
-import { useMusicContent } from '../../music/hooks/useMusicContent';
 import { useStats } from '@shared/hooks/useStats';
-import type { FirestoreEmergencyMeditation, FirestoreCourse } from '../../meditate/data/meditateRepository';
-import type { FirestoreSeries, FirestoreSleepMeditation } from '../../sleep/data/sleepRepository';
-import type { FirestoreSleepSound, FirestoreMusicItem, FirestoreAlbum } from '../../music/data/musicRepository';
+import {
+  useTodayQuote,
+  useListeningHistory,
+  useFavorites,
+} from '@shared/hooks/queries/useHomeQueries';
+import {
+  useEmergencyMeditations,
+  useCourses,
+} from '@shared/hooks/queries/useMeditateQueries';
+import { useSeries } from '@shared/hooks/queries/useSleepQueries';
+import { useAlbums } from '@shared/hooks/queries/useMusicQueries';
+import type { FirestoreEmergencyMeditation } from '../../meditate/data/meditateRepository';
+import { useQueryClient } from '@tanstack/react-query';
 
 const guestAdjectives = [
   'Calm', 'Peaceful', 'Serene', 'Gentle', 'Mindful', 'Tranquil', 'Zen',
@@ -30,48 +36,22 @@ export function useHomeViewModel() {
   const router = useRouter();
   const { stats, loading: statsLoading } = useStats();
   const { restorePurchases, isPremium: hasSubscription } = useSubscription();
-  const { homeContent, refreshHome } = useHomeContent();
-  const { meditateContent } = useMeditateContent();
-  const { sleepContent } = useSleepContent();
-  const { musicContent } = useMusicContent();
+  const queryClient = useQueryClient();
 
-  // Use preloaded data
-  const quote = homeContent.quote;
-  const recentlyPlayed = homeContent.recentlyPlayed;
-  const favorites = homeContent.favorites;
+  // Data Hooks
+  const { data: quote, refetch: refetchQuote } = useTodayQuote();
+  const { data: recentlyPlayed = [], refetch: refetchHistory } = useListeningHistory();
+  const { data: favorites = [], refetch: refetchFavorites } = useFavorites();
+  const { data: emergencyMeditations = [] } = useEmergencyMeditations();
+
+  // Navigation & Lookup Data
+  const { data: seriesList = [] } = useSeries();
+  const { data: albumsList = [] } = useAlbums();
+  const { data: coursesList = [] } = useCourses();
 
   // Refreshing state for pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-
-  // Emergency meditations from preloaded data
-  const emergencyMeditations = meditateContent.emergencyMeditations;
-
-  // Content data from preload context (for lookups)
-  const seriesDataRef = useRef<FirestoreSeries[]>([]);
-  const albumsDataRef = useRef<FirestoreAlbum[]>([]);
-  const coursesDataRef = useRef<FirestoreCourse[]>([]);
-  const emergencyDataRef = useRef<FirestoreEmergencyMeditation[]>([]);
-  const sleepSoundsDataRef = useRef<FirestoreSleepSound[]>([]);
-  const whiteNoiseDataRef = useRef<FirestoreMusicItem[]>([]);
-  const musicDataRef = useRef<FirestoreMusicItem[]>([]);
-  const asmrDataRef = useRef<FirestoreMusicItem[]>([]);
-  const sleepMeditationsDataRef = useRef<FirestoreSleepMeditation[]>([]);
-
-  // Sync preloaded data to refs for navigation lookups
-  useFocusEffect(
-    useCallback(() => {
-      seriesDataRef.current = sleepContent.series;
-      emergencyDataRef.current = meditateContent.emergencyMeditations;
-      coursesDataRef.current = meditateContent.courses;
-      sleepSoundsDataRef.current = musicContent.sleepSounds;
-      whiteNoiseDataRef.current = musicContent.whiteNoise;
-      musicDataRef.current = musicContent.music;
-      asmrDataRef.current = musicContent.asmr;
-      albumsDataRef.current = musicContent.albums;
-      sleepMeditationsDataRef.current = sleepContent.sleepMeditations;
-    }, [sleepContent, meditateContent, musicContent])
-  );
 
   // Generate a consistent random nickname for anonymous users based on their UID
   const generateGuestNickname = (uid: string): string => {
@@ -90,7 +70,6 @@ export function useHomeViewModel() {
     const emailPrefix = user?.email?.split('@')[0];
     if (emailPrefix) return emailPrefix;
 
-    // For anonymous users, generate a fun random nickname
     if (isAnonymous && user?.uid) {
       return generateGuestNickname(user.uid);
     }
@@ -98,13 +77,26 @@ export function useHomeViewModel() {
     return 'Friend';
   }, [user, isAnonymous]);
 
-  // Refresh home data on pull-to-refresh or focus (for favorites/history updates)
+  // Refresh home data on pull-to-refresh
   const handleRefresh = useCallback(async () => {
-    if (!user) return;
     setRefreshing(true);
-    await refreshHome(user.uid, isAnonymous);
+    await Promise.all([
+      refetchQuote(),
+      refetchHistory(),
+      refetchFavorites(),
+    ]);
     setRefreshing(false);
-  }, [user, isAnonymous, refreshHome]);
+  }, [refetchQuote, refetchHistory, refetchFavorites]);
+
+  // Refetch history/favorites when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        refetchHistory();
+        refetchFavorites();
+      }
+    }, [user, refetchHistory, refetchFavorites])
+  );
 
   const getGreeting = useCallback(() => {
     const hour = new Date().getHours();
@@ -144,7 +136,7 @@ export function useHomeViewModel() {
   }, [hasSubscription, router]);
 
   const findSeriesChapter = (chapterId: string) => {
-    for (const series of seriesDataRef.current) {
+    for (const series of seriesList) {
       const chapter = series.chapters.find((ch) => ch.id === chapterId);
       if (chapter) {
         return { series, chapter };
@@ -154,7 +146,7 @@ export function useHomeViewModel() {
   };
 
   const findAlbumTrack = (trackId: string) => {
-    for (const album of albumsDataRef.current) {
+    for (const album of albumsList) {
       const track = album.tracks?.find((t) => t.id === trackId);
       if (track) {
         return { album, track };
@@ -164,7 +156,7 @@ export function useHomeViewModel() {
   };
 
   const findCourseSession = (sessionId: string) => {
-    for (const course of coursesDataRef.current) {
+    for (const course of coursesList) {
       const session = course.sessions?.find((s) => s.id === sessionId);
       if (session) {
         return { course, session };
@@ -176,49 +168,36 @@ export function useHomeViewModel() {
   const getThumbnailForContent = useCallback((contentId: string, contentType: string): string | undefined => {
     switch (contentType) {
       case 'emergency':
-        return emergencyDataRef.current.find((e) => e.id === contentId)?.thumbnailUrl;
+        return emergencyMeditations.find((e) => e.id === contentId)?.thumbnailUrl;
       case 'series_chapter':
-        for (const series of seriesDataRef.current) {
+        for (const series of seriesList) {
           if (series.chapters.some((c) => c.id === contentId)) {
             return series.thumbnailUrl;
           }
         }
         return undefined;
       case 'album_track':
-        for (const album of albumsDataRef.current) {
+        for (const album of albumsList) {
           if (album.tracks?.some((t) => t.id === contentId)) {
             return album.thumbnailUrl;
           }
         }
         return undefined;
       case 'course_session':
-        for (const course of coursesDataRef.current) {
+        for (const course of coursesList) {
           if (course.sessions?.some((s) => s.id === contentId)) {
             return course.thumbnailUrl;
           }
         }
         return undefined;
-      case 'nature_sound': {
-        const sleepSound = sleepSoundsDataRef.current.find((s) => s.id === contentId);
-        if (sleepSound) return sleepSound.thumbnailUrl;
-        const whiteNoise = whiteNoiseDataRef.current.find((w) => w.id === contentId);
-        if (whiteNoise) return whiteNoise.thumbnailUrl;
-        const music = musicDataRef.current.find((m) => m.id === contentId);
-        if (music) return music.thumbnailUrl;
-        const asmr = asmrDataRef.current.find((a) => a.id === contentId);
-        if (asmr) return asmr.thumbnailUrl;
-        return undefined;
-      }
-      case 'sleep_meditation':
-        return sleepMeditationsDataRef.current.find((m) => m.id === contentId)?.thumbnailUrl;
       default:
         return undefined;
     }
-  }, []);
+  }, [emergencyMeditations, seriesList, albumsList, coursesList]);
 
   const navigateToContent = useCallback((contentId: string, contentType: string) => {
     if (contentId.startsWith('emergency_')) {
-      const emergency = emergencyDataRef.current.find((e) => e.id === contentId);
+      const emergency = emergencyMeditations.find((e) => e.id === contentId);
       if (emergency) {
         router.push({
           pathname: '/emergency/[id]',
@@ -283,7 +262,7 @@ export function useHomeViewModel() {
         break;
       }
       case 'emergency': {
-        const emergency = emergencyDataRef.current.find((e) => e.id === contentId);
+        const emergency = emergencyMeditations.find((e) => e.id === contentId);
         if (emergency) {
           router.push({
             pathname: '/emergency/[id]',
@@ -322,7 +301,7 @@ export function useHomeViewModel() {
         router.push({ pathname: '/sleep/meditation/[id]', params: { id: contentId } });
         break;
     }
-  }, [router]);
+  }, [router, emergencyMeditations, seriesList, albumsList, coursesList]);
 
   const navigateToSettings = useCallback(() => {
     router.push('/settings');

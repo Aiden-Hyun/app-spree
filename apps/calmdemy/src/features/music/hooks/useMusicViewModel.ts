@@ -3,20 +3,26 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useSubscription } from '@core/providers/contexts/SubscriptionContext';
-import { useMusicContent } from './useMusicContent';
+import {
+  useSleepSounds,
+  useWhiteNoise,
+  useMusic,
+  useAsmr,
+  useAlbums,
+} from '@shared/hooks/queries/useMusicQueries';
 import type { FirestoreSleepSound, FirestoreMusicItem, FirestoreAlbum } from '../data/musicRepository';
 
 export function useMusicViewModel() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
   const { isPremium: hasSubscription } = useSubscription();
-  const { musicContent } = useMusicContent();
 
-  const sleepSounds = musicContent.sleepSounds;
-  const whiteNoise = musicContent.whiteNoise;
-  const music = musicContent.music;
-  const asmr = musicContent.asmr;
-  const albums = musicContent.albums;
+  // Use Query Hooks
+  const { data: sleepSounds = [] } = useSleepSounds();
+  const { data: whiteNoise = [] } = useWhiteNoise();
+  const { data: music = [] } = useMusic();
+  const { data: asmr = [] } = useAsmr();
+  const { data: albums = [] } = useAlbums();
 
   const [showPaywall, setShowPaywall] = useState(false);
 

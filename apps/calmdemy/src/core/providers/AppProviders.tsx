@@ -4,26 +4,25 @@ import { ThemeProvider } from '@core/providers/contexts/ThemeContext';
 import { NetworkProvider } from '@core/providers/contexts/NetworkContext';
 import { SleepTimerProvider } from '@core/providers/contexts/SleepTimerContext';
 import { SubscriptionProvider } from '@core/providers/contexts/SubscriptionContext';
-import { ContentPreloadProvider } from '@core/providers/contexts/ContentPreloadContext';
-import { PreloadGate } from '@shared/ui/PreloadGate';
 import { OfflineNavigator } from '@shared/ui/OfflineNavigator';
+import { QueryProvider } from './QueryProvider';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <ContentPreloadProvider>
+    <QueryProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <SubscriptionProvider>
             <NetworkProvider>
               <SleepTimerProvider>
                 <OfflineNavigator>
-                  <PreloadGate>{children}</PreloadGate>
+                  {children}
                 </OfflineNavigator>
               </SleepTimerProvider>
             </NetworkProvider>
-          </ContentPreloadProvider>
-        </SubscriptionProvider>
-      </AuthProvider>
-    </ThemeProvider>
+          </SubscriptionProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryProvider>
   );
 }
