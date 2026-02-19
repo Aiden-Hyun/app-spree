@@ -32,6 +32,7 @@ const SECTION_IDS = [
   'imagePrompt',
   'thumbnail',
   'output',
+  'courseScripts',
 ];
 
 function toSummaryItems(
@@ -59,6 +60,42 @@ function getErrorType(error?: string) {
   return (parts[0] || 'Error').trim();
 }
 
+const COURSE_LABELS: Record<string, string> = {
+  INT: 'Course Intro',
+  M1L: 'Module 1 — Lesson',
+  M1P: 'Module 1 — Practice',
+  M2L: 'Module 2 — Lesson',
+  M2P: 'Module 2 — Practice',
+  M3L: 'Module 3 — Lesson',
+  M3P: 'Module 3 — Practice',
+  M4L: 'Module 4 — Lesson',
+  M4P: 'Module 4 — Practice',
+};
+
+const COURSE_SUFFIX_ORDER = Object.keys(COURSE_LABELS);
+
+function getCourseScriptOrder(code: string) {
+  const suffix = COURSE_SUFFIX_ORDER.find((key) => code.endsWith(key));
+  const index = suffix ? COURSE_SUFFIX_ORDER.indexOf(suffix) : -1;
+  return index === -1 ? 999 : index;
+}
+
+function getCourseScriptTitle(code: string, plan?: any) {
+  if (!code) return code;
+  if (code.endsWith('INT')) {
+    return plan?.intro?.title || COURSE_LABELS.INT;
+  }
+  const match = code.match(/M(\\d)([LP])$/);
+  if (!match) return code;
+  const moduleIndex = Number(match[1]) - 1;
+  const type = match[2];
+  const module = plan?.modules?.[moduleIndex];
+  if (type === 'L') {
+    return module?.lessonTitle || COURSE_LABELS[`M${match[1]}L`];
+  }
+  return module?.practiceTitle || COURSE_LABELS[`M${match[1]}P`];
+}
+
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -67,6 +104,7 @@ export default function JobDetailScreen() {
   const { job, isLoading, retry, cancel, requestDelete } = useJobDetail(id);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [errorManuallyCollapsed, setErrorManuallyCollapsed] = useState(false);
+  const [selectedCourseScript, setSelectedCourseScript] = useState<string>('');
 
   useEffect(() => {
     if (!job) return;
@@ -79,7 +117,15 @@ export default function JobDetailScreen() {
     }
     setExpandedSections(initial);
     setErrorManuallyCollapsed(false);
-  }, [job?.id, job?.error]);
+    if (job.contentType === 'course') {
+      const scripts = job.courseFormattedScripts || job.courseRawScripts || {};
+      const sorted = Object.keys(scripts).sort(
+        (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
+      );
+      const firstScript = sorted[0] || '';
+      setSelectedCourseScript(firstScript);
+    }
+  }, [job?.id, job?.error, job?.courseFormattedScripts, job?.courseRawScripts]);
 
   const handleRetry = () => {
     Alert.alert('Retry Job', 'Re-queue this job for processing?', [
@@ -145,6 +191,12 @@ export default function JobDetailScreen() {
   const createdDate = job.createdAt?.toDate
     ? job.createdAt.toDate().toLocaleString()
     : 'Unknown';
+
+  const courseScripts = job.courseFormattedScripts || job.courseRawScripts || {};
+  const courseScriptKeys = Object.keys(courseScripts).sort(
+    (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
+  );
+  const activeCourseScript = selectedCourseScript || courseScriptKeys[0] || '';
 
   const sections = [
     {
@@ -266,53 +318,60 @@ export default function JobDetailScreen() {
       ]),
       shouldRender: job.contentType === 'course' && Boolean(job.coursePlan),
       content: (
-        <>
-          {job.coursePlan?.courseGoal && (
-            <Text style={[styles.scriptText, { marginBottom: 12 }]}>
-              {job.coursePlan.courseGoal}
-            </Text>
-          )}
-          {(job.coursePlan?.modules || []).map((mod: any, i: number) => (
-            <View
-              key={i}
-              style={{
-                marginBottom: 12,
-                borderTopWidth: i > 0 ? 1 : 0,
-                borderTopColor: theme.colors.gray[200],
-                paddingTop: i > 0 ? 12 : 0,
-              }}
-            >
-              <Text
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            {job.coursePlan?.courseGoal && (
+              <Text style={[styles.scriptText, { marginBottom: 12 }]}>
+                {job.coursePlan.courseGoal}
+              </Text>
+            )}
+            {(job.coursePlan?.modules || []).map((mod: any, i: number) => (
+              <View
+                key={i}
                 style={{
-                  fontFamily: 'DMSans-SemiBold',
-                  fontSize: 14,
-                  color: theme.colors.text,
-                  marginBottom: 4,
+                  marginBottom: 12,
+                  borderTopWidth: i > 0 ? 1 : 0,
+                  borderTopColor: theme.colors.gray[200],
+                  paddingTop: i > 0 ? 12 : 0,
                 }}
               >
-                Module {mod.moduleNumber || i + 1}: {mod.moduleTitle}
-              </Text>
-              <Text
-                style={{
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 13,
-                  color: theme.colors.textMuted,
-                }}
-              >
-                Lesson: {mod.lessonTitle}
-              </Text>
-              <Text
-                style={{
-                  fontFamily: 'DMSans-Regular',
-                  fontSize: 13,
-                  color: theme.colors.textMuted,
-                }}
-              >
-                Practice: {mod.practiceTitle}
-              </Text>
-            </View>
-          ))}
-        </>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans-SemiBold',
+                    fontSize: 14,
+                    color: theme.colors.text,
+                    marginBottom: 4,
+                  }}
+                >
+                  Module {mod.moduleNumber || i + 1}: {mod.moduleTitle}
+                </Text>
+                {mod.objective && (
+                  <Text style={styles.subtleText}>Objective: {mod.objective}</Text>
+                )}
+                {mod.lessonTitle && (
+                  <Text style={styles.subtleText}>Lesson: {mod.lessonTitle}</Text>
+                )}
+                {mod.lessonSummary && (
+                  <Text style={styles.subtleText}>Summary: {mod.lessonSummary}</Text>
+                )}
+                {mod.practiceTitle && (
+                  <Text style={styles.subtleText}>Practice: {mod.practiceTitle}</Text>
+                )}
+                {mod.practiceType && (
+                  <Text style={styles.subtleText}>Practice Type: {mod.practiceType}</Text>
+                )}
+                {Array.isArray(mod.reflectionPrompts) && mod.reflectionPrompts.length > 0 && (
+                  <Text style={styles.subtleText}>
+                    Prompts: {mod.reflectionPrompts.join(' • ')}
+                  </Text>
+                )}
+                {mod.keyTakeaway && (
+                  <Text style={styles.subtleText}>Key Takeaway: {mod.keyTakeaway}</Text>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       ),
     },
     {
@@ -348,7 +407,13 @@ export default function JobDetailScreen() {
         },
       ]),
       shouldRender: Boolean(job.params.customInstructions),
-      content: <Text style={styles.scriptText}>{job.params.customInstructions}</Text>,
+      content: (
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            <Text style={styles.scriptText}>{job.params.customInstructions}</Text>
+          </ScrollView>
+        </View>
+      ),
     },
     {
       id: 'generatedScript',
@@ -361,9 +426,11 @@ export default function JobDetailScreen() {
       ]),
       shouldRender: Boolean(job.generatedScript),
       content: (
-        <Text style={styles.scriptText} numberOfLines={20}>
-          {job.generatedScript}
-        </Text>
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            <Text style={styles.scriptText}>{job.generatedScript}</Text>
+          </ScrollView>
+        </View>
       ),
     },
     {
@@ -374,9 +441,13 @@ export default function JobDetailScreen() {
       ]),
       shouldRender: Boolean(job.error),
       content: (
-        <View style={styles.errorCard}>
-          <Ionicons name="alert-circle" size={20} color={theme.colors.error} />
-          <Text style={styles.errorText}>{job.error}</Text>
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            <View style={styles.errorCard}>
+              <Ionicons name="alert-circle" size={20} color={theme.colors.error} />
+              <Text style={styles.errorText}>{job.error}</Text>
+            </View>
+          </ScrollView>
         </View>
       ),
     },
@@ -385,7 +456,13 @@ export default function JobDetailScreen() {
       title: 'Image Prompt',
       summaryItems: toSummaryItems([{ label: 'Prompt', value: 'Present' }]),
       shouldRender: Boolean(job.imagePrompt),
-      content: <Text style={styles.scriptText}>{job.imagePrompt}</Text>,
+      content: (
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            <Text style={styles.scriptText}>{job.imagePrompt}</Text>
+          </ScrollView>
+        </View>
+      ),
     },
     {
       id: 'thumbnail',
@@ -403,6 +480,56 @@ export default function JobDetailScreen() {
           )}
           {job.thumbnailUrl && <InfoRow label="Thumbnail URL" value={job.thumbnailUrl} />}
           {job.imagePath && <InfoRow label="Image Path" value={job.imagePath} />}
+        </>
+      ),
+    },
+    {
+      id: 'courseScripts',
+      title: 'Course Scripts',
+      summaryItems: toSummaryItems([
+        { label: 'Scripts', value: courseScriptKeys.length || undefined },
+        {
+          label: 'Selected',
+          value: activeCourseScript
+            ? getCourseScriptTitle(activeCourseScript, job.coursePlan)
+            : undefined,
+        },
+      ]),
+      shouldRender:
+        job.contentType === 'course' && courseScriptKeys.length > 0,
+      content: (
+        <>
+          <View style={styles.scriptPicker}>
+            {courseScriptKeys.map((code) => {
+              const selected = code === activeCourseScript;
+              return (
+                <Pressable
+                  key={code}
+                  onPress={() => setSelectedCourseScript(code)}
+                  style={[
+                    styles.scriptChip,
+                    selected && styles.scriptChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.scriptChipText,
+                      selected && styles.scriptChipTextActive,
+                    ]}
+                  >
+                    {getCourseScriptTitle(code, job.coursePlan)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.scrollBox}>
+            <ScrollView nestedScrollEnabled>
+              <Text style={styles.scriptText}>
+                {courseScripts[activeCourseScript]}
+              </Text>
+            </ScrollView>
+          </View>
         </>
       ),
     },
@@ -726,6 +853,13 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.text,
       lineHeight: 22,
     },
+    subtleText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      lineHeight: 20,
+      marginBottom: 4,
+    },
     controlButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -736,6 +870,35 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.gray[200],
+    },
+    scrollBox: {
+      maxHeight: 320,
+    },
+    scriptPicker: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 12,
+    },
+    scriptChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: theme.colors.gray[100],
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    scriptChipActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    scriptChipText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.text,
+    },
+    scriptChipTextActive: {
+      color: '#fff',
     },
     retryButton: {
       flexDirection: 'row',
