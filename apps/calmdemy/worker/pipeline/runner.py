@@ -218,6 +218,26 @@ def process_job_pre(db, job_id: str, job_data: dict):
         process_course_job(db, job_id, job_data)
         return
 
+    # If a previous attempt already produced the pre-stage outputs, resume at TTS.
+    if job_data.get("formattedScript") and job_data.get("thumbnailUrl"):
+        _update_status(
+            db,
+            job_id,
+            "tts_pending",
+            {
+                "formattedScript": job_data.get("formattedScript"),
+                "imagePrompt": job_data.get("imagePrompt"),
+                "imagePath": job_data.get("imagePath"),
+                "thumbnailUrl": job_data.get("thumbnailUrl"),
+                "imageModel": job_data.get("imageModel"),
+                "generatedTitle": job_data.get("generatedTitle") or job_data.get("title"),
+                "ttsPendingAt": fs.SERVER_TIMESTAMP,
+            },
+            last_completed=job_data.get("lastCompletedStage") or "image_generating",
+        )
+        print(f"  [pipeline] Job {job_id} resumed at tts_pending.")
+        return
+
     cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
     stage_tracker = {"current": "llm_generating"}
 

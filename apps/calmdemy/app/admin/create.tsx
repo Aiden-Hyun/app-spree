@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useJobQueue } from '@features/admin/hooks/useJobQueue';
@@ -37,6 +38,11 @@ import {
   checkCourseCodeExists,
   Subject,
 } from '@features/admin/data/adminRepository';
+import {
+  getDraft,
+  saveDraft,
+  deleteDraft,
+} from '@features/admin/data/draftRepository';
 import { Theme } from '@/theme';
 
 // ==================== DROPDOWN OPTION BUILDERS ====================
@@ -77,10 +83,35 @@ const TONE_OPTIONS: DropdownOption[] = [
   { id: 'very calm', label: 'Very Calm' },
 ];
 
+type DraftPayload = {
+  contentType: FactoryContentType;
+  title: string;
+  topic: string;
+  duration: number;
+  style: string;
+  technique: string;
+  difficulty: string;
+  customInstructions: string;
+  imagePrompt: string;
+  autoPublish: boolean;
+  courseCode: string;
+  courseTitle: string;
+  subjectId: string;
+  targetAudience: string;
+  tone: string;
+  llmBackend: JobBackend;
+  ttsBackend: JobBackend;
+  llmModel: string;
+  ttsModel: string;
+  ttsVoice: string;
+};
+
 // ==================== SCREEN ====================
 
 export default function CreateContentScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { draftId } = useLocalSearchParams<{ draftId?: string }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { createJob } = useJobQueue();
@@ -96,6 +127,11 @@ export default function CreateContentScreen() {
   const [customInstructions, setCustomInstructions] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
   const [autoPublish, setAutoPublish] = useState(true);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const initialDraftRef = useRef<DraftPayload | null>(null);
+  const defaultSnapshotRef = useRef<DraftPayload | null>(null);
+  const skipPromptRef = useRef(false);
 
   // Course-specific state
   const [courseCode, setCourseCode] = useState('');
@@ -122,6 +158,78 @@ export default function CreateContentScreen() {
   useEffect(() => {
     getSubjects().then(setSubjects).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadDraft = async () => {
+      if (!draftId) {
+        setActiveDraftId(null);
+        initialDraftRef.current = null;
+        setDraftReady(true);
+        return;
+      }
+
+      const draft = await getDraft(String(draftId));
+      if (!isMounted) return;
+
+      if (draft) {
+        setContentType(draft.contentType);
+        setTitle(draft.title);
+        setTopic(draft.topic);
+        setDuration(draft.duration);
+        setStyle(draft.style);
+        setTechnique(draft.technique);
+        setDifficulty(draft.difficulty || 'beginner');
+        setCustomInstructions(draft.customInstructions);
+        setImagePrompt(draft.imagePrompt);
+        setAutoPublish(draft.autoPublish);
+
+        setCourseCode(draft.courseCode);
+        setCourseTitle(draft.courseTitle);
+        setSubjectId(draft.subjectId);
+        setTargetAudience(draft.targetAudience || 'beginner');
+        setTone(draft.tone || 'gentle');
+
+        setLlmBackend(draft.llmBackend);
+        setTtsBackend(draft.ttsBackend);
+        setLlmModel(draft.llmModel);
+        setTtsModel(draft.ttsModel);
+        setTtsVoice(draft.ttsVoice);
+
+        setActiveDraftId(draft.id);
+        initialDraftRef.current = {
+          contentType: draft.contentType,
+          title: draft.title,
+          topic: draft.topic,
+          duration: draft.duration,
+          style: draft.style,
+          technique: draft.technique,
+          difficulty: draft.difficulty,
+          customInstructions: draft.customInstructions,
+          imagePrompt: draft.imagePrompt,
+          autoPublish: draft.autoPublish,
+          courseCode: draft.courseCode,
+          courseTitle: draft.courseTitle,
+          subjectId: draft.subjectId,
+          targetAudience: draft.targetAudience,
+          tone: draft.tone,
+          llmBackend: draft.llmBackend,
+          ttsBackend: draft.ttsBackend,
+          llmModel: draft.llmModel,
+          ttsModel: draft.ttsModel,
+          ttsVoice: draft.ttsVoice,
+        };
+      }
+
+      setDraftReady(true);
+    };
+
+    loadDraft();
+    return () => {
+      isMounted = false;
+    };
+  }, [draftId]);
 
   const subjectOptions: DropdownOption[] = useMemo(
     () => subjects.map((s) => ({ id: s.id, label: `${s.label} — ${s.fullName}` })),
@@ -181,9 +289,82 @@ export default function CreateContentScreen() {
         id: v.id,
         label: v.label,
         description: v.description,
+        sampleUrl: v.sampleUrl,
       })),
     [ttsModel]
   );
+
+  const buildDraftPayload = useCallback((): DraftPayload => ({
+    contentType,
+    title,
+    topic,
+    duration,
+    style,
+    technique,
+    difficulty,
+    customInstructions,
+    imagePrompt,
+    autoPublish,
+    courseCode,
+    courseTitle,
+    subjectId,
+    targetAudience,
+    tone,
+    llmBackend,
+    ttsBackend,
+    llmModel,
+    ttsModel,
+    ttsVoice,
+  }), [
+    contentType,
+    title,
+    topic,
+    duration,
+    style,
+    technique,
+    difficulty,
+    customInstructions,
+    imagePrompt,
+    autoPublish,
+    courseCode,
+    courseTitle,
+    subjectId,
+    targetAudience,
+    tone,
+    llmBackend,
+    ttsBackend,
+    llmModel,
+    ttsModel,
+    ttsVoice,
+  ]);
+
+  const isDirty = useMemo(() => {
+    if (!draftReady) return false;
+    const baseline = initialDraftRef.current || defaultSnapshotRef.current;
+    if (!baseline) return false;
+    const current = buildDraftPayload();
+    return JSON.stringify(current) !== JSON.stringify(baseline);
+  }, [buildDraftPayload, draftReady]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    if (!initialDraftRef.current && !defaultSnapshotRef.current) {
+      defaultSnapshotRef.current = buildDraftPayload();
+    }
+  }, [draftReady, buildDraftPayload]);
+
+  const handleSaveDraft = useCallback(async () => {
+    const payload = buildDraftPayload();
+    const saved = await saveDraft({
+      id: activeDraftId || undefined,
+      ...payload,
+    });
+    setActiveDraftId(saved.id);
+    initialDraftRef.current = payload;
+    if (!defaultSnapshotRef.current) {
+      defaultSnapshotRef.current = payload;
+    }
+  }, [activeDraftId, buildDraftPayload]);
 
   // Handlers
   const handleLLMBackendChange = (newBackend: JobBackend) => {
@@ -203,6 +384,44 @@ export default function CreateContentScreen() {
     setTtsModel(id);
     setTtsVoice(getDefaultVoice(id));
   };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (skipPromptRef.current || !isDirty) {
+        return;
+      }
+
+      event.preventDefault();
+
+      Alert.alert(
+        'Save Draft?',
+        'You have unsaved input. Would you like to save this as a draft?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: async () => {
+              if (activeDraftId) {
+                await deleteDraft(activeDraftId);
+              }
+              initialDraftRef.current = defaultSnapshotRef.current;
+              navigation.dispatch(event.data.action);
+            },
+          },
+          {
+            text: 'Save Draft',
+            onPress: async () => {
+              await handleSaveDraft();
+              navigation.dispatch(event.data.action);
+            },
+          },
+        ]
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation, isDirty, activeDraftId, handleSaveDraft]);
 
   const handleSubmit = async () => {
     if (isCourse) {
@@ -270,6 +489,10 @@ export default function CreateContentScreen() {
       };
 
       await createJob(input);
+      if (activeDraftId) {
+        await deleteDraft(activeDraftId);
+      }
+      skipPromptRef.current = true;
       router.back();
     } catch (error) {
       Alert.alert('Error', 'Failed to create job. Please try again.');

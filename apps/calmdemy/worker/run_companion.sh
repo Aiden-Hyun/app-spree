@@ -37,4 +37,5 @@ ensure_venv "$BASE_VENV" "$BASE_PY" "$BASE_REQ" "$BASE_MARKER"
 ensure_venv "$DMS_VENV" "$DMS_PY" "$DMS_REQ" "$DMS_MARKER"
 
 echo "[companion] Starting local companion..."
+export DMS_DEVICE="cpu"
 exec "$BASE_PY" "$WORKER_DIR/local_companion.py"

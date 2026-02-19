@@ -289,7 +289,8 @@ See `worker/CONTENT_FACTORY.md` for full schema. Core fields:
 - `createdAt`, `updatedAt`, `startedAt`, `ttsPendingAt`, `completedAt` (timestamps)
 - `createdBy` (string)
 - Optional: `generatedScript`, `formattedScript`, `generatedTitle`, `imagePrompt`, `imagePath`,
-  `thumbnailUrl`, `audioPath`, `error`, `courseProgress`, `coursePlan`, `courseId`
+  `thumbnailUrl`, `audioPath`, `error`, `courseProgress`, `coursePlan`,
+  `courseRawScripts`, `courseFormattedScripts`, `courseAudioResults`, `courseId`
 
 ### `worker_status`
 - `status` (string)

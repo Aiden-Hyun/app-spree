@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   subscribeToJobs,
   subscribeToJob,
@@ -13,12 +14,14 @@ import {
 } from '../data/adminRepository';
 import {
   ContentJob,
+  ContentDraft,
   CreateJobInput,
   JobStatus,
   WorkerControl,
   WorkerDesiredState,
   WorkerStatus,
 } from '../types';
+import { getDrafts, deleteDraft as removeDraft } from '../data/draftRepository';
 
 // ==================== JOB LIST HOOK ====================
 
@@ -121,4 +124,31 @@ export function useWorkerControl(workerId: 'local' | 'cloud') {
   );
 
   return { control, setDesiredState, setIdleTimeout };
+}
+
+// ==================== DRAFTS HOOK ====================
+
+export function useDrafts() {
+  const [drafts, setDrafts] = useState<ContentDraft[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    const next = await getDrafts();
+    setDrafts(next);
+    setIsLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
+  const deleteDraft = useCallback(async (id: string) => {
+    await removeDraft(id);
+    await refresh();
+  }, [refresh]);
+
+  return { drafts, isLoading, refresh, deleteDraft };
 }

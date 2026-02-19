@@ -13,11 +13,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import {
   useJobQueue,
+  useDrafts,
   useWorkerControl,
   useWorkerStatus,
 } from '@features/admin/hooks/useJobQueue';
 import { JobCard } from '@features/admin/components/JobCard';
-import { JobStatus, WorkerRuntimeState, WorkerStatus } from '@features/admin/types';
+import {
+  ContentDraft,
+  CONTENT_TYPE_LABELS,
+  JobStatus,
+  WorkerRuntimeState,
+  WorkerStatus,
+} from '@features/admin/types';
 import { Theme } from '@/theme';
 
 const FILTER_OPTIONS: { label: string; value: JobStatus | undefined }[] = [
@@ -38,6 +45,7 @@ export default function AdminDashboard() {
   const [restartInProgress, setRestartInProgress] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(true);
   const { jobs, isLoading } = useJobQueue(filter);
+  const { drafts, deleteDraft } = useDrafts();
   const { status: localWorker } = useWorkerStatus('local');
   const { status: cloudWorker } = useWorkerStatus('cloud');
   const {
@@ -326,12 +334,62 @@ export default function AdminDashboard() {
         ))}
       </View>
 
+      {drafts.length > 0 && (
+        <View style={styles.draftsSection}>
+          <View style={styles.draftsHeader}>
+            <Text style={styles.draftsTitle}>Drafts</Text>
+            <Text style={styles.draftsCount}>{drafts.length}</Text>
+          </View>
+          <View style={styles.draftsList}>
+            {drafts.map((draft) => (
+              <Pressable
+                key={draft.id}
+                style={({ pressed }) => [
+                  styles.draftCard,
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/admin/create',
+                    params: { draftId: draft.id },
+                  })
+                }
+              >
+                <View style={styles.draftRow}>
+                  <View style={styles.draftBadge}>
+                    <Text style={styles.draftBadgeText}>Draft</Text>
+                  </View>
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      deleteDraft(draft.id);
+                    }}
+                    style={({ pressed }) => [
+                      styles.draftDelete,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={theme.colors.error} />
+                  </Pressable>
+                </View>
+                <Text style={styles.draftLabel} numberOfLines={2}>
+                  {getDraftLabel(draft)}
+                </Text>
+                <Text style={styles.draftMeta}>
+                  Updated {formatDraftTime(draft.updatedAt)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Job List */}
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
-      ) : jobs.length === 0 ? (
+      ) : jobs.length === 0 && drafts.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="flask-outline" size={48} color={theme.colors.textMuted} />
           <Text style={styles.emptyText}>No jobs yet</Text>
@@ -493,6 +551,23 @@ function getLocalWorkerState(
   }
 
   return heartbeat;
+}
+
+function getDraftLabel(draft: ContentDraft): string {
+  const base =
+    draft.contentType === 'course'
+      ? (draft.courseTitle || draft.topic)
+      : (draft.title || draft.topic);
+  const typeLabel = CONTENT_TYPE_LABELS[draft.contentType] || 'Content';
+  if (base) {
+    return `${typeLabel}: ${base}`;
+  }
+  return `${typeLabel} Draft`;
+}
+
+function formatDraftTime(updatedAt: number): string {
+  if (!updatedAt) return 'unknown';
+  return new Date(updatedAt).toLocaleString();
 }
 
 const createStyles = (theme: Theme) =>
@@ -705,6 +780,66 @@ const createStyles = (theme: Theme) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
       gap: 8,
+    },
+    draftsSection: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    draftsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    draftsTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    draftsCount: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    draftsList: {
+      gap: 10,
+    },
+    draftCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 14,
+      padding: 14,
+    },
+    draftRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    draftBadge: {
+      backgroundColor: `${theme.colors.warning}25`,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+    },
+    draftBadgeText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 11,
+      color: theme.colors.warning,
+    },
+    draftDelete: {
+      padding: 4,
+    },
+    draftLabel: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 14,
+      color: theme.colors.text,
+      lineHeight: 20,
+    },
+    draftMeta: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      marginTop: 6,
     },
     filterChip: {
       paddingHorizontal: 14,

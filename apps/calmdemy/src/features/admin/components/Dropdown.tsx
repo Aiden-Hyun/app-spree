@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,18 @@ import {
   FlatList,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
+import { useAudioPlayer } from '@shared/hooks/useAudioPlayer';
 import { Theme } from '@/theme';
 
 export interface DropdownOption {
   id: string;
   label: string;
   description?: string;
+  sampleUrl?: string;
 }
 
 interface DropdownProps {
@@ -34,6 +37,9 @@ export function Dropdown({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [open, setOpen] = useState(false);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const previewPlayer = useAudioPlayer();
 
   const selectedOption = options.find((o) => o.id === selectedId);
   const displayLabel = selectedOption?.label || placeholder;
@@ -42,6 +48,43 @@ export function Dropdown({
     onSelect(id);
     setOpen(false);
   };
+
+  const handlePreview = async (item: DropdownOption) => {
+    if (!item.sampleUrl) return;
+
+    if (previewingId && previewingId !== item.id) {
+      previewPlayer.stop();
+    }
+
+    if (previewingId === item.id) {
+      if (previewPlayer.isPlaying) {
+        previewPlayer.pause();
+      } else {
+        previewPlayer.play();
+      }
+      return;
+    }
+
+    try {
+      setPreviewingId(item.id);
+      setPreviewLoadingId(item.id);
+      await previewPlayer.loadAudio(item.sampleUrl);
+      setPreviewLoadingId(null);
+      previewPlayer.play();
+    } catch (err) {
+      console.warn('Failed to preview audio:', err);
+      setPreviewLoadingId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      previewPlayer.stop();
+      previewPlayer.cleanup();
+      setPreviewingId(null);
+      setPreviewLoadingId(null);
+    }
+  }, [open]);
 
   return (
     <>
@@ -80,6 +123,8 @@ export function Dropdown({
               style={styles.list}
               renderItem={({ item }) => {
                 const isSelected = item.id === selectedId;
+                const isPreviewing = item.id === previewingId;
+                const isPreviewLoading = item.id === previewLoadingId;
                 return (
                   <Pressable
                     style={({ pressed }) => [
@@ -104,13 +149,34 @@ export function Dropdown({
                         </Text>
                       ) : null}
                     </View>
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color={theme.colors.primary}
-                      />
-                    )}
+                    <View style={styles.optionActions}>
+                      {item.sampleUrl ? (
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.previewButton,
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={() => handlePreview(item)}
+                        >
+                          {isPreviewLoading ? (
+                            <ActivityIndicator size="small" color={theme.colors.primary} />
+                          ) : (
+                            <Ionicons
+                              name={isPreviewing && previewPlayer.isPlaying ? 'pause' : 'play'}
+                              size={18}
+                              color={theme.colors.primary}
+                            />
+                          )}
+                        </Pressable>
+                      ) : null}
+                      {isSelected && (
+                        <Ionicons
+                          name="checkmark"
+                          size={20}
+                          color={theme.colors.primary}
+                        />
+                      )}
+                    </View>
                   </Pressable>
                 );
               }}
@@ -182,6 +248,16 @@ const createStyles = (theme: Theme) => {
     optionContent: {
       flex: 1,
       marginRight: 12,
+    },
+    optionActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    previewButton: {
+      padding: 6,
+      borderRadius: 999,
+      backgroundColor: theme.colors.surface,
     },
     optionLabel: {
       fontFamily: 'DMSans-Medium',

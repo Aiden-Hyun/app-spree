@@ -108,6 +108,25 @@ def load_worker_stacks() -> list[dict]:
                 "ttsModels": ["dms"],
                 "enabled": True,
             },
+            {
+                "id": "local-course-default",
+                "role": "course",
+                "venv": ".venv",
+                "ttsModels": [
+                    "piper",
+                    "styletts2",
+                    "gemini-tts-flash",
+                    "gemini-tts-pro",
+                ],
+                "enabled": True,
+            },
+            {
+                "id": "local-course-dms",
+                "role": "course",
+                "venv": ".venv-dms",
+                "ttsModels": ["dms"],
+                "enabled": True,
+            },
         ]
 
     with open(STACKS_PATH, "r", encoding="utf-8") as f:

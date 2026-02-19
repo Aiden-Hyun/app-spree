@@ -112,10 +112,16 @@ def _claim_job(db, doc_ref, role: str, tts_allowlist: set[str]) -> dict | None:
             return None
         data = snapshot.to_dict()
         status = data.get("status")
-        if role in ("pre", "full"):
+        if role in ("pre", "full", "course"):
             if status != "pending":
                 return None
             if _is_cloud_job(data):
+                return None
+            if role == "course" and data.get("contentType") != "course":
+                return None
+            if role == "pre" and data.get("contentType") == "course":
+                return None
+            if role == "course" and tts_allowlist and data.get("ttsModel") not in tts_allowlist:
                 return None
             transaction.update(doc_ref, {
                 "status": "llm_generating",
@@ -143,6 +149,8 @@ def get_next_job(db, role: str, tts_allowlist: set[str]):
     jobs_ref = db.collection(config.JOBS_COLLECTION)
 
     status_filter = "pending" if role in ("pre", "full") else "tts_pending"
+    if role == "course":
+        status_filter = "pending"
 
     # Firestore can't do "NOT EQUAL" across two fields in a compound query,
     # so we fetch jobs in batches and filter in Python.
@@ -165,8 +173,15 @@ def get_next_job(db, role: str, tts_allowlist: set[str]):
 
         for doc in docs:
             data = doc.to_dict()
-            if role in ("pre", "full"):
+            if role in ("pre", "full", "course"):
                 if _is_cloud_job(data):
+                    continue
+                if role == "course":
+                    if data.get("contentType") != "course":
+                        continue
+                    if tts_allowlist and data.get("ttsModel") not in tts_allowlist:
+                        continue
+                if role == "pre" and data.get("contentType") == "course":
                     continue
             else:
                 if _is_cloud_tts(data):
@@ -307,7 +322,7 @@ def _handle_course_publish(db, job_id: str, job_data: dict):
 def main():
     worker_id = os.getenv("WORKER_ID", "local")
     worker_role = os.getenv("WORKER_ROLE", "full").strip().lower()
-    if worker_role not in ("pre", "tts", "full"):
+    if worker_role not in ("pre", "tts", "full", "course"):
         print(f"[local-worker] Unknown WORKER_ROLE '{worker_role}', defaulting to 'full'.")
         worker_role = "full"
     tts_allowlist = _parse_tts_models(os.getenv("WORKER_TTS_MODELS"))
@@ -318,6 +333,9 @@ def main():
     print(f"  Project:       {config.PROJECT_ID}")
     if worker_role == "pre":
         print("  Handles:       pre stage (LLM + QA + image)")
+    elif worker_role == "course":
+        allowlist_text = ", ".join(sorted(tts_allowlist)) if tts_allowlist else "all"
+        print(f"  Handles:       course jobs (models: {allowlist_text})")
     elif worker_role == "tts":
         allowlist_text = ", ".join(sorted(tts_allowlist)) if tts_allowlist else "all"
         print(f"  Handles:       TTS stage (models: {allowlist_text})")
@@ -371,6 +389,8 @@ def main():
                     process_job_pre(db, job_id, job_data)
                 elif worker_role == "tts":
                     process_job_tts(db, job_id, job_data)
+                elif worker_role == "course":
+                    process_job(db, job_id, job_data)
                 else:
                     process_job(db, job_id, job_data)
 

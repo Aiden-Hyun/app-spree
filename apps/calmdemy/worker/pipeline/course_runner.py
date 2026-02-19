@@ -18,6 +18,8 @@ Session code convention:
 """
 
 import json
+import ast
+import re
 import os
 import traceback
 
@@ -28,14 +30,12 @@ from .qa_formatter import format_script
 from .tts_converter import convert_to_audio
 from .audio_processor import post_process_audio
 from .storage_uploader import upload_audio, upload_image
-from .image_generator import (
-    build_image_prompt,
-    generate_image,
-    DEFAULT_FALLBACK_URL,
-)
 from .voice_utils import get_voice_display_name
 import config
 
+DEFAULT_FALLBACK_URL = (
+    "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80"
+)
 
 # Session definitions in order
 SESSION_DEFS = [
@@ -102,6 +102,11 @@ Target audience: {params.get("targetAudience", "beginner")}
 Tone: {params.get("tone", "gentle")}
 
 Output the plan as JSON only, in this exact format (no markdown, no extra text):
+Rules:
+- Use plain text only (no SSML, no XML/HTML tags).
+- Do NOT include double quotes inside string values.
+- If you need quotation marks, use single quotes instead.
+ 
 {{
   "courseTitle": "...",
   "courseGoal": "...",
@@ -175,6 +180,21 @@ def _extract_json_object(text: str) -> str:
     raise ValueError("JSON object not balanced")
 
 
+def _clean_json_text(text: str) -> str:
+    """Best-effort cleanup for common LLM JSON mistakes."""
+    cleaned = text
+    # Normalize smart quotes
+    cleaned = cleaned.replace("“", "\"").replace("”", "\"")
+    cleaned = cleaned.replace("‘", "'").replace("’", "'")
+    # Convert double-quoted attribute values inside tags to single quotes
+    cleaned = re.sub(r'(<[^>]*?)="([^"]*?)"', r"\\1='\\2'", cleaned)
+    # Replace SSML break tags with pause markers
+    cleaned = re.sub(r"<break\\s+time='(\\d+)s'\\s*/?>", r"[PAUSE \\1s]", cleaned, flags=re.IGNORECASE)
+    # Remove trailing commas before } or ]
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+    return cleaned
+
+
 def _parse_plan(raw: str) -> dict:
     """Parse the LLM plan output as JSON. Tolerates markdown fences and extra text."""
     text = raw.strip()
@@ -188,7 +208,18 @@ def _parse_plan(raw: str) -> dict:
         return json.loads(text)
     except json.JSONDecodeError:
         extracted = _extract_json_object(text)
-        return json.loads(extracted)
+        cleaned = _clean_json_text(extracted)
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            py_text = cleaned
+            py_text = re.sub(r"\bnull\b", "None", py_text)
+            py_text = re.sub(r"\btrue\b", "True", py_text)
+            py_text = re.sub(r"\bfalse\b", "False", py_text)
+            data = ast.literal_eval(py_text)
+            if isinstance(data, dict):
+                return data
+            raise
 
 
 def _build_session_script_prompt(
@@ -301,41 +332,59 @@ def process_course_job(db, job_id: str, job_data: dict):
     params = job_data.get("params", {})
     course_code = params.get("courseCode", "COURSE101")
 
+    plan = job_data.get("coursePlan")
+    raw_scripts: dict[str, str] = job_data.get("courseRawScripts") or {}
+    formatted_scripts: dict[str, str] = job_data.get("courseFormattedScripts") or {}
+    audio_results: dict[str, dict] = job_data.get("courseAudioResults") or {}
+    current_stage = "llm_generating"
+
     try:
         # ========== STEP 1: Generate course plan ==========
-        _update_status(db, job_id, "llm_generating")
-        _update_progress(db, job_id, "Generating course plan...")
-
-        print(f"  [course] Generating plan for {course_code}...")
         adapter = _get_llm_adapter(job_data)
-        plan_prompt = _build_course_plan_prompt(job_data)
-        plan_raw = adapter.generate(plan_prompt, max_tokens=4096)
+        if not plan:
+            _update_status(db, job_id, "llm_generating")
+            _update_progress(db, job_id, "Generating course plan...")
 
-        plan = _parse_plan(plan_raw)
-        print(f"  [course] Plan parsed: {plan.get('courseTitle', 'unknown')}")
+            print(f"  [course] Generating plan for {course_code}...")
+            plan_prompt = _build_course_plan_prompt(job_data)
+            plan_raw = adapter.generate(plan_prompt, max_tokens=4096)
 
-        # Save plan to job
-        _update_status(db, job_id, "llm_generating", {"coursePlan": plan})
+            plan = _parse_plan(plan_raw)
+            print(f"  [course] Plan parsed: {plan.get('courseTitle', 'unknown')}")
+
+            # Save plan to job
+            _update_status(db, job_id, "llm_generating", {
+                "coursePlan": plan,
+                "lastCompletedStage": "llm_generating",
+            })
 
         # ========== STEP 1b: Generate course thumbnail ==========
         _update_status(db, job_id, "image_generating")
+        current_stage = "image_generating"
         course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled Course"))
-        image_prompt = build_image_prompt(
-            job_data,
-            course_title,
-            params.get("topic", ""),
-            "course",
-            plan=plan,
-        )
+        image_prompt = ""
         has_thumbnail = bool(job_data.get("thumbnailUrl"))
         thumbnail_url = job_data.get("thumbnailUrl") or DEFAULT_FALLBACK_URL
         image_path = job_data.get("imagePath", "") or ""
         if not has_thumbnail:
-            local_image_path = generate_image(image_prompt)
-            image_path, thumbnail_url = upload_image(
-                local_image_path,
-                {**job_data, "contentType": "course"},
-            )
+            try:
+                from .image_generator import build_image_prompt, generate_image
+                image_prompt = build_image_prompt(
+                    job_data,
+                    course_title,
+                    params.get("topic", ""),
+                    "course",
+                    plan=plan,
+                )
+                local_image_path = generate_image(image_prompt)
+                image_path, thumbnail_url = upload_image(
+                    local_image_path,
+                    {**job_data, "contentType": "course"},
+                )
+            except Exception as e:
+                print(f"  [course] Image generation skipped: {e}")
+                if not image_prompt:
+                    image_prompt = f"Course thumbnail for {course_title}"
 
         job_data = {
             **job_data,
@@ -349,53 +398,84 @@ def process_course_job(db, job_id: str, job_data: dict):
             "imagePath": image_path,
             "thumbnailUrl": thumbnail_url,
             "imageModel": config.IMAGE_MODEL_ID,
+            "lastCompletedStage": "image_generating",
         })
 
         # ========== STEP 2: Generate scripts for all 9 sessions ==========
-        scripts: dict[str, str] = {}
-        for i, session_def in enumerate(SESSION_DEFS):
-            session_code = f"{course_code}{session_def['suffix']}"
-            progress = f"Script {i + 1}/{TOTAL_SESSIONS} ({session_code})"
-            _update_progress(db, job_id, progress)
-            print(f"  [course] {progress}")
+        if len(formatted_scripts) < TOTAL_SESSIONS:
+            current_stage = "llm_generating"
+            scripts: dict[str, str] = dict(raw_scripts)
 
-            prompt = _build_session_script_prompt(session_def, plan, job_data)
-            raw_script = adapter.generate(
-                prompt,
-                max_tokens=max(2048, session_def["duration_min"] * 130 * 2),
-            )
+            for i, session_def in enumerate(SESSION_DEFS):
+                session_code = f"{course_code}{session_def['suffix']}"
+                if session_code in formatted_scripts:
+                    continue
+                if scripts.get(session_code, "").strip():
+                    continue
 
-            # Clean up end markers
-            for marker in ["---END---", "<end_of_script>"]:
-                if marker in raw_script:
-                    raw_script = raw_script[:raw_script.index(marker)].strip()
+                progress = f"Script {i + 1}/{TOTAL_SESSIONS} ({session_code})"
+                _update_progress(db, job_id, progress)
+                print(f"  [course] {progress}")
 
-            scripts[session_code] = raw_script
+                prompt = _build_session_script_prompt(session_def, plan, job_data)
+                raw_script = adapter.generate(
+                    prompt,
+                    max_tokens=max(2048, session_def["duration_min"] * 130 * 2),
+                )
 
-        # Save all scripts
-        _update_status(db, job_id, "qa_formatting", {
-            "generatedScript": json.dumps(
-                {k: v[:200] + "..." for k, v in scripts.items()},
-                indent=2,
-            ),
-        })
+                # Clean up end markers
+                for marker in ["---END---", "<end_of_script>"]:
+                    if marker in raw_script:
+                        raw_script = raw_script[:raw_script.index(marker)].strip()
 
-        # ========== STEP 3: QA format each script ==========
-        formatted_scripts: dict[str, str] = {}
-        for session_code, script in scripts.items():
-            try:
-                formatted = format_script(script, job_data)
-            except ValueError:
-                # If QA fails (too short), use raw script
-                formatted = script.strip()
-            formatted_scripts[session_code] = formatted
+                scripts[session_code] = raw_script
+
+                # Persist progress so retries don't regenerate scripts
+                _update_status(db, job_id, "llm_generating", {
+                    "generatedScript": json.dumps(
+                        {k: v[:200] + "..." for k, v in scripts.items()},
+                        indent=2,
+                    ),
+                    "courseRawScripts": scripts,
+                    "courseProgress": progress,
+                })
+
+            raw_scripts = scripts
+
+            # ========== STEP 3: QA format each script ==========
+            current_stage = "qa_formatting"
+            if not formatted_scripts:
+                formatted_scripts = {}
+
+            for session_def in SESSION_DEFS:
+                session_code = f"{course_code}{session_def['suffix']}"
+                if session_code in formatted_scripts:
+                    continue
+                script = scripts.get(session_code, "").strip()
+                if not script:
+                    raise RuntimeError(f"Missing raw script for {session_code}")
+                try:
+                    formatted = format_script(script, job_data)
+                except ValueError:
+                    # If QA fails (too short), use raw script
+                    formatted = script.strip()
+                formatted_scripts[session_code] = formatted
+
+            _update_status(db, job_id, "qa_formatting", {
+                "courseFormattedScripts": formatted_scripts,
+                "lastCompletedStage": "qa_formatting",
+            })
 
         # ========== STEP 4 & 5: TTS + post-process each session ==========
         _update_status(db, job_id, "tts_converting")
-        audio_results: dict[str, dict] = {}  # session_code -> {path, duration}
+        current_stage = "tts_converting"
+        if audio_results is None:
+            audio_results = {}
 
         for i, session_def in enumerate(SESSION_DEFS):
             session_code = f"{course_code}{session_def['suffix']}"
+            if session_code in audio_results and audio_results[session_code].get("storagePath"):
+                continue
             progress = f"Audio {i + 1}/{TOTAL_SESSIONS} ({session_code})"
             _update_progress(db, job_id, progress)
             print(f"  [course] {progress}")
@@ -423,9 +503,15 @@ def process_course_job(db, job_id: str, job_data: dict):
                 "storagePath": storage_path,
                 "durationSec": duration_sec,
             }
+            _update_status(db, job_id, "tts_converting", {
+                "courseAudioResults": audio_results,
+                "courseProgress": progress,
+                "lastCompletedStage": "tts_converting",
+            })
 
         _update_status(db, job_id, "uploading", {
             "courseProgress": f"All {TOTAL_SESSIONS} audio files uploaded",
+            "lastCompletedStage": "uploading",
         })
 
         # ========== STEP 6: Publish course + sessions ==========
@@ -433,6 +519,7 @@ def process_course_job(db, job_id: str, job_data: dict):
 
         if auto_publish:
             _update_status(db, job_id, "publishing")
+            current_stage = "publishing"
             _update_progress(db, job_id, "Publishing course...")
 
             course_id, session_ids = _publish_course(
@@ -444,6 +531,7 @@ def process_course_job(db, job_id: str, job_data: dict):
                 "courseSessionIds": session_ids,
                 "courseProgress": "Published",
                 "completedAt": fs.SERVER_TIMESTAMP,
+                "lastCompletedStage": "publishing",
             })
             print(f"  [course] Course {course_code} published! ID: {course_id}")
         else:
@@ -463,6 +551,7 @@ def process_course_job(db, job_id: str, job_data: dict):
                 "courseProgress": "Completed (awaiting approval)",
                 "coursePreviewSessions": preview_sessions,
                 "completedAt": fs.SERVER_TIMESTAMP,
+                "lastCompletedStage": "uploading",
             })
             print(f"  [course] Course {course_code} done (awaiting approval).")
 
@@ -472,7 +561,8 @@ def process_course_job(db, job_id: str, job_data: dict):
         traceback.print_exc()
         _update_status(db, job_id, "failed", {
             "error": error_msg,
-            "courseProgress": "Failed",
+            "failedStage": current_stage,
+            "resumeAvailable": bool(formatted_scripts or audio_results or raw_scripts),
         })
 
 

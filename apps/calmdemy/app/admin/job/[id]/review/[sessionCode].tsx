@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@core/providers/contexts/ThemeContext";
 import { useJobDetail } from "@features/admin/hooks/useJobQueue";
+import { getVoiceLabelById } from "@features/admin/constants/models";
 import { getAudioUrlFromPath } from "@/constants/audioFiles";
 import { useAudioPlayer } from "@shared/hooks/useAudioPlayer";
 import { MediaPlayer } from "@shared/ui/MediaPlayer";
@@ -74,12 +75,13 @@ export default function AdminCourseSessionReviewScreen() {
   }
 
   const durationMinutes = session.durationSec ? Math.max(1, Math.ceil(session.durationSec / 60)) : 0;
+  const narratorName = getVoiceLabelById(job.ttsVoice || "");
 
   return (
     <MediaPlayer
       category="course session"
       title={session.title || "Session Preview"}
-      instructor={job.ttsVoice || "Guide"}
+      instructor={narratorName || "Guide"}
       description={session.label}
       durationMinutes={durationMinutes}
       gradientColors={getCourseGradient()}

@@ -12,7 +12,7 @@ When the user provides a **course code + course title + course description** (or
 
 * Course code and title
 * One‑paragraph course goal
-* **Course intro outline**: narrated by **Britney Irvine**, includes a short educational disclaimer
+* **Course intro outline**: includes a short educational disclaimer (do not include narrator names)
 * **4 modules** (Module 1 to Module 4), each with:
 
   * Module title
@@ -64,6 +64,14 @@ When the user provides a **course code + course title + course description** (or
 
 * Do not include AI preambles or acknowledgements (e.g., "Okay, here's...").
 * Output only the requested content (plan or script) with no extra commentary.
+
+### Course plan JSON rules (very important)
+
+These rules apply **only** when outputting the course plan JSON:
+
+* Output **JSON only** — no markdown, no extra text.
+* Use **plain text only** in values (no SSML, no XML/HTML tags).
+* Do **not** include double quotes inside string values.
 
 ElevenLabs formatting rules (strict, explicit)
 

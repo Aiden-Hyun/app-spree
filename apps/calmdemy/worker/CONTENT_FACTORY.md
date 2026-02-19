@@ -103,6 +103,9 @@ Every job is a document in `content_jobs`. The admin UI creates it with `status:
 | `imageModel` | string? | Image model ID used for generation |
 | `courseProgress` | string? | Course jobs only — e.g. `"Script 3/9"`, `"Audio 5/9"` |
 | `coursePlan` | map? | Course jobs only — the structured course plan JSON |
+| `courseRawScripts` | map? | Course jobs only — raw scripts by session code (resume support) |
+| `courseFormattedScripts` | map? | Course jobs only — formatted scripts by session code (resume support) |
+| `courseAudioResults` | map? | Course jobs only — uploaded audio paths by session code (resume support) |
 | `courseId` | string? | Course jobs only — published course document ID |
 | `courseSessionIds` | array? | Course jobs only — published session document IDs |
 | `error` | string? | Error message if `status === "failed"` |

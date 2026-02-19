@@ -16,6 +16,7 @@ export interface VoiceOption {
   label: string;
   ttsModel: string; // which TTS model this voice belongs to
   description: string;
+  sampleUrl?: string;
 }
 
 // ==================== LLM MODELS ====================
@@ -137,21 +138,87 @@ export const TTS_VOICES: VoiceOption[] = [
   // DMS voices (Kyutai)
   {
     id: 'expresso/ex03-ex01_happy_001_channel1_334s.wav',
-    label: 'Britney',
+    label: 'Nolan',
     ttsModel: 'dms',
     description: 'Kyutai DMS voice (Expresso, happy)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/expresso/ex03-ex01_happy_001_channel1_334s.wav',
+  },
+  {
+    id: 'expresso/ex03-ex01_calm_001_channel1_1143s.wav',
+    label: 'Gavin',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (Expresso, calm)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/expresso/ex03-ex01_calm_001_channel1_1143s.wav',
   },
   {
     id: 'vctk/p226_023.wav',
-    label: 'Delilah',
+    label: 'Hugo',
     ttsModel: 'dms',
     description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p226_023.wav',
   },
   {
     id: 'vctk/p225_023.wav',
-    label: 'Milo',
+    label: 'Mila',
     ttsModel: 'dms',
     description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p225_023.wav',
+  },
+  {
+    id: 'vctk/p227_023.wav',
+    label: 'Simon',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p227_023.wav',
+  },
+  {
+    id: 'vctk/p228_023.wav',
+    label: 'Noa',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p228_023.wav',
+  },
+  {
+    id: 'vctk/p229_023.wav',
+    label: 'Luna',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p229_023.wav',
+  },
+  {
+    id: 'vctk/p230_023.wav',
+    label: 'Eva',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p230_023.wav',
+  },
+  {
+    id: 'vctk/p231_023.wav',
+    label: 'Iris',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p231_023.wav',
+  },
+  {
+    id: 'vctk/p232_023.wav',
+    label: 'Leo',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p232_023.wav',
+  },
+  {
+    id: 'vctk/p233_023.wav',
+    label: 'Aria',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p233_023.wav',
+  },
+  {
+    id: 'vctk/p234_023.wav',
+    label: 'Nora',
+    ttsModel: 'dms',
+    description: 'Kyutai DMS voice (VCTK)',
+    sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p234_023.wav',
   },
   // StyleTTS2 voices
   {
@@ -225,4 +292,9 @@ export function getDefaultTTSModel(backend: JobBackend = 'local'): string {
 export function getDefaultVoice(ttsModelId: string): string {
   const voices = getVoicesForTTSModel(ttsModelId);
   return voices.length > 0 ? voices[0].id : '';
+}
+
+export function getVoiceLabelById(voiceId: string): string {
+  const voice = TTS_VOICES.find((v) => v.id === voiceId);
+  return voice?.label ?? voiceId;
 }

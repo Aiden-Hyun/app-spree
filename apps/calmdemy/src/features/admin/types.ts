@@ -146,6 +146,9 @@ export interface ContentJob {
   // Course-specific outputs
   courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"
   coursePlan?: Record<string, any>;
+  courseRawScripts?: Record<string, string>;
+  courseFormattedScripts?: Record<string, string>;
+  courseAudioResults?: Record<string, { storagePath: string; durationSec: number }>;
   coursePreviewSessions?: Array<{
     code: string;
     label: string;
@@ -169,6 +172,42 @@ export interface ContentJob {
   ttsPendingAt?: Timestamp;
   completedAt?: Timestamp;
   createdBy: string;
+}
+
+// ==================== LOCAL DRAFTS ====================
+
+export interface ContentDraft {
+  id: string;
+  contentType: FactoryContentType;
+
+  // Common fields
+  title: string;
+  topic: string;
+  duration: number;
+  style: string;
+  technique: string;
+  difficulty: string;
+  customInstructions: string;
+  imagePrompt: string;
+  autoPublish: boolean;
+
+  // Course fields
+  courseCode: string;
+  courseTitle: string;
+  subjectId: string;
+  targetAudience: string;
+  tone: string;
+
+  // Model configuration
+  llmBackend: JobBackend;
+  ttsBackend: JobBackend;
+  llmModel: string;
+  ttsModel: string;
+  ttsVoice: string;
+
+  // Metadata
+  createdAt: number;
+  updatedAt: number;
 }
 
 // ==================== WORKER STATUS ====================
