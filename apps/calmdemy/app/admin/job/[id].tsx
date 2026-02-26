@@ -24,6 +24,7 @@ const SECTION_IDS = [
   'pipeline',
   'courseProgress',
   'jobDetails',
+  'watchdog',
   'coursePlan',
   'publishedCourse',
   'customInstructions',
@@ -300,6 +301,39 @@ export default function JobDetailScreen() {
             <InfoRow label="Resume Available" value={job.resumeAvailable ? 'Yes' : 'No'} />
           )}
           <InfoRow label="Created" value={createdDate} />
+        </>
+      ),
+    },
+    {
+      id: 'watchdog',
+      title: 'Watchdog Resets',
+      summaryItems: toSummaryItems([
+        {
+          label: 'Resets',
+          value: job.watchdogResetCount ? `${job.watchdogResetCount}` : undefined,
+        },
+        {
+          label: 'Reason',
+          value: job.lastWatchdogReason
+            ? job.lastWatchdogReason.length > 40
+              ? job.lastWatchdogReason.slice(0, 40) + '...'
+              : job.lastWatchdogReason
+            : undefined,
+        },
+      ]),
+      shouldRender: Boolean(job.watchdogResetCount && job.watchdogResetCount > 0),
+      content: (
+        <>
+          <InfoRow label="Reset Count" value={`${job.watchdogResetCount || 0}`} />
+          {job.lastWatchdogResetAt?.toDate && (
+            <InfoRow
+              label="Last Reset"
+              value={job.lastWatchdogResetAt.toDate().toLocaleString()}
+            />
+          )}
+          {job.lastWatchdogReason && (
+            <InfoRow label="Reason" value={job.lastWatchdogReason} />
+          )}
         </>
       ),
     },

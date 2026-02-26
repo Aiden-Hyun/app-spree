@@ -36,6 +36,7 @@ from pipeline.runner import process_job, process_job_pre, process_job_tts
 from pipeline.delete_job import process_delete_job, mark_delete_failed
 from pipeline.worker_status import update_worker_status
 from pipeline.content_publisher import publish_content
+from pipeline.watchdog import should_run_check, check_stale_jobs
 
 # Load .env file if present
 try:
@@ -352,6 +353,16 @@ def main():
     while True:
         try:
             update_worker_status(db, worker_id, "local")
+
+            # Watchdog: detect and reset jobs stuck in intermediate statuses.
+            # Only pre/full/course roles run this to avoid duplicate checks.
+            if worker_role in ("pre", "full", "course") and should_run_check():
+                try:
+                    reset_count = check_stale_jobs(db)
+                    if reset_count > 0:
+                        print(f"[local-worker] Watchdog reset {reset_count} stale job(s).")
+                except Exception as e:
+                    print(f"[local-worker] Watchdog error: {e}")
 
             if worker_role in ("pre", "full"):
                 # Handle delete requests first

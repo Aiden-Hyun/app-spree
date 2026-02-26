@@ -166,6 +166,12 @@ export interface ContentJob {
   deleteRequestedAt?: Timestamp;
   deleteInProgress?: boolean;
   deleteError?: string;
+
+  // Watchdog tracking
+  watchdogResetCount?: number;
+  lastWatchdogResetAt?: Timestamp;
+  lastWatchdogReason?: string;
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
   startedAt?: Timestamp;

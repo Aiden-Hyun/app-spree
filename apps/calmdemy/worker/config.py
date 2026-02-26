@@ -25,6 +25,10 @@ JOB_CACHE_DIR = os.getenv("JOB_CACHE_DIR", os.path.join(MODEL_DIR, "job_cache"))
 IDLE_SHUTDOWN_MINUTES = int(os.getenv("IDLE_SHUTDOWN_MINUTES", "5"))
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "15"))
 
+# Watchdog: stale job detection
+STALE_JOB_TIMEOUT_MINUTES = int(os.getenv("STALE_JOB_TIMEOUT_MINUTES", "30"))
+WATCHDOG_CHECK_INTERVAL_SECONDS = int(os.getenv("WATCHDOG_CHECK_INTERVAL_SECONDS", "300"))
+
 # Firestore collection
 JOBS_COLLECTION = "content_jobs"
 
