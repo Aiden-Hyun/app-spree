@@ -297,6 +297,7 @@ def _handle_course_publish(db, job_id: str, job_data: dict):
     from pipeline.course_runner import _publish_course
 
     plan = job_data.get("coursePlan")
+    audio_results = job_data.get("courseAudioResults") or {}
     if not plan:
         db.collection(config.JOBS_COLLECTION).document(job_id).update({
             "status": "failed",
@@ -304,17 +305,22 @@ def _handle_course_publish(db, job_id: str, job_data: dict):
             "updatedAt": fs.SERVER_TIMESTAMP,
         })
         return
+    if not audio_results:
+        db.collection(config.JOBS_COLLECTION).document(job_id).update({
+            "status": "failed",
+            "error": "No audio results found for publishing",
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        return
 
-    # The course runner already uploaded audio; audio paths are stored in job_data
-    # But we need the audio_results dict. For manual publish, the audio paths are
-    # in the course session data. We'll re-read them.
-    # For simplicity, we mark this as not yet supported for manual course publish.
+    course_id, session_ids = _publish_course(db, plan, audio_results, job_data)
     db.collection(config.JOBS_COLLECTION).document(job_id).update({
-        "status": "failed",
-        "error": "Manual course publishing not yet supported. Use auto-publish for courses.",
+        "status": "completed",
+        "courseId": course_id,
+        "courseSessionIds": session_ids,
         "updatedAt": fs.SERVER_TIMESTAMP,
     })
-    print(f"  [publish] Course manual publish not yet supported for job {job_id}")
+    print(f"  [publish] Course job {job_id} published. Course ID: {course_id}")
 
 
 # ==================== MAIN LOOP ====================
