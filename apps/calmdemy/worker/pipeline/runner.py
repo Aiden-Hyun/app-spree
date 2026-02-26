@@ -8,10 +8,8 @@ import traceback
 from firebase_admin import firestore as fs
 
 from .qa_formatter import format_script
-from .tts_converter import convert_to_audio
-from .audio_processor import post_process_audio
-from .storage_uploader import upload_audio, upload_image
-from .content_publisher import publish_content
+from .storage_uploader import upload_image
+from .stages import update_job_status as _update_status, run_tts_through_publish
 import config
 from .job_cache import (
     ensure_cache_dir,
@@ -19,31 +17,9 @@ from .job_cache import (
     save_state,
     write_text,
     read_text,
-    save_artifact,
     cleanup,
     has_cache,
 )
-
-
-def _update_status(
-    db,
-    job_id: str,
-    status: str,
-    extra: dict | None = None,
-    last_completed: str | None = None,
-):
-    """Update job status and timestamp in Firestore."""
-    data = {
-        "status": status,
-        "updatedAt": fs.SERVER_TIMESTAMP,
-    }
-    if status == "llm_generating" and not extra:
-        data["startedAt"] = fs.SERVER_TIMESTAMP
-    if last_completed:
-        data["lastCompletedStage"] = last_completed
-    if extra:
-        data.update(extra)
-    db.collection("content_jobs").document(job_id).update(data)
 
 
 def _cache_matches_job(job_data: dict, cache_state: dict) -> bool:
@@ -301,84 +277,11 @@ def process_job_tts(db, job_id: str, job_data: dict):
             last_completed=job_data.get("lastCompletedStage") or "image_generating",
         )
 
-        # Step 3: TTS — convert to audio (or reuse cached)
-        stage_tracker["current"] = "tts_converting"
-        wav_path = cache_file("wavPath")
-        if wav_path:
-            print("  [cache] Reusing cached WAV.")
-        else:
-            wav_path = convert_to_audio(formatted_script, job_data)
-            wav_path = save_artifact(job_id, wav_path, "tts_output.wav")
-            cache_update(wavPath=wav_path)
-        cache_update(lastCompletedStage="tts_converting")
-        _update_status(db, job_id, "post_processing", last_completed="tts_converting")
-
-        # Step 4: Post-process — normalize and encode (or reuse cached)
-        stage_tracker["current"] = "post_processing"
-        mp3_path = cache_file("mp3Path")
-        if mp3_path:
-            print("  [cache] Reusing cached MP3.")
-        else:
-            mp3_path = post_process_audio(wav_path)
-            mp3_path = save_artifact(job_id, mp3_path, "tts_output.mp3")
-            cache_update(mp3Path=mp3_path)
-        cache_update(lastCompletedStage="post_processing")
-        _update_status(db, job_id, "uploading", last_completed="post_processing")
-
-        # Step 5: Upload — push to Firebase Storage (or reuse cached)
-        stage_tracker["current"] = "uploading"
-        storage_path = job_data.get("audioPath") or cache_state.get("storagePath")
-        duration_sec = job_data.get("audioDurationSec") or cache_state.get("durationSec")
-        if storage_path:
-            print("  [cache] Reusing uploaded audio path.")
-        else:
-            storage_path, duration_sec = upload_audio(mp3_path, job_data)
-            cache_update(storagePath=storage_path, durationSec=duration_sec)
-
-        # Write audioPath even before publish so a failed publish can resume
-        auto_publish = job_data.get("autoPublish", True)
-        cache_update(lastCompletedStage="uploading")
-        _update_status(
-            db,
-            job_id,
-            "publishing" if auto_publish else "completed",
-            {
-                "audioPath": storage_path,
-                "audioDurationSec": duration_sec,
-            },
-            last_completed="uploading",
-        )
-
-        # Step 6: Publish (or skip if auto-publish is off)
         resolved_title = job_data.get("generatedTitle") or job_data.get("title", "")
-        job_data_with_title = {**job_data, "_resolvedTitle": resolved_title}
-
-        if auto_publish:
-            stage_tracker["current"] = "publishing"
-            content_id = publish_content(
-                db, storage_path, duration_sec, formatted_script, job_data_with_title
-            )
-            _update_status(db, job_id, "completed", {
-                "audioPath": storage_path,
-                "audioDurationSec": duration_sec,
-                "publishedContentId": content_id,
-                "completedAt": fs.SERVER_TIMESTAMP,
-                "resumeAvailable": False,
-                "failedStage": None,
-            }, last_completed="publishing")
-            print(f"  [pipeline] Job {job_id} completed. Content ID: {content_id}")
-        else:
-            # Mark as completed but without publishing
-            _update_status(db, job_id, "completed", {
-                "audioPath": storage_path,
-                "audioDurationSec": duration_sec,
-                "completedAt": fs.SERVER_TIMESTAMP,
-                "resumeAvailable": False,
-                "failedStage": None,
-            }, last_completed="uploading")
-            print(f"  [pipeline] Job {job_id} completed (awaiting approval, not published).")
-
-        cleanup(job_id)
+        run_tts_through_publish(
+            db, job_id, job_data, formatted_script, resolved_title,
+            cache_state, cache_update, cache_file, stage_tracker,
+        )
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
@@ -428,83 +331,10 @@ def process_job(db, job_id: str, job_data: dict):
             last_completed="image_generating",
         )
 
-        # Step 3: TTS — convert to audio (or reuse cached)
-        stage_tracker["current"] = "tts_converting"
-        wav_path = cache_file("wavPath")
-        if wav_path:
-            print("  [cache] Reusing cached WAV.")
-        else:
-            wav_path = convert_to_audio(formatted_script, job_data)
-            wav_path = save_artifact(job_id, wav_path, "tts_output.wav")
-            cache_update(wavPath=wav_path)
-        cache_update(lastCompletedStage="tts_converting")
-        _update_status(db, job_id, "post_processing", last_completed="tts_converting")
-
-        # Step 4: Post-process — normalize and encode (or reuse cached)
-        stage_tracker["current"] = "post_processing"
-        mp3_path = cache_file("mp3Path")
-        if mp3_path:
-            print("  [cache] Reusing cached MP3.")
-        else:
-            mp3_path = post_process_audio(wav_path)
-            mp3_path = save_artifact(job_id, mp3_path, "tts_output.mp3")
-            cache_update(mp3Path=mp3_path)
-        cache_update(lastCompletedStage="post_processing")
-        _update_status(db, job_id, "uploading", last_completed="post_processing")
-
-        # Step 5: Upload — push to Firebase Storage (or reuse cached)
-        stage_tracker["current"] = "uploading"
-        storage_path = job_data.get("audioPath") or cache_state.get("storagePath")
-        duration_sec = job_data.get("audioDurationSec") or cache_state.get("durationSec")
-        if storage_path:
-            print("  [cache] Reusing uploaded audio path.")
-        else:
-            storage_path, duration_sec = upload_audio(mp3_path, job_data)
-            cache_update(storagePath=storage_path, durationSec=duration_sec)
-
-        # Write audioPath even before publish so a failed publish can resume
-        auto_publish = job_data.get("autoPublish", True)
-        cache_update(lastCompletedStage="uploading")
-        _update_status(
-            db,
-            job_id,
-            "publishing" if auto_publish else "completed",
-            {
-                "audioPath": storage_path,
-                "audioDurationSec": duration_sec,
-            },
-            last_completed="uploading",
+        run_tts_through_publish(
+            db, job_id, job_data, formatted_script, generated_title,
+            cache_state, cache_update, cache_file, stage_tracker,
         )
-
-        # Step 6: Publish (or skip if auto-publish is off)
-        job_data_with_title = {**job_data, "_resolvedTitle": generated_title}
-
-        if auto_publish:
-            stage_tracker["current"] = "publishing"
-            content_id = publish_content(
-                db, storage_path, duration_sec, formatted_script, job_data_with_title
-            )
-            _update_status(db, job_id, "completed", {
-                "audioPath": storage_path,
-                "audioDurationSec": duration_sec,
-                "publishedContentId": content_id,
-                "completedAt": fs.SERVER_TIMESTAMP,
-                "resumeAvailable": False,
-                "failedStage": None,
-            }, last_completed="publishing")
-            print(f"  [pipeline] Job {job_id} completed. Content ID: {content_id}")
-        else:
-            # Mark as completed but without publishing
-            _update_status(db, job_id, "completed", {
-                "audioPath": storage_path,
-                "audioDurationSec": duration_sec,
-                "completedAt": fs.SERVER_TIMESTAMP,
-                "resumeAvailable": False,
-                "failedStage": None,
-            }, last_completed="uploading")
-            print(f"  [pipeline] Job {job_id} completed (awaiting approval, not published).")
-
-        cleanup(job_id)
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"

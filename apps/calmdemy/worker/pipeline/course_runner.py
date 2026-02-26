@@ -31,6 +31,8 @@ from .tts_converter import convert_to_audio
 from .audio_processor import post_process_audio
 from .storage_uploader import upload_audio, upload_image
 from .voice_utils import get_voice_display_name
+from .stages import update_job_status as _update_status
+from .stages import update_job_progress as _update_progress
 import config
 
 DEFAULT_FALLBACK_URL = (
@@ -51,27 +53,6 @@ SESSION_DEFS = [
 ]
 
 TOTAL_SESSIONS = len(SESSION_DEFS)
-
-
-def _update_status(db, job_id: str, status: str, extra: dict | None = None):
-    """Update job status and timestamp in Firestore."""
-    data = {
-        "status": status,
-        "updatedAt": fs.SERVER_TIMESTAMP,
-    }
-    if status == "llm_generating" and not extra:
-        data["startedAt"] = fs.SERVER_TIMESTAMP
-    if extra:
-        data.update(extra)
-    db.collection("content_jobs").document(job_id).update(data)
-
-
-def _update_progress(db, job_id: str, progress: str):
-    """Update course progress indicator."""
-    db.collection("content_jobs").document(job_id).update({
-        "courseProgress": progress,
-        "updatedAt": fs.SERVER_TIMESTAMP,
-    })
 
 
 def _load_system_prompt() -> str:
