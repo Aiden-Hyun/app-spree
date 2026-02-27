@@ -185,42 +185,46 @@ The admin UI is an Expo Router stack at `/admin`, gated by an admin role check.
 
 ```
 apps/calmdemy/worker/
-├── local_worker.py          # Main entry point — polls Firestore
-├── config.py                # Environment-based configuration
-├── .env                     # Local env vars (LMSTUDIO_HOST, etc.)
-├── service-account-key.json # Firebase credentials (gitignored)
-├── requirements.txt         # Python dependencies
-├── course_system_prompt.txt # System prompt for course LLM generation
-├── prompts/                 # Prompt templates per content type
-│   ├── guided_meditation.txt
-│   ├── sleep_meditation.txt
-│   ├── bedtime_story.txt
-│   ├── emergency_meditation.txt
-│   └── course_session.txt
-├── pipeline/                # Pipeline step modules
-│   ├── runner.py            # Main orchestrator (single-item jobs)
-│   ├── course_runner.py     # Course orchestrator (9-audio jobs)
-│   ├── llm_generator.py     # Step 1: LLM script generation
-│   ├── qa_formatter.py      # Step 2: QA and formatting
-│   ├── image_generator.py   # Step 3: Image generation (thumbnails)
-│   ├── tts_converter.py     # Step 4: TTS conversion (handles pauses)
-│   ├── audio_processor.py   # Step 5: ffmpeg normalize + encode MP3
-│   ├── storage_uploader.py  # Step 6: Upload to Firebase Storage
-│   └── content_publisher.py # Step 7: Create Firestore document
-└── models/                  # Model adapters
-    ├── registry.py          # Factory for LLM/TTS adapters
-    ├── llm_base.py          # Abstract LLM interface
-    ├── llm_ollama.py        # Ollama adapter
-    ├── llm_lmstudio.py      # LM Studio adapter
-    ├── llm_gemini_api.py    # Gemini API adapter
-    ├── llm_gemma.py         # Gemma (cloud, legacy)
-    ├── llm_llama.py         # Llama (cloud, legacy)
-    ├── tts_base.py          # Abstract TTS interface
-    ├── tts_piper.py         # Piper TTS adapter
-    ├── tts_dms.py           # Kyutai DMS TTS adapter (moshi)
-    ├── tts_styletts2.py     # StyleTTS2 adapter (local, high quality)
-    ├── tts_gemini.py        # Gemini TTS API adapter
-    └── tts_coqui.py         # Coqui XTTS (cloud, legacy)
+├── local_worker.py             # Thin orchestrator; imports helpers
+├── worker_claims.py            # Job claim/filter helpers
+├── worker_publish.py           # Manual publish handlers
+├── worker_delete.py            # Delete job handlers
+├── companion/                  # Local companion modules
+│   ├── control_loop.py         # Main loop + control doc helpers
+│   ├── stacks.py               # Start/stop workers, pid tracking, ensure_running
+│   ├── listener.py             # Firestore on_snapshot trigger
+│   ├── wake_server.py          # Optional /wake HTTP endpoint
+│   ├── dedupe.py               # TTL-based wake dedupe
+│   └── __init__.py
+├── local_companion.py          # Thin entrypoint wiring companion modules
+├── legacy_cloud/               # Cloud-only (optional, behind ENABLE_CLOUD_BACKENDS)
+│   ├── main.py                 # Legacy cloud worker
+│   ├── llm_gemma.py            # Gemma adapter (cloud)
+│   ├── llm_llama.py            # Llama adapter (cloud)
+│   ├── tts_coqui.py            # Coqui XTTS adapter (cloud)
+│   └── __init__.py
+├── models/                     # Model adapters (local/API)
+│   ├── registry.py             # Factory for LLM/TTS adapters (cloud gated by ENABLE_CLOUD_BACKENDS)
+│   ├── llm_base.py
+│   ├── llm_ollama.py
+│   ├── llm_lmstudio.py
+│   ├── llm_gemini_api.py
+│   ├── tts_base.py
+│   ├── tts_piper.py
+│   ├── tts_dms.py
+│   ├── tts_styletts2.py
+│   └── tts_gemini.py
+├── pipeline/                   # Pipeline step modules
+│   ├── runner.py
+│   ├── course_runner.py
+│   ├── llm_generator.py
+│   ├── qa_formatter.py
+│   ├── image_generator.py
+│   ├── tts_converter.py
+│   ├── audio_processor.py
+│   ├── storage_uploader.py
+│   └── content_publisher.py
+└── prompts/system_prompts/...  # Prompt templates
 ```
 
 ### Main Loop (`local_worker.py`)

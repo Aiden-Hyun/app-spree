@@ -10,10 +10,13 @@ To add a new model:
 from __future__ import annotations
 
 import importlib
+import os
 from typing import Callable
 
 from .llm_base import LLMBase
 from .tts_base import TTSBase
+
+ENABLE_CLOUD_BACKENDS = os.getenv("ENABLE_CLOUD_BACKENDS", "false").lower() == "true"
 
 
 def _load_symbol(module_name: str, symbol: str):
@@ -52,43 +55,47 @@ def _lmstudio_factory():
 
 # ==================== LLM REGISTRY ====================
 
-LLM_FACTORIES: dict[str, Callable[[], LLMBase]] = {
-    # Cloud GPU models
-    "gemma-3-12b": lambda: _factory(".llm_gemma", "GemmaAdapter"),
-    "llama-3.1-8b": lambda: _factory(".llm_llama", "LlamaAdapter"),
-    # Gemini API models
+LLM_FACTORIES: dict[str, Callable[[], LLMBase]] = {}
+if ENABLE_CLOUD_BACKENDS:
+    LLM_FACTORIES.update({
+        "gemma-3-12b": lambda: _factory(".legacy_cloud.llm_gemma", "GemmaAdapter"),
+        "llama-3.1-8b": lambda: _factory(".legacy_cloud.llm_llama", "LlamaAdapter"),
+    })
+
+LLM_FACTORIES.update({
     "gemini-2.5-flash": _gemini_flash_factory,
     "gemini-2.5-pro": _gemini_pro_factory,
-    # Local
     "lmstudio-local": _lmstudio_factory,
     "ollama-local": _ollama_factory,
-}
+})
 
 # ==================== TTS REGISTRY ====================
 
 TTS_FACTORIES: dict[str, Callable[[], TTSBase]] = {
-    # Cloud / Local
     "piper": lambda: _factory(".tts_piper", "PiperAdapter"),
     "dms": lambda: _factory(".tts_dms", "DMSTTSAdapter"),
     "styletts2": lambda: _factory(".tts_styletts2", "StyleTTS2Adapter"),
-    "coqui-xtts-v2": lambda: _factory(".tts_coqui", "CoquiXTTSAdapter"),
-    # Gemini API TTS
     "gemini-tts-flash": _gemini_tts_flash_factory,
     "gemini-tts-pro": _gemini_tts_pro_factory,
 }
 
+if ENABLE_CLOUD_BACKENDS:
+    TTS_FACTORIES["coqui-xtts-v2"] = lambda: _factory(".legacy_cloud.tts_coqui", "CoquiXTTSAdapter")
+
 # Keep backward-compatible dict names
-LLM_MODELS: dict[str, Callable[[], LLMBase]] = {
-    "gemma-3-12b": LLM_FACTORIES["gemma-3-12b"],
-    "llama-3.1-8b": LLM_FACTORIES["llama-3.1-8b"],
-}
+LLM_MODELS: dict[str, Callable[[], LLMBase]] = {}
+if ENABLE_CLOUD_BACKENDS:
+    LLM_MODELS["gemma-3-12b"] = LLM_FACTORIES["gemma-3-12b"]
+    LLM_MODELS["llama-3.1-8b"] = LLM_FACTORIES["llama-3.1-8b"]
 
 TTS_MODELS: dict[str, Callable[[], TTSBase]] = {
     "piper": TTS_FACTORIES["piper"],
     "dms": TTS_FACTORIES["dms"],
     "styletts2": TTS_FACTORIES["styletts2"],
-    "coqui-xtts-v2": TTS_FACTORIES["coqui-xtts-v2"],
 }
+
+if ENABLE_CLOUD_BACKENDS and "coqui-xtts-v2" in TTS_FACTORIES:
+    TTS_MODELS["coqui-xtts-v2"] = TTS_FACTORIES["coqui-xtts-v2"]
 
 
 def get_llm(model_id: str) -> LLMBase:

@@ -5,22 +5,25 @@ Delete job artifacts (local cache + remote audio) and remove job doc.
 from firebase_admin import storage, firestore as fs
 
 import config
+from observability import get_logger
 from .job_cache import cleanup as cleanup_cache
+
+logger = get_logger(__name__)
 
 
 def _safe_delete_blob(bucket, storage_path: str) -> None:
     if not storage_path:
         return
     if not storage_path.startswith("audio/"):
-        print(f"  [delete] Skipping non-audio path: {storage_path}")
+        logger.info("Delete skipped non-audio path", extra={"path": storage_path})
         return
     blob = bucket.blob(storage_path)
     try:
         if blob.exists():
             blob.delete()
-            print(f"  [delete] Removed storage object: {storage_path}")
+            logger.info("Deleted storage object", extra={"path": storage_path})
     except Exception as e:
-        print(f"  [delete] Failed to delete {storage_path}: {e}")
+        logger.warning("Failed to delete storage object", extra={"path": storage_path, "error": str(e)})
 
 
 def process_delete_job(db, job_id: str, job_data: dict) -> None:
@@ -48,7 +51,7 @@ def process_delete_job(db, job_id: str, job_data: dict) -> None:
 
     # Remove job doc
     db.collection(config.JOBS_COLLECTION).document(job_id).delete()
-    print(f"  [delete] Job {job_id} deleted.")
+    logger.info("Job deleted", extra={"job_id": job_id})
 
 
 def mark_delete_failed(db, job_id: str, error_msg: str) -> None:

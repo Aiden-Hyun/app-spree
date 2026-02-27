@@ -5,6 +5,9 @@ Step 1: Generate a narration script using an LLM.
 import os
 from models.registry import get_llm
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 # Approximate words-per-minute for narrated meditation audio
 WORDS_PER_MINUTE = 130
@@ -81,7 +84,7 @@ def generate_script(job_data: dict) -> str:
     model_id = job_data.get("llmModel", "gemma-3-12b")
     content_type = job_data.get("contentType", "guided_meditation")
 
-    print(f"  [llm] Generating script with {model_id}...")
+    logger.info("LLM generating script", extra={"model_id": model_id, "content_type": content_type})
 
     # Load model (reuse if same model as previous job)
     adapter = _get_llm_adapter(job_data)
@@ -106,6 +109,6 @@ def generate_script(job_data: dict) -> str:
             script = script[:script.index(marker)].strip()
 
     word_count = len(script.split())
-    print(f"  [llm] Script generated: {word_count} words")
+    logger.info("LLM script generated", extra={"model_id": model_id, "words": word_count})
 
     return script
