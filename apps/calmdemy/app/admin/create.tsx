@@ -1,28 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Pressable,
-  Alert,
-  ActivityIndicator,
-  Switch,
-} from 'react-native';
+import { View, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useJobQueue } from '@features/admin/hooks/useJobQueue';
 import {
   FactoryContentType,
-  CONTENT_TYPE_LABELS,
   CreateJobInput,
   JobBackend,
-  AVAILABLE_BACKENDS,
-  BACKEND_LABELS,
-  BACKEND_DESCRIPTIONS,
 } from '@features/admin/types';
 import {
   getLLMModelsForBackend,
@@ -32,7 +17,6 @@ import {
   getDefaultTTSModel,
   getDefaultVoice,
 } from '@features/admin/constants/models';
-import { Dropdown, DropdownOption } from '@features/admin/components/Dropdown';
 import {
   getSubjects,
   checkCourseCodeExists,
@@ -43,23 +27,18 @@ import {
   saveDraft,
   deleteDraft,
 } from '@features/admin/data/draftRepository';
-import { Theme } from '@/theme';
+import { DropdownOption } from '@features/admin/components/Dropdown';
+import { CreateContentForm } from '@features/admin/components/CreateContentForm';
 
-// ==================== DROPDOWN OPTION BUILDERS ====================
-
-const CONTENT_TYPES: FactoryContentType[] = [
-  'guided_meditation',
-  'sleep_meditation',
-  'bedtime_story',
-  'emergency_meditation',
-  'course_session',
-  'course',
+// Static options
+const CONTENT_TYPE_OPTIONS: DropdownOption[] = [
+  { id: 'guided_meditation', label: 'Guided Meditation' },
+  { id: 'sleep_meditation', label: 'Sleep Meditation' },
+  { id: 'bedtime_story', label: 'Bedtime Story' },
+  { id: 'emergency_meditation', label: 'Emergency Meditation' },
+  { id: 'course_session', label: 'Course Session' },
+  { id: 'course', label: 'Full Course (9 audio)' },
 ];
-
-const CONTENT_TYPE_OPTIONS: DropdownOption[] = CONTENT_TYPES.map((ct) => ({
-  id: ct,
-  label: CONTENT_TYPE_LABELS[ct],
-}));
 
 const DURATION_OPTIONS: DropdownOption[] = [5, 10, 15, 20, 30].map((d) => ({
   id: String(d),
@@ -106,14 +85,11 @@ type DraftPayload = {
   ttsVoice: string;
 };
 
-// ==================== SCREEN ====================
-
 export default function CreateContentScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { draftId } = useLocalSearchParams<{ draftId?: string }>();
   const { theme } = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
   const { createJob } = useJobQueue();
 
   // Form state
@@ -366,25 +342,7 @@ export default function CreateContentScreen() {
     }
   }, [activeDraftId, buildDraftPayload]);
 
-  // Handlers
-  const handleLLMBackendChange = (newBackend: JobBackend) => {
-    setLlmBackend(newBackend);
-    const defaultLLM = getDefaultLLMModel(newBackend);
-    setLlmModel(defaultLLM);
-  };
-
-  const handleTTSBackendChange = (newBackend: JobBackend) => {
-    setTtsBackend(newBackend);
-    const defaultTTS = getDefaultTTSModel(newBackend);
-    setTtsModel(defaultTTS);
-    setTtsVoice(getDefaultVoice(defaultTTS));
-  };
-
-  const handleTTSModelChange = (id: string) => {
-    setTtsModel(id);
-    setTtsVoice(getDefaultVoice(id));
-  };
-
+  // Navigation guard — prompt to save draft
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
       if (skipPromptRef.current || !isDirty) {
@@ -423,6 +381,25 @@ export default function CreateContentScreen() {
     return unsubscribe;
   }, [navigation, isDirty, activeDraftId, handleSaveDraft]);
 
+  // Handlers
+  const handleLLMBackendChange = (newBackend: JobBackend) => {
+    setLlmBackend(newBackend);
+    const defaultLLM = getDefaultLLMModel(newBackend);
+    setLlmModel(defaultLLM);
+  };
+
+  const handleTTSBackendChange = (newBackend: JobBackend) => {
+    setTtsBackend(newBackend);
+    const defaultTTS = getDefaultTTSModel(newBackend);
+    setTtsModel(defaultTTS);
+    setTtsVoice(getDefaultVoice(defaultTTS));
+  };
+
+  const handleTTSModelChange = (id: string) => {
+    setTtsModel(id);
+    setTtsVoice(getDefaultVoice(id));
+  };
+
   const handleSubmit = async () => {
     if (isCourse) {
       // Course-specific validation
@@ -446,11 +423,9 @@ export default function CreateContentScreen() {
         Alert.alert('Required', 'Please enter a course description / topic.');
         return;
       }
-    } else {
-      if (!topic.trim()) {
-        Alert.alert('Required', 'Please enter a topic.');
-        return;
-      }
+    } else if (!topic.trim()) {
+      Alert.alert('Required', 'Please enter a topic.');
+      return;
     }
 
     setIsSubmitting(true);
@@ -503,456 +478,64 @@ export default function CreateContentScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      {/* Content Type */}
-      <Text style={styles.sectionTitle}>Content Type</Text>
-      <Dropdown
-        options={CONTENT_TYPE_OPTIONS}
-        selectedId={contentType}
-        onSelect={(id) => setContentType(id as FactoryContentType)}
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <CreateContentForm
+        contentType={contentType}
+        onContentTypeChange={setContentType}
+        contentTypeOptions={CONTENT_TYPE_OPTIONS}
+        title={title}
+        onTitleChange={setTitle}
+        topic={topic}
+        onTopicChange={setTopic}
+        duration={duration}
+        onDurationChange={setDuration}
+        style={style}
+        onStyleChange={setStyle}
+        technique={technique}
+        onTechniqueChange={setTechnique}
+        difficulty={difficulty}
+        onDifficultyChange={(id) => setDifficulty(String(id))}
+        customInstructions={customInstructions}
+        onCustomInstructionsChange={setCustomInstructions}
+        imagePrompt={imagePrompt}
+        onImagePromptChange={setImagePrompt}
+        isCourse={isCourse}
+        courseCode={courseCode}
+        onCourseCodeChange={handleCourseCodeChange}
+        courseCodeError={courseCodeError}
+        isCheckingCode={isCheckingCode}
+        courseTitle={courseTitle}
+        onCourseTitleChange={setCourseTitle}
+        subjectId={subjectId}
+        onSubjectChange={setSubjectId}
+        subjectOptions={subjectOptions}
+        targetAudience={targetAudience}
+        onTargetAudienceChange={setTargetAudience}
+        tone={tone}
+        onToneChange={setTone}
+        llmBackend={llmBackend}
+        onLLMBackendChange={handleLLMBackendChange}
+        ttsBackend={ttsBackend}
+        onTTSBackendChange={handleTTSBackendChange}
+        llmModel={llmModel}
+        onLLMModelChange={setLlmModel}
+        ttsModel={ttsModel}
+        onTTSModelChange={handleTTSModelChange}
+        ttsVoice={ttsVoice}
+        onTTSVoiceChange={setTtsVoice}
+        llmModelOptions={llmModelOptions}
+        ttsModelOptions={ttsModelOptions}
+        voiceOptions={voiceOptions}
+        autoPublish={autoPublish}
+        onAutoPublishChange={setAutoPublish}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        durationOptions={DURATION_OPTIONS}
+        difficultyOptions={DIFFICULTY_OPTIONS}
+        audienceOptions={AUDIENCE_OPTIONS}
+        toneOptions={TONE_OPTIONS}
       />
-
-      {isCourse ? (
-        <>
-          {/* ========== COURSE-SPECIFIC FIELDS ========== */}
-
-          {/* Subject */}
-          <Text style={styles.sectionTitle}>Therapy Subject</Text>
-          <Dropdown
-            options={subjectOptions}
-            selectedId={subjectId}
-            onSelect={setSubjectId}
-            placeholder="Select a therapy subject..."
-          />
-
-          {/* Course Code */}
-          <Text style={styles.sectionTitle}>Course Code</Text>
-          <View>
-            <TextInput
-              style={[
-                styles.input,
-                courseCodeError ? { borderWidth: 1, borderColor: theme.colors.error } : null,
-              ]}
-              placeholder='e.g. "CBT101"'
-              placeholderTextColor={theme.colors.textMuted}
-              value={courseCode}
-              onChangeText={handleCourseCodeChange}
-              autoCapitalize="characters"
-            />
-            {isCheckingCode && (
-              <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
-                Checking...
-              </Text>
-            )}
-            {courseCodeError && (
-              <Text style={[styles.helperText, { color: theme.colors.error }]}>
-                {courseCodeError}
-              </Text>
-            )}
-            {courseCode.length >= 3 && !courseCodeError && !isCheckingCode && (
-              <Text style={[styles.helperText, { color: theme.colors.success }]}>
-                Code available
-              </Text>
-            )}
-          </View>
-
-          {/* Course Title */}
-          <Text style={styles.sectionTitle}>Course Title</Text>
-          <TextInput
-            style={styles.input}
-            placeholder='e.g. "Rethink Your Thoughts"'
-            placeholderTextColor={theme.colors.textMuted}
-            value={courseTitle}
-            onChangeText={setCourseTitle}
-          />
-
-          {/* Course Description / Topic */}
-          <Text style={styles.sectionTitle}>Course Description</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder='Describe the course goal and what it covers...'
-            placeholderTextColor={theme.colors.textMuted}
-            value={topic}
-            onChangeText={setTopic}
-            multiline
-            numberOfLines={3}
-          />
-
-          {/* Target Audience */}
-          <Text style={styles.sectionTitle}>Target Audience</Text>
-          <Dropdown
-            options={AUDIENCE_OPTIONS}
-            selectedId={targetAudience}
-            onSelect={setTargetAudience}
-          />
-
-          {/* Tone */}
-          <Text style={styles.sectionTitle}>Tone</Text>
-          <Dropdown
-            options={TONE_OPTIONS}
-            selectedId={tone}
-            onSelect={setTone}
-          />
-
-          {/* Custom Instructions */}
-          <Text style={styles.sectionTitle}>Custom Instructions (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="Any additional guidance for the LLM..."
-            placeholderTextColor={theme.colors.textMuted}
-            value={customInstructions}
-            onChangeText={setCustomInstructions}
-            multiline
-            numberOfLines={3}
-          />
-
-          {/* Image Prompt */}
-          <Text style={styles.sectionTitle}>Image Prompt (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="Optional image prompt for the thumbnail..."
-            placeholderTextColor={theme.colors.textMuted}
-            value={imagePrompt}
-            onChangeText={setImagePrompt}
-            multiline
-            numberOfLines={3}
-          />
-
-          {/* Info Banner */}
-          <View style={[styles.infoBanner, { backgroundColor: `${theme.colors.primary}10` }]}>
-            <Ionicons name="information-circle-outline" size={18} color={theme.colors.primary} />
-            <Text style={[styles.infoBannerText, { color: theme.colors.textLight }]}>
-              This will generate 9 audio files: 1 intro + 4 modules (lesson + practice each).
-            </Text>
-          </View>
-        </>
-      ) : (
-        <>
-          {/* ========== SINGLE-ITEM FIELDS ========== */}
-
-          {/* Title */}
-          <Text style={styles.sectionTitle}>Title (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Leave empty to auto-generate from LLM"
-            placeholderTextColor={theme.colors.textMuted}
-            value={title}
-            onChangeText={setTitle}
-          />
-
-          {/* Topic */}
-          <Text style={styles.sectionTitle}>Topic</Text>
-          <TextInput
-            style={styles.input}
-            placeholder='e.g. "Body scan for anxiety relief"'
-            placeholderTextColor={theme.colors.textMuted}
-            value={topic}
-            onChangeText={setTopic}
-            multiline
-          />
-
-          {/* Duration */}
-          <Text style={styles.sectionTitle}>Duration</Text>
-          <Dropdown
-            options={DURATION_OPTIONS}
-            selectedId={String(duration)}
-            onSelect={(id) => setDuration(Number(id))}
-          />
-
-          {/* Difficulty */}
-          <Text style={styles.sectionTitle}>Difficulty</Text>
-          <Dropdown
-            options={DIFFICULTY_OPTIONS}
-            selectedId={difficulty}
-            onSelect={setDifficulty}
-          />
-
-          {/* Style & Technique */}
-          <Text style={styles.sectionTitle}>Style (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder='e.g. "calm", "energizing", "grounding"'
-            placeholderTextColor={theme.colors.textMuted}
-            value={style}
-            onChangeText={setStyle}
-          />
-
-          <Text style={styles.sectionTitle}>Technique (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder='e.g. "body_scan", "visualization"'
-            placeholderTextColor={theme.colors.textMuted}
-            value={technique}
-            onChangeText={setTechnique}
-          />
-
-          {/* Custom Instructions */}
-          <Text style={styles.sectionTitle}>Custom Instructions (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="Any additional guidance for the LLM..."
-            placeholderTextColor={theme.colors.textMuted}
-            value={customInstructions}
-            onChangeText={setCustomInstructions}
-            multiline
-            numberOfLines={3}
-          />
-
-          {/* Image Prompt */}
-          <Text style={styles.sectionTitle}>Image Prompt (optional)</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="Optional image prompt for the thumbnail..."
-            placeholderTextColor={theme.colors.textMuted}
-            value={imagePrompt}
-            onChangeText={setImagePrompt}
-            multiline
-            numberOfLines={3}
-          />
-        </>
-      )}
-
-      {/* Model Selection */}
-      <View style={styles.divider} />
-      <Text style={styles.sectionHeader}>Model Configuration</Text>
-
-      {/* LLM Backend + Model */}
-      <Text style={styles.sectionTitle}>LLM Backend</Text>
-      <View style={styles.segmentRow}>
-        {AVAILABLE_BACKENDS.map((b) => (
-          <Pressable
-            key={b}
-            style={[styles.segment, llmBackend === b && styles.segmentActive]}
-            onPress={() => handleLLMBackendChange(b)}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                llmBackend === b && styles.segmentTextActive,
-              ]}
-            >
-              {BACKEND_LABELS[b]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>LLM Model</Text>
-      <Dropdown
-        options={llmModelOptions}
-        selectedId={llmModel}
-        onSelect={setLlmModel}
-      />
-
-      {/* TTS Backend + Model */}
-      <Text style={styles.sectionTitle}>TTS Backend</Text>
-      <View style={styles.segmentRow}>
-        {AVAILABLE_BACKENDS.map((b) => (
-          <Pressable
-            key={b}
-            style={[styles.segment, ttsBackend === b && styles.segmentActive]}
-            onPress={() => handleTTSBackendChange(b)}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                ttsBackend === b && styles.segmentTextActive,
-              ]}
-            >
-              {BACKEND_LABELS[b]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>TTS Model</Text>
-      <Dropdown
-        options={ttsModelOptions}
-        selectedId={ttsModel}
-        onSelect={handleTTSModelChange}
-      />
-
-      {/* Voice */}
-      {voiceOptions.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Voice</Text>
-          <Dropdown
-            options={voiceOptions}
-            selectedId={ttsVoice}
-            onSelect={setTtsVoice}
-          />
-        </>
-      )}
-
-      {/* Auto-Publish Toggle */}
-      <View style={styles.divider} />
-      <View style={styles.toggleRow}>
-        <View style={styles.toggleInfo}>
-          <Text style={styles.toggleLabel}>Auto-publish</Text>
-          <Text style={styles.toggleDescription}>
-            {autoPublish
-              ? 'Content will be published automatically when done'
-              : 'Content will need manual approval before publishing'}
-          </Text>
-        </View>
-        <Switch
-          value={autoPublish}
-          onValueChange={setAutoPublish}
-          trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
-          thumbColor={autoPublish ? theme.colors.primary : theme.colors.gray[400]}
-        />
-      </View>
-
-      {/* Submit */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.submitButton,
-          pressed && { opacity: 0.85 },
-          isSubmitting && styles.submitButtonDisabled,
-        ]}
-        onPress={handleSubmit}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name="sparkles" size={20} color="#fff" />
-            <Text style={styles.submitText}>Generate Content</Text>
-          </>
-        )}
-      </Pressable>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+    </View>
   );
 }
 
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    content: {
-      padding: 20,
-    },
-    sectionHeader: {
-      fontFamily: 'DMSans-Bold',
-      fontSize: 18,
-      color: theme.colors.text,
-      marginBottom: 16,
-    },
-    sectionTitle: {
-      fontFamily: 'DMSans-SemiBold',
-      fontSize: 14,
-      color: theme.colors.textLight,
-      marginBottom: 10,
-      marginTop: 16,
-    },
-    segmentRow: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    segment: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 10,
-      borderRadius: 10,
-      backgroundColor: theme.colors.surface,
-    },
-    segmentActive: {
-      backgroundColor: theme.colors.primary,
-    },
-    segmentText: {
-      fontFamily: 'DMSans-SemiBold',
-      fontSize: 13,
-      color: theme.colors.textMuted,
-    },
-    segmentTextActive: {
-      color: '#fff',
-    },
-    input: {
-      backgroundColor: theme.colors.surface,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      fontFamily: 'DMSans-Regular',
-      fontSize: 15,
-      color: theme.colors.text,
-    },
-    multilineInput: {
-      minHeight: 80,
-      textAlignVertical: 'top',
-    },
-    helperText: {
-      fontFamily: 'DMSans-Regular',
-      fontSize: 12,
-      marginTop: 6,
-      marginLeft: 4,
-    },
-    infoBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      borderRadius: 12,
-      padding: 14,
-      marginTop: 16,
-    },
-    infoBannerText: {
-      fontFamily: 'DMSans-Regular',
-      fontSize: 13,
-      flex: 1,
-      lineHeight: 18,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: theme.colors.gray[200],
-      marginVertical: 24,
-    },
-    toggleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 4,
-    },
-    toggleInfo: {
-      flex: 1,
-      marginRight: 16,
-    },
-    toggleLabel: {
-      fontFamily: 'DMSans-SemiBold',
-      fontSize: 15,
-      color: theme.colors.text,
-    },
-    toggleDescription: {
-      fontFamily: 'DMSans-Regular',
-      fontSize: 12,
-      color: theme.colors.textMuted,
-      marginTop: 2,
-    },
-    submitButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.primary,
-      borderRadius: 16,
-      paddingVertical: 18,
-      gap: 10,
-      marginTop: 32,
-    },
-    submitButtonDisabled: {
-      backgroundColor: theme.colors.gray[300],
-    },
-    submitText: {
-      fontFamily: 'DMSans-SemiBold',
-      fontSize: 17,
-      color: '#fff',
-    },
-  });
