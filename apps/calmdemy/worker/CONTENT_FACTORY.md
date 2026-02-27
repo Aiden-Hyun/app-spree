@@ -656,21 +656,17 @@ Press Ctrl+C to stop.
 
 The admin UI displays stack PIDs, status, and log paths from `worker_stacks_status/local`.
 
-### Option B — Wake via Firebase Function (tunnel to Mac)
+### Option B — Firestore listeners (no tunnel) + optional wake endpoint
 
-- Cloud Function (`functions/dispatchWake`) watches `content_jobs` and sends an authenticated HTTPS POST to the Mac companion when a job hits `pending`, `tts_pending`, or `publishing` (non-cloud backends).
-- Companion wake server (opt-in): set `ENABLE_WAKE_SERVER=true` and expose your Mac via a tunnel (ngrok/Cloudflare) so the function can reach `/wake`.
-- Endpoint (local): `POST /wake` with header `X-Wake-Signature` = `HMAC_SHA256(secret, body)` using `WAKE_SHARED_SECRET`.
-- Env (companion/worker):
+- Companion listens to Firestore `content_jobs` (statuses: `pending`, `tts_pending`, `publishing`) and triggers a start as soon as a matching job appears (non-cloud backends). This removes the poll delay without any inbound tunnel.
+- Enable with `ENABLE_JOB_LISTENER=true` (default).
+- When triggered, companion sets `worker_control.desiredState=running` and can start stacks immediately (`FORCE_IMMEDIATE_START=true`).
+- Dedupe window: `WAKE_DEDUP_WINDOW_SEC=300` (applies to listeners and optional wake endpoint).
+- Optional wake server remains available if you want a cloud dispatcher later:
   - `ENABLE_WAKE_SERVER=true`
   - `WAKE_SHARED_SECRET=<strong_random>`
-  - `WAKE_SERVER_PORT=8787` (default)
-  - `FORCE_IMMEDIATE_START=true` (start stacks immediately) or `false` (only set desiredState=running)
-  - `WAKE_DEDUP_WINDOW_SEC=300`
-- Env (Cloud Function):
-  - `WAKE_ENDPOINT_URL=https://<your-tunnel>/wake`
-  - `WAKE_SHARED_SECRET=<same secret as companion>`
-- Behavior: function calls `/wake`; companion verifies signature, sets `worker_control.desiredState=running`, and (optionally) starts stacks immediately. 2s polling remains as safety net.
+  - `WAKE_SERVER_PORT=8787`
+  - Cloud Function dispatcher (in `functions/dispatchWake`) can be used if you do expose a tunnel; otherwise leave disabled.
 
 ### Latency SLO (Option A)
 

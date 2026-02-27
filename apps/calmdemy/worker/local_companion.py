@@ -52,6 +52,7 @@ WAKE_SHARED_SECRET = os.getenv("WAKE_SHARED_SECRET", "")
 WAKE_SERVER_PORT = int(os.getenv("WAKE_SERVER_PORT", "8787"))
 FORCE_IMMEDIATE_START = os.getenv("FORCE_IMMEDIATE_START", "true").lower() == "true"
 WAKE_DEDUP_WINDOW_SEC = int(os.getenv("WAKE_DEDUP_WINDOW_SEC", "300"))
+ENABLE_JOB_LISTENER = os.getenv("ENABLE_JOB_LISTENER", "true").lower() == "true"
 
 ACTIVE_STATUSES = [
     "llm_generating",
@@ -65,6 +66,7 @@ ACTIVE_STATUSES = [
 
 RECENT_WAKES: dict[str, float] = {}
 RECENT_WAKES_LOCK = threading.Lock()
+JOB_LISTENER = None
 
 
 # ==================== FIREBASE INIT ====================
@@ -528,6 +530,48 @@ def _process_wake(db, payload: dict) -> None:
     logger.info("Wake started stacks", extra={"pid": pid, "running": list(running.keys())})
 
 
+def start_job_listener(db):
+    """Subscribe to pending jobs and trigger wake logic without polling."""
+    global JOB_LISTENER
+    try:
+        query = (
+            db.collection(JOBS_COLLECTION)
+            .where("status", "in", ["pending", "tts_pending", "publishing"])
+        )
+
+        def on_snapshot(docs, changes, _read_time):
+            for change in changes:
+                if change.type.name not in ("ADDED", "MODIFIED"):
+                    continue
+                doc = change.document
+                data = doc.to_dict() or {}
+                status = data.get("status")
+                if status not in ("pending", "tts_pending", "publishing"):
+                    continue
+                if data.get("llmBackend") == "cloud" or data.get("ttsBackend") == "cloud":
+                    continue
+                job_id = doc.id
+                if _is_duplicate_wake(job_id):
+                    logger.debug("Listener wake ignored duplicate", extra={"job_id": job_id})
+                    continue
+                payload = {
+                    "jobId": job_id,
+                    "status": status,
+                    "contentType": data.get("contentType"),
+                    "ttsModel": data.get("ttsModel"),
+                    "llmModel": data.get("llmModel"),
+                }
+                try:
+                    _process_wake(db, payload)
+                except Exception as exc:
+                    logger.exception("Listener wake failed", extra={"job_id": job_id, "error": str(exc)})
+
+        JOB_LISTENER = query.on_snapshot(on_snapshot)
+        logger.info("Job listener started", extra={"listener": True})
+    except Exception as exc:
+        logger.exception("Failed to start job listener", extra={"error": str(exc)})
+
+
 # ==================== MAIN LOOP ====================
 
 
@@ -541,6 +585,8 @@ def main() -> None:
     ensure_control_doc(db)
     if ENABLE_WAKE_SERVER:
         start_wake_server(db)
+    if ENABLE_JOB_LISTENER:
+        start_job_listener(db)
 
     last_activity_ts = time.time()
 
