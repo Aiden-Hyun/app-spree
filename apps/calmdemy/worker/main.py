@@ -20,8 +20,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 import config
+from observability import configure_logging, get_logger
 from pipeline.runner import process_job
 from pipeline.worker_status import update_worker_status
+
+configure_logging()
+logger = get_logger(__name__)
 
 # ==================== INIT ====================
 
@@ -94,11 +98,11 @@ def get_next_pending_job(db):
 
 def shutdown_vm():
     """Stop this VM. The Cloud Function will restart it when needed."""
-    print("[worker] No pending jobs. Shutting down VM...")
+    logger.info("No pending jobs. Shutting down VM...")
     try:
         subprocess.run(["sudo", "shutdown", "-h", "now"], check=False)
     except Exception as e:
-        print(f"[worker] Shutdown command failed: {e}")
+        logger.exception("Shutdown command failed", extra={"error": str(e)})
         # If we can't shutdown via command, try the API
         try:
             from google.cloud import compute_v1
@@ -109,20 +113,23 @@ def shutdown_vm():
                 instance=config.GCE_VM_NAME,
             )
         except Exception as api_err:
-            print(f"[worker] API shutdown also failed: {api_err}")
+            logger.exception("API shutdown failed", extra={"error": str(api_err)})
 
 
 # ==================== MAIN LOOP ====================
 
 
 def main():
-    print("=" * 60)
-    print("  Calmdemy Content Factory — VM Worker (cloud backend)")
-    print("=" * 60)
-    print(f"  Project:    {config.PROJECT_ID}")
-    print(f"  Model dir:  {config.MODEL_DIR}")
-    print(f"  Idle limit: {config.IDLE_SHUTDOWN_MINUTES} min")
-    print("=" * 60)
+    configure_logging()
+    logger.info("Calmdemy Content Factory — VM Worker (cloud backend)")
+    logger.info(
+        "Worker configuration",
+        extra={
+            "project_id": config.PROJECT_ID,
+            "model_dir": config.MODEL_DIR,
+            "idle_shutdown_minutes": config.IDLE_SHUTDOWN_MINUTES,
+        },
+    )
 
     db = init_firebase()
     idle_seconds = 0
@@ -135,13 +142,18 @@ def main():
             idle_seconds = 0
             job_id = job_doc.id
             job_data = job_doc.to_dict()
-            print(f"\n[worker] Processing job: {job_id}")
-            print(f"         Type: {job_data.get('contentType')}")
-            print(f"         Topic: {job_data.get('params', {}).get('topic')}")
+            logger.info(
+                "Processing job",
+                extra={
+                    "job_id": job_id,
+                    "content_type": job_data.get("contentType"),
+                    "topic": job_data.get("params", {}).get("topic"),
+                },
+            )
 
             process_job(db, job_id, job_data)
 
-            print(f"[worker] Job {job_id} finished.\n")
+            logger.info("Job finished", extra={"job_id": job_id})
         else:
             idle_seconds += config.POLL_INTERVAL_SECONDS
             idle_minutes = idle_seconds / 60
@@ -151,10 +163,12 @@ def main():
                 break  # In case shutdown doesn't immediately kill the process
 
             remaining = config.IDLE_SHUTDOWN_MINUTES - idle_minutes
-            print(
-                f"[worker] Queue empty. "
-                f"Shutdown in {remaining:.1f} min. "
-                f"Polling in {config.POLL_INTERVAL_SECONDS}s..."
+            logger.info(
+                "Queue empty",
+                extra={
+                    "shutdown_in_minutes": round(remaining, 1),
+                    "poll_interval_sec": config.POLL_INTERVAL_SECONDS,
+                },
             )
             time.sleep(config.POLL_INTERVAL_SECONDS)
 

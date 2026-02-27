@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import time
+import random
 import signal
 import subprocess
 from typing import Optional
@@ -23,6 +24,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 import config  # noqa: E402
+from observability import configure_logging, get_logger  # noqa: E402
 
 # Load .env file if present
 try:
@@ -32,10 +34,13 @@ try:
 except ImportError:
     pass
 
+configure_logging()
+logger = get_logger(__name__)
+
 CONTROL_COLLECTION = "worker_control"
 CONTROL_DOC_ID = "local"
 JOBS_COLLECTION = config.JOBS_COLLECTION
-POLL_SECONDS = int(os.getenv("COMPANION_POLL_SECONDS", "8"))
+POLL_SECONDS = int(os.getenv("COMPANION_POLL_SECONDS", "2"))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 STACKS_PATH = os.path.join(BASE_DIR, "worker_stacks.json")
 
@@ -299,7 +304,7 @@ def ensure_control_doc(db):
 
     doc_ref.set(
         {
-            "desiredState": "stopped",
+            "desiredState": "running",
             "idleTimeoutMin": 10,
             "currentState": "stopped",
             "workerPid": None,
@@ -326,6 +331,30 @@ def get_control(db) -> dict:
     return snapshot.to_dict() or {}
 
 
+def update_stacks_status(db, stacks: list[dict], running: dict[str, int]) -> None:
+    """Write aggregate status for all stacks (for admin UI)."""
+    doc_ref = db.collection("worker_stacks_status").document("local")
+    stack_entries = []
+    for stack in stacks:
+        stack_id = stack.get("id")
+        stack_entries.append({
+            "id": stack_id,
+            "role": stack.get("role"),
+            "venv": stack.get("venv"),
+            "enabled": bool(stack.get("enabled", True)),
+            "pid": running.get(stack_id),
+            "logPath": _log_path(stack_id),
+            "lastUpdatedAt": firestore.SERVER_TIMESTAMP,
+        })
+    doc_ref.set(
+        {
+            "stacks": stack_entries,
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        },
+        merge=True,
+    )
+
+
 def has_pending_jobs(db) -> bool:
     jobs_ref = db.collection(JOBS_COLLECTION)
     q = jobs_ref.where("status", "in", ["pending", "tts_pending"]).limit(1)
@@ -342,15 +371,10 @@ def has_active_jobs(db) -> bool:
 
 
 def main() -> None:
-    print("=" * 60)
-    print("  Calmdemy Content Factory — Local Companion")
-    print("=" * 60)
-    print(f"  Project:       {config.PROJECT_ID}")
-    print(f"  Poll interval: {POLL_SECONDS}s")
-    print("=" * 60)
-    print()
-    print("Press Ctrl+C to stop.")
-    print()
+    logger.info("Calmdemy Content Factory — Local Companion")
+    logger.info("Project", extra={"project_id": config.PROJECT_ID})
+    logger.info("Poll interval", extra={"poll_interval_sec": POLL_SECONDS})
+    logger.info("Press Ctrl+C to stop.")
 
     db = init_firebase()
     ensure_control_doc(db)
@@ -366,6 +390,10 @@ def main() -> None:
             stacks = load_worker_stacks()
             enabled_stacks = [s for s in stacks if s.get("enabled", True)]
             running = _running_stack_pids(stacks)
+            try:
+                update_stacks_status(db, stacks, running)
+            except Exception as e:
+                logger.warning("Failed to update stacks status", extra={"error": str(e)})
 
             # Stop any disabled stacks that are still running
             for stack in stacks:
@@ -489,12 +517,13 @@ def main() -> None:
             time.sleep(POLL_SECONDS)
 
         except KeyboardInterrupt:
-            print("\n[companion] Stopped by user.")
+            logger.info("Stopped by user")
             sys.exit(0)
         except Exception as e:
             update_control(db, {"lastError": f"{type(e).__name__}: {e}"})
-            print(f"[companion] Error: {e}")
-            time.sleep(POLL_SECONDS)
+            logger.exception("Companion error", extra={"error": str(e)})
+            jitter = random.uniform(-0.3, 0.3)
+            time.sleep(max(0.5, POLL_SECONDS + jitter))
 
 
 if __name__ == "__main__":

@@ -47,6 +47,7 @@ If a field is not listed below, it is not relied on by the app/worker and may be
 | `content_jobs` | Admin read/write | Content factory jobs.
 | `worker_status` | Admin read-only | Worker heartbeat/state.
 | `worker_control` | Admin read/write | Admin control plane for worker.
+| `factory_metrics` | Admin read-only | Daily aggregate metrics for content factory jobs.
 
 ## Field Contracts (Known Fields)
 
@@ -302,6 +303,19 @@ See `worker/CONTENT_FACTORY.md` for full schema. Core fields:
 - `idleTimeoutMin` (number)
 - `requestedBy` (string)
 - `requestedAt` (timestamp)
+
+### `factory_metrics`
+Document ID convention: `YYYY-MM-DD` (UTC).
+- `completed_total` (number)
+- `failed_total` (number)
+- `completed_by_type` (map: contentType -> count)
+- `failed_by_type` (map: contentType -> count)
+- `failed_by_stage` (map: stage -> count, optional)
+- `duration_sec_sum` (number, optional)
+- `duration_sec_count` (number, optional)
+- `queue_latency_sec_sum` (number, optional)
+- `queue_latency_sec_count` (number, optional)
+- `lastUpdatedAt` (timestamp)
 
 ## Index Requirements
 

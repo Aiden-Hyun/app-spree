@@ -7,6 +7,9 @@ import subprocess
 import shutil
 import json
 
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 def _get_loudness(wav_path: str) -> float | None:
     """Measure integrated loudness in LUFS using ffmpeg."""
@@ -30,7 +33,7 @@ def _get_loudness(wav_path: str) -> float | None:
             data = json.loads(output[json_start:json_end])
             return float(data.get("input_i", -99))
     except Exception as e:
-        print(f"  [audio] Loudness measurement failed: {e}")
+        logger.warning("Loudness measurement failed", extra={"error": str(e)})
     return None
 
 
@@ -40,7 +43,7 @@ def post_process_audio(wav_path: str) -> str:
 
     Returns path to the output MP3 file.
     """
-    print("  [audio] Post-processing audio...")
+    logger.info("Post-processing audio")
 
     mp3_path = wav_path.replace(".wav", ".mp3")
 
@@ -55,12 +58,18 @@ def post_process_audio(wav_path: str) -> str:
     )
 
     if needs_normalize:
-        print(f"  [audio] Normalizing: {current_lufs} LUFS -> {target_lufs} LUFS")
+        logger.info(
+            "Normalizing loudness",
+            extra={"current_lufs": current_lufs, "target_lufs": target_lufs},
+        )
         audio_filter = (
             f"loudnorm=I={target_lufs}:LRA=11:TP=-1.5"
         )
     else:
-        print(f"  [audio] Loudness OK ({current_lufs:.1f} LUFS), skipping normalize")
+        logger.info(
+            "Loudness OK, skipping normalize",
+            extra={"current_lufs": round(current_lufs, 1)},
+        )
         audio_filter = None
 
     # Encode to MP3
@@ -85,7 +94,7 @@ def post_process_audio(wav_path: str) -> str:
         raise RuntimeError(f"MP3 file not created: {mp3_path}")
 
     size_mb = os.path.getsize(mp3_path) / (1024 * 1024)
-    print(f"  [audio] MP3 encoded: {size_mb:.1f} MB")
+    logger.info("MP3 encoded", extra={"size_mb": round(size_mb, 1)})
 
     # Clean up WAV to save disk space
     try:

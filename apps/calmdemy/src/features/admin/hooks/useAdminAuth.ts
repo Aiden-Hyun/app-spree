@@ -24,12 +24,30 @@ export function useAdminAuth(): UseAdminAuthResult {
     let cancelled = false;
     setIsChecking(true);
 
-    checkIsAdmin(user.uid).then((result) => {
-      if (!cancelled) {
-        setIsAdmin(result);
-        setIsChecking(false);
+    (async () => {
+      try {
+        const token = await user.getIdTokenResult(true);
+        const claimAdmin = token.claims?.admin === true;
+        if (!claimAdmin) {
+          // Legacy fallback: Firestore role (display-only, not authoritative)
+          const legacy = await checkIsAdmin(user.uid);
+          if (!cancelled) {
+            setIsAdmin(legacy);
+            setIsChecking(false);
+          }
+          return;
+        }
+        if (!cancelled) {
+          setIsAdmin(true);
+          setIsChecking(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setIsAdmin(false);
+          setIsChecking(false);
+        }
       }
-    });
+    })();
 
     return () => {
       cancelled = true;

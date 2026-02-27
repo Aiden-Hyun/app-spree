@@ -9,7 +9,11 @@ from .audio_processor import post_process_audio
 from .storage_uploader import upload_audio
 from .content_publisher import publish_content
 from .job_cache import save_artifact, cleanup
+from .metrics import record_job_metric
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 
 # ==================== STATUS HELPERS ====================
@@ -69,7 +73,7 @@ def run_tts_through_publish(
     stage_tracker["current"] = "tts_converting"
     wav_path = cache_file("wavPath")
     if wav_path:
-        print("  [cache] Reusing cached WAV.")
+        logger.info("Reusing cached WAV.", extra={"job_id": job_id})
     else:
         wav_path = convert_to_audio(formatted_script, job_data)
         wav_path = save_artifact(job_id, wav_path, "tts_output.wav")
@@ -81,7 +85,7 @@ def run_tts_through_publish(
     stage_tracker["current"] = "post_processing"
     mp3_path = cache_file("mp3Path")
     if mp3_path:
-        print("  [cache] Reusing cached MP3.")
+        logger.info("Reusing cached MP3.", extra={"job_id": job_id})
     else:
         mp3_path = post_process_audio(wav_path)
         mp3_path = save_artifact(job_id, mp3_path, "tts_output.mp3")
@@ -94,7 +98,7 @@ def run_tts_through_publish(
     storage_path = job_data.get("audioPath") or cache_state.get("storagePath")
     duration_sec = job_data.get("audioDurationSec") or cache_state.get("durationSec")
     if storage_path:
-        print("  [cache] Reusing uploaded audio path.")
+        logger.info("Reusing uploaded audio path.", extra={"job_id": job_id})
     else:
         storage_path, duration_sec = upload_audio(mp3_path, job_data)
         cache_update(storagePath=storage_path, durationSec=duration_sec)
@@ -129,7 +133,11 @@ def run_tts_through_publish(
             "resumeAvailable": False,
             "failedStage": None,
         }, last_completed="publishing")
-        print(f"  [pipeline] Job {job_id} completed. Content ID: {content_id}")
+        logger.info(
+            "Job completed (published)",
+            extra={"job_id": job_id, "content_id": content_id},
+        )
+        record_job_metric(db, job_id, job_data, "completed")
     else:
         # Mark as completed but without publishing
         _update_status(db, job_id, "completed", {
@@ -139,6 +147,10 @@ def run_tts_through_publish(
             "resumeAvailable": False,
             "failedStage": None,
         }, last_completed="uploading")
-        print(f"  [pipeline] Job {job_id} completed (awaiting approval, not published).")
+        logger.info(
+            "Job completed (awaiting approval)",
+            extra={"job_id": job_id},
+        )
+        record_job_metric(db, job_id, job_data, "completed")
 
     cleanup(job_id)

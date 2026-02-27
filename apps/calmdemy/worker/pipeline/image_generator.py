@@ -9,6 +9,9 @@ import torch
 from PIL import Image
 
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 _cached_pipe = None
 _cached_pipeline_class = None
@@ -192,6 +195,6 @@ def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str
         if raw:
             return raw
     except Exception as e:
-        print(f"  [image] Prompt generation failed: {e}")
+        logger.warning("Prompt generation failed", extra={"error": str(e)})
 
     return "Calming minimalist nature scene, soft light, gentle colors, no text, no people, high quality."

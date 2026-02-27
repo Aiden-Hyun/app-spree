@@ -27,11 +27,13 @@ Usage:
 import os
 import sys
 import time
+import random
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 import config
+from observability import configure_logging, get_logger
 from pipeline.runner import process_job, process_job_pre, process_job_tts
 from pipeline.delete_job import process_delete_job, mark_delete_failed
 from pipeline.worker_status import update_worker_status
@@ -44,6 +46,9 @@ try:
     load_dotenv()
 except ImportError:
     pass
+
+configure_logging()
+logger = get_logger(__name__)
 
 
 # ==================== INIT ====================
@@ -212,6 +217,34 @@ def get_next_publish_job(db):
     return None
 
 
+def _claim_publish_job(db, doc_ref) -> dict | None:
+    """Atomically claim a publishing job to avoid duplicate publishes."""
+    from firebase_admin import firestore as fs
+
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def _tx_claim(transaction):
+        snapshot = doc_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict()
+        if data.get("status") != "publishing":
+            return None
+        if data.get("publishedContentId") or data.get("courseId"):
+            return None
+        publish_token = data.get("publishToken") or snapshot.id
+        transaction.update(doc_ref, {
+            "status": "publishing_in_progress",
+            "publishToken": publish_token,
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        data["publishToken"] = publish_token
+        return data
+
+    return _tx_claim(transaction)
+
+
 def _claim_delete_job(db, doc_ref) -> dict | None:
     """Atomically claim a delete request to avoid duplicate processing."""
     from firebase_admin import firestore as fs
@@ -259,6 +292,15 @@ def handle_publish_job(db, job_id: str, job_data: dict):
 
     content_type = job_data.get("contentType", "")
 
+    # Fast path: already published
+    if job_data.get("publishedContentId") or job_data.get("courseId"):
+        logger.info("Publish skipped (already published)", extra={"job_id": job_id})
+        db.collection(config.JOBS_COLLECTION).document(job_id).update({
+            "status": "completed",
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        return
+
     # Course jobs have a dedicated publish flow
     if content_type == "course":
         _handle_course_publish(db, job_id, job_data)
@@ -269,7 +311,10 @@ def handle_publish_job(db, job_id: str, job_data: dict):
     script = job_data.get("formattedScript") or job_data.get("generatedScript", "")
 
     if not storage_path:
-        print(f"  [publish] Job {job_id} has no audio path, cannot publish.")
+        logger.warning(
+            "Publish skipped: job has no audio path",
+            extra={"job_id": job_id},
+        )
         db.collection(config.JOBS_COLLECTION).document(job_id).update({
             "status": "failed",
             "error": "No audio path found for publishing",
@@ -288,13 +333,27 @@ def handle_publish_job(db, job_id: str, job_data: dict):
         "publishedContentId": content_id,
         "updatedAt": fs.SERVER_TIMESTAMP,
     })
-    print(f"  [publish] Job {job_id} published. Content ID: {content_id}")
+    logger.info(
+        "Publish completed",
+        extra={"job_id": job_id, "content_id": content_id},
+    )
 
 
 def _handle_course_publish(db, job_id: str, job_data: dict):
     """Publish a course job that was awaiting approval."""
     from firebase_admin import firestore as fs
     from pipeline.course_runner import _publish_course
+
+    if job_data.get("courseId") and job_data.get("courseSessionIds"):
+        db.collection(config.JOBS_COLLECTION).document(job_id).update({
+            "status": "completed",
+            "updatedAt": fs.SERVER_TIMESTAMP,
+        })
+        logger.info(
+            "Course publish skipped (already published)",
+            extra={"job_id": job_id, "course_id": job_data.get("courseId")},
+        )
+        return
 
     plan = job_data.get("coursePlan")
     audio_results = job_data.get("courseAudioResults") or {}
@@ -320,7 +379,10 @@ def _handle_course_publish(db, job_id: str, job_data: dict):
         "courseSessionIds": session_ids,
         "updatedAt": fs.SERVER_TIMESTAMP,
     })
-    print(f"  [publish] Course job {job_id} published. Course ID: {course_id}")
+    logger.info(
+        "Course publish completed",
+        extra={"job_id": job_id, "course_id": course_id},
+    )
 
 
 # ==================== MAIN LOOP ====================
@@ -330,29 +392,33 @@ def main():
     worker_id = os.getenv("WORKER_ID", "local")
     worker_role = os.getenv("WORKER_ROLE", "full").strip().lower()
     if worker_role not in ("pre", "tts", "full", "course"):
-        print(f"[local-worker] Unknown WORKER_ROLE '{worker_role}', defaulting to 'full'.")
+        logger.warning(
+            "Unknown WORKER_ROLE; defaulting to full",
+            extra={"worker_role": worker_role},
+        )
         worker_role = "full"
     tts_allowlist = _parse_tts_models(os.getenv("WORKER_TTS_MODELS"))
 
-    print("=" * 60)
-    print("  Calmdemy Content Factory — Local Worker (primary)")
-    print("=" * 60)
-    print(f"  Project:       {config.PROJECT_ID}")
+    logger.info("Calmdemy Content Factory — Local Worker (primary)")
+    logger.info("Project", extra={"project_id": config.PROJECT_ID})
     if worker_role == "pre":
-        print("  Handles:       pre stage (LLM + QA + image)")
+        logger.info("Handles pre stage (LLM + QA + image)")
     elif worker_role == "course":
         allowlist_text = ", ".join(sorted(tts_allowlist)) if tts_allowlist else "all"
-        print(f"  Handles:       course jobs (models: {allowlist_text})")
+        logger.info(
+            "Handles course jobs",
+            extra={"tts_models": allowlist_text},
+        )
     elif worker_role == "tts":
         allowlist_text = ", ".join(sorted(tts_allowlist)) if tts_allowlist else "all"
-        print(f"  Handles:       TTS stage (models: {allowlist_text})")
+        logger.info(
+            "Handles TTS stage",
+            extra={"tts_models": allowlist_text},
+        )
     else:
-        print("  Handles:       full pipeline (legacy)")
-    print(f"  Poll interval: {config.POLL_INTERVAL_SECONDS}s")
-    print("=" * 60)
-    print()
-    print("Press Ctrl+C to stop.")
-    print()
+        logger.info("Handles full pipeline (legacy)")
+    logger.info("Poll interval", extra={"poll_interval_sec": config.POLL_INTERVAL_SECONDS})
+    logger.info("Press Ctrl+C to stop.")
 
     db = init_firebase()
 
@@ -366,16 +432,19 @@ def main():
                 try:
                     reset_count = check_stale_jobs(db)
                     if reset_count > 0:
-                        print(f"[local-worker] Watchdog reset {reset_count} stale job(s).")
+                        logger.info(
+                            "Watchdog reset stale jobs",
+                            extra={"reset_count": reset_count},
+                        )
                 except Exception as e:
-                    print(f"[local-worker] Watchdog error: {e}")
+                    logger.exception("Watchdog error", extra={"error": str(e)})
 
             if worker_role in ("pre", "full"):
                 # Handle delete requests first
                 delete_job = get_next_delete_job(db)
                 if delete_job:
                     del_id, del_data = delete_job
-                    print(f"\n[local-worker] Deleting job: {del_id}")
+                    logger.info("Deleting job", extra={"job_id": del_id})
                     try:
                         process_delete_job(db, del_id, del_data)
                     except Exception as e:
@@ -386,9 +455,11 @@ def main():
                 publish_doc = get_next_publish_job(db)
                 if publish_doc:
                     pub_id = publish_doc.id
-                    pub_data = publish_doc.to_dict()
-                    print(f"\n[local-worker] Publishing approved job: {pub_id}")
-                    handle_publish_job(db, pub_id, pub_data)
+                    claimed = _claim_publish_job(db, publish_doc.reference)
+                    if not claimed:
+                        continue
+                    logger.info("Publishing approved job", extra={"job_id": pub_id})
+                    handle_publish_job(db, pub_id, claimed)
                     continue
 
             # Check for new pending jobs
@@ -396,11 +467,18 @@ def main():
 
             if next_job:
                 job_id, job_data = next_job
-                print(f"\n[local-worker] Processing job: {job_id}")
-                print(f"               Type:     {job_data.get('contentType')}")
-                print(f"               Topic:    {job_data.get('params', {}).get('topic')}")
-                print(f"               LLM:      {job_data.get('llmModel')} ({job_data.get('llmBackend', 'local')})")
-                print(f"               TTS:      {job_data.get('ttsModel')} ({job_data.get('ttsBackend', 'local')})")
+                logger.info(
+                    "Processing job",
+                    extra={
+                        "job_id": job_id,
+                        "content_type": job_data.get("contentType"),
+                        "topic": job_data.get("params", {}).get("topic"),
+                        "llm_model": job_data.get("llmModel"),
+                        "llm_backend": job_data.get("llmBackend", "local"),
+                        "tts_model": job_data.get("ttsModel"),
+                        "tts_backend": job_data.get("ttsBackend", "local"),
+                    },
+                )
 
                 if worker_role == "pre":
                     process_job_pre(db, job_id, job_data)
@@ -411,7 +489,7 @@ def main():
                 else:
                     process_job(db, job_id, job_data)
 
-                print(f"[local-worker] Job {job_id} finished.\n")
+                logger.info("Job finished", extra={"job_id": job_id})
             else:
                 if worker_role == "tts":
                     idle_label = "No TTS pending jobs"
@@ -419,18 +497,25 @@ def main():
                     idle_label = "No pending jobs"
                 else:
                     idle_label = "No pending jobs"
-                print(
-                    f"[local-worker] {idle_label}. "
-                    f"Polling in {config.POLL_INTERVAL_SECONDS}s..."
+                logger.info(
+                    "Idle",
+                    extra={
+                        "state": idle_label,
+                        "poll_interval_sec": config.POLL_INTERVAL_SECONDS,
+                    },
                 )
-                time.sleep(config.POLL_INTERVAL_SECONDS)
+                jitter = random.uniform(-0.3, 0.3)
+                time.sleep(max(0.5, config.POLL_INTERVAL_SECONDS + jitter))
 
         except KeyboardInterrupt:
-            print("\n[local-worker] Stopped by user.")
+            logger.info("Stopped by user")
             sys.exit(0)
         except Exception as e:
-            print(f"[local-worker] Error: {e}")
-            print(f"[local-worker] Retrying in {config.POLL_INTERVAL_SECONDS}s...")
+            logger.exception("Worker error", extra={"error": str(e)})
+            logger.info(
+                "Retrying after error",
+                extra={"poll_interval_sec": config.POLL_INTERVAL_SECONDS},
+            )
             time.sleep(config.POLL_INTERVAL_SECONDS)
 
 

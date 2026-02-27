@@ -13,6 +13,9 @@ import shutil
 
 from models.registry import get_tts
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 # Cache loaded TTS model across jobs
 _cached_tts = None
@@ -107,7 +110,10 @@ def convert_to_audio(script: str, job_data: dict) -> str:
     tts_model_id = job_data.get("ttsModel", "piper")
     voice_id = job_data.get("ttsVoice", "en_US-amy-medium")
 
-    print(f"  [tts] Converting to audio with {tts_model_id} / {voice_id}...")
+    logger.info(
+        "Converting to audio",
+        extra={"tts_model": tts_model_id, "voice_id": voice_id},
+    )
 
     # Load TTS model (reuse if same)
     if (_cached_tts is None
@@ -122,7 +128,7 @@ def convert_to_audio(script: str, job_data: dict) -> str:
 
     # Split script on pause markers
     segments = _split_on_pauses(script)
-    print(f"  [tts] Script split into {len(segments)} segments")
+    logger.info("Script split into segments", extra={"segment_count": len(segments)})
 
     # Synthesize each segment
     tmp_dir = tempfile.mkdtemp(prefix="calmdemy_tts_")
@@ -167,7 +173,7 @@ def convert_to_audio(script: str, job_data: dict) -> str:
 
         if pending_silences:
             # Script had only pauses; fall back to defaults
-            print("  [tts] No audio segments found; using default WAV params for silence.")
+            logger.warning("No audio segments found; using default WAV params for silence.")
             for seconds, pause_path in pending_silences:
                 _generate_silence(
                     seconds,
@@ -184,7 +190,7 @@ def convert_to_audio(script: str, job_data: dict) -> str:
         # Get duration
         with wave.open(output_path, 'r') as wf:
             duration = wf.getnframes() / wf.getframerate()
-        print(f"  [tts] Full audio: {duration:.1f}s")
+        logger.info("Full audio generated", extra={"duration_sec": round(duration, 1)})
 
         return output_path
 

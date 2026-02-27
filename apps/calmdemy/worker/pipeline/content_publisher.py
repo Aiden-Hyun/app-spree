@@ -8,6 +8,9 @@ import math
 
 from firebase_admin import firestore as fs
 from .voice_utils import get_voice_display_name
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 
 def _generate_description(script: str, max_length: int = 200) -> str:
@@ -55,7 +58,10 @@ def publish_content(
     voice = get_voice_display_name(voice_id)
     thumbnail_url = job_data.get("thumbnailUrl") or ""
 
-    print(f"  [publish] Creating {content_type} document: {title}")
+    logger.info(
+        "Creating content document",
+        extra={"content_type": content_type, "title": title},
+    )
 
     doc_data = {}
     collection_name = ""
@@ -157,5 +163,8 @@ def publish_content(
     doc_ref = db.collection(collection_name).add(doc_data)
     content_id = doc_ref[1].id
 
-    print(f"  [publish] Created: {collection_name}/{content_id}")
+    logger.info(
+        "Content document created",
+        extra={"collection": collection_name, "content_id": content_id},
+    )
     return content_id

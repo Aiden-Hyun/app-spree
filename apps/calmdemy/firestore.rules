@@ -10,9 +10,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Users can read/write their own user document
+    // Users can read their own user document; cannot set role from client
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn()
+        && request.auth.uid == userId
+        && !('role' in request.resource.data);
     }
 
     // Meditation sessions - users can only access their own
@@ -159,6 +162,18 @@ service cloud.firestore {
     // Local worker control (admins can read/write)
     match /worker_control/{workerId} {
       allow read, write: if isAdmin();
+    }
+
+    // Factory metrics (admins can read)
+    match /factory_metrics/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Multi-stack status (admins can read)
+    match /worker_stacks_status/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }

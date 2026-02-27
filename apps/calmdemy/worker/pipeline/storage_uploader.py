@@ -10,6 +10,9 @@ from mutagen.mp3 import MP3
 from firebase_admin import storage
 
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 # Storage path conventions (must match the app's audioFiles.ts)
 STORAGE_PATHS = {
@@ -68,7 +71,7 @@ def upload_audio(mp3_path: str, job_data: dict) -> tuple[str, float]:
     filename = f"{slug}-{unique_id}.mp3"
     storage_path = f"{base_path}/{filename}"
 
-    print(f"  [upload] Uploading to: {storage_path}")
+    logger.info("Uploading audio", extra={"storage_path": storage_path})
 
     # Get duration before upload
     duration_sec = _get_audio_duration(mp3_path)
@@ -84,7 +87,10 @@ def upload_audio(mp3_path: str, job_data: dict) -> tuple[str, float]:
     blob.patch()
 
     size_mb = os.path.getsize(mp3_path) / (1024 * 1024)
-    print(f"  [upload] Uploaded: {size_mb:.1f} MB, {duration_sec:.1f}s")
+    logger.info(
+        "Audio uploaded",
+        extra={"size_mb": round(size_mb, 1), "duration_sec": round(duration_sec, 1)},
+    )
 
     # Clean up local file
     try:
@@ -110,7 +116,7 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
     filename = f"{slug}-{unique_id}.png"
     storage_path = f"{base_path}/{filename}"
 
-    print(f"  [upload] Uploading image to: {storage_path}")
+    logger.info("Uploading image", extra={"storage_path": storage_path})
 
     bucket = storage.bucket(config.STORAGE_BUCKET)
     blob = bucket.blob(storage_path)
@@ -131,7 +137,7 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
     )
 
     size_kb = os.path.getsize(image_path) / 1024
-    print(f"  [upload] Image uploaded: {size_kb:.1f} KB")
+    logger.info("Image uploaded", extra={"size_kb": round(size_kb, 1)})
 
     try:
         os.remove(image_path)

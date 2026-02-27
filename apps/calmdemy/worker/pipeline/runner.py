@@ -3,14 +3,15 @@ Pipeline runner — orchestrates all steps for a single content job.
 """
 
 import os
-import traceback
 
 from firebase_admin import firestore as fs
 
 from .qa_formatter import format_script
 from .storage_uploader import upload_image
 from .stages import update_job_status as _update_status, run_tts_through_publish
+from .metrics import record_job_metric
 import config
+from observability import get_logger
 from .job_cache import (
     ensure_cache_dir,
     load_state,
@@ -21,6 +22,7 @@ from .job_cache import (
     has_cache,
 )
 
+logger = get_logger(__name__)
 
 def _cache_matches_job(job_data: dict, cache_state: dict) -> bool:
     """Return False if cache model/voice metadata conflicts with current job."""
@@ -57,7 +59,7 @@ def _generate_title_from_llm(job_data: dict, script: str) -> str:
 def _prepare_cache(job_id: str, job_data: dict):
     cache_state = load_state(job_id) or {}
     if cache_state and not _cache_matches_job(job_data, cache_state):
-        print("  [cache] Model/voice mismatch; clearing cached artifacts.")
+        logger.info("Cache model/voice mismatch; clearing cached artifacts.")
         cleanup(job_id)
         cache_state = {}
 
@@ -108,13 +110,19 @@ def _run_pre_stage(
     admin_title = job_data.get("title", "").strip()
     if admin_title:
         generated_title = admin_title
-        print(f"  [pipeline] Using admin-provided title: {generated_title}")
+        logger.info(
+            "Using admin-provided title",
+            extra={"job_id": job_id, "generated_title": generated_title},
+        )
     else:
         generated_title = job_data.get("generatedTitle") or cache_state.get("generatedTitle")
         if not generated_title:
-            print("  [pipeline] No title provided, generating from LLM...")
+            logger.info("No title provided, generating from LLM...", extra={"job_id": job_id})
             generated_title = _generate_title_from_llm(job_data, script)
-            print(f"  [pipeline] Generated title: {generated_title}")
+            logger.info(
+                "Generated title",
+                extra={"job_id": job_id, "generated_title": generated_title},
+            )
 
     cache_update(
         generatedScriptPath=script_path,
@@ -146,7 +154,7 @@ def _run_pre_stage(
     image_prompt = job_data.get("imagePrompt") or cache_state.get("imagePrompt")
 
     if thumbnail_url:
-        print("  [image] Reusing cached thumbnail URL.")
+        logger.info("Reusing cached thumbnail URL.", extra={"job_id": job_id})
     else:
         if not image_prompt:
             image_prompt = build_image_prompt(
@@ -211,7 +219,7 @@ def process_job_pre(db, job_id: str, job_data: dict):
             },
             last_completed=job_data.get("lastCompletedStage") or "image_generating",
         )
-        print(f"  [pipeline] Job {job_id} resumed at tts_pending.")
+        logger.info("Job resumed at tts_pending", extra={"job_id": job_id})
         return
 
     cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
@@ -244,17 +252,20 @@ def process_job_pre(db, job_id: str, job_data: dict):
             last_completed="image_generating",
         )
 
-        print(f"  [pipeline] Job {job_id} ready for TTS.")
+        logger.info("Job ready for TTS", extra={"job_id": job_id})
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
-        print(f"  [pipeline] Job {job_id} FAILED: {error_msg}")
-        traceback.print_exc()
+        logger.exception(
+            "Job failed",
+            extra={"job_id": job_id, "stage": stage_tracker["current"], "error": error_msg},
+        )
         _update_status(db, job_id, "failed", {
             "error": error_msg,
             "failedStage": stage_tracker["current"],
             "resumeAvailable": has_cache(job_id),
         })
+        record_job_metric(db, job_id, job_data, "failed", stage_tracker["current"], error_msg)
 
 
 def process_job_tts(db, job_id: str, job_data: dict):
@@ -285,13 +296,16 @@ def process_job_tts(db, job_id: str, job_data: dict):
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
-        print(f"  [pipeline] Job {job_id} FAILED: {error_msg}")
-        traceback.print_exc()
+        logger.exception(
+            "Job failed",
+            extra={"job_id": job_id, "stage": stage_tracker["current"], "error": error_msg},
+        )
         _update_status(db, job_id, "failed", {
             "error": error_msg,
             "failedStage": stage_tracker["current"],
             "resumeAvailable": has_cache(job_id),
         })
+        record_job_metric(db, job_id, job_data, "failed", stage_tracker["current"], error_msg)
 
 
 def process_job(db, job_id: str, job_data: dict):
@@ -338,10 +352,13 @@ def process_job(db, job_id: str, job_data: dict):
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
-        print(f"  [pipeline] Job {job_id} FAILED: {error_msg}")
-        traceback.print_exc()
+        logger.exception(
+            "Job failed",
+            extra={"job_id": job_id, "stage": stage_tracker["current"], "error": error_msg},
+        )
         _update_status(db, job_id, "failed", {
             "error": error_msg,
             "failedStage": stage_tracker["current"],
             "resumeAvailable": has_cache(job_id),
         })
+        record_job_metric(db, job_id, job_data, "failed", stage_tracker["current"], error_msg)

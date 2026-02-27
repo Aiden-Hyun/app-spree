@@ -4,10 +4,13 @@ Step 2: QA and formatting — validate and clean up the generated script.
 
 import re
 
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 def format_script(script: str, job_data: dict) -> str:
     """Validate structure and normalize pause markers in the script."""
-    print("  [qa] Formatting script...")
+    logger.info("Formatting script")
 
     text = script.strip()
 
@@ -35,7 +38,10 @@ def format_script(script: str, job_data: dict) -> str:
 
     word_count = len(text.split())
     pause_count = len(re.findall(r'\[PAUSE \d+s\]', text))
-    print(f"  [qa] Formatted: {word_count} words, {pause_count} pauses")
+    logger.info(
+        "Formatted script",
+        extra={"word_count": word_count, "pause_count": pause_count},
+    )
 
     if word_count < 50:
         raise ValueError(f"Script too short ({word_count} words). LLM may have failed.")

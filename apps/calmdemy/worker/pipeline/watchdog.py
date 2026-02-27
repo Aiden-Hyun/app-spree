@@ -13,6 +13,9 @@ from datetime import datetime, timedelta, timezone
 from firebase_admin import firestore as fs_module
 
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 # Statuses that are "in-flight" and can go stale if the worker crashes.
 PRE_STAGE_STATUSES = ["llm_generating", "qa_formatting", "image_generating"]
@@ -156,11 +159,18 @@ def _reset_stale_job(
     try:
         did_reset = _tx_reset(transaction)
         if did_reset:
-            print(
-                f"  [watchdog] Job {job_id}: {reason} "
-                f"(reset #{current_reset_count + 1})"
+            logger.info(
+                "Watchdog reset job",
+                extra={
+                    "job_id": job_id,
+                    "reason": reason,
+                    "reset_count": current_reset_count + 1,
+                },
             )
         return did_reset
     except Exception as e:
-        print(f"  [watchdog] Failed to reset job {job_id}: {e}")
+        logger.exception(
+            "Watchdog failed to reset job",
+            extra={"job_id": job_id, "error": str(e)},
+        )
         return False

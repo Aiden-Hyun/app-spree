@@ -21,7 +21,6 @@ import json
 import ast
 import re
 import os
-import traceback
 
 from firebase_admin import firestore as fs
 
@@ -33,7 +32,11 @@ from .storage_uploader import upload_audio, upload_image
 from .voice_utils import get_voice_display_name
 from .stages import update_job_status as _update_status
 from .stages import update_job_progress as _update_progress
+from .metrics import record_job_metric
 import config
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 DEFAULT_FALLBACK_URL = (
     "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80"
@@ -326,12 +329,15 @@ def process_course_job(db, job_id: str, job_data: dict):
             _update_status(db, job_id, "llm_generating")
             _update_progress(db, job_id, "Generating course plan...")
 
-            print(f"  [course] Generating plan for {course_code}...")
+            logger.info("Generating course plan", extra={"course_code": course_code, "job_id": job_id})
             plan_prompt = _build_course_plan_prompt(job_data)
             plan_raw = adapter.generate(plan_prompt, max_tokens=4096)
 
             plan = _parse_plan(plan_raw)
-            print(f"  [course] Plan parsed: {plan.get('courseTitle', 'unknown')}")
+            logger.info(
+                "Course plan parsed",
+                extra={"course_title": plan.get("courseTitle", "unknown"), "job_id": job_id},
+            )
 
             # Save plan to job
             _update_status(db, job_id, "llm_generating", {
@@ -363,7 +369,10 @@ def process_course_job(db, job_id: str, job_data: dict):
                     {**job_data, "contentType": "course"},
                 )
             except Exception as e:
-                print(f"  [course] Image generation skipped: {e}")
+                logger.warning(
+                    "Image generation skipped",
+                    extra={"job_id": job_id, "error": str(e)},
+                )
                 if not image_prompt:
                     image_prompt = f"Course thumbnail for {course_title}"
 
@@ -396,7 +405,7 @@ def process_course_job(db, job_id: str, job_data: dict):
 
                 progress = f"Script {i + 1}/{TOTAL_SESSIONS} ({session_code})"
                 _update_progress(db, job_id, progress)
-                print(f"  [course] {progress}")
+                logger.info("Course progress", extra={"job_id": job_id, "progress": progress})
 
                 prompt = _build_session_script_prompt(session_def, plan, job_data)
                 raw_script = adapter.generate(
@@ -459,7 +468,7 @@ def process_course_job(db, job_id: str, job_data: dict):
                 continue
             progress = f"Audio {i + 1}/{TOTAL_SESSIONS} ({session_code})"
             _update_progress(db, job_id, progress)
-            print(f"  [course] {progress}")
+            logger.info("Course progress", extra={"job_id": job_id, "progress": progress})
 
             script = formatted_scripts[session_code]
 
@@ -514,7 +523,11 @@ def process_course_job(db, job_id: str, job_data: dict):
                 "completedAt": fs.SERVER_TIMESTAMP,
                 "lastCompletedStage": "publishing",
             })
-            print(f"  [course] Course {course_code} published! ID: {course_id}")
+            logger.info(
+                "Course published",
+                extra={"job_id": job_id, "course_code": course_code, "course_id": course_id},
+            )
+            record_job_metric(db, job_id, job_data, "completed")
         else:
             preview_sessions = []
             for session_def in SESSION_DEFS:
@@ -534,17 +547,24 @@ def process_course_job(db, job_id: str, job_data: dict):
                 "completedAt": fs.SERVER_TIMESTAMP,
                 "lastCompletedStage": "uploading",
             })
-            print(f"  [course] Course {course_code} done (awaiting approval).")
+            logger.info(
+                "Course completed (awaiting approval)",
+                extra={"job_id": job_id, "course_code": course_code},
+            )
+            record_job_metric(db, job_id, job_data, "completed")
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
-        print(f"  [course] Job {job_id} FAILED: {error_msg}")
-        traceback.print_exc()
+        logger.exception(
+            "Course job failed",
+            extra={"job_id": job_id, "stage": current_stage, "error": error_msg},
+        )
         _update_status(db, job_id, "failed", {
             "error": error_msg,
             "failedStage": current_stage,
             "resumeAvailable": bool(formatted_scripts or audio_results or raw_scripts),
         })
+        record_job_metric(db, job_id, job_data, "failed", current_stage, error_msg)
 
 
 def _publish_course(
@@ -597,7 +617,10 @@ def _publish_course(
 
     _, course_ref = db.collection("courses").add(course_data)
     course_id = course_ref.id
-    print(f"  [publish] Created course: {course_id} ({course_code})")
+    logger.info(
+        "Created course document",
+        extra={"course_id": course_id, "course_code": course_code},
+    )
 
     # Create session documents
     session_ids = []
@@ -622,6 +645,9 @@ def _publish_course(
 
         _, session_ref = db.collection("course_sessions").add(session_data)
         session_ids.append(session_ref.id)
-        print(f"  [publish] Created session: {session_ref.id} ({session_code})")
+        logger.info(
+            "Created session document",
+            extra={"session_id": session_ref.id, "session_code": session_code},
+        )
 
     return course_id, session_ids
