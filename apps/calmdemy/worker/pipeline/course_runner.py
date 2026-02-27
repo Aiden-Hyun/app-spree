@@ -513,7 +513,7 @@ def process_course_job(db, job_id: str, job_data: dict):
             _update_progress(db, job_id, "Publishing course...")
 
             course_id, session_ids = _publish_course(
-                db, plan, audio_results, job_data,
+                db, job_id, plan, audio_results, job_data,
             )
 
             _update_status(db, job_id, "completed", {
@@ -569,11 +569,12 @@ def process_course_job(db, job_id: str, job_data: dict):
 
 def _publish_course(
     db,
+    job_id: str,
     plan: dict,
     audio_results: dict,
     job_data: dict,
 ) -> tuple[str, list[str]]:
-    """Create the course document and 9 session documents in Firestore."""
+    """Create the course document and 9 session documents in Firestore, idempotently."""
     import math
 
     params = job_data.get("params", {})
@@ -588,6 +589,11 @@ def _publish_course(
     voice_id = job_data.get("ttsVoice", "Calmdemy")
     voice = get_voice_display_name(voice_id)
     thumbnail_url = job_data.get("thumbnailUrl") or ""
+    publish_token = job_data.get("publishToken") or job_id
+
+    # Idempotency: if already published, return existing IDs
+    if job_data.get("courseId") and job_data.get("courseSessionIds"):
+        return job_data["courseId"], job_data["courseSessionIds"]
 
     # Calculate total duration
     total_duration = sum(
@@ -615,7 +621,8 @@ def _publish_course(
         "createdAt": fs.SERVER_TIMESTAMP,
     }
 
-    _, course_ref = db.collection("courses").add(course_data)
+    course_ref = db.collection("courses").document(str(publish_token))
+    course_ref.set(course_data, merge=True)
     course_id = course_ref.id
     logger.info(
         "Created course document",
@@ -643,7 +650,8 @@ def _publish_course(
             "createdAt": fs.SERVER_TIMESTAMP,
         }
 
-        _, session_ref = db.collection("course_sessions").add(session_data)
+        session_ref = db.collection("course_sessions").document(f"{publish_token}-{session_code}")
+        session_ref.set(session_data, merge=True)
         session_ids.append(session_ref.id)
         logger.info(
             "Created session document",

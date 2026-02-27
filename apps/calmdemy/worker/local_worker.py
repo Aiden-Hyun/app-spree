@@ -372,7 +372,7 @@ def _handle_course_publish(db, job_id: str, job_data: dict):
         })
         return
 
-    course_id, session_ids = _publish_course(db, plan, audio_results, job_data)
+    course_id, session_ids = _publish_course(db, job_id, plan, audio_results, job_data)
     db.collection(config.JOBS_COLLECTION).document(job_id).update({
         "status": "completed",
         "courseId": course_id,

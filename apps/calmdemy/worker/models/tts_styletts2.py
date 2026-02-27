@@ -16,6 +16,9 @@ import nltk
 from munch import Munch
 
 from .tts_base import TTSBase
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 _STYLE_MODULE_CACHE: dict[str, object] = {}
 
@@ -176,7 +179,7 @@ class StyleTTS2Adapter(TTSBase):
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
-            print("  [styletts2] MPS not available; falling back to CPU.")
+            logger.info("StyleTTS2: MPS not available; falling back to CPU.")
 
         for key in model:
             model[key].eval()
@@ -283,6 +286,10 @@ class StyleTTS2Adapter(TTSBase):
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         sf.write(output_path, wav, self._sample_rate, subtype="PCM_16")
+        logger.info(
+            "StyleTTS2 audio generated",
+            extra={"checkpoint": self._checkpoint_name, "path": output_path},
+        )
 
     def unload(self) -> None:
         self._model = None

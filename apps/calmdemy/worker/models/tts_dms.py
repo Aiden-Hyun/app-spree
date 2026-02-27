@@ -7,6 +7,9 @@ import torch
 import sphn
 
 from .tts_base import TTSBase
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 
 class DMSTTSAdapter(TTSBase):
@@ -58,7 +61,7 @@ class DMSTTSAdapter(TTSBase):
 
         self._device = device
 
-        print(f"  [dms] Loading model from {repo} on {device}...")
+        logger.info("DMS loading model", extra={"repo": repo, "device": device})
         checkpoint_info = CheckpointInfo.from_hf_repo(repo)
         self._tts_model = TTSModel.from_checkpoint_info(
             checkpoint_info,
@@ -79,7 +82,7 @@ class DMSTTSAdapter(TTSBase):
                 # Older moshi versions don't accept repo kwarg
                 self._voice_path = self._tts_model.get_voice_path(self._voice_id)
 
-        print(f"  [dms] Loaded voice: {self._voice_id}")
+        logger.info("DMS voice loaded", extra={"voice_id": self._voice_id})
 
     def synthesize(self, text: str, output_path: str) -> None:
         """Convert text to audio and save as WAV file."""
@@ -87,7 +90,7 @@ class DMSTTSAdapter(TTSBase):
             raise RuntimeError("DMS TTS model not loaded. Call load() first.")
 
         word_count = len(text.split())
-        print(f"  [dms] Synthesizing {word_count} words...")
+        logger.info("DMS synthesizing", extra={"words": word_count, "voice_id": self._voice_id})
 
         entries = self._tts_model.prepare_script([text], padding_between=1)
         condition_attributes = self._tts_model.make_condition_attributes(
@@ -111,7 +114,7 @@ class DMSTTSAdapter(TTSBase):
         sphn.write_wav(output_path, pcm, self._tts_model.mimi.sample_rate)
 
         duration = pcm.shape[-1] / self._tts_model.mimi.sample_rate
-        print(f"  [dms] Audio generated: {duration:.1f}s")
+        logger.info("DMS audio generated", extra={"duration_sec": duration, "voice_id": self._voice_id})
 
     def unload(self) -> None:
         self._tts_model = None

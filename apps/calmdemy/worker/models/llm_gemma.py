@@ -2,6 +2,10 @@
 
 import os
 from .llm_base import LLMBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class GemmaAdapter(LLMBase):
@@ -24,16 +28,16 @@ class GemmaAdapter(LLMBase):
             source = model_path
         else:
             source = self.MODEL_NAME
-            print(f"  [gemma] Downloading {self.MODEL_NAME} from HuggingFace...")
+            logger.info("Downloading Gemma model", extra={"model": self.MODEL_NAME})
 
-        print(f"  [gemma] Loading model from {source}...")
+        logger.info("Loading Gemma model", extra={"source": source})
         self._tokenizer = AutoTokenizer.from_pretrained(source)
         self._model = AutoModelForCausalLM.from_pretrained(
             source,
             torch_dtype=torch.bfloat16,
             device_map="auto",
         )
-        print("  [gemma] Model loaded.")
+        logger.info("Gemma model loaded")
 
     def generate(self, prompt: str, max_tokens: int = 4096) -> str:
         if self._model is None:

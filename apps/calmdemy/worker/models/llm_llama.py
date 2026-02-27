@@ -2,6 +2,10 @@
 
 import os
 from .llm_base import LLMBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class LlamaAdapter(LLMBase):
@@ -21,7 +25,7 @@ class LlamaAdapter(LLMBase):
             source = model_path
         else:
             source = self.MODEL_NAME
-            print(f"  [llama] Downloading {self.MODEL_NAME} from HuggingFace...")
+            logger.info("Downloading Llama model", extra={"model": self.MODEL_NAME})
 
         self._llm = LLM(
             model=source,
@@ -29,7 +33,7 @@ class LlamaAdapter(LLMBase):
             max_model_len=8192,
             gpu_memory_utilization=0.85,
         )
-        print("  [llama] Model loaded.")
+        logger.info("Llama model loaded", extra={"source": source})
 
     def generate(self, prompt: str, max_tokens: int = 4096) -> str:
         if self._llm is None:

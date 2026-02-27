@@ -5,6 +5,10 @@ import json
 import urllib.request
 import urllib.error
 from .llm_base import LLMBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class LMStudioAdapter(LLMBase):
@@ -22,7 +26,7 @@ class LMStudioAdapter(LLMBase):
 
     def load(self, model_dir: str) -> None:
         """Verify LM Studio is reachable and a model is loaded."""
-        print(f"  [lmstudio] Checking LM Studio at {self._host}...")
+        logger.info("Checking LM Studio", extra={"host": self._host})
         try:
             req = urllib.request.Request(f"{self._host}/v1/models")
             with urllib.request.urlopen(req, timeout=10) as resp:
@@ -30,9 +34,9 @@ class LMStudioAdapter(LLMBase):
                 models = data.get("data", [])
                 model_ids = [m.get("id", "") for m in models]
                 if model_ids:
-                    print(f"  [lmstudio] Loaded model(s): {', '.join(model_ids)}")
+                    logger.info("LM Studio loaded models", extra={"models": model_ids})
                 else:
-                    print("  [lmstudio] Warning: No models loaded. Load a model in LM Studio first.")
+                    logger.warning("LM Studio has no models loaded")
         except urllib.error.URLError as e:
             raise RuntimeError(
                 f"Cannot connect to LM Studio at {self._host}. "
@@ -42,7 +46,7 @@ class LMStudioAdapter(LLMBase):
 
     def generate(self, prompt: str, max_tokens: int = 4096) -> str:
         """Generate text using the LM Studio OpenAI-compatible API."""
-        print(f"  [lmstudio] Generating...")
+        logger.info("Generating with LM Studio")
 
         payload = json.dumps({
             "messages": [
@@ -67,7 +71,7 @@ class LMStudioAdapter(LLMBase):
                 if not choices:
                     raise RuntimeError("LM Studio returned no choices")
                 text = choices[0].get("message", {}).get("content", "")
-                print(f"  [lmstudio] Generated {len(text)} chars")
+                logger.info("LM Studio generated text", extra={"chars": len(text)})
                 return text.strip()
         except urllib.error.URLError as e:
             raise RuntimeError(f"LM Studio API call failed: {e}")

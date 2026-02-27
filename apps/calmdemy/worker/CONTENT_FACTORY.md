@@ -578,6 +578,11 @@ A course creates:
 
 ## 12. Running the Worker
 
+### Admin auth (custom claims)
+
+- Run `node scripts/setAdminClaims.js <uid or email>` to seed `admin=true` custom claims and mirror `role: "admin"` to the user doc (display-only).
+- The admin UI now gates on the custom claim; Firestore rules block client writes to `users.role`.
+
 ### Prerequisites
 
 - Python 3.11+
@@ -650,6 +655,11 @@ The companion prints stack status and keeps desired state at `running` by defaul
 Press Ctrl+C to stop.
 
 The admin UI displays stack PIDs, status, and log paths from `worker_stacks_status/local`.
+
+### Latency SLO (Option A)
+
+- Warm path: P95 ≤ 5s, P99 ≤ 10s from job enqueue to worker start (cold model loads excluded).
+- Achieved via always-on stacks (launchd), 2s polls with jitter, restart waits on state not sleep.
 
 ### Seeding Subjects
 

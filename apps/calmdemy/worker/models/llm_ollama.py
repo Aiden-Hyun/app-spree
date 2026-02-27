@@ -5,6 +5,10 @@ import json
 import urllib.request
 import urllib.error
 from .llm_base import LLMBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class OllamaAdapter(LLMBase):
@@ -22,24 +26,24 @@ class OllamaAdapter(LLMBase):
 
     def load(self, model_dir: str) -> None:
         """Verify Ollama is reachable. No model weights to load ourselves."""
-        print(f"  [ollama] Checking Ollama at {self._host}...")
+        logger.info("Checking Ollama", extra={"host": self._host})
         try:
             req = urllib.request.Request(f"{self._host}/api/tags")
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode())
                 model_names = [m.get("name", "") for m in data.get("models", [])]
-                print(f"  [ollama] Available models: {', '.join(model_names)}")
+                logger.info("Ollama models", extra={"models": model_names})
         except urllib.error.URLError as e:
             raise RuntimeError(
                 f"Cannot connect to Ollama at {self._host}. "
                 f"Make sure Ollama is running: ollama serve\n"
                 f"Error: {e}"
             )
-        print(f"  [ollama] Will use model: {self._model_name}")
+        logger.info("Ollama model selected", extra={"model": self._model_name})
 
     def generate(self, prompt: str, max_tokens: int = 4096) -> str:
         """Generate text using the Ollama API."""
-        print(f"  [ollama] Generating with {self._model_name}...")
+        logger.info("Generating with Ollama", extra={"model": self._model_name})
 
         payload = json.dumps({
             "model": self._model_name,
@@ -62,7 +66,10 @@ class OllamaAdapter(LLMBase):
             with urllib.request.urlopen(req, timeout=600) as resp:
                 data = json.loads(resp.read().decode())
                 text = data.get("response", "")
-                print(f"  [ollama] Generated {len(text)} chars")
+                logger.info(
+                    "Ollama generated text",
+                    extra={"model": self._model_name, "chars": len(text)},
+                )
                 return text.strip()
         except urllib.error.URLError as e:
             raise RuntimeError(f"Ollama API call failed: {e}")

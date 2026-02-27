@@ -2,6 +2,9 @@
 
 import os
 from .tts_base import TTSBase
+from observability import get_logger
+
+logger = get_logger(__name__)
 
 
 class CoquiXTTSAdapter(TTSBase):
@@ -23,7 +26,7 @@ class CoquiXTTSAdapter(TTSBase):
         speaker_wav = os.path.join(speaker_dir, f"{voice_id}.wav")
         if os.path.isfile(speaker_wav):
             self._speaker_wav = speaker_wav
-            print(f"  [xtts] Using speaker reference: {speaker_wav}")
+            logger.info("XTTS using speaker reference", extra={"speaker_wav": speaker_wav})
 
         # Load XTTS v2 model
         if os.path.isdir(xtts_dir):
@@ -31,13 +34,13 @@ class CoquiXTTSAdapter(TTSBase):
         else:
             self._model = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
 
-        print(f"  [xtts] Model loaded with voice: {voice_id}")
+        logger.info("XTTS model loaded", extra={"voice_id": voice_id})
 
     def synthesize(self, text: str, output_path: str) -> None:
         if self._model is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        print(f"  [xtts] Synthesizing {len(text.split())} words...")
+        logger.info("XTTS synthesizing", extra={"words": len(text.split()), "voice_id": self._voice_id})
 
         if self._speaker_wav:
             self._model.tts_to_file(
@@ -54,7 +57,7 @@ class CoquiXTTSAdapter(TTSBase):
                 language="en",
             )
 
-        print(f"  [xtts] Audio generated: {output_path}")
+        logger.info("XTTS audio generated", extra={"path": output_path, "voice_id": self._voice_id})
 
     def unload(self) -> None:
         del self._model

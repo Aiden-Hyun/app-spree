@@ -5,6 +5,10 @@ import wave
 import struct
 from google import genai
 from .tts_base import TTSBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class GeminiTTSAdapter(TTSBase):
@@ -36,7 +40,7 @@ class GeminiTTSAdapter(TTSBase):
         self._client = genai.Client(api_key=api_key)
         self._voice_id = voice_id
         model_name = self.MODEL_MAP.get(self._model_id, self._model_id)
-        print(f"  [gemini-tts] Initialized with model: {model_name}")
+        logger.info("Gemini TTS initialized", extra={"model": model_name, "voice_id": voice_id})
 
     def synthesize(self, text: str, output_path: str) -> None:
         """Convert text to audio using the Gemini TTS API and save as WAV."""
@@ -45,7 +49,10 @@ class GeminiTTSAdapter(TTSBase):
 
         model_name = self.MODEL_MAP.get(self._model_id, self._model_id)
         word_count = len(text.split())
-        print(f"  [gemini-tts] Synthesizing {word_count} words with {model_name}...")
+        logger.info(
+            "Gemini TTS synthesizing",
+            extra={"model": model_name, "words": word_count, "voice_id": self._voice_id},
+        )
 
         response = self._client.models.generate_content(
             model=model_name,
@@ -93,7 +100,10 @@ class GeminiTTSAdapter(TTSBase):
         # Report duration
         num_samples = len(audio_data) // 2  # 16-bit = 2 bytes per sample
         duration = num_samples / sample_rate
-        print(f"  [gemini-tts] Audio generated: {duration:.1f}s")
+        logger.info(
+            "Gemini TTS audio generated",
+            extra={"duration_sec": duration, "model": model_name, "voice_id": self._voice_id},
+        )
 
     def unload(self) -> None:
         """No resources to free for API-based TTS."""

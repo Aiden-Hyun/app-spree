@@ -9,6 +9,10 @@ import struct
 import urllib.request
 from pathlib import Path
 from .tts_base import TTSBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 # Default directory where Piper voices are cached locally
@@ -57,11 +61,11 @@ class PiperAdapter(TTSBase):
             model_file = os.path.join(d, f"{voice_id}.onnx")
             if os.path.isfile(model_file):
                 self._model_path = model_file
-                print(f"  [piper] Loaded voice: {voice_id} from {d}")
+                logger.info("Piper voice loaded", extra={"voice_id": voice_id, "path": d})
                 return
 
         # Not cached — download from Hugging Face
-        print(f"  [piper] Voice {voice_id} not cached. Downloading from HuggingFace...")
+        logger.info("Piper voice not cached; downloading", extra={"voice_id": voice_id})
         self._download_voice(voice_id)
 
     def _download_voice(self, voice_id: str) -> None:
@@ -81,7 +85,7 @@ class PiperAdapter(TTSBase):
         ]:
             if os.path.isfile(dest):
                 continue
-            print(f"  [piper] Downloading {label}: {url}")
+            logger.info("Downloading Piper voice asset", extra={"voice_id": voice_id, "label": label, "url": url})
             try:
                 urllib.request.urlretrieve(url, dest)
             except Exception as e:
@@ -90,11 +94,11 @@ class PiperAdapter(TTSBase):
                 ) from e
 
         self._model_path = onnx_dest
-        print(f"  [piper] Voice {voice_id} ready.")
+        logger.info("Piper voice ready", extra={"voice_id": voice_id})
 
     def synthesize(self, text: str, output_path: str) -> None:
         """Run Piper TTS to generate a WAV file from text."""
-        print(f"  [piper] Synthesizing {len(text.split())} words...")
+        logger.info("Piper synthesizing", extra={"voice_id": self._voice_id, "words": len(text.split())})
 
         piper_bin = _resolve_piper_bin()
         cmd = [piper_bin, "--output_file", output_path]
@@ -127,9 +131,9 @@ class PiperAdapter(TTSBase):
                 frames = wf.getnframes()
                 rate = wf.getframerate()
                 duration = frames / rate
-                print(f"  [piper] Audio generated: {duration:.1f}s")
+                logger.info("Piper audio generated", extra={"voice_id": self._voice_id, "duration_sec": duration})
         except Exception:
-            print("  [piper] Audio generated (duration unknown).")
+            logger.info("Piper audio generated (duration unknown)", extra={"voice_id": self._voice_id})
 
 
 def _resolve_piper_bin() -> str:

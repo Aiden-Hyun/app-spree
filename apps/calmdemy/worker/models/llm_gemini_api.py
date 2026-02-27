@@ -3,6 +3,10 @@
 import os
 from google import genai
 from .llm_base import LLMBase
+from observability import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class GeminiAPIAdapter(LLMBase):
@@ -33,7 +37,7 @@ class GeminiAPIAdapter(LLMBase):
             )
         self._client = genai.Client(api_key=api_key)
         model_name = self.MODEL_MAP.get(self._model_id, self._model_id)
-        print(f"  [gemini-api] Initialized with model: {model_name}")
+        logger.info("Gemini API initialized", extra={"model": model_name})
 
     def generate(self, prompt: str, max_tokens: int = 4096) -> str:
         """Generate text using the Gemini API."""
@@ -41,7 +45,7 @@ class GeminiAPIAdapter(LLMBase):
             raise RuntimeError("Client not initialized. Call load() first.")
 
         model_name = self.MODEL_MAP.get(self._model_id, self._model_id)
-        print(f"  [gemini-api] Generating with {model_name}...")
+        logger.info("Generating with Gemini API", extra={"model": model_name})
 
         response = self._client.models.generate_content(
             model=model_name,
@@ -54,7 +58,7 @@ class GeminiAPIAdapter(LLMBase):
         )
 
         text = response.text or ""
-        print(f"  [gemini-api] Generated {len(text)} chars")
+        logger.info("Gemini API generated text", extra={"model": model_name, "chars": len(text)})
         return text.strip()
 
     def unload(self) -> None:
