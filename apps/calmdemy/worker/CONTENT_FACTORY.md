@@ -656,6 +656,22 @@ Press Ctrl+C to stop.
 
 The admin UI displays stack PIDs, status, and log paths from `worker_stacks_status/local`.
 
+### Option B — Wake via Firebase Function (tunnel to Mac)
+
+- Cloud Function (`functions/dispatchWake`) watches `content_jobs` and sends an authenticated HTTPS POST to the Mac companion when a job hits `pending`, `tts_pending`, or `publishing` (non-cloud backends).
+- Companion wake server (opt-in): set `ENABLE_WAKE_SERVER=true` and expose your Mac via a tunnel (ngrok/Cloudflare) so the function can reach `/wake`.
+- Endpoint (local): `POST /wake` with header `X-Wake-Signature` = `HMAC_SHA256(secret, body)` using `WAKE_SHARED_SECRET`.
+- Env (companion/worker):
+  - `ENABLE_WAKE_SERVER=true`
+  - `WAKE_SHARED_SECRET=<strong_random>`
+  - `WAKE_SERVER_PORT=8787` (default)
+  - `FORCE_IMMEDIATE_START=true` (start stacks immediately) or `false` (only set desiredState=running)
+  - `WAKE_DEDUP_WINDOW_SEC=300`
+- Env (Cloud Function):
+  - `WAKE_ENDPOINT_URL=https://<your-tunnel>/wake`
+  - `WAKE_SHARED_SECRET=<same secret as companion>`
+- Behavior: function calls `/wake`; companion verifies signature, sets `worker_control.desiredState=running`, and (optionally) starts stacks immediately. 2s polling remains as safety net.
+
 ### Latency SLO (Option A)
 
 - Warm path: P95 ≤ 5s, P99 ≤ 10s from job enqueue to worker start (cold model loads excluded).

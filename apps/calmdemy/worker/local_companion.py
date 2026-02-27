@@ -13,6 +13,10 @@ import time
 import random
 import signal
 import subprocess
+import hmac
+import hashlib
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
 import firebase_admin
@@ -43,6 +47,11 @@ JOBS_COLLECTION = config.JOBS_COLLECTION
 POLL_SECONDS = int(os.getenv("COMPANION_POLL_SECONDS", "2"))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 STACKS_PATH = os.path.join(BASE_DIR, "worker_stacks.json")
+ENABLE_WAKE_SERVER = os.getenv("ENABLE_WAKE_SERVER", "false").lower() == "true"
+WAKE_SHARED_SECRET = os.getenv("WAKE_SHARED_SECRET", "")
+WAKE_SERVER_PORT = int(os.getenv("WAKE_SERVER_PORT", "8787"))
+FORCE_IMMEDIATE_START = os.getenv("FORCE_IMMEDIATE_START", "true").lower() == "true"
+WAKE_DEDUP_WINDOW_SEC = int(os.getenv("WAKE_DEDUP_WINDOW_SEC", "300"))
 
 ACTIVE_STATUSES = [
     "llm_generating",
@@ -53,6 +62,9 @@ ACTIVE_STATUSES = [
     "uploading",
     "publishing",
 ]
+
+RECENT_WAKES: dict[str, float] = {}
+RECENT_WAKES_LOCK = threading.Lock()
 
 
 # ==================== FIREBASE INIT ====================
@@ -367,6 +379,155 @@ def has_active_jobs(db) -> bool:
     return any(q.stream())
 
 
+def _is_duplicate_wake(job_id: str) -> bool:
+    now = time.time()
+    with RECENT_WAKES_LOCK:
+        # prune old
+        expired = [jid for jid, ts in RECENT_WAKES.items() if now - ts > WAKE_DEDUP_WINDOW_SEC]
+        for jid in expired:
+            RECENT_WAKES.pop(jid, None)
+        last = RECENT_WAKES.get(job_id)
+        if last and now - last < WAKE_DEDUP_WINDOW_SEC:
+            return True
+        RECENT_WAKES[job_id] = now
+    return False
+
+
+def _make_wake_handler(db):
+    class WakeHandler(BaseHTTPRequestHandler):
+        server_version = "CalmdemyWake/1.0"
+
+        def _send(self, code: int, payload: dict):
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format, *args):
+            # Suppress default noisy logging; we use structured logger instead.
+            return
+
+        def do_GET(self):
+            if self.path.startswith("/wake/health"):
+                self._send(200, {"ok": True})
+            else:
+                self._send(404, {"error": "not found"})
+
+        def do_POST(self):
+            if self.path != "/wake":
+                self._send(404, {"error": "not found"})
+                return
+
+            if not WAKE_SHARED_SECRET:
+                logger.warning("Wake server missing secret; rejecting request")
+                self._send(503, {"error": "wake secret not configured"})
+                return
+
+            sig = self.headers.get("X-Wake-Signature", "")
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length)
+
+            expected = hmac.new(
+                WAKE_SHARED_SECRET.encode("utf-8"),
+                raw,
+                hashlib.sha256,
+            ).hexdigest()
+            if not hmac.compare_digest(expected, sig):
+                logger.warning("Wake request signature mismatch")
+                self._send(401, {"error": "invalid signature"})
+                return
+
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+            except Exception:
+                self._send(400, {"error": "invalid json"})
+                return
+
+            job_id = payload.get("jobId")
+            if not job_id:
+                self._send(400, {"error": "jobId required"})
+                return
+
+            if _is_duplicate_wake(job_id):
+                logger.info("Wake ignored (duplicate)", extra={"job_id": job_id})
+                self._send(200, {"ok": True, "duplicate": True})
+                return
+
+            try:
+                _process_wake(db, payload)
+                self._send(200, {"ok": True})
+            except Exception as exc:
+                logger.exception("Wake handling failed", extra={"error": str(exc)})
+                self._send(500, {"error": "wake handling failed"})
+
+    return WakeHandler
+
+
+def start_wake_server(db):
+    handler_cls = _make_wake_handler(db)
+    server = ThreadingHTTPServer(("0.0.0.0", WAKE_SERVER_PORT), handler_cls)
+
+    def _serve():
+        logger.info(
+            "Wake server listening",
+            extra={"port": WAKE_SERVER_PORT, "enable_immediate_start": FORCE_IMMEDIATE_START},
+        )
+        try:
+            server.serve_forever()
+        except Exception as exc:
+            logger.exception("Wake server stopped", extra={"error": str(exc)})
+
+    thread = threading.Thread(target=_serve, daemon=True)
+    thread.start()
+    return thread
+
+
+def _process_wake(db, payload: dict) -> None:
+    """Handle a wake request: set desired state and optionally start stacks."""
+    job_id = payload.get("jobId")
+    status = payload.get("status")
+    logger.info(
+        "Wake received",
+        extra={"job_id": job_id, "status": status, "force_immediate_start": FORCE_IMMEDIATE_START},
+    )
+
+    # Always set desired state to running to ensure worker starts quickly.
+    update_control(
+        db,
+        {
+            "desiredState": "running",
+            "lastAction": "wake-dispatcher",
+            "requestedBy": "wake-dispatcher",
+            "requestedAt": firestore.SERVER_TIMESTAMP,
+        },
+    )
+
+    if not FORCE_IMMEDIATE_START:
+        return
+
+    stacks = load_worker_stacks()
+    enabled_stacks = [s for s in stacks if s.get("enabled", True)]
+    running = _running_stack_pids(stacks)
+
+    for stack in enabled_stacks:
+        if stack["id"] not in running:
+            running[stack["id"]] = start_worker(stack)
+
+    pid = _primary_pid(enabled_stacks, running)
+    update_control(
+        db,
+        {
+            "currentState": "running",
+            "workerPid": pid,
+            "lastAction": "wake-dispatcher",
+            "lastError": None,
+        },
+    )
+    logger.info("Wake started stacks", extra={"pid": pid, "running": list(running.keys())})
+
+
 # ==================== MAIN LOOP ====================
 
 
@@ -378,6 +539,8 @@ def main() -> None:
 
     db = init_firebase()
     ensure_control_doc(db)
+    if ENABLE_WAKE_SERVER:
+        start_wake_server(db)
 
     last_activity_ts = time.time()
 
