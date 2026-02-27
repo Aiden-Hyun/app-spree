@@ -20,8 +20,14 @@ import {
   WorkerControl,
   WorkerDesiredState,
   WorkerStatus,
+  WorkerStackStatus,
+  FactoryMetrics,
 } from '../types';
 import { getDrafts, deleteDraft as removeDraft } from '../data/draftRepository';
+import {
+  subscribeToStacksStatus,
+  subscribeToFactoryMetrics,
+} from '../data/adminRepository';
 
 // ==================== JOB LIST HOOK ====================
 
@@ -151,4 +157,30 @@ export function useDrafts() {
   }, [refresh]);
 
   return { drafts, isLoading, refresh, deleteDraft };
+}
+
+// ==================== WORKER STACKS ====================
+
+export function useWorkerStacks() {
+  const [stacks, setStacks] = useState<WorkerStackStatus[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToStacksStatus((next) => setStacks(next));
+    return unsubscribe;
+  }, []);
+
+  return { stacks };
+}
+
+// ==================== FACTORY METRICS ====================
+
+export function useFactoryMetrics() {
+  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToFactoryMetrics((next) => setMetrics(next));
+    return unsubscribe;
+  }, []);
+
+  return { metrics };
 }

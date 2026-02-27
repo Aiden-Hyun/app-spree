@@ -9,7 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { Theme } from '@/theme';
-import { WorkerRuntimeState, WorkerStatus } from '../types';
+import { WorkerRuntimeState, WorkerStatus, WorkerStackStatus } from '../types';
 
 export type LocalUiState = WorkerRuntimeState | 'start_clicked' | 'stop_clicked';
 
@@ -33,6 +33,7 @@ interface FactoryOverviewProps {
   controlsDisabled: boolean;
   restartInProgress: boolean;
   isOpen: boolean;
+  stacks?: WorkerStackStatus[];
   onToggle: () => void;
   onAutoModeChange: (next: boolean) => void;
   onStartNow: () => void;
@@ -55,6 +56,7 @@ export function FactoryOverview({
   controlsDisabled,
   restartInProgress,
   isOpen,
+  stacks = [],
   onToggle,
   onAutoModeChange,
   onStartNow,
@@ -130,6 +132,36 @@ export function FactoryOverview({
               <Text style={styles.workerMeta}>{cloudState.meta}</Text>
             </View>
           </View>
+
+          {stacks.length > 0 ? (
+            <View style={styles.stacksCard}>
+              <View style={styles.stacksHeader}>
+                <Ionicons name="layers-outline" size={16} color={theme.colors.text} />
+                <Text style={styles.stacksTitle}>Stacks</Text>
+              </View>
+              {stacks.map((stack) => {
+                const status = getStackStatus(stack, theme);
+                return (
+                  <View key={stack.id} style={styles.stackRow}>
+                    <View style={styles.stackLeft}>
+                      <Text style={styles.stackId}>{stack.id}</Text>
+                      <Text style={styles.stackMeta}>
+                        {stack.role || 'role?'} · {stack.venv || 'venv?'}
+                      </Text>
+                    </View>
+                    <View style={styles.stackRight}>
+                      <Text style={[styles.stackStatus, { color: status.color }]}>
+                        {status.label}
+                      </Text>
+                      {stack.logPath ? (
+                        <Text style={styles.stackMeta}>log: {stack.logPath}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
 
           <View style={styles.controlCard}>
             <View style={styles.controlHeader}>
@@ -367,6 +399,16 @@ function formatAge(ageSec: number): string {
   return `${hours}h ago`;
 }
 
+function getStackStatus(stack: WorkerStackStatus, theme: Theme) {
+  if (stack.enabled === false) {
+    return { label: 'Disabled', color: theme.colors.textMuted };
+  }
+  if (stack.pid) {
+    return { label: `Running (pid ${stack.pid})`, color: theme.colors.success };
+  }
+  return { label: 'Stopped', color: theme.colors.error };
+}
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     statsRow: {
@@ -567,5 +609,53 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.textMuted,
       marginTop: 2,
+    },
+    stacksCard: {
+      marginTop: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      padding: 10,
+      backgroundColor: theme.colors.background,
+      gap: 6,
+    },
+    stacksHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    stacksTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    stackRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      paddingVertical: 4,
+    },
+    stackLeft: {
+      flex: 1,
+    },
+    stackRight: {
+      alignItems: 'flex-end',
+      flex: 1,
+    },
+    stackId: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    stackMeta: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      marginTop: 2,
+    },
+    stackStatus: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
     },
   });

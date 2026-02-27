@@ -41,7 +41,7 @@ The Content Factory is an automated pipeline that generates audio content for th
 │  └──────────────┘                                       │
 └─────────────────────────────────────────────────────────┘
                               │
-                    polls every 15s
+                    polls every ~2s (jittered)
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────┐
@@ -398,7 +398,7 @@ If `autoPublish` is true:
 2. Create **9 documents** in `course_sessions` collection (courseId, code, title, audioPath, order, duration).
 3. Course Intro (`order: 0`) is marked `isFree: true`.
 
-> **Note:** Manual publishing (autoPublish=false) is not yet supported for courses. Use auto-publish.
+> **Note:** Manual publishing is supported. The worker uses an idempotent `publishToken` to guard against double-publish.
 
 ---
 
@@ -632,25 +632,24 @@ Optional environment variables:
 
 ### Run
 
+**launchd (recommended):**
+
+- Companion plist: `/Users/aidenhyun/Library/LaunchAgents/com.calmdemy.local-companion.plist`
+- Logs: `worker/logs/companion.log` and per-stack `worker/logs/local_worker_<stack>.log`
+- Start/stop: `launchctl load ~/Library/LaunchAgents/com.calmdemy.local-companion.plist` /
+  `launchctl unload ~/Library/LaunchAgents/com.calmdemy.local-companion.plist`
+
+**Manual run (foreground):**
+
 ```bash
 cd apps/calmdemy/worker
 python3 local_companion.py
 ```
 
-The worker will print:
-```
-============================================================
-  Calmdemy Content Factory — Local Worker (primary)
-============================================================
-  Project:       calmnest-e910e
-  Handles:       all non-cloud jobs (local + api)
-  Poll interval: 15s
-============================================================
-
+The companion prints stack status and keeps desired state at `running` by default. Workers poll every **2s** with ±300ms jitter.
 Press Ctrl+C to stop.
-```
 
-It then polls every 15 seconds. When a job is found, you'll see detailed progress output for each pipeline step.
+The admin UI displays stack PIDs, status, and log paths from `worker_stacks_status/local`.
 
 ### Seeding Subjects
 

@@ -245,6 +245,36 @@ export interface WorkerControl {
   requestedAt?: Timestamp;
 }
 
+// ==================== WORKER STACKS ====================
+
+export interface WorkerStackStatus {
+  id: string;
+  role?: string;
+  venv?: string;
+  enabled?: boolean;
+  pid?: number;
+  logPath?: string;
+  lastUpdatedAt?: Timestamp;
+  heartbeat?: WorkerStatus | null;
+}
+
+// ==================== FACTORY METRICS ====================
+
+export interface FactoryMetrics {
+  id: string; // YYYY-MM-DD
+  completed_total?: number;
+  failed_total?: number;
+  completed_by_type?: Record<string, number>;
+  failed_by_type?: Record<string, number>;
+  failed_by_stage?: Record<string, number>;
+  duration_sec_sum?: number;
+  duration_sec_count?: number;
+  queue_latency_sec_sum?: number;
+  queue_latency_sec_count?: number;
+  last_error?: string;
+  lastUpdatedAt?: Timestamp;
+}
+
 // ==================== CREATE JOB INPUT ====================
 
 export interface CreateJobInput {

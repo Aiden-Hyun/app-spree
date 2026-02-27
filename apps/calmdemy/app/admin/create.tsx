@@ -142,7 +142,7 @@ export default function CreateContentScreen() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [courseCodeError, setCourseCodeError] = useState<string | null>(null);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
-  const codeCheckTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const codeCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isCourse = contentType === 'course';
 
@@ -386,7 +386,7 @@ export default function CreateContentScreen() {
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
       if (skipPromptRef.current || !isDirty) {
         return;
       }

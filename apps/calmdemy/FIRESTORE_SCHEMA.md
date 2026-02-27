@@ -48,6 +48,7 @@ If a field is not listed below, it is not relied on by the app/worker and may be
 | `worker_status` | Admin read-only | Worker heartbeat/state.
 | `worker_control` | Admin read/write | Admin control plane for worker.
 | `factory_metrics` | Admin read-only | Daily aggregate metrics for content factory jobs.
+| `worker_stacks_status` | Admin read-only | Local companion-reported stack list (pid, venv, log path).
 
 ## Field Contracts (Known Fields)
 
@@ -316,6 +317,17 @@ Document ID convention: `YYYY-MM-DD` (UTC).
 - `queue_latency_sec_sum` (number, optional)
 - `queue_latency_sec_count` (number, optional)
 - `lastUpdatedAt` (timestamp)
+
+### `worker_stacks_status`
+- `updatedAt` (timestamp)
+- `stacks` (array of maps)
+  - `id` (string) — stack/worker id (matches `worker_status` doc id)
+  - `role` (string) — `pre`, `tts`, `course`, or `full`
+  - `venv` (string) — virtualenv path used
+  - `enabled` (boolean)
+  - `pid` (number, optional) — OS process id if running
+  - `logPath` (string, optional) — stdout/stderr log file path
+  - `lastUpdatedAt` (timestamp)
 
 ## Index Requirements
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
@@ -8,6 +8,8 @@ import {
   useDrafts,
   useWorkerControl,
   useWorkerStatus,
+  useWorkerStacks,
+  useFactoryMetrics,
 } from '@features/admin/hooks/useJobQueue';
 import { JobStatus } from '@features/admin/types';
 import { Theme } from '@/theme';
@@ -21,6 +23,7 @@ import {
 import { FiltersRow } from '@features/admin/components/FiltersRow';
 import { DraftsSection } from '@features/admin/components/DraftsSection';
 import { JobList } from '@features/admin/components/JobList';
+import { FactoryMetrics } from '@features/admin/types';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -34,6 +37,8 @@ export default function AdminDashboard() {
   const { drafts, deleteDraft } = useDrafts();
   const { status: localWorker } = useWorkerStatus('local');
   const { status: cloudWorker } = useWorkerStatus('cloud');
+  const { stacks } = useWorkerStacks();
+  const { metrics } = useFactoryMetrics();
   const {
     control: localControl,
     setDesiredState: setLocalDesiredState,
@@ -60,6 +65,11 @@ export default function AdminDashboard() {
   const lastAction = localControl?.lastAction ?? '—';
   const lastError = localControl?.lastError;
   const controlsDisabled = restartInProgress;
+  const controlRef = React.useRef(localControl);
+
+  React.useEffect(() => {
+    controlRef.current = localControl;
+  }, [localControl]);
 
   React.useEffect(() => {
     if (!optimisticState || !localControl?.currentState) return;
@@ -80,6 +90,18 @@ export default function AdminDashboard() {
     }
   }, [optimisticState, localControl?.currentState]);
 
+  const waitForState = async (
+    predicate: (ctrl: typeof localControl) => boolean,
+    timeoutMs = 12000
+  ) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (predicate(controlRef.current)) return true;
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    return false;
+  };
+
   const handleRestart = async () => {
     if (restartInProgress) return;
     const wasAuto = autoMode;
@@ -87,9 +109,10 @@ export default function AdminDashboard() {
     try {
       setOptimisticState('stop_clicked');
       await setLocalDesiredState('stopped');
-      await new Promise((resolve) => setTimeout(resolve, 9000));
+      await waitForState((ctrl) => ctrl?.currentState === 'stopped');
       setOptimisticState('start_clicked');
       await setLocalDesiredState(wasAuto ? 'auto' : 'running');
+      await waitForState((ctrl) => ctrl?.currentState === 'running');
     } catch {
       setOptimisticState(null);
     } finally {
@@ -138,6 +161,7 @@ export default function AdminDashboard() {
         controlsDisabled={controlsDisabled}
         restartInProgress={restartInProgress}
         isOpen={overviewOpen}
+        stacks={stacks}
         onToggle={() => setOverviewOpen((prev) => !prev)}
         onAutoModeChange={handleAutoModeChange}
         onStartNow={handleStartNow}
@@ -169,6 +193,8 @@ export default function AdminDashboard() {
         onJobSelect={(jobId) => router.push(`/admin/job/${jobId}`)}
       />
 
+      <MetricsCard metrics={metrics} />
+
       <Pressable
         style={({ pressed }) => [
           styles.fab,
@@ -179,6 +205,37 @@ export default function AdminDashboard() {
       >
         <Ionicons name="add" size={28} color="#fff" />
       </Pressable>
+    </View>
+  );
+}
+
+function MetricsCard({ metrics }: { metrics: FactoryMetrics | null }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const completed = metrics?.completed_total ?? 0;
+  const failed = metrics?.failed_total ?? 0;
+  const lastError = metrics?.last_error;
+
+  return (
+    <View style={styles.metricsCard}>
+      <View style={styles.metricsHeader}>
+        <Ionicons name="stats-chart-outline" size={18} color={theme.colors.text} />
+        <Text style={styles.metricsTitle}>Factory Metrics (today)</Text>
+      </View>
+      <View style={styles.metricsRow}>
+        <View style={styles.metricItem}>
+          <Text style={[styles.metricNumber, { color: theme.colors.success }]}>{completed}</Text>
+          <Text style={styles.metricLabel}>Completed</Text>
+        </View>
+        <View style={styles.metricItem}>
+          <Text style={[styles.metricNumber, { color: theme.colors.error }]}>{failed}</Text>
+          <Text style={styles.metricLabel}>Failed</Text>
+        </View>
+      </View>
+      {lastError ? (
+        <Text style={styles.metricError}>Last error: {lastError}</Text>
+      ) : null}
     </View>
   );
 }
@@ -203,5 +260,48 @@ const createStyles = (theme: Theme) =>
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 4,
+    },
+    metricsCard: {
+      marginHorizontal: 16,
+      marginTop: 10,
+      marginBottom: 20,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      padding: 12,
+      backgroundColor: theme.colors.surface,
+    },
+    metricsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    metricsTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    metricsRow: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    metricItem: {
+      flex: 1,
+    },
+    metricNumber: {
+      fontFamily: 'DMSans-Bold',
+      fontSize: 20,
+    },
+    metricLabel: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    metricError: {
+      marginTop: 8,
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.error,
     },
   });

@@ -22,6 +22,8 @@ import {
   WorkerControl,
   WorkerDesiredState,
   WorkerStatus,
+  WorkerStackStatus,
+  FactoryMetrics,
 } from '../types';
 
 // Re-export subject/course utilities from meditate repository
@@ -116,13 +118,10 @@ export async function getContentJobs(
     }
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(
-      (docSnapshot) =>
-        ({
-          id: docSnapshot.id,
-          ...docSnapshot.data(),
-        } as ContentJob)
-    );
+    return snapshot.docs.map((docSnapshot) => {
+      const data = docSnapshot.data() as Record<string, any>;
+      return { id: docSnapshot.id, ...data } as ContentJob;
+    });
   } catch (error) {
     console.error('Error fetching content jobs:', error);
     return [];
@@ -135,7 +134,8 @@ export async function getContentJob(jobId: string): Promise<ContentJob | null> {
   try {
     const docSnapshot = await getDoc(doc(jobsCollection, jobId));
     if (!docSnapshot.exists()) return null;
-    return { id: docSnapshot.id, ...docSnapshot.data() } as ContentJob;
+    const data = docSnapshot.data() as Record<string, any>;
+    return { id: docSnapshot.id, ...data } as ContentJob;
   } catch (error) {
     console.error('Error fetching content job:', error);
     return null;
@@ -161,13 +161,10 @@ export function subscribeToJobs(
   }
 
   return onSnapshot(q, (snapshot) => {
-    const jobs = snapshot.docs.map(
-      (docSnapshot) =>
-        ({
-          id: docSnapshot.id,
-          ...docSnapshot.data(),
-        } as ContentJob)
-    );
+    const jobs = snapshot.docs.map((docSnapshot) => {
+      const data = docSnapshot.data() as Record<string, any>;
+      return { id: docSnapshot.id, ...data } as ContentJob;
+    });
     callback(jobs);
   });
 }
@@ -181,7 +178,8 @@ export function subscribeToJob(
       callback(null);
       return;
     }
-    callback({ id: docSnapshot.id, ...docSnapshot.data() } as ContentJob);
+    const data = docSnapshot.data() as Record<string, any>;
+    callback({ id: docSnapshot.id, ...data } as ContentJob);
   });
 }
 
@@ -197,6 +195,32 @@ export function subscribeToWorkerStatus(
       return;
     }
     callback({ id: docSnapshot.id, ...docSnapshot.data() } as WorkerStatus);
+  });
+}
+
+// ==================== WORKER STACKS STATUS ====================
+
+export function subscribeToStacksStatus(
+  callback: (stacks: WorkerStackStatus[]) => void
+): Unsubscribe {
+  const stacksDoc = doc(db, 'worker_stacks_status', 'local');
+  return onSnapshot(stacksDoc, (docSnapshot) => {
+    if (!docSnapshot.exists()) {
+      callback([]);
+      return;
+    }
+    const data = docSnapshot.data() as Record<string, any>;
+    const stacks = (data.stacks || []) as any[];
+    const mapped: WorkerStackStatus[] = stacks.map((s: Record<string, any>) => ({
+      id: String(s.id || 'unknown'),
+      role: s.role,
+      venv: s.venv,
+      enabled: s.enabled,
+      pid: s.pid,
+      logPath: s.logPath,
+      lastUpdatedAt: s.lastUpdatedAt,
+    }));
+    callback(mapped);
   });
 }
 
@@ -295,5 +319,22 @@ export async function publishCompletedJob(jobId: string): Promise<void> {
     status: 'publishing',
     autoPublish: true,
     updatedAt: serverTimestamp(),
+  });
+}
+
+// ==================== FACTORY METRICS ====================
+
+export function subscribeToFactoryMetrics(
+  callback: (metrics: FactoryMetrics | null) => void
+): Unsubscribe {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const metricsDoc = doc(db, 'factory_metrics', dateKey);
+  return onSnapshot(metricsDoc, (docSnapshot) => {
+    if (!docSnapshot.exists()) {
+      callback(null);
+      return;
+    }
+    const data = docSnapshot.data() as Record<string, any>;
+    callback({ id: docSnapshot.id, ...data } as FactoryMetrics);
   });
 }

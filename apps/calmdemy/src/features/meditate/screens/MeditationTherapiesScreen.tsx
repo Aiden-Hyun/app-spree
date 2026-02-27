@@ -109,7 +109,7 @@ export default function TherapiesScreen() {
               onPress={() => setSelectedTherapy(therapy.id)}
             >
               <Ionicons
-                name={therapy.icon}
+                name={therapy.icon as keyof typeof Ionicons.glyphMap}
                 size={16}
                 color={selectedTherapy === therapy.id ? "white" : therapy.color}
               />
@@ -147,7 +147,7 @@ export default function TherapiesScreen() {
                 ]}
               >
                 <Ionicons
-                  name={selectedTherapyData.icon}
+                  name={selectedTherapyData.icon as keyof typeof Ionicons.glyphMap}
                   size={28}
                   color={selectedTherapyData.color}
                 />
