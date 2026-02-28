@@ -16,6 +16,7 @@ import { WorkerStackStatus, WorkerLogEntry } from '../types';
 import { Theme } from '@/theme';
 
 type LevelFilter = 'all' | 'INFO' | 'WARNING' | 'ERROR';
+type SortOrder = 'asc' | 'desc';
 
 interface WorkerLogsPanelProps {
   stacks: WorkerStackStatus[];
@@ -38,6 +39,7 @@ export function WorkerLogsPanel({ stacks, isOpen, onToggle }: WorkerLogsPanelPro
   const [selectedStackId, setSelectedStackId] = useState<string>('');
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [copyHint, setCopyHint] = useState<string>('');
   const { tail } = useWorkerLogTail(selectedStackId, refreshNonce);
 
@@ -52,20 +54,26 @@ export function WorkerLogsPanel({ stacks, isOpen, onToggle }: WorkerLogsPanelPro
     }
   }, [stacks, selectedStackId]);
 
-  const filteredLines = useMemo(() => {
+  const filteredLinesChronological = useMemo(() => {
     const lines = tail?.lines || [];
-    if (levelFilter === 'all') return lines;
-    const threshold = LEVEL_ORDER[levelFilter];
-    return lines.filter((line) => {
+    return levelFilter === 'all'
+      ? lines
+      : lines.filter((line) => {
       const level = String(line.level || 'INFO').toUpperCase();
-      return (LEVEL_ORDER[level] || LEVEL_ORDER.INFO) >= threshold;
+      return (LEVEL_ORDER[level] || LEVEL_ORDER.INFO) >= LEVEL_ORDER[levelFilter];
     });
   }, [tail?.lines, levelFilter]);
+
+  const orderedLines = useMemo(() => {
+    return sortOrder === 'desc'
+      ? [...filteredLinesChronological].reverse()
+      : filteredLinesChronological;
+  }, [filteredLinesChronological, sortOrder]);
 
   const updatedLabel = formatUpdatedLabel(tail?.updatedAt);
 
   const handleCopy = async () => {
-    const text = buildLogText(filteredLines);
+    const text = buildLogText(orderedLines);
     if (!text.trim()) {
       setCopyHint('No lines to copy');
       return;
@@ -174,27 +182,42 @@ export function WorkerLogsPanel({ stacks, isOpen, onToggle }: WorkerLogsPanelPro
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.8 }]}
+                onPress={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+              >
+                <Ionicons name="swap-vertical" size={14} color={theme.colors.text} />
+                <Text style={styles.actionText}>
+                  {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.8 }]}
                 onPress={handleCopy}
               >
                 <Ionicons name="copy-outline" size={14} color={theme.colors.text} />
-                <Text style={styles.actionText}>Copy latest</Text>
+                <Text style={styles.actionText}>Copy</Text>
               </Pressable>
             </View>
           </View>
           {copyHint ? <Text style={styles.copyHint}>{copyHint}</Text> : null}
 
           <ScrollView style={styles.logBox}>
-            {filteredLines.length === 0 ? (
+            {orderedLines.length === 0 ? (
               <Text style={styles.emptyText}>No log lines yet for this stack.</Text>
             ) : (
-              filteredLines.map((line, index) => (
-                <View key={`${line.timestamp || 'row'}-${index}`} style={styles.logLine}>
+              orderedLines.map((line, index) => {
+                const lineNumber = getLineNumber(
+                  index,
+                  filteredLinesChronological.length,
+                  sortOrder
+                );
+                return (
+                  <View key={`${line.timestamp || 'row'}-${index}`} style={styles.logLine}>
                   <Text style={styles.logMeta}>
-                    [{(line.level || 'INFO').toUpperCase()}] {line.timestamp || 'no-ts'}
+                    #{lineNumber} [{(line.level || 'INFO').toUpperCase()}] {formatLogTimestamp(line.timestamp)}
                   </Text>
                   <Text style={styles.logMessage}>{line.message || line.raw || ''}</Text>
                 </View>
-              ))
+              )})
             )}
           </ScrollView>
         </View>
@@ -223,11 +246,37 @@ function formatUpdatedLabel(updatedAt: unknown): string {
     timestampMs = new Date(updatedAt as string).getTime();
   }
   if (!Number.isFinite(timestampMs) || timestampMs <= 0) return 'Updated: unknown';
+  const absolute = formatAbsoluteDateTime(timestampMs);
   const ageSec = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
-  if (ageSec < 5) return 'Updated: just now';
-  if (ageSec < 60) return `Updated: ${ageSec}s ago`;
-  if (ageSec < 3600) return `Updated: ${Math.floor(ageSec / 60)}m ago`;
-  return `Updated: ${Math.floor(ageSec / 3600)}h ago`;
+  if (ageSec < 5) return `Updated: ${absolute} (just now)`;
+  if (ageSec < 60) return `Updated: ${absolute} (${ageSec}s ago)`;
+  if (ageSec < 3600) return `Updated: ${absolute} (${Math.floor(ageSec / 60)}m ago)`;
+  return `Updated: ${absolute} (${Math.floor(ageSec / 3600)}h ago)`;
+}
+
+function formatLogTimestamp(timestamp?: string): string {
+  if (!timestamp) return 'no-ts';
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return timestamp;
+  return formatAbsoluteDateTime(date.getTime());
+}
+
+function formatAbsoluteDateTime(timestampMs: number): string {
+  return new Date(timestampMs).toLocaleString([], {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function getLineNumber(index: number, total: number, sortOrder: SortOrder): number {
+  if (sortOrder === 'desc') {
+    return total - index;
+  }
+  return index + 1;
 }
 
 const createStyles = (theme: Theme) =>
@@ -310,13 +359,13 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.text,
     },
     actionsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      gap: 8,
     },
     actionsRight: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 8,
+      alignItems: 'center',
     },
     actionButton: {
       flexDirection: 'row',

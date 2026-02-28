@@ -17,29 +17,59 @@ interface JobListProps {
   isLoading: boolean;
   hasDrafts: boolean;
   onJobSelect: (jobId: string) => void;
+  headerComponent?: React.ReactElement | null;
+  footerComponent?: React.ReactElement | null;
 }
 
-export function JobList({ jobs, isLoading, hasDrafts, onJobSelect }: JobListProps) {
+export function JobList({
+  jobs,
+  isLoading,
+  hasDrafts,
+  onJobSelect,
+  headerComponent = null,
+  footerComponent = null,
+}: JobListProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (isLoading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
+      <FlatList
+        data={[]}
+        keyExtractor={(_, index) => `loading-${index}`}
+        renderItem={() => null}
+        ListHeaderComponent={headerComponent}
+        ListFooterComponent={
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        }
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
     );
   }
 
   if (jobs.length === 0 && !hasDrafts) {
     return (
-      <View style={styles.center}>
-        <Ionicons name="flask-outline" size={48} color={theme.colors.textMuted} />
-        <Text style={styles.emptyText}>No jobs yet</Text>
-        <Text style={styles.emptySubtext}>
-          Tap + to create your first content
-        </Text>
-      </View>
+      <FlatList
+        data={[]}
+        keyExtractor={(_, index) => `empty-${index}`}
+        renderItem={() => null}
+        ListHeaderComponent={headerComponent}
+        ListFooterComponent={
+          <View style={styles.center}>
+            <Ionicons name="flask-outline" size={48} color={theme.colors.textMuted} />
+            <Text style={styles.emptyText}>No jobs yet</Text>
+            <Text style={styles.emptySubtext}>
+              Tap + to create your first content
+            </Text>
+            {footerComponent}
+          </View>
+        }
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
     );
   }
 
@@ -48,8 +78,12 @@ export function JobList({ jobs, isLoading, hasDrafts, onJobSelect }: JobListProp
       data={jobs}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
-        <JobCard job={item} onPress={() => onJobSelect(item.id)} />
+        <View style={styles.jobItem}>
+          <JobCard job={item} onPress={() => onJobSelect(item.id)} />
+        </View>
       )}
+      ListHeaderComponent={headerComponent}
+      ListFooterComponent={footerComponent}
       contentContainerStyle={styles.list}
       ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       showsVerticalScrollIndicator={false}
@@ -76,7 +110,9 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textMuted,
     },
     list: {
-      padding: 16,
       paddingBottom: 100,
+    },
+    jobItem: {
+      marginHorizontal: 16,
     },
   });

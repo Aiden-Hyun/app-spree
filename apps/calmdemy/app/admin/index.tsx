@@ -149,61 +149,63 @@ export default function AdminDashboard() {
 
   return (
     <View style={styles.container}>
-      <FactoryOverview
-        pendingCount={pendingCount}
-        activeCount={activeCount}
-        completedCount={completedCount}
-        localState={localState}
-        cloudState={cloudState}
-        autoMode={autoMode}
-        idleTimeoutMin={idleTimeoutMin}
-        controlStateLabel={controlStateLabel}
-        lastAction={lastAction}
-        lastError={lastError}
-        controlsDisabled={controlsDisabled}
-        restartInProgress={restartInProgress}
-        isOpen={overviewOpen}
-        stacks={stacks}
-        logsOpen={logsOpen}
-        onToggle={() => setOverviewOpen((prev) => !prev)}
-        onViewLogs={() => setLogsOpen((prev) => !prev)}
-        onAutoModeChange={handleAutoModeChange}
-        onStartNow={handleStartNow}
-        onStopNow={handleStopNow}
-        onRestart={handleRestart}
-        onIdleTimeoutChange={setLocalIdleTimeout}
-      />
-
-      <WorkerLogsPanel
-        stacks={stacks}
-        isOpen={logsOpen}
-        onToggle={() => setLogsOpen((prev) => !prev)}
-      />
-
-      <FiltersRow
-        selectedFilter={filter}
-        onFilterChange={setFilter}
-      />
-
-      <DraftsSection
-        drafts={drafts}
-        onDelete={deleteDraft}
-        onSelect={(draftId) =>
-          router.push({
-            pathname: '/admin/create',
-            params: { draftId },
-          })
-        }
-      />
-
       <JobList
         jobs={jobs}
         isLoading={isLoading}
         hasDrafts={drafts.length > 0}
         onJobSelect={(jobId) => router.push(`/admin/job/${jobId}`)}
-      />
+        headerComponent={
+          <>
+            <FactoryOverview
+              pendingCount={pendingCount}
+              activeCount={activeCount}
+              completedCount={completedCount}
+              localState={localState}
+              cloudState={cloudState}
+              autoMode={autoMode}
+              idleTimeoutMin={idleTimeoutMin}
+              controlStateLabel={controlStateLabel}
+              lastAction={lastAction}
+              lastError={lastError}
+              controlsDisabled={controlsDisabled}
+              restartInProgress={restartInProgress}
+              isOpen={overviewOpen}
+              stacks={stacks}
+              logsOpen={logsOpen}
+              onToggle={() => setOverviewOpen((prev) => !prev)}
+              onViewLogs={() => setLogsOpen((prev) => !prev)}
+              onAutoModeChange={handleAutoModeChange}
+              onStartNow={handleStartNow}
+              onStopNow={handleStopNow}
+              onRestart={handleRestart}
+              onIdleTimeoutChange={setLocalIdleTimeout}
+            />
 
-      <MetricsCard metrics={metrics} />
+            <WorkerLogsPanel
+              stacks={stacks}
+              isOpen={logsOpen}
+              onToggle={() => setLogsOpen((prev) => !prev)}
+            />
+
+            <FiltersRow
+              selectedFilter={filter}
+              onFilterChange={setFilter}
+            />
+
+            <DraftsSection
+              drafts={drafts}
+              onDelete={deleteDraft}
+              onSelect={(draftId) =>
+                router.push({
+                  pathname: '/admin/create',
+                  params: { draftId },
+                })
+              }
+            />
+          </>
+        }
+        footerComponent={<MetricsCard metrics={metrics} />}
+      />
 
       <Pressable
         style={({ pressed }) => [

@@ -142,6 +142,17 @@ export interface ContentJob {
   lastCompletedStage?: JobStatus;
   failedStage?: JobStatus;
   resumeAvailable?: boolean;
+  errorCode?: string;
+  jobRunId?: string;
+  runAttempt?: number;
+  runWorkerId?: string;
+  runWorkerRole?: string;
+  runStartedAt?: Timestamp;
+  runEndedAt?: Timestamp;
+  lastRunStatus?: 'running' | 'completed' | 'failed';
+  publishInProgress?: boolean;
+  publishLeaseOwner?: string;
+  publishLeaseExpiresAt?: Timestamp;
 
   // Course-specific outputs
   courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"

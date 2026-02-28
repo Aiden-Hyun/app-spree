@@ -359,7 +359,7 @@ export async function requestDeleteJob(jobId: string): Promise<void> {
 // ==================== PUBLISH COMPLETED JOB ====================
 
 export async function publishCompletedJob(jobId: string): Promise<void> {
-  // Set the job status to 'pending_publish' so the worker picks it up
+  // Set the job status to 'publishing' so the worker picks it up
   // and runs only the publishing step.
   await updateDoc(doc(jobsCollection, jobId), {
     status: 'publishing',

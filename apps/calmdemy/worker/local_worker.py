@@ -21,6 +21,7 @@ from pipeline.runner import process_job, process_job_pre, process_job_tts
 from pipeline.delete_job import process_delete_job, mark_delete_failed
 from pipeline.worker_status import update_worker_status
 from pipeline.watchdog import should_run_check, check_stale_jobs
+from pipeline.job_run import start_job_run
 
 from worker_claims import get_next_job, parse_tts_models
 from worker_publish import get_next_publish_job, claim_publish_job, handle_publish_job
@@ -121,9 +122,11 @@ def main():
                 publish_doc = get_next_publish_job(db)
                 if publish_doc:
                     pub_id = publish_doc.id
-                    claimed = claim_publish_job(db, publish_doc.reference)
+                    claimed = claim_publish_job(db, publish_doc.reference, worker_id)
                     if not claimed:
                         continue
+                    run_id = start_job_run(db, pub_id, claimed, worker_id, "publish")
+                    claimed = {**claimed, "jobRunId": run_id}
                     logger.info("Publishing approved job", extra={"job_id": pub_id})
                     handle_publish_job(db, pub_id, claimed)
                     continue
@@ -132,10 +135,14 @@ def main():
 
             if next_job:
                 job_id, job_data = next_job
+                run_id = start_job_run(db, job_id, job_data, worker_id, worker_role)
+                job_data = {**job_data, "jobRunId": run_id}
                 logger.info(
                     "Processing job",
                     extra={
                         "job_id": job_id,
+                        "job_run_id": run_id,
+                        "worker_role": worker_role,
                         "content_type": job_data.get("contentType"),
                         "topic": job_data.get("params", {}).get("topic"),
                         "llm_model": job_data.get("llmModel"),
@@ -154,7 +161,7 @@ def main():
                 else:
                     process_job(db, job_id, job_data)
 
-                logger.info("Job finished", extra={"job_id": job_id})
+                logger.info("Job finished", extra={"job_id": job_id, "job_run_id": run_id})
             else:
                 idle_label = "No pending jobs" if worker_role != "tts" else "No TTS pending jobs"
                 logger.debug(

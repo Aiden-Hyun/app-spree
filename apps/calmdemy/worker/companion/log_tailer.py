@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
@@ -190,7 +191,7 @@ class LogTailPublisher:
             if self._level_value("INFO") < self.min_level_value:
                 return None
             return {
-                "timestamp": "",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": "INFO",
                 "logger": "raw",
                 "message": redacted_raw,
@@ -203,7 +204,7 @@ class LogTailPublisher:
 
         message = parsed.get("message", redacted_raw)
         entry = {
-            "timestamp": str(parsed.get("timestamp", "")),
+            "timestamp": str(parsed.get("timestamp") or datetime.now(timezone.utc).isoformat()),
             "level": level,
             "logger": str(parsed.get("logger", "")),
             "message": self._truncate(self._redact(str(message))),
