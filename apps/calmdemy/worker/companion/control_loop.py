@@ -93,7 +93,7 @@ def update_control(db, data: dict) -> None:
 def get_control(db) -> dict:
     doc_ref = db.collection(CONTROL_COLLECTION).document(CONTROL_DOC_ID)
     snapshot = doc_ref.get()
-    if not snapshot.exists():
+    if not snapshot.exists:
         return {}
     return snapshot.to_dict() or {}
 
