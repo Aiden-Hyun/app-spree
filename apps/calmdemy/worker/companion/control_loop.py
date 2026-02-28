@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import random
+from datetime import datetime, timezone
 from typing import Optional
 
 import firebase_admin
@@ -102,6 +103,7 @@ def update_stacks_status(db, stack_defs: list[dict], running: dict[str, int]) ->
     """Write aggregate status for all stacks (for admin UI)."""
     doc_ref = db.collection("worker_stacks_status").document("local")
     stack_entries = []
+    now = datetime.now(timezone.utc)
     for stack_def in stack_defs:
         stack_id = stack_def.get("id")
         stack_entries.append({
@@ -111,7 +113,7 @@ def update_stacks_status(db, stack_defs: list[dict], running: dict[str, int]) ->
             "enabled": bool(stack_def.get("enabled", True)),
             "pid": running.get(stack_id),
             "logPath": stacks.log_path(stack_id),
-            "lastUpdatedAt": firestore.SERVER_TIMESTAMP,
+            "lastUpdatedAt": now,
         })
     doc_ref.set(
         {
