@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -70,6 +70,23 @@ export function FactoryOverview({
 }: FactoryOverviewProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [stacksOpen, setStacksOpen] = useState(true);
+
+  const stacksMeta = useMemo(() => {
+    if (!stacks.length) return '';
+    const total = stacks.length;
+    const enabled = stacks.filter((s) => s.enabled !== false).length;
+    const running = stacks.filter((s) => Boolean(s.pid)).length;
+    const mostRecentMs = stacks.reduce((max, stack) => {
+      const ts = getTimestampMs(stack.lastUpdatedAt);
+      if (!ts) return max;
+      return Math.max(max, ts);
+    }, 0);
+    const freshness = mostRecentMs > 0
+      ? ` · updated ${formatAge(Math.max(0, (Date.now() - mostRecentMs) / 1000))}`
+      : '';
+    return `${running}/${enabled} running · ${total} total${freshness}`;
+  }, [stacks]);
 
   return (
     <View style={styles.overviewCard}>
@@ -140,50 +157,69 @@ export function FactoryOverview({
           {stacks.length > 0 ? (
             <View style={styles.stacksCard}>
               <View style={styles.stacksHeaderRow}>
-                <View style={styles.stacksHeader}>
-                  <Ionicons name="layers-outline" size={16} color={theme.colors.text} />
-                  <Text style={styles.stacksTitle}>Stacks</Text>
-                </View>
-                {onViewLogs ? (
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.logsButton,
-                      pressed && { opacity: 0.8 },
-                    ]}
-                    onPress={onViewLogs}
-                  >
-                    <Ionicons
-                      name={logsOpen ? 'eye-off-outline' : 'eye-outline'}
-                      size={13}
-                      color={theme.colors.text}
-                    />
-                    <Text style={styles.logsButtonText}>
-                      {logsOpen ? 'Hide Logs' : 'View Logs'}
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              {stacks.map((stack) => {
-                const status = getStackStatus(stack, theme);
-                return (
-                  <View key={stack.id} style={styles.stackRow}>
-                    <View style={styles.stackLeft}>
-                      <Text style={styles.stackId}>{stack.id}</Text>
-                      <Text style={styles.stackMeta}>
-                        {stack.role || 'role?'} · {stack.venv || 'venv?'}
-                      </Text>
-                    </View>
-                    <View style={styles.stackRight}>
-                      <Text style={[styles.stackStatus, { color: status.color }]}>
-                        {status.label}
-                      </Text>
-                      {stack.logPath ? (
-                        <Text style={styles.stackMeta}>log: {stack.logPath}</Text>
-                      ) : null}
-                    </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.stacksHeaderPressable,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                  onPress={() => setStacksOpen((prev) => !prev)}
+                >
+                  <View style={styles.stacksHeader}>
+                    <Ionicons name="layers-outline" size={16} color={theme.colors.text} />
+                    <Text style={styles.stacksTitle}>Stacks</Text>
                   </View>
-                );
-              })}
+                  <Ionicons
+                    name={stacksOpen ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={theme.colors.textMuted}
+                  />
+                </Pressable>
+                <View style={styles.stackActions}>
+                  {onViewLogs ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.logsButton,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                      onPress={onViewLogs}
+                    >
+                      <Ionicons
+                        name={logsOpen ? 'eye-off-outline' : 'eye-outline'}
+                        size={13}
+                        color={theme.colors.text}
+                      />
+                      <Text style={styles.logsButtonText}>
+                        {logsOpen ? 'Hide Logs' : 'View Logs'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+              {stacksOpen ? (
+                stacks.map((stack) => {
+                  const status = getStackStatus(stack, theme);
+                  return (
+                    <View key={stack.id} style={styles.stackRow}>
+                      <View style={styles.stackLeft}>
+                        <Text style={styles.stackId}>{stack.id}</Text>
+                        <Text style={styles.stackMeta}>
+                          {stack.role || 'role?'} · {stack.venv || 'venv?'}
+                        </Text>
+                      </View>
+                      <View style={styles.stackRight}>
+                        <Text style={[styles.stackStatus, { color: status.color }]}>
+                          {status.label}
+                        </Text>
+                        {stack.logPath ? (
+                          <Text style={styles.stackMeta}>log: {stack.logPath}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.stacksCollapsedMeta}>{stacksMeta}</Text>
+              )}
             </View>
           ) : null}
 
@@ -433,6 +469,17 @@ function getStackStatus(stack: WorkerStackStatus, theme: Theme) {
   return { label: 'Stopped', color: theme.colors.error };
 }
 
+function getTimestampMs(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'object' && value !== null && 'toDate' in (value as any)) {
+    const date = (value as any).toDate?.();
+    return date ? date.getTime() : 0;
+  }
+  const date = new Date(value as any);
+  const ms = date.getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     statsRow: {
@@ -648,6 +695,18 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       gap: 6,
     },
+    stacksHeaderPressable: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flex: 1,
+    },
+    stackActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginLeft: 8,
+    },
     stacksHeaderRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -702,5 +761,11 @@ const createStyles = (theme: Theme) =>
     stackStatus: {
       fontFamily: 'DMSans-SemiBold',
       fontSize: 12,
+    },
+    stacksCollapsedMeta: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      paddingVertical: 4,
     },
   });
