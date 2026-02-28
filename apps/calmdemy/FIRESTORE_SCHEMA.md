@@ -49,6 +49,7 @@ If a field is not listed below, it is not relied on by the app/worker and may be
 | `worker_control` | Admin read/write | Admin control plane for worker.
 | `factory_metrics` | Admin read-only | Daily aggregate metrics for content factory jobs.
 | `worker_stacks_status` | Admin read-only | Local companion-reported stack list (pid, venv, log path).
+| `worker_log_tails` | Admin read-only | Bounded per-stack live log tail snapshots for admin UI.
 
 ## Field Contracts (Known Fields)
 
@@ -328,6 +329,22 @@ Document ID convention: `YYYY-MM-DD` (UTC).
   - `pid` (number, optional) — OS process id if running
   - `logPath` (string, optional) — stdout/stderr log file path
   - `lastUpdatedAt` (timestamp)
+
+### `worker_log_tails`
+Document ID convention: `{stackId}`.
+- `stackId` (string)
+- `stackRole` (string, optional)
+- `pid` (number or null)
+- `source` (string, currently `"local-companion"`)
+- `lineCount` (number)
+- `updatedAt` (timestamp)
+- `lines` (array of maps, bounded tail)
+  - `timestamp` (string, optional)
+  - `level` (string, e.g. `INFO`, `WARNING`, `ERROR`)
+  - `logger` (string, optional)
+  - `message` (string)
+  - `raw` (string, optional)
+  - `job_id`, `stage`, `content_type`, `model_id`, `error` (string, optional)
 
 ## Index Requirements
 

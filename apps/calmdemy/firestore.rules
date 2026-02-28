@@ -175,5 +175,11 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    // Worker log tails (admins can read)
+    match /worker_log_tails/{stackId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }

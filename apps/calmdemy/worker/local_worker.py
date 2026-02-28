@@ -157,7 +157,7 @@ def main():
                 logger.info("Job finished", extra={"job_id": job_id})
             else:
                 idle_label = "No pending jobs" if worker_role != "tts" else "No TTS pending jobs"
-                logger.info(
+                logger.debug(
                     "Idle",
                     extra={
                         "state": idle_label,
@@ -181,4 +181,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

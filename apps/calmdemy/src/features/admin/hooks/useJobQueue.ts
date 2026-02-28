@@ -22,11 +22,13 @@ import {
   WorkerStatus,
   WorkerStackStatus,
   FactoryMetrics,
+  WorkerLogTail,
 } from '../types';
 import { getDrafts, deleteDraft as removeDraft } from '../data/draftRepository';
 import {
   subscribeToStacksStatus,
   subscribeToFactoryMetrics,
+  subscribeToWorkerLogTail,
 } from '../data/adminRepository';
 
 // ==================== JOB LIST HOOK ====================
@@ -170,6 +172,23 @@ export function useWorkerStacks() {
   }, []);
 
   return { stacks };
+}
+
+// ==================== WORKER LOG TAIL ====================
+
+export function useWorkerLogTail(stackId?: string, refreshNonce = 0) {
+  const [tail, setTail] = useState<WorkerLogTail | null>(null);
+
+  useEffect(() => {
+    if (!stackId) {
+      setTail(null);
+      return;
+    }
+    const unsubscribe = subscribeToWorkerLogTail(stackId, (next) => setTail(next));
+    return unsubscribe;
+  }, [stackId, refreshNonce]);
+
+  return { tail };
 }
 
 // ==================== FACTORY METRICS ====================

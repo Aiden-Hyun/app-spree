@@ -258,6 +258,32 @@ export interface WorkerStackStatus {
   heartbeat?: WorkerStatus | null;
 }
 
+// ==================== WORKER LOG TAILS ====================
+
+export interface WorkerLogEntry {
+  timestamp?: string;
+  level?: string;
+  logger?: string;
+  message: string;
+  raw?: string;
+  job_id?: string;
+  stage?: string;
+  content_type?: string;
+  model_id?: string;
+  error?: string;
+}
+
+export interface WorkerLogTail {
+  id: string;
+  stackId: string;
+  stackRole?: string;
+  pid?: number | null;
+  source?: string;
+  lineCount?: number;
+  lines: WorkerLogEntry[];
+  updatedAt?: Timestamp;
+}
+
 // ==================== FACTORY METRICS ====================
 
 export interface FactoryMetrics {

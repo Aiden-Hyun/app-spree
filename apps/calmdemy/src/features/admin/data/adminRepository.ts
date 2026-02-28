@@ -24,6 +24,8 @@ import {
   WorkerStatus,
   WorkerStackStatus,
   FactoryMetrics,
+  WorkerLogTail,
+  WorkerLogEntry,
 } from '../types';
 
 // Re-export subject/course utilities from meditate repository
@@ -221,6 +223,50 @@ export function subscribeToStacksStatus(
       lastUpdatedAt: s.lastUpdatedAt,
     }));
     callback(mapped);
+  });
+}
+
+// ==================== WORKER LOG TAILS ====================
+
+export function subscribeToWorkerLogTail(
+  stackId: string,
+  callback: (tail: WorkerLogTail | null) => void
+): Unsubscribe {
+  if (!stackId) {
+    callback(null);
+    return () => undefined;
+  }
+
+  const tailDoc = doc(db, 'worker_log_tails', stackId);
+  return onSnapshot(tailDoc, (docSnapshot) => {
+    if (!docSnapshot.exists()) {
+      callback(null);
+      return;
+    }
+    const data = docSnapshot.data() as Record<string, any>;
+    const linesRaw = Array.isArray(data.lines) ? data.lines : [];
+    const lines: WorkerLogEntry[] = linesRaw.map((line: Record<string, any>) => ({
+      timestamp: line.timestamp,
+      level: line.level,
+      logger: line.logger,
+      message: String(line.message || ''),
+      raw: line.raw,
+      job_id: line.job_id,
+      stage: line.stage,
+      content_type: line.content_type,
+      model_id: line.model_id,
+      error: line.error,
+    }));
+    callback({
+      id: docSnapshot.id,
+      stackId: String(data.stackId || docSnapshot.id),
+      stackRole: data.stackRole,
+      pid: data.pid ?? null,
+      source: data.source,
+      lineCount: data.lineCount,
+      lines,
+      updatedAt: data.updatedAt,
+    } as WorkerLogTail);
   });
 }
 

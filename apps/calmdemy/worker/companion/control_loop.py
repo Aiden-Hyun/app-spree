@@ -16,6 +16,7 @@ for path in (BASE_DIR, PARENT_DIR):
 import config
 from observability import get_logger
 from . import stacks
+from .log_tailer import LogTailPublisher
 
 logger = get_logger(__name__)
 
@@ -139,6 +140,16 @@ def ensure_running_wrapper(db, force_immediate_start: bool):
 
 def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
     last_activity_ts = time.time()
+    log_tail_enabled = os.getenv("ENABLE_ADMIN_LOG_TAIL", "true").lower() == "true"
+    log_tailer = None
+    if log_tail_enabled:
+        log_tailer = LogTailPublisher(
+            db,
+            max_lines=int(os.getenv("ADMIN_LOG_TAIL_MAX_LINES", "120")),
+            max_line_chars=int(os.getenv("ADMIN_LOG_TAIL_MAX_LINE_CHARS", "500")),
+            min_level=os.getenv("ADMIN_LOG_MIN_LEVEL", "INFO"),
+            interval_sec=float(os.getenv("ADMIN_LOG_TAIL_INTERVAL_SEC", "2")),
+        )
 
     while True:
         try:
@@ -153,6 +164,15 @@ def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
                 update_stacks_status(db, stack_defs, running)
             except Exception as e:
                 logger.warning("Failed to update stacks status", extra={"error": str(e)})
+            if log_tailer:
+                try:
+                    stack_logs = [
+                        {**stack_def, "logPath": stacks.log_path(stack_def["id"])}
+                        for stack_def in stack_defs
+                    ]
+                    log_tailer.publish(stack_logs, running)
+                except Exception as e:
+                    logger.warning("Failed to publish log tails", extra={"error": str(e)})
 
             # Stop any disabled stacks that are still running
             for stack_def in stack_defs:

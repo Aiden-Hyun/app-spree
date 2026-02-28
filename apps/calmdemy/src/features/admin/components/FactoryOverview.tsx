@@ -34,7 +34,9 @@ interface FactoryOverviewProps {
   restartInProgress: boolean;
   isOpen: boolean;
   stacks?: WorkerStackStatus[];
+  logsOpen?: boolean;
   onToggle: () => void;
+  onViewLogs?: () => void;
   onAutoModeChange: (next: boolean) => void;
   onStartNow: () => void;
   onStopNow: () => void;
@@ -57,7 +59,9 @@ export function FactoryOverview({
   restartInProgress,
   isOpen,
   stacks = [],
+  logsOpen = false,
   onToggle,
+  onViewLogs,
   onAutoModeChange,
   onStartNow,
   onStopNow,
@@ -135,9 +139,29 @@ export function FactoryOverview({
 
           {stacks.length > 0 ? (
             <View style={styles.stacksCard}>
-              <View style={styles.stacksHeader}>
-                <Ionicons name="layers-outline" size={16} color={theme.colors.text} />
-                <Text style={styles.stacksTitle}>Stacks</Text>
+              <View style={styles.stacksHeaderRow}>
+                <View style={styles.stacksHeader}>
+                  <Ionicons name="layers-outline" size={16} color={theme.colors.text} />
+                  <Text style={styles.stacksTitle}>Stacks</Text>
+                </View>
+                {onViewLogs ? (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.logsButton,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                    onPress={onViewLogs}
+                  >
+                    <Ionicons
+                      name={logsOpen ? 'eye-off-outline' : 'eye-outline'}
+                      size={13}
+                      color={theme.colors.text}
+                    />
+                    <Text style={styles.logsButtonText}>
+                      {logsOpen ? 'Hide Logs' : 'View Logs'}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
               {stacks.map((stack) => {
                 const status = getStackStatus(stack, theme);
@@ -623,11 +647,32 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+    },
+    stacksHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: 4,
     },
     stacksTitle: {
       fontFamily: 'DMSans-SemiBold',
       fontSize: 13,
+      color: theme.colors.text,
+    },
+    logsButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[300],
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    logsButtonText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 11,
       color: theme.colors.text,
     },
     stackRow: {

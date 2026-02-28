@@ -659,6 +659,8 @@ The companion prints stack status and keeps desired state at `running` by defaul
 Press Ctrl+C to stop.
 
 The admin UI displays stack PIDs, status, and log paths from `worker_stacks_status/local`.
+The companion also publishes bounded live log tails per stack to `worker_log_tails/{stackId}`
+for admin debugging (recent lines only, not full history).
 
 ### Option B — Firestore listeners (no tunnel) + optional wake endpoint
 
@@ -666,6 +668,12 @@ The admin UI displays stack PIDs, status, and log paths from `worker_stacks_stat
 - Enable with `ENABLE_JOB_LISTENER=true` (default).
 - When triggered, companion sets `worker_control.desiredState=running` and can start stacks immediately (`FORCE_IMMEDIATE_START=true`).
 - Dedupe window: `WAKE_DEDUP_WINDOW_SEC=300` (applies to listeners and optional wake endpoint).
+- Admin log tail publisher defaults:
+  - `ENABLE_ADMIN_LOG_TAIL=true`
+  - `ADMIN_LOG_TAIL_MAX_LINES=120`
+  - `ADMIN_LOG_TAIL_MAX_LINE_CHARS=500`
+  - `ADMIN_LOG_TAIL_INTERVAL_SEC=2`
+  - `ADMIN_LOG_MIN_LEVEL=INFO`
 - Optional wake server remains available if you want a cloud dispatcher later:
   - `ENABLE_WAKE_SERVER=true`
   - `WAKE_SHARED_SECRET=<strong_random>`

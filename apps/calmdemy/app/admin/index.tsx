@@ -24,6 +24,7 @@ import { FiltersRow } from '@features/admin/components/FiltersRow';
 import { DraftsSection } from '@features/admin/components/DraftsSection';
 import { JobList } from '@features/admin/components/JobList';
 import { FactoryMetrics } from '@features/admin/types';
+import { WorkerLogsPanel } from '@features/admin/components/WorkerLogsPanel';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function AdminDashboard() {
   const [optimisticState, setOptimisticState] = useState<LocalUiState | null>(null);
   const [restartInProgress, setRestartInProgress] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(true);
+  const [logsOpen, setLogsOpen] = useState(false);
   const { jobs, isLoading } = useJobQueue(filter);
   const { drafts, deleteDraft } = useDrafts();
   const { status: localWorker } = useWorkerStatus('local');
@@ -162,12 +164,20 @@ export default function AdminDashboard() {
         restartInProgress={restartInProgress}
         isOpen={overviewOpen}
         stacks={stacks}
+        logsOpen={logsOpen}
         onToggle={() => setOverviewOpen((prev) => !prev)}
+        onViewLogs={() => setLogsOpen((prev) => !prev)}
         onAutoModeChange={handleAutoModeChange}
         onStartNow={handleStartNow}
         onStopNow={handleStopNow}
         onRestart={handleRestart}
         onIdleTimeoutChange={setLocalIdleTimeout}
+      />
+
+      <WorkerLogsPanel
+        stacks={stacks}
+        isOpen={logsOpen}
+        onToggle={() => setLogsOpen((prev) => !prev)}
       />
 
       <FiltersRow
