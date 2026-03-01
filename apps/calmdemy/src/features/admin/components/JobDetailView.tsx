@@ -17,12 +17,15 @@ import {
   CONTENT_TYPE_LABELS,
   JOB_STATUS_LABELS,
   ContentJob,
+  JobStepTimelineEntry,
 } from '../types';
 import { getVoiceLabelById } from '../constants/models';
 import { Theme } from '@/theme';
 
 type Props = {
   job: ContentJob;
+  timeline?: JobStepTimelineEntry[];
+  isTimelineLoading?: boolean;
   isAwaitingApproval: boolean;
   isReviewable: boolean;
   isDeletable: boolean;
@@ -35,6 +38,7 @@ type Props = {
 
 const SECTION_IDS = [
   'pipeline',
+  'stepTimeline',
   'courseProgress',
   'jobDetails',
   'watchdog',
@@ -51,6 +55,8 @@ const SECTION_IDS = [
 
 export function JobDetailView({
   job,
+  timeline = [],
+  isTimelineLoading = false,
   isAwaitingApproval,
   isReviewable,
   isDeletable,
@@ -98,6 +104,8 @@ export function JobDetailView({
 
   const sections = buildSections({
     job,
+    timeline,
+    isTimelineLoading,
     theme,
     styles,
     createdDate,
@@ -258,6 +266,8 @@ export function JobDetailView({
 
 function buildSections(params: {
   job: ContentJob;
+  timeline: JobStepTimelineEntry[];
+  isTimelineLoading: boolean;
   theme: Theme;
   styles: ReturnType<typeof createStyles>;
   createdDate: string;
@@ -268,6 +278,8 @@ function buildSections(params: {
 }) {
   const {
     job,
+    timeline,
+    isTimelineLoading,
     theme,
     styles,
     createdDate,
@@ -286,6 +298,69 @@ function buildSections(params: {
       ]),
       shouldRender: true,
       content: <PipelineStepper currentStatus={job.status} />,
+    },
+    {
+      id: 'stepTimeline',
+      title: 'Step Timeline',
+      summaryItems: toSummaryItems([
+        { label: 'Events', value: timeline.length || undefined },
+        {
+          label: 'Latest',
+          value: timeline[0]
+            ? `${timeline[0].stepName} • ${formatStepState(timeline[0].state)}`
+            : undefined,
+        },
+      ]),
+      shouldRender: isTimelineLoading || timeline.length > 0,
+      content: isTimelineLoading ? (
+        <View style={styles.timelineLoadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text style={styles.emptySubtext}>Loading timeline...</Text>
+        </View>
+      ) : (
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            {timeline.map((entry) => (
+              <View key={entry.id} style={styles.timelineRow}>
+                <View style={styles.timelineHeader}>
+                  <Text style={styles.timelineStepName}>{entry.stepName}</Text>
+                  <Text
+                    style={[
+                      styles.timelineState,
+                      { color: getStepStateColor(entry.state, theme) },
+                    ]}
+                  >
+                    {formatStepState(entry.state)}
+                  </Text>
+                </View>
+                <View style={styles.timelineMetaRow}>
+                  <Text style={styles.timelineMetaText}>
+                    {formatTimelineTimestamp(entry.timestamp)}
+                  </Text>
+                  {entry.runId && (
+                    <Text style={styles.timelineMetaText}>
+                      Run {truncate(entry.runId, 10)}
+                    </Text>
+                  )}
+                  {typeof entry.attempt === 'number' && (
+                    <Text style={styles.timelineMetaText}>
+                      Attempt {entry.attempt}
+                    </Text>
+                  )}
+                  <Text style={styles.timelineMetaText}>
+                    {formatTimelineSource(entry.source)}
+                  </Text>
+                </View>
+                {(entry.errorCode || entry.errorMessage) && (
+                  <Text style={styles.timelineError}>
+                    {[entry.errorCode, entry.errorMessage].filter(Boolean).join(': ')}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      ),
     },
     {
       id: 'courseProgress',
@@ -372,9 +447,18 @@ function buildSections(params: {
           {job.failedStage && (
             <InfoRow label="Failed Stage" value={JOB_STATUS_LABELS[job.failedStage]} />
           )}
+          {job.errorCode && <InfoRow label="Error Code" value={job.errorCode} />}
           {typeof job.resumeAvailable === 'boolean' && (
             <InfoRow label="Resume Available" value={job.resumeAvailable ? 'Yes' : 'No'} />
           )}
+          {job.engine && <InfoRow label="Engine" value={job.engine.toUpperCase()} />}
+          {job.jobRunId && <InfoRow label="Run ID" value={job.jobRunId} />}
+          {typeof job.runAttempt === 'number' && (
+            <InfoRow label="Run Attempt" value={`${job.runAttempt}`} />
+          )}
+          {job.lastRunStatus && <InfoRow label="Run Status" value={job.lastRunStatus} />}
+          {job.v2RunId && <InfoRow label="V2 Run ID" value={job.v2RunId} />}
+          {job.v2DispatchError && <InfoRow label="V2 Dispatch Error" value={job.v2DispatchError} />}
           <InfoRow label="Created" value={createdDate} />
         </>
       ),
@@ -668,6 +752,31 @@ function formatDuration(seconds?: number) {
   return `${minutes}:${String(remaining).padStart(2, '0')}`;
 }
 
+function formatTimelineTimestamp(timestamp?: { toDate?: () => Date }) {
+  if (!timestamp?.toDate) return 'No timestamp';
+  return timestamp.toDate().toLocaleString();
+}
+
+function formatStepState(state: string) {
+  return state
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getStepStateColor(state: string, theme: Theme) {
+  if (state === 'failed') return theme.colors.error;
+  if (state === 'succeeded' || state === 'completed') return theme.colors.success;
+  if (state === 'retry_scheduled') return theme.colors.warning;
+  if (state === 'running' || state === 'publishing') return theme.colors.primary;
+  return theme.colors.textMuted;
+}
+
+function formatTimelineSource(source: JobStepTimelineEntry['source']) {
+  return source === 'v2' ? 'V2' : 'V1';
+}
+
 function toSummaryItems(
   items: Array<{ label: string; value?: string | number | null }>
 ): SummaryItem[] {
@@ -861,6 +970,49 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textMuted,
       lineHeight: 20,
       marginBottom: 4,
+    },
+    timelineLoadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    timelineRow: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[200],
+    },
+    timelineHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 4,
+    },
+    timelineStepName: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+      flex: 1,
+    },
+    timelineState: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+    },
+    timelineMetaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 4,
+    },
+    timelineMetaText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    timelineError: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.colors.error,
     },
     errorCard: {
       flexDirection: 'row',

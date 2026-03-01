@@ -3,7 +3,7 @@ import { View, ActivityIndicator, Text, Alert, StyleSheet } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { useJobDetail } from '@features/admin/hooks/useJobQueue';
+import { useJobDetail, useJobStepTimeline } from '@features/admin/hooks/useJobQueue';
 import { publishCompletedJob } from '@features/admin/data/adminRepository';
 import { JobDetailView } from '@features/admin/components/JobDetailView';
 import { Theme } from '@/theme';
@@ -14,6 +14,7 @@ export default function JobDetailScreen() {
   const { theme } = useTheme();
   const styles = createStyles(theme);
   const { job, isLoading, retry, cancel, requestDelete } = useJobDetail(id);
+  const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(id || '');
 
   const handleRetry = () => retry();
   const handleCancel = () => cancel();
@@ -72,6 +73,8 @@ export default function JobDetailScreen() {
       />
       <JobDetailView
         job={job}
+        timeline={timeline}
+        isTimelineLoading={isTimelineLoading}
         isAwaitingApproval={isAwaitingApproval}
         isReviewable={isReviewable}
         isDeletable={isDeletable}

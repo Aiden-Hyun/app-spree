@@ -12,6 +12,7 @@ import {
   updateDoc,
   where,
   limit,
+  Timestamp,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../../../firebase';
@@ -26,6 +27,7 @@ import {
   FactoryMetrics,
   WorkerLogTail,
   WorkerLogEntry,
+  JobStepTimelineEntry,
 } from '../types';
 
 // Re-export subject/course utilities from meditate repository
@@ -39,6 +41,60 @@ export type { Subject } from '../../meditate/data/meditateRepository';
 const jobsCollection = collection(db, 'content_jobs');
 const usersCollection = collection(db, 'users');
 const workerControlCollection = collection(db, 'worker_control');
+const stepRunsCollection = collection(db, 'factory_step_runs');
+
+function parseNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function asTimestamp(value: unknown): Timestamp | undefined {
+  if (value instanceof Timestamp) return value;
+  return undefined;
+}
+
+function toLegacyTimelineEntry(
+  id: string,
+  data: Record<string, any>
+): JobStepTimelineEntry {
+  return {
+    id,
+    source: 'legacy',
+    jobId: String(data.jobId || ''),
+    runId: data.jobRunId ? String(data.jobRunId) : undefined,
+    stepName: String(data.stepName || data.status || 'unknown'),
+    state: String(data.status || 'unknown'),
+    eventType: data.eventType ? String(data.eventType) : undefined,
+    errorCode: data.errorCode ? String(data.errorCode) : undefined,
+    errorMessage: data.error ? String(data.error) : undefined,
+    timestamp: asTimestamp(data.recordedAt),
+  };
+}
+
+function toV2TimelineEntry(id: string, data: Record<string, any>): JobStepTimelineEntry {
+  return {
+    id,
+    source: 'v2',
+    jobId: String(data.job_id || ''),
+    runId: data.run_id ? String(data.run_id) : undefined,
+    stepName: String(data.step_name || 'unknown'),
+    state: String(data.state || 'unknown'),
+    attempt: parseNumber(data.attempt),
+    nextAttempt: parseNumber(data.next_attempt),
+    retryDelaySec: parseNumber(data.retry_delay_seconds),
+    errorCode: data.error_code ? String(data.error_code) : undefined,
+    errorMessage: data.error_message ? String(data.error_message) : undefined,
+    timestamp:
+      asTimestamp(data.ended_at) ||
+      asTimestamp(data.updated_at) ||
+      asTimestamp(data.started_at) ||
+      asTimestamp(data.created_at),
+  };
+}
 
 // ==================== ADMIN CHECK ====================
 
@@ -185,6 +241,94 @@ export function subscribeToJob(
   });
 }
 
+export function subscribeToJobStepTimeline(
+  jobId: string,
+  callback: (entries: JobStepTimelineEntry[]) => void
+): Unsubscribe {
+  if (!jobId) {
+    callback([]);
+    return () => undefined;
+  }
+
+  let legacyEntries: JobStepTimelineEntry[] = [];
+  let v2Entries: JobStepTimelineEntry[] = [];
+
+  const handleTimelineError = (label: 'legacy' | 'v2', error: unknown) => {
+    const code =
+      typeof error === 'object' && error && 'code' in error
+        ? String((error as { code?: unknown }).code || '')
+        : '';
+    if (code === 'permission-denied') {
+      // Timeline is optional. If rules block this collection, keep detail screen usable.
+      if (__DEV__) {
+        console.log(`[timeline] ${label} step timeline unavailable (permission denied)`);
+      }
+      return;
+    }
+    console.warn(`Error subscribing to ${label} step timeline:`, error);
+  };
+
+  const emit = () => {
+    const map = new Map<string, JobStepTimelineEntry>();
+    [...legacyEntries, ...v2Entries].forEach((entry) => {
+      map.set(entry.id, entry);
+    });
+
+    const merged = Array.from(map.values()).sort((a, b) => {
+      const aMillis = a.timestamp?.toMillis?.() || 0;
+      const bMillis = b.timestamp?.toMillis?.() || 0;
+      return bMillis - aMillis;
+    });
+    callback(merged);
+  };
+
+  const legacyQuery = query(
+    stepRunsCollection,
+    where('jobId', '==', jobId),
+    limit(200)
+  );
+  const v2Query = query(
+    stepRunsCollection,
+    where('job_id', '==', jobId),
+    limit(200)
+  );
+
+  const unsubscribeLegacy = onSnapshot(
+    legacyQuery,
+    (snapshot) => {
+      legacyEntries = snapshot.docs.map((docSnapshot) =>
+        toLegacyTimelineEntry(docSnapshot.id, docSnapshot.data() as Record<string, any>)
+      );
+      emit();
+    },
+    (error) => {
+      handleTimelineError('legacy', error);
+      legacyEntries = [];
+      emit();
+    }
+  );
+
+  const unsubscribeV2 = onSnapshot(
+    v2Query,
+    (snapshot) => {
+      v2Entries = snapshot.docs.map((docSnapshot) =>
+        toV2TimelineEntry(docSnapshot.id, docSnapshot.data() as Record<string, any>)
+      );
+      emit();
+    },
+    (error) => {
+      handleTimelineError('v2', error);
+      v2Entries = [];
+      emit();
+    }
+  );
+
+  return () => {
+    unsubscribeLegacy();
+    unsubscribeV2();
+  };
+}
+
 // ==================== WORKER STATUS ====================
 
 export function subscribeToWorkerStatus(
@@ -327,10 +471,16 @@ export async function retryJob(jobId: string): Promise<void> {
   await updateDoc(doc(jobsCollection, jobId), {
     status: 'pending',
     error: null,
+    errorCode: null,
     updatedAt: serverTimestamp(),
     startedAt: null,
     completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
     failedStage: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
   });
 }
 
@@ -340,6 +490,13 @@ export async function cancelJob(jobId: string): Promise<void> {
   await updateDoc(doc(jobsCollection, jobId), {
     status: 'failed',
     error: 'Cancelled by admin',
+    errorCode: 'cancelled_by_admin',
+    failedStage: 'pending',
+    runEndedAt: serverTimestamp(),
+    lastRunStatus: 'failed',
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
     updatedAt: serverTimestamp(),
   });
 }
@@ -364,6 +521,12 @@ export async function publishCompletedJob(jobId: string): Promise<void> {
   await updateDoc(doc(jobsCollection, jobId), {
     status: 'publishing',
     autoPublish: true,
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
     updatedAt: serverTimestamp(),
   });
 }

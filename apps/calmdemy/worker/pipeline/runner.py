@@ -10,6 +10,7 @@ from .qa_formatter import format_script
 from .storage_uploader import upload_image
 from .stages import update_job_status as _update_status, run_tts_through_publish
 from .metrics import record_job_metric
+from .error_codes import classify_error
 import config
 from observability import get_logger
 from .job_cache import (
@@ -23,6 +24,32 @@ from .job_cache import (
 )
 
 logger = get_logger(__name__)
+
+
+def _with_run(extra: dict | None, job_run_id: str | None) -> dict | None:
+    if not job_run_id:
+        return extra
+    payload = dict(extra or {})
+    payload.setdefault("jobRunId", job_run_id)
+    return payload
+
+
+def _set_status(
+    db,
+    job_id: str,
+    status: str,
+    job_run_id: str | None,
+    extra: dict | None = None,
+    last_completed: str | None = None,
+):
+    _update_status(
+        db,
+        job_id,
+        status,
+        _with_run(extra, job_run_id),
+        last_completed=last_completed,
+    )
+
 
 def _cache_matches_job(job_data: dict, cache_state: dict) -> bool:
     """Return False if cache model/voice metadata conflicts with current job."""
@@ -89,13 +116,14 @@ def _run_pre_stage(
     cache_update,
     cache_file,
     stage_tracker: dict,
+    job_run_id: str | None,
 ):
     from .llm_generator import generate_script
     from .image_generator import build_image_prompt, generate_image
 
     # Step 1: LLM — generate script (or reuse cached)
     stage_tracker["current"] = "llm_generating"
-    _update_status(db, job_id, "llm_generating")
+    _set_status(db, job_id, "llm_generating", job_run_id)
 
     script = job_data.get("generatedScript") or read_text(job_id, "generated_script.txt")
     if not script:
@@ -130,10 +158,11 @@ def _run_pre_stage(
         lastCompletedStage="llm_generating",
     )
 
-    _update_status(
+    _set_status(
         db,
         job_id,
         "qa_formatting",
+        job_run_id,
         {
             "generatedScript": script,
             "generatedTitle": generated_title,
@@ -145,7 +174,7 @@ def _run_pre_stage(
     stage_tracker["current"] = "qa_formatting"
     formatted_script = format_script(script, job_data)
     cache_update(lastCompletedStage="qa_formatting")
-    _update_status(db, job_id, "image_generating", last_completed="qa_formatting")
+    _set_status(db, job_id, "image_generating", job_run_id, last_completed="qa_formatting")
 
     # Step 2b: Image generation — thumbnail (or reuse cached)
     stage_tracker["current"] = "image_generating"
@@ -202,12 +231,15 @@ def process_job_pre(db, job_id: str, job_data: dict):
         process_course_job(db, job_id, job_data)
         return
 
+    job_run_id = job_data.get("jobRunId")
+
     # If a previous attempt already produced the pre-stage outputs, resume at TTS.
     if job_data.get("formattedScript") and job_data.get("thumbnailUrl"):
-        _update_status(
+        _set_status(
             db,
             job_id,
             "tts_pending",
+            job_run_id,
             {
                 "formattedScript": job_data.get("formattedScript"),
                 "imagePrompt": job_data.get("imagePrompt"),
@@ -234,12 +266,14 @@ def process_job_pre(db, job_id: str, job_data: dict):
             cache_update,
             cache_file,
             stage_tracker,
+            job_run_id,
         )
 
-        _update_status(
+        _set_status(
             db,
             job_id,
             "tts_pending",
+            job_run_id,
             {
                 "formattedScript": formatted_script,
                 "imagePrompt": job_data.get("imagePrompt"),
@@ -256,15 +290,29 @@ def process_job_pre(db, job_id: str, job_data: dict):
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
+        error_code = classify_error(e)
         logger.exception(
             "Job failed",
-            extra={"job_id": job_id, "stage": stage_tracker["current"], "error": error_msg},
+            extra={
+                "job_id": job_id,
+                "job_run_id": job_run_id,
+                "stage": stage_tracker["current"],
+                "error": error_msg,
+                "error_code": error_code,
+            },
         )
-        _update_status(db, job_id, "failed", {
-            "error": error_msg,
-            "failedStage": stage_tracker["current"],
-            "resumeAvailable": has_cache(job_id),
-        })
+        _set_status(
+            db,
+            job_id,
+            "failed",
+            job_run_id,
+            {
+                "error": error_msg,
+                "errorCode": error_code,
+                "failedStage": stage_tracker["current"],
+                "resumeAvailable": has_cache(job_id),
+            },
+        )
         record_job_metric(db, job_id, job_data, "failed", stage_tracker["current"], error_msg)
 
 
@@ -272,16 +320,18 @@ def process_job_tts(db, job_id: str, job_data: dict):
     """Run the TTS + post-processing + upload + publish stages."""
     if job_data.get("contentType") == "course":
         raise RuntimeError("Course jobs are not supported in the TTS-only stage.")
+    job_run_id = job_data.get("jobRunId")
     cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
     stage_tracker = {"current": "tts_converting"}
 
     try:
         formatted_script = _resolve_formatted_script(job_id, job_data)
 
-        _update_status(
+        _set_status(
             db,
             job_id,
             "tts_converting",
+            job_run_id,
             {
                 "formattedScript": formatted_script,
             },
@@ -291,20 +341,34 @@ def process_job_tts(db, job_id: str, job_data: dict):
         resolved_title = job_data.get("generatedTitle") or job_data.get("title", "")
         run_tts_through_publish(
             db, job_id, job_data, formatted_script, resolved_title,
-            cache_state, cache_update, cache_file, stage_tracker,
+            cache_state, cache_update, cache_file, stage_tracker, job_run_id=job_run_id,
         )
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
+        error_code = classify_error(e)
         logger.exception(
             "Job failed",
-            extra={"job_id": job_id, "stage": stage_tracker["current"], "error": error_msg},
+            extra={
+                "job_id": job_id,
+                "job_run_id": job_run_id,
+                "stage": stage_tracker["current"],
+                "error": error_msg,
+                "error_code": error_code,
+            },
         )
-        _update_status(db, job_id, "failed", {
-            "error": error_msg,
-            "failedStage": stage_tracker["current"],
-            "resumeAvailable": has_cache(job_id),
-        })
+        _set_status(
+            db,
+            job_id,
+            "failed",
+            job_run_id,
+            {
+                "error": error_msg,
+                "errorCode": error_code,
+                "failedStage": stage_tracker["current"],
+                "resumeAvailable": has_cache(job_id),
+            },
+        )
         record_job_metric(db, job_id, job_data, "failed", stage_tracker["current"], error_msg)
 
 
@@ -316,6 +380,7 @@ def process_job(db, job_id: str, job_data: dict):
         process_course_job(db, job_id, job_data)
         return
 
+    job_run_id = job_data.get("jobRunId")
     cache_state, cache_update, cache_file = _prepare_cache(job_id, job_data)
     stage_tracker = {"current": "llm_generating"}
 
@@ -328,12 +393,14 @@ def process_job(db, job_id: str, job_data: dict):
             cache_update,
             cache_file,
             stage_tracker,
+            job_run_id,
         )
 
-        _update_status(
+        _set_status(
             db,
             job_id,
             "tts_converting",
+            job_run_id,
             {
                 "formattedScript": formatted_script,
                 "imagePrompt": job_data.get("imagePrompt"),
@@ -347,18 +414,32 @@ def process_job(db, job_id: str, job_data: dict):
 
         run_tts_through_publish(
             db, job_id, job_data, formatted_script, generated_title,
-            cache_state, cache_update, cache_file, stage_tracker,
+            cache_state, cache_update, cache_file, stage_tracker, job_run_id=job_run_id,
         )
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
+        error_code = classify_error(e)
         logger.exception(
             "Job failed",
-            extra={"job_id": job_id, "stage": stage_tracker["current"], "error": error_msg},
+            extra={
+                "job_id": job_id,
+                "job_run_id": job_run_id,
+                "stage": stage_tracker["current"],
+                "error": error_msg,
+                "error_code": error_code,
+            },
         )
-        _update_status(db, job_id, "failed", {
-            "error": error_msg,
-            "failedStage": stage_tracker["current"],
-            "resumeAvailable": has_cache(job_id),
-        })
+        _set_status(
+            db,
+            job_id,
+            "failed",
+            job_run_id,
+            {
+                "error": error_msg,
+                "errorCode": error_code,
+                "failedStage": stage_tracker["current"],
+                "resumeAvailable": has_cache(job_id),
+            },
+        )
         record_job_metric(db, job_id, job_data, "failed", stage_tracker["current"], error_msg)

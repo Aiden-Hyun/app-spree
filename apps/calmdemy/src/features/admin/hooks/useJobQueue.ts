@@ -9,6 +9,7 @@ import {
   retryJob,
   cancelJob,
   requestDeleteJob,
+  subscribeToJobStepTimeline,
   setWorkerDesiredState,
   setWorkerIdleTimeout,
 } from '../data/adminRepository';
@@ -23,6 +24,7 @@ import {
   WorkerStackStatus,
   FactoryMetrics,
   WorkerLogTail,
+  JobStepTimelineEntry,
 } from '../types';
 import { getDrafts, deleteDraft as removeDraft } from '../data/draftRepository';
 import {
@@ -88,6 +90,31 @@ export function useJobDetail(jobId: string) {
   }, [jobId]);
 
   return { job, isLoading, retry, cancel, requestDelete };
+}
+
+// ==================== STEP TIMELINE HOOK ====================
+
+export function useJobStepTimeline(jobId: string) {
+  const [timeline, setTimeline] = useState<JobStepTimelineEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!jobId) {
+      setTimeline([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const unsubscribe = subscribeToJobStepTimeline(jobId, (entries) => {
+      setTimeline(entries);
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
+  }, [jobId]);
+
+  return { timeline, isLoading };
 }
 
 // ==================== WORKER STATUS HOOK ====================

@@ -23,6 +23,17 @@ STACKS_PATH = os.path.join(BASE_DIR, "..", "worker_stacks.json")
 
 def load_worker_stacks() -> list[dict]:
     """Load worker stack definitions from JSON (or fall back to defaults)."""
+    engine = os.getenv("FACTORY_ENGINE", "v1").strip().lower()
+    if engine == "v2":
+        return [
+            {
+                "id": os.getenv("V2_STACK_ID", "local-v2"),
+                "role": "v2",
+                "venv": os.getenv("V2_VENV", ".venv"),
+                "enabled": True,
+            }
+        ]
+
     if not os.path.isfile(STACKS_PATH):
         return [
             {"id": "local", "role": "pre", "venv": ".venv", "enabled": True},
@@ -151,7 +162,9 @@ def start_worker(stack: dict) -> int:
     stack_id = stack["id"]
     log_file = open(log_path(stack_id), "a", encoding="utf-8")
 
-    worker_path = os.path.join(BASE_DIR, "..", "local_worker.py")
+    engine = os.getenv("FACTORY_ENGINE", "v1").strip().lower()
+    worker_filename = "local_worker_v2.py" if engine == "v2" else "local_worker.py"
+    worker_path = os.path.join(BASE_DIR, "..", worker_filename)
     venv_path = stack.get("venv", ".venv")
     if not os.path.isabs(venv_path):
         venv_path = os.path.join(BASE_DIR, "..", venv_path)
@@ -161,6 +174,8 @@ def start_worker(stack: dict) -> int:
     env = os.environ.copy()
     env["WORKER_ID"] = stack_id
     env["WORKER_ROLE"] = str(stack.get("role", "full")).lower()
+    if engine == "v2":
+        env.setdefault("V2_ENABLE_DISPATCH", "true")
     tts_models = stack.get("ttsModels") or []
     if tts_models:
         env["WORKER_TTS_MODELS"] = ",".join(tts_models)

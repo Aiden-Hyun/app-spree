@@ -33,6 +33,7 @@ from .voice_utils import get_voice_display_name
 from .stages import update_job_status as _update_status
 from .stages import update_job_progress as _update_progress
 from .metrics import record_job_metric
+from .error_codes import classify_error
 import config
 from observability import get_logger
 
@@ -315,6 +316,13 @@ def process_course_job(db, job_id: str, job_data: dict):
     """Run the full course pipeline: plan -> 9 scripts -> 9 audio -> publish."""
     params = job_data.get("params", {})
     course_code = params.get("courseCode", "COURSE101")
+    job_run_id = job_data.get("jobRunId")
+
+    def _set_status(status: str, extra: dict | None = None):
+        payload = dict(extra or {})
+        if job_run_id:
+            payload.setdefault("jobRunId", job_run_id)
+        _update_status(db, job_id, status, payload or None)
 
     plan = job_data.get("coursePlan")
     raw_scripts: dict[str, str] = job_data.get("courseRawScripts") or {}
@@ -326,7 +334,7 @@ def process_course_job(db, job_id: str, job_data: dict):
         # ========== STEP 1: Generate course plan ==========
         adapter = _get_llm_adapter(job_data)
         if not plan:
-            _update_status(db, job_id, "llm_generating")
+            _set_status("llm_generating")
             _update_progress(db, job_id, "Generating course plan...")
 
             logger.info("Generating course plan", extra={"course_code": course_code, "job_id": job_id})
@@ -340,13 +348,13 @@ def process_course_job(db, job_id: str, job_data: dict):
             )
 
             # Save plan to job
-            _update_status(db, job_id, "llm_generating", {
+            _set_status("llm_generating", {
                 "coursePlan": plan,
                 "lastCompletedStage": "llm_generating",
             })
 
         # ========== STEP 1b: Generate course thumbnail ==========
-        _update_status(db, job_id, "image_generating")
+        _set_status("image_generating")
         current_stage = "image_generating"
         course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled Course"))
         image_prompt = ""
@@ -383,7 +391,7 @@ def process_course_job(db, job_id: str, job_data: dict):
             "thumbnailUrl": thumbnail_url,
             "imageModel": config.IMAGE_MODEL_ID,
         }
-        _update_status(db, job_id, "image_generating", {
+        _set_status("image_generating", {
             "imagePrompt": image_prompt,
             "imagePath": image_path,
             "thumbnailUrl": thumbnail_url,
@@ -421,7 +429,7 @@ def process_course_job(db, job_id: str, job_data: dict):
                 scripts[session_code] = raw_script
 
                 # Persist progress so retries don't regenerate scripts
-                _update_status(db, job_id, "llm_generating", {
+                _set_status("llm_generating", {
                     "generatedScript": json.dumps(
                         {k: v[:200] + "..." for k, v in scripts.items()},
                         indent=2,
@@ -451,13 +459,13 @@ def process_course_job(db, job_id: str, job_data: dict):
                     formatted = script.strip()
                 formatted_scripts[session_code] = formatted
 
-            _update_status(db, job_id, "qa_formatting", {
+            _set_status("qa_formatting", {
                 "courseFormattedScripts": formatted_scripts,
                 "lastCompletedStage": "qa_formatting",
             })
 
         # ========== STEP 4 & 5: TTS + post-process each session ==========
-        _update_status(db, job_id, "tts_converting")
+        _set_status("tts_converting")
         current_stage = "tts_converting"
         if audio_results is None:
             audio_results = {}
@@ -493,13 +501,13 @@ def process_course_job(db, job_id: str, job_data: dict):
                 "storagePath": storage_path,
                 "durationSec": duration_sec,
             }
-            _update_status(db, job_id, "tts_converting", {
+            _set_status("tts_converting", {
                 "courseAudioResults": audio_results,
                 "courseProgress": progress,
                 "lastCompletedStage": "tts_converting",
             })
 
-        _update_status(db, job_id, "uploading", {
+        _set_status("uploading", {
             "courseProgress": f"All {TOTAL_SESSIONS} audio files uploaded",
             "lastCompletedStage": "uploading",
         })
@@ -508,7 +516,7 @@ def process_course_job(db, job_id: str, job_data: dict):
         auto_publish = job_data.get("autoPublish", True)
 
         if auto_publish:
-            _update_status(db, job_id, "publishing")
+            _set_status("publishing")
             current_stage = "publishing"
             _update_progress(db, job_id, "Publishing course...")
 
@@ -516,7 +524,7 @@ def process_course_job(db, job_id: str, job_data: dict):
                 db, job_id, plan, audio_results, job_data,
             )
 
-            _update_status(db, job_id, "completed", {
+            _set_status("completed", {
                 "courseId": course_id,
                 "courseSessionIds": session_ids,
                 "courseProgress": "Published",
@@ -541,7 +549,7 @@ def process_course_job(db, job_id: str, job_data: dict):
                     "audioPath": audio.get("storagePath", ""),
                     "durationSec": audio.get("durationSec", 0),
                 })
-            _update_status(db, job_id, "completed", {
+            _set_status("completed", {
                 "courseProgress": "Completed (awaiting approval)",
                 "coursePreviewSessions": preview_sessions,
                 "completedAt": fs.SERVER_TIMESTAMP,
@@ -555,12 +563,20 @@ def process_course_job(db, job_id: str, job_data: dict):
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
+        error_code = classify_error(e)
         logger.exception(
             "Course job failed",
-            extra={"job_id": job_id, "stage": current_stage, "error": error_msg},
+            extra={
+                "job_id": job_id,
+                "job_run_id": job_run_id,
+                "stage": current_stage,
+                "error": error_msg,
+                "error_code": error_code,
+            },
         )
-        _update_status(db, job_id, "failed", {
+        _set_status("failed", {
             "error": error_msg,
+            "errorCode": error_code,
             "failedStage": current_stage,
             "resumeAvailable": bool(formatted_scripts or audio_results or raw_scripts),
         })

@@ -33,6 +33,8 @@ def claim_job(db, doc_ref, role: str, tts_allowlist: set[str]) -> Optional[dict]
             return None
         data = snapshot.to_dict()
         status = data.get("status")
+        if data.get("engine") == "v2":
+            return None
         if role in ("pre", "full", "course"):
             if status != "pending":
                 return None
@@ -92,6 +94,8 @@ def get_next_job(db, role: str, tts_allowlist: set[str]) -> Optional[Tuple[str, 
 
         for doc in docs:
             data = doc.to_dict()
+            if data.get("engine") == "v2":
+                continue
             if role in ("pre", "full", "course"):
                 if is_cloud_job(data):
                     continue
@@ -115,4 +119,3 @@ def get_next_job(db, role: str, tts_allowlist: set[str]) -> Optional[Tuple[str, 
         last_doc = docs[-1]
 
     return None
-

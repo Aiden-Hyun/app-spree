@@ -148,11 +148,19 @@ export interface ContentJob {
   runWorkerId?: string;
   runWorkerRole?: string;
   runStartedAt?: Timestamp;
+  runContinuedAt?: Timestamp;
   runEndedAt?: Timestamp;
   lastRunStatus?: 'running' | 'completed' | 'failed';
   publishInProgress?: boolean;
   publishLeaseOwner?: string;
   publishLeaseExpiresAt?: Timestamp;
+  engine?: 'v1' | 'v2';
+  v2JobId?: string;
+  v2RunId?: string;
+  v2Locked?: boolean;
+  v2DispatchError?: string;
+  v2DispatchedBy?: string;
+  v2DispatchedAt?: Timestamp;
 
   // Course-specific outputs
   courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"
@@ -177,6 +185,7 @@ export interface ContentJob {
   deleteRequestedAt?: Timestamp;
   deleteInProgress?: boolean;
   deleteError?: string;
+  deleteErrorCode?: string;
 
   // Watchdog tracking
   watchdogResetCount?: number;
@@ -189,6 +198,26 @@ export interface ContentJob {
   ttsPendingAt?: Timestamp;
   completedAt?: Timestamp;
   createdBy: string;
+}
+
+// ==================== STEP TIMELINE ====================
+
+export type JobStepTimelineSource = 'legacy' | 'v2';
+
+export interface JobStepTimelineEntry {
+  id: string;
+  source: JobStepTimelineSource;
+  jobId: string;
+  runId?: string;
+  stepName: string;
+  state: string;
+  eventType?: string;
+  attempt?: number;
+  nextAttempt?: number;
+  retryDelaySec?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  timestamp?: Timestamp;
 }
 
 // ==================== LOCAL DRAFTS ====================

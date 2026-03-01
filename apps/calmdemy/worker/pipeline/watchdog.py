@@ -22,9 +22,12 @@ PRE_STAGE_STATUSES = ["llm_generating", "qa_formatting", "image_generating"]
 TTS_STAGE_STATUSES = ["tts_converting", "post_processing", "uploading"]
 HANDOFF_STATUS = "tts_pending"
 PUBLISH_STATUS = "publishing"
+LEGACY_PUBLISH_IN_PROGRESS_STATUS = "publishing_in_progress"
 
 ALL_STALE_STATUSES = (
-    PRE_STAGE_STATUSES + TTS_STAGE_STATUSES + [HANDOFF_STATUS, PUBLISH_STATUS]
+    PRE_STAGE_STATUSES
+    + TTS_STAGE_STATUSES
+    + [HANDOFF_STATUS, PUBLISH_STATUS, LEGACY_PUBLISH_IN_PROGRESS_STATUS]
 )
 
 # Module-level throttle state
@@ -88,6 +91,9 @@ def _determine_reset_action(status: str) -> tuple[str, str]:
     if status == PUBLISH_STATUS:
         return "failed", f"Marked as failed from stale '{status}' (duplicate publish risk)"
 
+    if status == LEGACY_PUBLISH_IN_PROGRESS_STATUS:
+        return "publishing", "Reset from stale legacy publish claim back to publishing"
+
     return "failed", f"Marked as failed from unknown stale status '{status}'"
 
 
@@ -144,6 +150,9 @@ def _reset_stale_job(
             "watchdogResetCount": current_reset_count + 1,
             "lastWatchdogResetAt": fs_module.SERVER_TIMESTAMP,
             "lastWatchdogReason": reason,
+            "publishInProgress": False,
+            "publishLeaseOwner": None,
+            "publishLeaseExpiresAt": None,
         }
 
         if new_status == "failed":

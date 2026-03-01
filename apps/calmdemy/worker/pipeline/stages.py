@@ -10,6 +10,7 @@ from .storage_uploader import upload_audio
 from .content_publisher import publish_content
 from .job_cache import save_artifact, cleanup
 from .metrics import record_job_metric
+from .step_audit import record_step_transition
 import config
 from observability import get_logger
 
@@ -31,6 +32,14 @@ def update_job_status(
         "status": status,
         "updatedAt": fs.SERVER_TIMESTAMP,
     }
+    if status in ("llm_generating", "qa_formatting", "image_generating", "tts_pending", "tts_converting", "post_processing", "uploading", "publishing"):
+        data["lastRunStatus"] = "running"
+    if status == "completed":
+        data["lastRunStatus"] = "completed"
+        data["runEndedAt"] = fs.SERVER_TIMESTAMP
+    elif status == "failed":
+        data["lastRunStatus"] = "failed"
+        data["runEndedAt"] = fs.SERVER_TIMESTAMP
     if status == "llm_generating" and not extra:
         data["startedAt"] = fs.SERVER_TIMESTAMP
     if last_completed:
@@ -38,6 +47,7 @@ def update_job_status(
     if extra:
         data.update(extra)
     db.collection(config.JOBS_COLLECTION).document(job_id).update(data)
+    record_step_transition(db, job_id, data)
 
 
 def update_job_progress(db, job_id: str, progress: str):
@@ -61,6 +71,7 @@ def run_tts_through_publish(
     cache_update,
     cache_file,
     stage_tracker: dict,
+    job_run_id: str | None = None,
 ):
     """Execute TTS → post-process → upload → publish for a single content job.
 
@@ -68,6 +79,13 @@ def run_tts_through_publish(
     Callers are responsible for the try/except around this function.
     """
     _update_status = update_job_status  # local alias for brevity
+
+    def _extra(payload: dict | None = None) -> dict | None:
+        if not job_run_id:
+            return payload
+        data = dict(payload or {})
+        data.setdefault("jobRunId", job_run_id)
+        return data
 
     # Step 3: TTS — convert to audio (or reuse cached)
     stage_tracker["current"] = "tts_converting"
@@ -79,7 +97,13 @@ def run_tts_through_publish(
         wav_path = save_artifact(job_id, wav_path, "tts_output.wav")
         cache_update(wavPath=wav_path)
     cache_update(lastCompletedStage="tts_converting")
-    _update_status(db, job_id, "post_processing", last_completed="tts_converting")
+    _update_status(
+        db,
+        job_id,
+        "post_processing",
+        _extra(),
+        last_completed="tts_converting",
+    )
 
     # Step 4: Post-process — normalize and encode (or reuse cached)
     stage_tracker["current"] = "post_processing"
@@ -91,7 +115,13 @@ def run_tts_through_publish(
         mp3_path = save_artifact(job_id, mp3_path, "tts_output.mp3")
         cache_update(mp3Path=mp3_path)
     cache_update(lastCompletedStage="post_processing")
-    _update_status(db, job_id, "uploading", last_completed="post_processing")
+    _update_status(
+        db,
+        job_id,
+        "uploading",
+        _extra(),
+        last_completed="post_processing",
+    )
 
     # Step 5: Upload — push to Firebase Storage (or reuse cached)
     stage_tracker["current"] = "uploading"
@@ -110,10 +140,10 @@ def run_tts_through_publish(
         db,
         job_id,
         "publishing" if auto_publish else "completed",
-        {
+        _extra({
             "audioPath": storage_path,
             "audioDurationSec": duration_sec,
-        },
+        }),
         last_completed="uploading",
     )
 
@@ -125,14 +155,14 @@ def run_tts_through_publish(
         content_id = publish_content(
             db, storage_path, duration_sec, formatted_script, job_data_with_title
         )
-        _update_status(db, job_id, "completed", {
+        _update_status(db, job_id, "completed", _extra({
             "audioPath": storage_path,
             "audioDurationSec": duration_sec,
             "publishedContentId": content_id,
             "completedAt": fs.SERVER_TIMESTAMP,
             "resumeAvailable": False,
             "failedStage": None,
-        }, last_completed="publishing")
+        }), last_completed="publishing")
         logger.info(
             "Job completed (published)",
             extra={"job_id": job_id, "content_id": content_id},
@@ -140,13 +170,13 @@ def run_tts_through_publish(
         record_job_metric(db, job_id, job_data, "completed")
     else:
         # Mark as completed but without publishing
-        _update_status(db, job_id, "completed", {
+        _update_status(db, job_id, "completed", _extra({
             "audioPath": storage_path,
             "audioDurationSec": duration_sec,
             "completedAt": fs.SERVER_TIMESTAMP,
             "resumeAvailable": False,
             "failedStage": None,
-        }, last_completed="uploading")
+        }), last_completed="uploading")
         logger.info(
             "Job completed (awaiting approval)",
             extra={"job_id": job_id},

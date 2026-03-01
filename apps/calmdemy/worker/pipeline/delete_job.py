@@ -7,6 +7,7 @@ from firebase_admin import storage, firestore as fs
 import config
 from observability import get_logger
 from .job_cache import cleanup as cleanup_cache
+from .error_codes import classify_error
 
 logger = get_logger(__name__)
 
@@ -57,6 +58,7 @@ def process_delete_job(db, job_id: str, job_data: dict) -> None:
 def mark_delete_failed(db, job_id: str, error_msg: str) -> None:
     db.collection(config.JOBS_COLLECTION).document(job_id).update({
         "deleteError": error_msg,
+        "deleteErrorCode": classify_error(error_msg),
         "deleteInProgress": False,
         "updatedAt": fs.SERVER_TIMESTAMP,
     })
