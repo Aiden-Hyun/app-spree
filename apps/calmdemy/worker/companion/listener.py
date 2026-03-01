@@ -18,7 +18,7 @@ def start_job_listener(
     """Subscribe to pending jobs and trigger ensure_running without polling."""
     query = (
         db.collection("content_jobs")
-        .where("status", "in", ["pending", "tts_pending", "publishing"])
+        .where("status", "in", ["pending", "publishing"])
     )
 
     last_trigger_ts = 0.0
@@ -32,9 +32,7 @@ def start_job_listener(
             doc = change.document
             data = doc.to_dict() or {}
             status = data.get("status")
-            if status not in ("pending", "tts_pending", "publishing"):
-                continue
-            if data.get("llmBackend") == "cloud" or data.get("ttsBackend") == "cloud":
+            if status not in ("pending", "publishing"):
                 continue
             job_id = doc.id
             if deduper.is_duplicate(job_id):
@@ -54,4 +52,3 @@ def start_job_listener(
     listener = query.on_snapshot(on_snapshot)
     logger.info("Job listener started", extra={"listener": True})
     return listener
-

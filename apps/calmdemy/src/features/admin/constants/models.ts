@@ -48,19 +48,6 @@ export const LLM_MODELS: ModelOption[] = [
     description: 'Google, best quality, free tier available',
     backend: 'api',
   },
-  // Cloud GPU models (legacy — hidden from UI)
-  {
-    id: 'gemma-3-12b',
-    label: 'Gemma 3 12B',
-    description: 'Google, strong instruction-following, runs on L4 GPU',
-    backend: 'cloud',
-  },
-  {
-    id: 'llama-3.1-8b',
-    label: 'Llama 3.1 8B',
-    description: 'Meta, general-purpose, efficient',
-    backend: 'cloud',
-  },
 ];
 
 // ==================== TTS MODELS ====================
@@ -71,7 +58,7 @@ export const TTS_MODELS: ModelOption[] = [
     id: 'piper',
     label: 'Piper TTS',
     description: 'Fast, lightweight, runs on CPU, many voices',
-    backend: ['local', 'cloud'],
+    backend: 'local',
   },
   {
     id: 'dms',
@@ -97,13 +84,6 @@ export const TTS_MODELS: ModelOption[] = [
     label: 'Gemini TTS Pro',
     description: 'Google Gemini 2.5 Pro TTS, higher quality',
     backend: 'api',
-  },
-  // Cloud-only TTS (legacy — hidden from UI)
-  {
-    id: 'coqui-xtts-v2',
-    label: 'Coqui XTTS v2',
-    description: 'High quality, voice cloning, needs GPU',
-    backend: 'cloud',
   },
 ];
 
@@ -226,19 +206,6 @@ export const TTS_VOICES: VoiceOption[] = [
     label: 'StyleTTS2 Default',
     ttsModel: 'styletts2',
     description: 'Default StyleTTS2 English voice',
-  },
-  // Coqui XTTS voices (legacy)
-  {
-    id: 'xtts-female-calm',
-    label: 'XTTS Calm Female',
-    ttsModel: 'coqui-xtts-v2',
-    description: 'High-quality calm female voice',
-  },
-  {
-    id: 'xtts-male-soothing',
-    label: 'XTTS Soothing Male',
-    ttsModel: 'coqui-xtts-v2',
-    description: 'High-quality soothing male voice',
   },
   // Gemini TTS voices
   {

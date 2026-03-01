@@ -18,7 +18,6 @@ import {
   LocalUiState,
   getControlStateLabel,
   getLocalWorkerState,
-  getWorkerState,
 } from '@features/admin/components/FactoryOverview';
 import { FiltersRow } from '@features/admin/components/FiltersRow';
 import { DraftsSection } from '@features/admin/components/DraftsSection';
@@ -38,7 +37,6 @@ export default function AdminDashboard() {
   const { jobs, isLoading } = useJobQueue(filter);
   const { drafts, deleteDraft } = useDrafts();
   const { status: localWorker } = useWorkerStatus('local');
-  const { status: cloudWorker } = useWorkerStatus('cloud');
   const { stacks } = useWorkerStacks();
   const { metrics } = useFactoryMetrics();
   const {
@@ -60,7 +58,6 @@ export default function AdminDashboard() {
   const completedCount = jobs.filter((j) => j.status === 'completed').length;
 
   const localState = getLocalWorkerState(localWorker, localControl, theme, optimisticState);
-  const cloudState = getWorkerState(cloudWorker, theme);
   const autoMode = localControl?.desiredState === 'auto';
   const idleTimeoutMin = localControl?.idleTimeoutMin ?? 10;
   const controlStateLabel = getControlStateLabel(localControl?.currentState, optimisticState);
@@ -161,7 +158,6 @@ export default function AdminDashboard() {
               activeCount={activeCount}
               completedCount={completedCount}
               localState={localState}
-              cloudState={cloudState}
               autoMode={autoMode}
               idleTimeoutMin={idleTimeoutMin}
               controlStateLabel={controlStateLabel}

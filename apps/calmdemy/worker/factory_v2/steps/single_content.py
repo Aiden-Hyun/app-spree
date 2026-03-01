@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 import config
-from pipeline.llm_generator import generate_script
-from pipeline.qa_formatter import format_script
-from pipeline.image_generator import build_image_prompt, generate_image
-from pipeline.tts_converter import convert_to_audio
-from pipeline.audio_processor import post_process_audio
-from pipeline.storage_uploader import upload_audio, upload_image
-from pipeline.content_publisher import publish_content
+from factory_v2.shared.llm_generator import generate_script
+from factory_v2.shared.qa_formatter import format_script
+from factory_v2.shared.image_generator import build_image_prompt, generate_image
+from factory_v2.shared.tts_converter import convert_to_audio
+from factory_v2.shared.audio_processor import post_process_audio
+from factory_v2.shared.storage_uploader import upload_audio, upload_image
+from factory_v2.shared.content_publisher import publish_content
 
 from .base import StepContext, StepResult
 

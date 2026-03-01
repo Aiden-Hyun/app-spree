@@ -119,7 +119,7 @@ export function useJobStepTimeline(jobId: string) {
 
 // ==================== WORKER STATUS HOOK ====================
 
-export function useWorkerStatus(workerId: 'local' | 'cloud') {
+export function useWorkerStatus(workerId: 'local') {
   const [status, setStatus] = useState<WorkerStatus | null>(null);
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export function useWorkerStatus(workerId: 'local' | 'cloud') {
 
 // ==================== WORKER CONTROL HOOK ====================
 
-export function useWorkerControl(workerId: 'local' | 'cloud') {
+export function useWorkerControl(workerId: 'local') {
   const [control, setControl] = useState<WorkerControl | null>(null);
 
   useEffect(() => {

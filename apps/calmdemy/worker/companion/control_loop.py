@@ -126,7 +126,7 @@ def update_stacks_status(db, stack_defs: list[dict], running: dict[str, int]) ->
 
 def has_pending_jobs(db) -> bool:
     jobs_ref = db.collection(JOBS_COLLECTION)
-    q = jobs_ref.where("status", "in", ["pending", "tts_pending"]).limit(1)
+    q = jobs_ref.where("status", "in", ["pending", "publishing"]).limit(1)
     return any(q.stream())
 
 

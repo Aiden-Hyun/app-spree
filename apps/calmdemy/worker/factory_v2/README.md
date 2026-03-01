@@ -1,32 +1,47 @@
-# Content Factory V2 Scaffold
+# Content Factory V2
 
-This package is a migration scaffold for the workflow-engine architecture.
+Content Factory now runs on a V2-only workflow engine.
 
-Current status:
-- Domain state models and transitions are defined.
-- Firestore repositories and step queue primitives exist.
-- Worker loop can claim, execute, and complete queue items.
-- Single-content step executors are wired (`generate_script` through `publish_content`).
-- Compatibility projection updates the legacy `content_jobs` document when `request.compat.content_job_id` is provided.
-- Existing production pipeline is still the source of truth.
+## Overview
 
-Planned next steps:
-1. Add course fan-out/fan-in executors.
-2. Add per-step retry policies (`retry_scheduled` and backoff).
-3. Add admin timeline UI sourced from `factory_step_runs`.
+- `content_jobs` remains the external/admin contract.
+- Execution state is tracked in `factory_jobs`, `factory_job_runs`, `factory_step_runs`, `factory_step_queue`, and `factory_events`.
+- The worker projects compatibility fields back to `content_jobs` so existing admin screens keep working.
 
-## Running From Admin UI (V2 engine)
+## Workflows
 
-1. Set `FACTORY_ENGINE=v2` in `worker/.env`.
-   - Optional: set `V2_MAX_STEP_RETRIES=2` (default `2`).
-2. Start companion as usual (`python local_companion.py`).
-3. Use the existing Admin UI to create/publish jobs.
+### Single content
 
-How it works:
-- V2 dispatcher claims eligible `content_jobs` (`pending`, `publishing`) and marks them with `engine: "v2"`.
-- V2 worker bootstraps a `factory_jobs/{jobId}` document and starts a `factory_job_runs` run.
-- Step execution updates both V2 tables and legacy `content_jobs` (compat projection), so current UI continues to function.
+1. `generate_script`
+2. `format_script`
+3. `generate_image`
+4. `synthesize_audio`
+5. `post_process_audio`
+6. `upload_audio`
+7. `publish_content`
 
-Current coverage:
-- Single-content types run as decomposed V2 steps.
-- Course jobs are currently executed through a legacy wrapped step (`run_course_pipeline` / `publish_course_manual`) while migration continues.
+### Course
+
+1. `generate_course_plan`
+2. `generate_course_thumbnail`
+3. `generate_course_scripts`
+4. `format_course_scripts`
+5. `synthesize_course_audio`
+6. `upload_course_audio`
+7. `publish_course`
+
+## Running locally
+
+1. Start companion as usual: `python local_companion.py`
+2. Ensure worker control desired state is `running` or `auto`.
+3. Create jobs from Admin UI.
+
+Companion starts `local_worker.py` (V2 runtime) only.
+
+## Runtime flags
+
+- `V2_ENABLE_DISPATCH` (default: `true`)
+- `V2_POLL_INTERVAL_SECONDS` (default: `1.0`)
+- `V2_MAX_STEP_RETRIES` (default: `2`)
+- `V2_STACK_ID` (default: `local-v2`)
+- `V2_VENV` (default: `.venv`)

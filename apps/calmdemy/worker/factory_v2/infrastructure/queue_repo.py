@@ -86,6 +86,62 @@ class FirestoreQueueRepo:
 
         return None
 
+    def recover_stale_leases(self, max_docs: int = 50) -> int:
+        """Reset expired leased/running queue items back to ready."""
+        now = datetime.now(timezone.utc)
+        recovered = 0
+
+        for state in ("leased", "running"):
+            query = (
+                self.db.collection("factory_step_queue")
+                .where("state", "==", state)
+                .where("lease_expires_at", "<=", now)
+                .limit(max_docs)
+            )
+            for doc in query.stream():
+                tx = self.db.transaction()
+
+                @fs.transactional
+                def _recover(transaction):
+                    snap = doc.reference.get(transaction=transaction)
+                    if not snap.exists:
+                        return False
+                    data = snap.to_dict() or {}
+                    live_state = str(data.get("state") or "")
+                    if live_state not in ("leased", "running"):
+                        return False
+
+                    lease_expires_at = data.get("lease_expires_at")
+                    if lease_expires_at is None:
+                        return False
+
+                    lease_ts = (
+                        datetime.fromtimestamp(lease_expires_at.timestamp(), tz=timezone.utc)
+                        if hasattr(lease_expires_at, "timestamp")
+                        else lease_expires_at
+                    )
+                    if isinstance(lease_ts, datetime) and lease_ts.tzinfo is None:
+                        lease_ts = lease_ts.replace(tzinfo=timezone.utc)
+                    if not isinstance(lease_ts, datetime) or lease_ts > now:
+                        return False
+
+                    transaction.update(
+                        doc.reference,
+                        {
+                            "state": "ready",
+                            "lease_owner": None,
+                            "lease_expires_at": None,
+                            "available_at": now,
+                            "updated_at": fs.SERVER_TIMESTAMP,
+                        },
+                    )
+                    return True
+
+                if _recover(tx):
+                    recovered += 1
+
+        return recovered
+
     def mark_running(self, queue_id: str, worker_id: str) -> None:
         self.db.collection("factory_step_queue").document(queue_id).update(
             {

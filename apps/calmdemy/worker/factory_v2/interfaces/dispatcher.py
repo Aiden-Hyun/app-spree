@@ -32,6 +32,18 @@ def _claim_for_v2(db, doc_ref, worker_id: str) -> Optional[dict]:
         if data.get("deleteRequested"):
             return None
         if _is_cloud_job(data):
+            transaction.update(
+                doc_ref,
+                {
+                    "status": "failed",
+                    "error": "Unsupported backend: cloud",
+                    "errorCode": "unsupported_backend",
+                    "failedStage": "pending",
+                    "lastRunStatus": "failed",
+                    "runEndedAt": fs.SERVER_TIMESTAMP,
+                    "updatedAt": fs.SERVER_TIMESTAMP,
+                },
+            )
             return None
         if data.get("v2Locked"):
             return None

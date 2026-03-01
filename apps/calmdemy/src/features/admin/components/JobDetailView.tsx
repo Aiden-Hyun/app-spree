@@ -773,8 +773,8 @@ function getStepStateColor(state: string, theme: Theme) {
   return theme.colors.textMuted;
 }
 
-function formatTimelineSource(source: JobStepTimelineEntry['source']) {
-  return source === 'v2' ? 'V2' : 'V1';
+function formatTimelineSource(_source: JobStepTimelineEntry['source']) {
+  return 'V2';
 }
 
 function toSummaryItems(

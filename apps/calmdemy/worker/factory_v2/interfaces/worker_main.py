@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import time
 
+from firebase_admin import firestore
+from firebase_admin import firestore as fs
+
+import config
 from observability import get_logger
-from pipeline.error_codes import classify_error
-from pipeline.worker_status import update_worker_status
+from factory_v2.shared.delete_job import mark_delete_failed, process_delete_job
+from factory_v2.shared.error_codes import classify_error
+from factory_v2.shared.worker_status import update_worker_status
 
 from .dispatcher import dispatch_next_content_job
 from ..infrastructure.firestore_repos import (
@@ -49,6 +54,7 @@ class WorkerMain:
             self.step_run_repo,
             self.queue_repo,
         )
+        self._last_recovery_at = 0.0
 
     @staticmethod
     def _is_retryable(error_code: str) -> bool:
@@ -67,6 +73,81 @@ class WorkerMain:
         # 5s, 10s, 20s, 40s...
         return min(300, 5 * (2 ** max(0, retry_count)))
 
+    @staticmethod
+    def _compat_failed_stage(step_name: str) -> str:
+        mapping = {
+            "generate_script": "llm_generating",
+            "format_script": "qa_formatting",
+            "generate_image": "image_generating",
+            "synthesize_audio": "tts_converting",
+            "post_process_audio": "post_processing",
+            "upload_audio": "uploading",
+            "publish_content": "publishing",
+            "generate_course_plan": "llm_generating",
+            "generate_course_scripts": "llm_generating",
+            "format_course_scripts": "qa_formatting",
+            "generate_course_thumbnail": "image_generating",
+            "synthesize_course_audio": "tts_converting",
+            "upload_course_audio": "uploading",
+            "publish_course": "publishing",
+        }
+        return mapping.get(step_name, "pending")
+
+    def _claim_delete_job(self, doc_ref) -> dict | None:
+        transaction = self.db.transaction()
+
+        @firestore.transactional
+        def _tx_claim(tx):
+            snapshot = doc_ref.get(transaction=tx)
+            if not snapshot.exists:
+                return None
+            data = snapshot.to_dict() or {}
+            if not data.get("deleteRequested"):
+                return None
+            if data.get("deleteInProgress"):
+                return None
+
+            tx.update(
+                doc_ref,
+                {
+                    "deleteInProgress": True,
+                    "updatedAt": fs.SERVER_TIMESTAMP,
+                },
+            )
+            return data
+
+        return _tx_claim(transaction)
+
+    def _next_delete_job(self) -> tuple[str, dict] | None:
+        query = self.db.collection(config.JOBS_COLLECTION).where("deleteRequested", "==", True).limit(10)
+        for doc in query.stream():
+            claimed = self._claim_delete_job(doc.reference)
+            if claimed is not None:
+                return doc.id, claimed
+        return None
+
+    def _cleanup_factory_records(self, job_id: str) -> None:
+        self.db.collection("factory_jobs").document(job_id).delete()
+
+        for collection_name in ("factory_job_runs", "factory_step_runs", "factory_step_queue", "factory_events"):
+            query = self.db.collection(collection_name).where("job_id", "==", job_id).limit(500)
+            for snapshot in query.stream():
+                snapshot.reference.delete()
+
+    def _handle_delete_requests(self) -> bool:
+        delete_job = self._next_delete_job()
+        if not delete_job:
+            return False
+
+        job_id, job_data = delete_job
+        logger.info("V2 deleting job", extra={"job_id": job_id, "worker_id": self.worker_id})
+        try:
+            process_delete_job(self.db, job_id, job_data)
+            self._cleanup_factory_records(job_id)
+        except Exception as exc:
+            mark_delete_failed(self.db, job_id, f"{type(exc).__name__}: {exc}")
+        return True
+
     def run_forever(self) -> None:
         while True:
             try:
@@ -76,6 +157,25 @@ class WorkerMain:
                     "V2 heartbeat failed",
                     extra={"worker_id": self.worker_id, "error": str(heartbeat_exc)},
                 )
+
+            if self._handle_delete_requests():
+                continue
+
+            now = time.time()
+            if now - self._last_recovery_at >= 15:
+                self._last_recovery_at = now
+                try:
+                    recovered = self.queue_repo.recover_stale_leases()
+                    if recovered:
+                        logger.info(
+                            "V2 queue stale leases recovered",
+                            extra={"worker_id": self.worker_id, "recovered": recovered},
+                        )
+                except Exception as recovery_exc:
+                    logger.warning(
+                        "V2 queue lease recovery failed",
+                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
+                    )
 
             if self.enable_dispatch:
                 try:
@@ -141,6 +241,7 @@ class WorkerMain:
                 },
             )
 
+            job: dict | None = None
             try:
                 job = self.job_repo.get(job_id)
                 executor = get_executor(step_name)
@@ -239,6 +340,22 @@ class WorkerMain:
                         "step_name": step_name,
                         "error_code": error_code,
                         "attempt": attempt,
+                    },
+                )
+
+                request = (job or {}).get("request") or {}
+                compat = request.get("compat") or {}
+                content_job_id = compat.get("content_job_id")
+                self.job_repo.patch_compat_content_job(
+                    content_job_id,
+                    {
+                        "status": "failed",
+                        "error": error_msg,
+                        "errorCode": error_code,
+                        "failedStage": self._compat_failed_stage(step_name),
+                        "jobRunId": run_id,
+                        "lastRunStatus": "failed",
+                        "runEndedAt": fs.SERVER_TIMESTAMP,
                     },
                 )
                 self.orchestrator.on_step_failed(job_id, run_id, step_name, error_code)

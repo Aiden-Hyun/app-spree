@@ -24,7 +24,6 @@ interface FactoryOverviewProps {
   activeCount: number;
   completedCount: number;
   localState: WorkerCardState;
-  cloudState: WorkerCardState;
   autoMode: boolean;
   idleTimeoutMin: number;
   controlStateLabel: string;
@@ -49,7 +48,6 @@ export function FactoryOverview({
   activeCount,
   completedCount,
   localState,
-  cloudState,
   autoMode,
   idleTimeoutMin,
   controlStateLabel,
@@ -141,16 +139,6 @@ export function FactoryOverview({
                 {localState.label}
               </Text>
               <Text style={styles.workerMeta}>{localState.meta}</Text>
-            </View>
-            <View style={[styles.workerCard, { borderColor: cloudState.color }]}>
-              <View style={styles.workerHeader}>
-                <Ionicons name="cloud-outline" size={18} color={cloudState.color} />
-                <Text style={styles.workerTitle}>Cloud Worker</Text>
-              </View>
-              <Text style={[styles.workerStatus, { color: cloudState.color }]}>
-                {cloudState.label}
-              </Text>
-              <Text style={styles.workerMeta}>{cloudState.meta}</Text>
             </View>
           </View>
 

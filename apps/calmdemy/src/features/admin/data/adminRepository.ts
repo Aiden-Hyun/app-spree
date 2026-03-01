@@ -57,24 +57,6 @@ function asTimestamp(value: unknown): Timestamp | undefined {
   return undefined;
 }
 
-function toLegacyTimelineEntry(
-  id: string,
-  data: Record<string, any>
-): JobStepTimelineEntry {
-  return {
-    id,
-    source: 'legacy',
-    jobId: String(data.jobId || ''),
-    runId: data.jobRunId ? String(data.jobRunId) : undefined,
-    stepName: String(data.stepName || data.status || 'unknown'),
-    state: String(data.status || 'unknown'),
-    eventType: data.eventType ? String(data.eventType) : undefined,
-    errorCode: data.errorCode ? String(data.errorCode) : undefined,
-    errorMessage: data.error ? String(data.error) : undefined,
-    timestamp: asTimestamp(data.recordedAt),
-  };
-}
-
 function toV2TimelineEntry(id: string, data: Record<string, any>): JobStepTimelineEntry {
   return {
     id,
@@ -250,10 +232,9 @@ export function subscribeToJobStepTimeline(
     return () => undefined;
   }
 
-  let legacyEntries: JobStepTimelineEntry[] = [];
   let v2Entries: JobStepTimelineEntry[] = [];
 
-  const handleTimelineError = (label: 'legacy' | 'v2', error: unknown) => {
+  const handleTimelineError = (error: unknown) => {
     const code =
       typeof error === 'object' && error && 'code' in error
         ? String((error as { code?: unknown }).code || '')
@@ -261,16 +242,16 @@ export function subscribeToJobStepTimeline(
     if (code === 'permission-denied') {
       // Timeline is optional. If rules block this collection, keep detail screen usable.
       if (__DEV__) {
-        console.log(`[timeline] ${label} step timeline unavailable (permission denied)`);
+        console.log('[timeline] v2 step timeline unavailable (permission denied)');
       }
       return;
     }
-    console.warn(`Error subscribing to ${label} step timeline:`, error);
+    console.warn('Error subscribing to v2 step timeline:', error);
   };
 
   const emit = () => {
     const map = new Map<string, JobStepTimelineEntry>();
-    [...legacyEntries, ...v2Entries].forEach((entry) => {
+    v2Entries.forEach((entry) => {
       map.set(entry.id, entry);
     });
 
@@ -282,30 +263,10 @@ export function subscribeToJobStepTimeline(
     callback(merged);
   };
 
-  const legacyQuery = query(
-    stepRunsCollection,
-    where('jobId', '==', jobId),
-    limit(200)
-  );
   const v2Query = query(
     stepRunsCollection,
     where('job_id', '==', jobId),
     limit(200)
-  );
-
-  const unsubscribeLegacy = onSnapshot(
-    legacyQuery,
-    (snapshot) => {
-      legacyEntries = snapshot.docs.map((docSnapshot) =>
-        toLegacyTimelineEntry(docSnapshot.id, docSnapshot.data() as Record<string, any>)
-      );
-      emit();
-    },
-    (error) => {
-      handleTimelineError('legacy', error);
-      legacyEntries = [];
-      emit();
-    }
   );
 
   const unsubscribeV2 = onSnapshot(
@@ -317,14 +278,13 @@ export function subscribeToJobStepTimeline(
       emit();
     },
     (error) => {
-      handleTimelineError('v2', error);
+      handleTimelineError(error);
       v2Entries = [];
       emit();
     }
   );
 
   return () => {
-    unsubscribeLegacy();
     unsubscribeV2();
   };
 }
@@ -332,7 +292,7 @@ export function subscribeToJobStepTimeline(
 // ==================== WORKER STATUS ====================
 
 export function subscribeToWorkerStatus(
-  workerId: 'local' | 'cloud',
+  workerId: 'local',
   callback: (status: WorkerStatus | null) => void
 ): Unsubscribe {
   return onSnapshot(doc(db, 'worker_status', workerId), (docSnapshot) => {
@@ -417,7 +377,7 @@ export function subscribeToWorkerLogTail(
 // ==================== WORKER CONTROL ====================
 
 export function subscribeToWorkerControl(
-  workerId: 'local' | 'cloud',
+  workerId: 'local',
   callback: (control: WorkerControl | null) => void
 ): Unsubscribe {
   return onSnapshot(doc(workerControlCollection, workerId), (docSnapshot) => {
@@ -430,7 +390,7 @@ export function subscribeToWorkerControl(
 }
 
 export async function setWorkerDesiredState(
-  workerId: 'local' | 'cloud',
+  workerId: 'local',
   desiredState: WorkerDesiredState
 ): Promise<void> {
   const userId = getCurrentUserId();
@@ -448,7 +408,7 @@ export async function setWorkerDesiredState(
 }
 
 export async function setWorkerIdleTimeout(
-  workerId: 'local' | 'cloud',
+  workerId: 'local',
   idleTimeoutMin: number
 ): Promise<void> {
   const userId = getCurrentUserId();

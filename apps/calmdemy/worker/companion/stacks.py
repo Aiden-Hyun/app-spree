@@ -1,12 +1,10 @@
 import os
-import json
 import sys
 import signal
 import subprocess
 import time
-from typing import Optional, Callable
+from typing import Callable, Optional
 
-import config
 from observability import get_logger
 
 logger = get_logger(__name__)
@@ -18,85 +16,18 @@ for path in (BASE_DIR, PARENT_DIR):
         sys.path.insert(0, path)
 
 LOG_DIR = os.path.join(BASE_DIR, "..", "logs")
-STACKS_PATH = os.path.join(BASE_DIR, "..", "worker_stacks.json")
 
 
 def load_worker_stacks() -> list[dict]:
-    """Load worker stack definitions from JSON (or fall back to defaults)."""
-    engine = os.getenv("FACTORY_ENGINE", "v1").strip().lower()
-    if engine == "v2":
-        return [
-            {
-                "id": os.getenv("V2_STACK_ID", "local-v2"),
-                "role": "v2",
-                "venv": os.getenv("V2_VENV", ".venv"),
-                "enabled": True,
-            }
-        ]
-
-    if not os.path.isfile(STACKS_PATH):
-        return [
-            {"id": "local", "role": "pre", "venv": ".venv", "enabled": True},
-            {
-                "id": "local-tts-default",
-                "role": "tts",
-                "venv": ".venv",
-                "ttsModels": [
-                    "piper",
-                    "styletts2",
-                    "gemini-tts-flash",
-                    "gemini-tts-pro",
-                ],
-                "enabled": True,
-            },
-            {
-                "id": "local-tts-dms",
-                "role": "tts",
-                "venv": ".venv-dms",
-                "ttsModels": ["dms"],
-                "enabled": True,
-            },
-            {
-                "id": "local-course-default",
-                "role": "course",
-                "venv": ".venv",
-                "ttsModels": [
-                    "piper",
-                    "styletts2",
-                    "gemini-tts-flash",
-                    "gemini-tts-pro",
-                ],
-                "enabled": True,
-            },
-            {
-                "id": "local-course-dms",
-                "role": "course",
-                "venv": ".venv-dms",
-                "ttsModels": ["dms"],
-                "enabled": True,
-            },
-        ]
-
-    with open(STACKS_PATH, "r", encoding="utf-8") as f:
-        raw = json.load(f)
-
-    stacks = raw if isinstance(raw, list) else []
-    normalized = []
-    for idx, stack in enumerate(stacks):
-        if not isinstance(stack, dict):
-            continue
-        stack_id = stack.get("id") or f"local-stack-{idx}"
-        tts_models = stack.get("ttsModels", [])
-        if isinstance(tts_models, str):
-            tts_models = [tts_models]
-        normalized.append({
-            "id": stack_id,
-            "role": str(stack.get("role", "full")).lower(),
-            "venv": stack.get("venv", ".venv"),
-            "ttsModels": tts_models,
-            "enabled": stack.get("enabled", True),
-        })
-    return normalized
+    """Load V2 worker stack definitions (V1 stacks are removed)."""
+    return [
+        {
+            "id": os.getenv("V2_STACK_ID", "local-v2"),
+            "role": "v2",
+            "venv": os.getenv("V2_VENV", ".venv"),
+            "enabled": True,
+        }
+    ]
 
 
 def _sanitize_stack_id(stack_id: str) -> str:
@@ -162,9 +93,7 @@ def start_worker(stack: dict) -> int:
     stack_id = stack["id"]
     log_file = open(log_path(stack_id), "a", encoding="utf-8")
 
-    engine = os.getenv("FACTORY_ENGINE", "v1").strip().lower()
-    worker_filename = "local_worker_v2.py" if engine == "v2" else "local_worker.py"
-    worker_path = os.path.join(BASE_DIR, "..", worker_filename)
+    worker_path = os.path.join(BASE_DIR, "..", "local_worker.py")
     venv_path = stack.get("venv", ".venv")
     if not os.path.isabs(venv_path):
         venv_path = os.path.join(BASE_DIR, "..", venv_path)
@@ -173,12 +102,8 @@ def start_worker(stack: dict) -> int:
 
     env = os.environ.copy()
     env["WORKER_ID"] = stack_id
-    env["WORKER_ROLE"] = str(stack.get("role", "full")).lower()
-    if engine == "v2":
-        env.setdefault("V2_ENABLE_DISPATCH", "true")
-    tts_models = stack.get("ttsModels") or []
-    if tts_models:
-        env["WORKER_TTS_MODELS"] = ",".join(tts_models)
+    env["WORKER_ROLE"] = "v2"
+    env.setdefault("V2_ENABLE_DISPATCH", "true")
     env.setdefault("PYTHONUNBUFFERED", "1")
 
     process = subprocess.Popen(
@@ -231,10 +156,8 @@ def running_stack_pids(stacks: list[dict]) -> dict[str, int]:
 
 def primary_pid(stacks: list[dict], running: dict[str, int]) -> Optional[int]:
     for stack in stacks:
-        if stack.get("role") == "pre" and stack["id"] in running:
+        if stack["id"] in running:
             return running[stack["id"]]
-    if "local" in running:
-        return running["local"]
     for pid in running.values():
         return pid
     return None

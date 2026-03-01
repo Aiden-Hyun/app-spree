@@ -19,7 +19,7 @@ _cached_model_id = None
 
 def _load_prompt_template(content_type: str) -> str:
     """Load the prompt template file for a content type."""
-    prompts_dir = os.path.join(os.path.dirname(__file__), "..", "prompts")
+    prompts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "prompts")
     filename = f"{content_type}.txt"
     filepath = os.path.join(prompts_dir, filename)
 
@@ -32,7 +32,7 @@ def _load_prompt_template(content_type: str) -> str:
 
 def _load_system_prompt(content_type: str) -> str:
     """Load an optional system prompt for a content type."""
-    system_dir = os.path.join(os.path.dirname(__file__), "..", "system_prompts")
+    system_dir = os.path.join(os.path.dirname(__file__), "..", "..", "system_prompts")
     filename = f"{content_type}_system_prompt.txt"
     prompt_path = os.path.join(system_dir, filename)
     if not os.path.isfile(prompt_path):
@@ -69,7 +69,7 @@ def _get_llm_adapter(job_data: dict):
     """Get (and cache) the LLM adapter for the current job."""
     global _cached_model, _cached_model_id
 
-    model_id = job_data.get("llmModel", "gemma-3-12b")
+    model_id = job_data.get("llmModel", "ollama-local")
     if _cached_model is None or _cached_model_id != model_id:
         if _cached_model is not None:
             _cached_model.unload()
@@ -81,7 +81,7 @@ def _get_llm_adapter(job_data: dict):
 
 def generate_script(job_data: dict) -> str:
     """Generate a meditation/story script using the specified LLM."""
-    model_id = job_data.get("llmModel", "gemma-3-12b")
+    model_id = job_data.get("llmModel", "ollama-local")
     content_type = job_data.get("contentType", "guided_meditation")
 
     logger.info("LLM generating script", extra={"model_id": model_id, "content_type": content_type})

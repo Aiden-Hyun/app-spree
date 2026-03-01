@@ -21,7 +21,10 @@ if WORKER_DIR not in sys.path:
     sys.path.insert(0, WORKER_DIR)
 
 import config  # noqa: E402
-from pipeline.voice_utils import DEFAULT_VOICE_NAME_OVERRIDES, get_voice_display_name  # noqa: E402
+from factory_v2.shared.voice_utils import (  # noqa: E402
+    DEFAULT_VOICE_NAME_OVERRIDES,
+    get_voice_display_name,
+)
 
 
 COLLECTIONS = [

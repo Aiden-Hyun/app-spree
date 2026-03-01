@@ -23,6 +23,13 @@ def _extract_runtime(content_job: dict) -> dict:
         "storage_path": content_job.get("audioPath"),
         "duration_sec": content_job.get("audioDurationSec"),
         "published_content_id": content_job.get("publishedContentId"),
+        "course_plan": content_job.get("coursePlan"),
+        "course_raw_scripts": content_job.get("courseRawScripts"),
+        "course_formatted_scripts": content_job.get("courseFormattedScripts"),
+        "course_audio_results": content_job.get("courseAudioResults"),
+        "course_preview_sessions": content_job.get("coursePreviewSessions"),
+        "course_id": content_job.get("courseId"),
+        "course_session_ids": content_job.get("courseSessionIds"),
     }
 
 
@@ -45,10 +52,10 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     is_course = content_type == "course"
 
     trigger = "bootstrap"
-    first_step = "run_course_pipeline" if is_course else None
+    first_step = "generate_course_plan" if is_course else None
     if status == "publishing":
         trigger = "manual_publish"
-        first_step = "publish_course_manual" if is_course else "publish_content"
+        first_step = "publish_course" if is_course else "publish_content"
 
     v2_job_id = content_job_id
     db.collection("factory_jobs").document(v2_job_id).set(

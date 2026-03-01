@@ -44,21 +44,19 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
 
 // ==================== JOB BACKEND ====================
 
-export type JobBackend = 'local' | 'api' | 'cloud';
+export type JobBackend = 'local' | 'api';
 
-/** Backends selectable in the admin UI. Cloud is kept for legacy but hidden. */
+/** Backends selectable in the admin UI. */
 export const AVAILABLE_BACKENDS: JobBackend[] = ['local', 'api'];
 
 export const BACKEND_LABELS: Record<JobBackend, string> = {
   local: 'Local',
   api: 'Gemini API',
-  cloud: 'Cloud GPU',
 };
 
 export const BACKEND_DESCRIPTIONS: Record<JobBackend, string> = {
   local: 'Runs on your Mac (Ollama must be running)',
   api: 'Uses Gemini API (free tier)',
-  cloud: 'Runs on GCE VM with GPU (unavailable)',
 };
 
 // ==================== CONTENT TYPES ====================
@@ -202,7 +200,7 @@ export interface ContentJob {
 
 // ==================== STEP TIMELINE ====================
 
-export type JobStepTimelineSource = 'legacy' | 'v2';
+export type JobStepTimelineSource = 'v2';
 
 export interface JobStepTimelineEntry {
   id: string;
@@ -261,7 +259,7 @@ export interface ContentDraft {
 export interface WorkerStatus {
   id: string;
   workerId?: string;
-  workerType?: 'local' | 'cloud';
+  workerType?: 'local';
   lastHeartbeat?: Timestamp;
   updatedAt?: Timestamp;
   pollIntervalSec?: number;

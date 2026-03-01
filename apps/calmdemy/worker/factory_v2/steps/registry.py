@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .base import StepContext, StepResult
-from . import single_content, course_legacy
+from . import course, single_content
 
 
 StepExecutor = Callable[[StepContext], StepResult]
@@ -17,8 +17,13 @@ EXECUTORS: dict[str, StepExecutor] = {
     "post_process_audio": single_content.execute_post_process_audio,
     "upload_audio": single_content.execute_upload_audio,
     "publish_content": single_content.execute_publish_content,
-    "run_course_pipeline": course_legacy.execute_run_course_pipeline,
-    "publish_course_manual": course_legacy.execute_publish_course_manual,
+    "generate_course_plan": course.execute_generate_course_plan,
+    "generate_course_thumbnail": course.execute_generate_course_thumbnail,
+    "generate_course_scripts": course.execute_generate_course_scripts,
+    "format_course_scripts": course.execute_format_course_scripts,
+    "synthesize_course_audio": course.execute_synthesize_course_audio,
+    "upload_course_audio": course.execute_upload_course_audio,
+    "publish_course": course.execute_publish_course,
 }
 
 

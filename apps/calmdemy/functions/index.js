@@ -10,7 +10,7 @@ if (!admin.apps.length) {
 }
 
 const REGION = "northamerica-northeast1";
-const ALLOWED_STATUSES = new Set(["pending", "tts_pending", "publishing"]);
+const ALLOWED_STATUSES = new Set(["pending", "publishing"]);
 const DUP_WINDOW_MS = 5 * 60 * 1000;
 const recent = new Map();
 
@@ -37,8 +37,6 @@ exports.dispatchWake = functions
 
     const status = after.status;
     if (!ALLOWED_STATUSES.has(status)) return null;
-    if (after.llmBackend === "cloud" || after.ttsBackend === "cloud") return null;
-
     const endpoint =
       process.env.WAKE_ENDPOINT_URL || functions.config().wake?.endpoint;
     const secret =
