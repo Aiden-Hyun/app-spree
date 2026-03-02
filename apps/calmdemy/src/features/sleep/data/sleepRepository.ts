@@ -2,13 +2,60 @@ import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { BedtimeStory } from '../../../types';
 
+function normalizeBedtimeStory(
+  id: string,
+  data: Record<string, unknown>
+): BedtimeStory {
+  return {
+    id,
+    ...(data as Omit<BedtimeStory, 'id'>),
+    // Product rule: non-course audio content is free.
+    isFree: true,
+  };
+}
+
+function normalizeSleepMeditation(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreSleepMeditation {
+  return {
+    id,
+    ...(data as Omit<FirestoreSleepMeditation, 'id'>),
+    isFree: true,
+  };
+}
+
+function normalizeSeriesChapter(
+  chapter: FirestoreSeriesChapter
+): FirestoreSeriesChapter {
+  return {
+    ...chapter,
+    isFree: true,
+  };
+}
+
+function normalizeSeries(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreSeries {
+  const raw = {
+    id,
+    ...(data as Omit<FirestoreSeries, 'id'>),
+  } as FirestoreSeries;
+
+  return {
+    ...raw,
+    chapters: (raw.chapters || []).map(normalizeSeriesChapter),
+  };
+}
+
 // ==================== BEDTIME STORIES ====================
 
 export async function getBedtimeStories(): Promise<BedtimeStory[]> {
   try {
     const snapshot = await getDocs(collection(db, 'bedtime_stories'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as BedtimeStory)
+      (docSnapshot) => normalizeBedtimeStory(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching bedtime stories:', error);
@@ -23,7 +70,7 @@ export async function getBedtimeStoryById(
     const docRef = doc(db, 'bedtime_stories', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as BedtimeStory;
+    return normalizeBedtimeStory(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching bedtime story:', error);
     return null;
@@ -52,7 +99,8 @@ export async function getSleepMeditations(): Promise<FirestoreSleepMeditation[]>
   try {
     const snapshot = await getDocs(collection(db, 'sleep_meditations'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreSleepMeditation)
+      (docSnapshot) =>
+        normalizeSleepMeditation(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching sleep meditations:', error);
@@ -67,7 +115,7 @@ export async function getSleepMeditationById(
     const docRef = doc(db, 'sleep_meditations', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as FirestoreSleepMeditation;
+    return normalizeSleepMeditation(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching sleep meditation:', error);
     return null;
@@ -103,7 +151,7 @@ export async function getSeries(): Promise<FirestoreSeries[]> {
   try {
     const snapshot = await getDocs(collection(db, 'series'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreSeries)
+      (docSnapshot) => normalizeSeries(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching series:', error);
@@ -118,7 +166,7 @@ export async function getSeriesById(
     const docRef = doc(db, 'series', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as FirestoreSeries;
+    return normalizeSeries(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching series:', error);
     return null;

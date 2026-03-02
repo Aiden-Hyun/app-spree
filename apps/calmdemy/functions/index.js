@@ -2,7 +2,7 @@
 // Watches content_jobs for new work and sends a signed HTTPS wake to the Mac companion.
 
 const crypto = require("crypto");
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 if (!admin.apps.length) {

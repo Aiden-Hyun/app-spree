@@ -11,8 +11,10 @@ This deployment guide covers the V2-only content factory runtime.
 ## Prerequisites
 
 - Python venv at `worker/.venv`
+- Python venv at `worker/.venv-dms` (for DMS stack isolation)
 - Firebase Admin credentials available (`GOOGLE_APPLICATION_CREDENTIALS` or `worker/service-account-key.json`)
 - App dependencies installed (`npm install` in app root)
+- Stack manifest configured in `worker/worker_stacks.json`
 
 ## 1) Deploy Firestore Rules/Indexes
 
@@ -32,6 +34,7 @@ python3 local_companion.py
 ```
 
 Companion starts/stops `local_worker.py` automatically based on `worker_control/local` and queue state.
+In multi-stack mode, it starts one process per enabled stack definition.
 
 ## 3) Optional Runtime Tuning
 
@@ -40,14 +43,13 @@ Set env vars in `worker/.env` as needed:
 - `V2_ENABLE_DISPATCH=true`
 - `V2_POLL_INTERVAL_SECONDS=1.0`
 - `V2_MAX_STEP_RETRIES=2`
-- `V2_STACK_ID=local-v2`
-- `V2_VENV=.venv`
+- `WORKER_STACKS_FILE=/absolute/path/to/worker_stacks.json` (optional)
 
 ## 4) Verify Worker Health
 
-- `worker_status/local-v2` heartbeat updates
-- `worker_stacks_status/local` shows running PID
-- `worker_log_tails/local-v2` streams logs
+- `worker_stacks_status/local` shows expected enabled stacks + capabilities
+- each enabled stack has running PID in `worker_stacks_status/local.stacks[*].pid`
+- `worker_log_tails/<stackId>` streams logs per stack
 
 ## 5) Validate End-to-End
 
@@ -68,6 +70,8 @@ Set env vars in `worker/.env` as needed:
 
 - Inspect `factory_step_queue` for expired leases.
 - V2 worker runs stale-lease recovery periodically; restart companion if needed.
+- For synth steps, verify `required_tts_model` has a matching enabled stack in `worker_stacks.json`.
+- If no capable stack exists, dispatch fails fast with `errorCode=no_capable_stack`.
 
 ### Permission errors in admin timeline
 
@@ -77,3 +81,8 @@ Set env vars in `worker/.env` as needed:
   - `factory_jobs`
   - `factory_step_queue`
   - `factory_events`
+
+## Multi-Venv Convention
+
+Follow `worker/VENV_STRATEGY.md` when adding/refactoring model runtimes.
+Do not collapse to a single venv while incompatible model dependencies exist.

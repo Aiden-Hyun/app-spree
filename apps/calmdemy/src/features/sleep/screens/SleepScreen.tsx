@@ -120,7 +120,7 @@ export function SleepScreen() {
                       fallbackIcon={getCategoryIcon(story.category)}
                       fallbackColor={theme.colors.sleepAccent}
                       meta={`${story.duration_minutes} min`}
-                      isPremium={story.is_premium}
+                      isPremium={!story.isFree}
                       onPress={() => handleStoryPress(story)}
                       darkMode
                     />

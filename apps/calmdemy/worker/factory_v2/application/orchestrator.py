@@ -14,6 +14,18 @@ class Orchestrator:
         self.step_run_repo = step_run_repo
         self.queue_repo = queue_repo
 
+    @staticmethod
+    def _content_job_tts_model(job: dict) -> str:
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        model = str(payload.get("ttsModel") or "").strip().lower()
+        return model or "piper"
+
+    def _required_tts_model_for_step(self, job: dict, step_name: str) -> str | None:
+        if step_name in {"synthesize_audio", "synthesize_course_audio"}:
+            return self._content_job_tts_model(job)
+        return None
+
     def start_new_run(
         self,
         job_id: str,
@@ -41,6 +53,7 @@ class Orchestrator:
             run_id=run_id,
             step_name=first,
             step_run_id=step_run_id,
+            required_tts_model=self._required_tts_model_for_step(job, first),
         )
         return run_id
 
@@ -68,6 +81,7 @@ class Orchestrator:
                 run_id=run_id,
                 step_name=next_step,
                 step_run_id=step_run_id,
+                required_tts_model=self._required_tts_model_for_step(job, next_step),
             )
 
     def on_step_failed(self, job_id: str, run_id: str, step_name: str, error_code: str) -> None:

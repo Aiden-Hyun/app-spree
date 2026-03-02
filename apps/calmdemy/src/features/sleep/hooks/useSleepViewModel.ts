@@ -52,7 +52,7 @@ export function useSleepViewModel() {
   }, [router]);
 
   const handleStoryPress = useCallback((story: BedtimeStory) => {
-    if (story.is_premium && !hasSubscription) {
+    if (!story.isFree && !hasSubscription) {
       setShowPaywall(true);
       return;
     }

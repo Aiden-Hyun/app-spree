@@ -6,6 +6,7 @@ import time
 from typing import Callable, Optional
 
 from observability import get_logger
+from .stack_config import load_stack_config
 
 logger = get_logger(__name__)
 
@@ -19,15 +20,8 @@ LOG_DIR = os.path.join(BASE_DIR, "..", "logs")
 
 
 def load_worker_stacks() -> list[dict]:
-    """Load V2 worker stack definitions (V1 stacks are removed)."""
-    return [
-        {
-            "id": os.getenv("V2_STACK_ID", "local-v2"),
-            "role": "v2",
-            "venv": os.getenv("V2_VENV", ".venv"),
-            "enabled": True,
-        }
-    ]
+    """Load worker stack definitions from worker_stacks.json (with fallback)."""
+    return load_stack_config()
 
 
 def _sanitize_stack_id(stack_id: str) -> str:
@@ -102,8 +96,14 @@ def start_worker(stack: dict) -> int:
 
     env = os.environ.copy()
     env["WORKER_ID"] = stack_id
-    env["WORKER_ROLE"] = "v2"
-    env.setdefault("V2_ENABLE_DISPATCH", "true")
+    env["WORKER_ROLE"] = str(stack.get("role") or "v2")
+    env["WORKER_DISPATCH"] = "true" if stack.get("dispatch", False) else "false"
+    env["WORKER_ACCEPT_NON_TTS"] = (
+        "true" if stack.get("acceptNonTtsSteps", True) else "false"
+    )
+    tts_models = stack.get("ttsModels") or []
+    env["WORKER_TTS_MODELS"] = ",".join(str(model) for model in tts_models)
+    env["V2_ENABLE_DISPATCH"] = env["WORKER_DISPATCH"]
     env.setdefault("PYTHONUNBUFFERED", "1")
 
     process = subprocess.Popen(

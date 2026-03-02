@@ -3,13 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import config
-from factory_v2.shared.llm_generator import generate_script
-from factory_v2.shared.qa_formatter import format_script
-from factory_v2.shared.image_generator import build_image_prompt, generate_image
-from factory_v2.shared.tts_converter import convert_to_audio
-from factory_v2.shared.audio_processor import post_process_audio
-from factory_v2.shared.storage_uploader import upload_audio, upload_image
-from factory_v2.shared.content_publisher import publish_content
 
 from .base import StepContext, StepResult
 
@@ -27,6 +20,8 @@ def _runtime(job: dict) -> dict[str, Any]:
 
 
 def execute_generate_script(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.llm_generator import generate_script
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -57,6 +52,8 @@ def execute_generate_script(ctx: StepContext) -> StepResult:
 
 
 def execute_format_script(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.qa_formatter import format_script
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     script = runtime.get("generated_script")
@@ -81,6 +78,9 @@ def execute_format_script(ctx: StepContext) -> StepResult:
 
 
 def execute_generate_image(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.image_generator import build_image_prompt, generate_image
+    from factory_v2.shared.storage_uploader import upload_image
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -116,6 +116,8 @@ def execute_generate_image(ctx: StepContext) -> StepResult:
 
 
 def execute_synthesize_audio(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.tts_converter import convert_to_audio
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     script = runtime.get("formatted_script")
@@ -133,6 +135,8 @@ def execute_synthesize_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_post_process_audio(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.audio_processor import post_process_audio
+
     runtime = _runtime(ctx.job)
     wav_path = runtime.get("wav_path")
     if not wav_path:
@@ -149,6 +153,8 @@ def execute_post_process_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_upload_audio(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.storage_uploader import upload_audio
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     mp3_path = runtime.get("mp3_path")
@@ -171,6 +177,8 @@ def execute_upload_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_publish_content(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.content_publisher import publish_content
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     request_status = (job_data.get("status") or "").strip().lower()

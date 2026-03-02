@@ -11,13 +11,6 @@ import config
 from firebase_admin import firestore as fs
 
 from observability import get_logger
-from factory_v2.shared.audio_processor import post_process_audio
-from factory_v2.shared.image_generator import build_image_prompt, generate_image
-from factory_v2.shared.llm_generator import _get_llm_adapter
-from factory_v2.shared.qa_formatter import format_script
-from factory_v2.shared.storage_uploader import upload_audio, upload_image
-from factory_v2.shared.tts_converter import convert_to_audio
-from factory_v2.shared.voice_utils import get_voice_display_name
 
 from .base import StepContext, StepResult
 
@@ -325,6 +318,8 @@ def _publish_course(
     audio_results: dict[str, dict[str, Any]],
     job_data: dict,
 ) -> tuple[str, list[str]]:
+    from factory_v2.shared.voice_utils import get_voice_display_name
+
     params = job_data.get("params", {})
     course_code = params.get("courseCode", "COURSE101")
     course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled"))
@@ -378,7 +373,7 @@ def _publish_course(
             "duration_minutes": max(1, math.ceil(duration_sec / 60)),
             "audioPath": audio.get("storagePath", ""),
             "order": session_def["order"],
-            "isFree": session_def["order"] == 0,
+            "isFree": False,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
         }
@@ -391,6 +386,8 @@ def _publish_course(
 
 
 def execute_generate_course_plan(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.llm_generator import _get_llm_adapter
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -415,6 +412,9 @@ def execute_generate_course_plan(ctx: StepContext) -> StepResult:
 
 
 def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.image_generator import build_image_prompt, generate_image
+    from factory_v2.shared.storage_uploader import upload_image
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     plan = runtime.get("course_plan") or job_data.get("coursePlan") or {}
@@ -461,6 +461,8 @@ def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
 
 
 def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.llm_generator import _get_llm_adapter
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     plan = runtime.get("course_plan") or job_data.get("coursePlan")
@@ -512,6 +514,8 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
 
 
 def execute_format_course_scripts(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.qa_formatter import format_script
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -552,6 +556,10 @@ def execute_format_course_scripts(ctx: StepContext) -> StepResult:
 
 
 def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.audio_processor import post_process_audio
+    from factory_v2.shared.storage_uploader import upload_audio
+    from factory_v2.shared.tts_converter import convert_to_audio
+
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 

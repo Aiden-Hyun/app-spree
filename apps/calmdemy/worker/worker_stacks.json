@@ -1,19 +1,20 @@
 [
-  {"id": "local", "role": "pre", "venv": ".venv", "enabled": true},
   {
-    "id": "local-tts-default",
+    "id": "local-primary",
+    "role": "v2",
+    "venv": ".venv",
+    "enabled": true,
+    "dispatch": true,
+    "acceptNonTtsSteps": true,
+    "ttsModels": ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"]
+  },
+  {
+    "id": "local-tts-dms",
     "role": "tts",
-    "venv": ".venv",
-    "ttsModels": ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"],
-    "enabled": true
-  },
-  {"id": "local-tts-dms", "role": "tts", "venv": ".venv-dms", "ttsModels": ["dms"], "enabled": true},
-  {
-    "id": "local-course-default",
-    "role": "course",
-    "venv": ".venv",
-    "ttsModels": ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"],
-    "enabled": true
-  },
-  {"id": "local-course-dms", "role": "course", "venv": ".venv-dms", "ttsModels": ["dms"], "enabled": true}
+    "venv": ".venv-dms",
+    "enabled": true,
+    "dispatch": false,
+    "acceptNonTtsSteps": false,
+    "ttsModels": ["dms"]
+  }
 ]

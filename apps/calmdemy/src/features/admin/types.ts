@@ -290,6 +290,9 @@ export interface WorkerStackStatus {
   role?: string;
   venv?: string;
   enabled?: boolean;
+  dispatch?: boolean;
+  acceptNonTtsSteps?: boolean;
+  ttsModels?: string[];
   pid?: number;
   logPath?: string;
   lastUpdatedAt?: Timestamp;

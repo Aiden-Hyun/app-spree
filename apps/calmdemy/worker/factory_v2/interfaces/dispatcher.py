@@ -6,6 +6,10 @@ from firebase_admin import firestore
 from firebase_admin import firestore as fs
 
 from observability import get_logger
+from companion.stack_config import (
+    any_enabled_stack_supports_tts_model,
+    load_stack_config,
+)
 from .bootstrap import bootstrap_from_content_job
 
 logger = get_logger(__name__)
@@ -17,7 +21,7 @@ def _is_cloud_job(data: dict) -> bool:
     return data.get("llmBackend") == "cloud" or data.get("ttsBackend") == "cloud"
 
 
-def _claim_for_v2(db, doc_ref, worker_id: str) -> Optional[dict]:
+def _claim_for_v2(db, doc_ref, worker_id: str, stack_defs: list[dict]) -> Optional[dict]:
     tx = db.transaction()
 
     @firestore.transactional
@@ -45,6 +49,49 @@ def _claim_for_v2(db, doc_ref, worker_id: str) -> Optional[dict]:
                 },
             )
             return None
+        if data.get("status") == "pending":
+            if not any(
+                stack.get("enabled", True) and stack.get("acceptNonTtsSteps", True)
+                for stack in stack_defs
+            ):
+                message = (
+                    "No enabled worker stack can execute non-TTS steps. "
+                    "Enable a primary stack and retry."
+                )
+                transaction.update(
+                    doc_ref,
+                    {
+                        "status": "failed",
+                        "error": message,
+                        "errorCode": "no_capable_stack",
+                        "failedStage": "pending",
+                        "lastRunStatus": "failed",
+                        "runEndedAt": fs.SERVER_TIMESTAMP,
+                        "v2DispatchError": message,
+                        "updatedAt": fs.SERVER_TIMESTAMP,
+                    },
+                )
+                return None
+            required_tts_model = str(data.get("ttsModel") or "").strip().lower() or "piper"
+            if not any_enabled_stack_supports_tts_model(stack_defs, required_tts_model):
+                message = (
+                    f"No enabled worker stack supports ttsModel '{required_tts_model}'. "
+                    "Enable a capable stack and retry."
+                )
+                transaction.update(
+                    doc_ref,
+                    {
+                        "status": "failed",
+                        "error": message,
+                        "errorCode": "no_capable_stack",
+                        "failedStage": "tts_converting",
+                        "lastRunStatus": "failed",
+                        "runEndedAt": fs.SERVER_TIMESTAMP,
+                        "v2DispatchError": message,
+                        "updatedAt": fs.SERVER_TIMESTAMP,
+                    },
+                )
+                return None
         if data.get("v2Locked"):
             return None
 
@@ -67,11 +114,12 @@ def _claim_for_v2(db, doc_ref, worker_id: str) -> Optional[dict]:
 def dispatch_next_content_job(db, worker_id: str) -> Optional[tuple[str, str]]:
     """Claim one eligible content job and bootstrap a V2 run."""
     jobs = db.collection("content_jobs")
+    stack_defs = load_stack_config()
 
     for status in _DISPATCH_STATUSES:
         query = jobs.where("status", "==", status).order_by("createdAt").limit(25)
         for doc in query.stream():
-            claimed = _claim_for_v2(db, doc.reference, worker_id)
+            claimed = _claim_for_v2(db, doc.reference, worker_id, stack_defs)
             if claimed is None:
                 continue
 

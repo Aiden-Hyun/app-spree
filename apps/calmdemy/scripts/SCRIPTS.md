@@ -20,6 +20,12 @@ This folder contains one-off or operational scripts. Run them from the project r
 - Side effects: Writes/merges six subject documents in Firestore.
 - Do not run: Against production unless you intend to overwrite subject data.
 
+`migrateCoursesOnlyPremium.js`
+- Purpose: Enforce the "courses-only premium" policy in Firestore data.
+- Inputs: `serviceAccountKey.json` in repo root; optional `--dry-run`.
+- Side effects: Updates `isFree` flags across audio collections, removes legacy `bedtime_stories.is_premium`, and enforces `course_sessions.isFree=false`.
+- Do not run: Against production without validating the dry-run output first.
+
 `uploadAudio.js`
 - Purpose: Normalize and upload audio files under `assets/audio/**` to Firebase Storage.
 - Inputs: `serviceAccountKey.json` in repo root, FFmpeg installed, optional flags `--all`, `--force`, `--skip-normalize`.

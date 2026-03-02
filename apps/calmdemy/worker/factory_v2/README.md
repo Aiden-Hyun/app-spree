@@ -36,12 +36,17 @@ Content Factory now runs on a V2-only workflow engine.
 2. Ensure worker control desired state is `running` or `auto`.
 3. Create jobs from Admin UI.
 
-Companion starts `local_worker.py` (V2 runtime) only.
+Companion starts one or more `local_worker.py` processes based on `worker/worker_stacks.json`.
+Capability routing ensures synth steps are claimed only by stacks whose `ttsModels` allowlist matches.
 
 ## Runtime flags
 
 - `V2_ENABLE_DISPATCH` (default: `true`)
 - `V2_POLL_INTERVAL_SECONDS` (default: `1.0`)
 - `V2_MAX_STEP_RETRIES` (default: `2`)
-- `V2_STACK_ID` (default: `local-v2`)
-- `V2_VENV` (default: `.venv`)
+- `WORKER_STACKS_FILE` (optional path override)
+- `WORKER_DISPATCH` (per-stack, injected by companion)
+- `WORKER_ACCEPT_NON_TTS` (per-stack, injected by companion)
+- `WORKER_TTS_MODELS` (per-stack, injected by companion)
+
+See `worker/VENV_STRATEGY.md` for the normative multi-venv convention.

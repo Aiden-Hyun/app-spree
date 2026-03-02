@@ -132,7 +132,7 @@ export interface NatureSound {
   audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
   category: "rain" | "ocean" | "forest" | "fire" | "wind" | "ambient";
-  is_premium: boolean;
+  isFree?: boolean;
   created_at: string;
 }
 
@@ -147,7 +147,6 @@ export interface BedtimeStory {
   audio_file?: string; // Key for local audio asset (see audioFiles.ts)
   thumbnail_url?: string;
   category: "nature" | "fantasy" | "travel" | "fiction" | "thriller" | "fairytale";
-  is_premium: boolean;
   isFree?: boolean;
   created_at: string;
 }

@@ -186,13 +186,20 @@ export function FactoryOverview({
               {stacksOpen ? (
                 stacks.map((stack) => {
                   const status = getStackStatus(stack, theme);
+                  const modeLabel = stack.dispatch ? 'dispatcher' : 'executor';
+                  const ttsModels = stack.ttsModels?.length
+                    ? stack.ttsModels.join(', ')
+                    : stack.acceptNonTtsSteps
+                      ? '*'
+                      : '-';
                   return (
                     <View key={stack.id} style={styles.stackRow}>
                       <View style={styles.stackLeft}>
                         <Text style={styles.stackId}>{stack.id}</Text>
                         <Text style={styles.stackMeta}>
-                          {stack.role || 'role?'} · {stack.venv || 'venv?'}
+                          {stack.role || 'role?'} · {stack.venv || 'venv?'} · {modeLabel}
                         </Text>
+                        <Text style={styles.stackMeta}>tts: {ttsModels}</Text>
                       </View>
                       <View style={styles.stackRight}>
                         <Text style={[styles.stackStatus, { color: status.color }]}>

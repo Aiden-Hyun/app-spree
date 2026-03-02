@@ -24,17 +24,48 @@ const coursesCollection = collection(db, 'courses');
 const courseSessionsCollection = collection(db, 'course_sessions');
 const subjectsCollection = collection(db, 'subjects');
 
+function normalizeMeditation(
+  id: string,
+  data: Record<string, unknown>
+): GuidedMeditation {
+  return {
+    id,
+    ...(data as Omit<GuidedMeditation, 'id'>),
+    // Product rule: non-course audio content is free.
+    isFree: true,
+  };
+}
+
+function normalizeEmergencyMeditation(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreEmergencyMeditation {
+  return {
+    id,
+    ...(data as Omit<FirestoreEmergencyMeditation, 'id'>),
+    isFree: true,
+  };
+}
+
+function normalizeCourseSession(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreCourseSession {
+  return {
+    id,
+    ...(data as Omit<FirestoreCourseSession, 'id'>),
+    // Product rule: courses are premium-only.
+    isFree: false,
+  };
+}
+
 // ==================== MEDITATIONS ====================
 
 export async function getMeditations(): Promise<GuidedMeditation[]> {
   try {
     const snapshot = await getDocs(meditationsCollection);
     return snapshot.docs.map(
-      (docSnapshot) =>
-        ({
-          id: docSnapshot.id,
-          ...docSnapshot.data(),
-        } as GuidedMeditation)
+      (docSnapshot) => normalizeMeditation(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching meditations:', error);
@@ -47,11 +78,7 @@ export async function getMeditationsByTheme(theme: string): Promise<GuidedMedita
     const q = query(meditationsCollection, where('themes', 'array-contains', theme));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(
-      (docSnapshot) =>
-        ({
-          id: docSnapshot.id,
-          ...docSnapshot.data(),
-        } as GuidedMeditation)
+      (docSnapshot) => normalizeMeditation(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching meditations by theme:', error);
@@ -69,11 +96,7 @@ export async function getMeditationsByTechnique(
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(
-      (docSnapshot) =>
-        ({
-          id: docSnapshot.id,
-          ...docSnapshot.data(),
-        } as GuidedMeditation)
+      (docSnapshot) => normalizeMeditation(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching meditations by technique:', error);
@@ -88,7 +111,7 @@ export async function getMeditationById(
     const docRef = doc(meditationsCollection, id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as GuidedMeditation;
+    return normalizeMeditation(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching meditation by id:', error);
     return null;
@@ -174,7 +197,8 @@ export async function getEmergencyMeditations(): Promise<FirestoreEmergencyMedit
   try {
     const snapshot = await getDocs(emergencyMeditationsCollection);
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreEmergencyMeditation)
+      (docSnapshot) =>
+        normalizeEmergencyMeditation(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching emergency meditations:', error);
@@ -189,10 +213,7 @@ export async function getEmergencyMeditationById(
     const docRef = doc(db, 'emergency_meditations', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return {
-      id: docSnap.id,
-      ...docSnap.data(),
-    } as FirestoreEmergencyMeditation;
+    return normalizeEmergencyMeditation(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching emergency meditation:', error);
     return null;
@@ -239,12 +260,26 @@ async function getCourseSessionsByCourseId(
     const q = query(courseSessionsCollection, where('courseId', '==', courseId));
     const snapshot = await getDocs(q);
     const sessions = snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreCourseSession)
+      (docSnapshot) => normalizeCourseSession(docSnapshot.id, docSnapshot.data())
     );
     return sessions.sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch (error) {
     console.error('Error fetching course sessions:', error);
     return [];
+  }
+}
+
+export async function getCourseSessionById(
+  id: string
+): Promise<FirestoreCourseSession | null> {
+  try {
+    const docRef = doc(courseSessionsCollection, id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+    return normalizeCourseSession(docSnap.id, docSnap.data());
+  } catch (error) {
+    console.error('Error fetching course session by id:', error);
+    return null;
   }
 }
 

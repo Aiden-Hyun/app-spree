@@ -10,11 +10,13 @@ import { useAuth } from '@core/providers/contexts/AuthContext';
 import { getAudioUrlFromPath } from '@/constants/audioFiles';
 import { markContentCompleted } from '@shared/data/content';
 import { createSession } from '@/features/profile/data/profileRepository';
+import { getCourseSessionById } from '@/features/meditate/data/meditateRepository';
 import { getLocalAudioPath } from '@/services/downloadService';
 import { buildSessionMetaInfo } from '@shared/utils/courseCodeParser';
 import { Theme } from '@/theme';
 import { useSubscription } from '@core/providers/contexts/SubscriptionContext';
 import { PaywallModal } from '@shared/ui/PaywallModal';
+import { isCourseSessionLocked } from '@shared/utils/premiumPolicy';
 
 interface SessionItem {
   id: string;
@@ -22,7 +24,7 @@ interface SessionItem {
   audioPath: string;
   title: string;
   duration_minutes: number;
-  dayNumber: number;
+  dayNumber?: number;
   description?: string;
   isFree?: boolean;
 }
@@ -51,6 +53,7 @@ function CourseSessionPlayerScreen() {
   const [loading, setLoading] = useState(true);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | undefined>();
   const [showPaywall, setShowPaywall] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const hasTrackedSession = useRef(false);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -101,6 +104,21 @@ function CourseSessionPlayerScreen() {
       }
       
       try {
+        let currentSession: SessionItem | undefined;
+        if (sessions.length > 0) {
+          currentSession = sessions.find((session) => session.id === id);
+        }
+        if (!currentSession && id) {
+          currentSession = (await getCourseSessionById(id)) || undefined;
+        }
+
+        if (isCourseSessionLocked(currentSession, hasSubscription)) {
+          setIsLocked(true);
+          setShowPaywall(true);
+          return;
+        }
+
+        setIsLocked(false);
         // Try to use downloaded audio first, fall back to streaming
         const localPath = await getLocalAudioPath(id);
         if (localPath) {
@@ -119,14 +137,20 @@ function CourseSessionPlayerScreen() {
     }
     
     loadSessionAudio();
-  }, [audioPath]);
+  }, [audioPath, hasSubscription, id, sessions]);
 
   // Auto-start playback when coming from auto-play navigation
   useEffect(() => {
-    if (autoPlay === 'true' && !loading && audioPlayer.duration > 0 && !audioPlayer.isPlaying) {
+    if (
+      !isLocked &&
+      autoPlay === 'true' &&
+      !loading &&
+      audioPlayer.duration > 0 &&
+      !audioPlayer.isPlaying
+    ) {
       audioPlayer.play();
     }
-  }, [autoPlay, loading, audioPlayer.duration]);
+  }, [audioPlayer.duration, audioPlayer.isPlaying, autoPlay, isLocked, loading]);
 
   // Track session completion (mark as completed at 80%)
   useEffect(() => {
@@ -158,8 +182,7 @@ function CourseSessionPlayerScreen() {
     if (!hasPrevious) return;
     const prevSession = sessions[currentIdx - 1];
     
-    // Check if previous session is locked
-    if (!prevSession.isFree && !hasSubscription) {
+    if (isCourseSessionLocked(prevSession, hasSubscription)) {
       setShowPaywall(true);
       return;
     }
@@ -188,8 +211,7 @@ function CourseSessionPlayerScreen() {
     if (!hasNext) return;
     const nextSession = sessions[currentIdx + 1];
     
-    // Check if next session is locked
-    if (!nextSession.isFree && !hasSubscription) {
+    if (isCourseSessionLocked(nextSession, hasSubscription)) {
       setShowPaywall(true);
       return;
     }
@@ -223,6 +245,13 @@ function CourseSessionPlayerScreen() {
   const metaInfo = sessionCode && courseCode 
     ? buildSessionMetaInfo(sessionCode, courseCode) 
     : undefined;
+  const handlePlayPause = async () => {
+    if (isLocked) {
+      setShowPaywall(true);
+      return;
+    }
+    await onPlayPause();
+  };
 
   return (
     <>
@@ -240,7 +269,7 @@ function CourseSessionPlayerScreen() {
         audioPlayer={audioPlayer}
         onBack={handleGoBack}
         onToggleFavorite={onToggleFavorite}
-        onPlayPause={onPlayPause}
+        onPlayPause={handlePlayPause}
         loadingText="Loading session..."
         onPrevious={hasPrevious ? handlePrevious : undefined}
         onNext={hasNext ? handleNext : undefined}

@@ -1,6 +1,51 @@
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
+function normalizeAlbumTrack(track: FirestoreAlbumTrack): FirestoreAlbumTrack {
+  return {
+    ...track,
+    // Product rule: non-course audio content is free.
+    isFree: true,
+  };
+}
+
+function normalizeAlbum(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreAlbum {
+  const raw = {
+    id,
+    ...(data as Omit<FirestoreAlbum, 'id'>),
+  } as FirestoreAlbum;
+
+  return {
+    ...raw,
+    tracks: (raw.tracks || []).map(normalizeAlbumTrack),
+  };
+}
+
+function normalizeSleepSound(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreSleepSound {
+  return {
+    id,
+    ...(data as Omit<FirestoreSleepSound, 'id'>),
+    isFree: true,
+  };
+}
+
+function normalizeMusicItem(
+  id: string,
+  data: Record<string, unknown>
+): FirestoreMusicItem {
+  return {
+    id,
+    ...(data as Omit<FirestoreMusicItem, 'id'>),
+    isFree: true,
+  };
+}
+
 // ==================== ALBUMS ====================
 
 export interface FirestoreAlbumTrack {
@@ -29,7 +74,7 @@ export async function getAlbums(): Promise<FirestoreAlbum[]> {
   try {
     const snapshot = await getDocs(collection(db, 'albums'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreAlbum)
+      (docSnapshot) => normalizeAlbum(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching albums:', error);
@@ -42,7 +87,7 @@ export async function getAlbumById(id: string): Promise<FirestoreAlbum | null> {
     const docRef = doc(db, 'albums', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as FirestoreAlbum;
+    return normalizeAlbum(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching album:', error);
     return null;
@@ -67,7 +112,7 @@ export async function getSleepSounds(): Promise<FirestoreSleepSound[]> {
   try {
     const snapshot = await getDocs(collection(db, 'sleep_sounds'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreSleepSound)
+      (docSnapshot) => normalizeSleepSound(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching sleep sounds:', error);
@@ -83,7 +128,7 @@ export async function getSleepSoundsByCategory(
     const q = query(collection(db, 'sleep_sounds'), where('category', '==', category));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreSleepSound)
+      (docSnapshot) => normalizeSleepSound(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching sleep sounds by category:', error);
@@ -98,7 +143,7 @@ export async function getSleepSoundById(
     const docRef = doc(db, 'sleep_sounds', id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() } as FirestoreSleepSound;
+    return normalizeSleepSound(docSnap.id, docSnap.data());
   } catch (error) {
     console.error('Error fetching sleep sound by id:', error);
     return null;
@@ -176,7 +221,7 @@ export async function getWhiteNoise(): Promise<FirestoreMusicItem[]> {
   try {
     const snapshot = await getDocs(collection(db, 'white_noise'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreMusicItem)
+      (docSnapshot) => normalizeMusicItem(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching white noise:', error);
@@ -188,7 +233,7 @@ export async function getMusic(): Promise<FirestoreMusicItem[]> {
   try {
     const snapshot = await getDocs(collection(db, 'music'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreMusicItem)
+      (docSnapshot) => normalizeMusicItem(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching music:', error);
@@ -200,7 +245,7 @@ export async function getAsmr(): Promise<FirestoreMusicItem[]> {
   try {
     const snapshot = await getDocs(collection(db, 'asmr'));
     return snapshot.docs.map(
-      (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as FirestoreMusicItem)
+      (docSnapshot) => normalizeMusicItem(docSnapshot.id, docSnapshot.data())
     );
   } catch (error) {
     console.error('Error fetching asmr:', error);

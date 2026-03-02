@@ -22,6 +22,7 @@ class FirestoreQueueRepo:
         step_run_id: str,
         shard_key: str = "root",
         available_at: datetime | None = None,
+        required_tts_model: str | None = None,
     ) -> str:
         queue_id = self.make_queue_id(run_id, step_name, shard_key)
         doc_ref = self.db.collection("factory_step_queue").document(queue_id)
@@ -37,6 +38,8 @@ class FirestoreQueueRepo:
             "created_at": fs.SERVER_TIMESTAMP,
             "updated_at": fs.SERVER_TIMESTAMP,
         }
+        if required_tts_model:
+            payload["required_tts_model"] = str(required_tts_model).strip().lower()
         try:
             doc_ref.create(payload)
         except AlreadyExists:
@@ -44,7 +47,31 @@ class FirestoreQueueRepo:
             pass
         return queue_id
 
-    def claim_next(self, worker_id: str, lease_seconds: int = 300) -> tuple[str, dict] | None:
+    @staticmethod
+    def _supports_payload(
+        payload: dict,
+        accept_non_tts_steps: bool,
+        supported_tts_models: set[str] | None,
+    ) -> bool:
+        step_name = str(payload.get("step_name") or "")
+        is_tts_step = step_name in {"synthesize_audio", "synthesize_course_audio"}
+        if not is_tts_step:
+            return accept_non_tts_steps
+
+        required_tts_model = str(payload.get("required_tts_model") or "").strip().lower()
+        if not required_tts_model:
+            return True
+        if supported_tts_models is None:
+            return True
+        return required_tts_model in supported_tts_models
+
+    def claim_next(
+        self,
+        worker_id: str,
+        lease_seconds: int = 300,
+        accept_non_tts_steps: bool = True,
+        supported_tts_models: set[str] | None = None,
+    ) -> tuple[str, dict] | None:
         now = datetime.now(timezone.utc)
         query = (
             self.db.collection("factory_step_queue")
@@ -56,6 +83,13 @@ class FirestoreQueueRepo:
 
         docs = list(query.stream())
         for doc in docs:
+            doc_payload = doc.to_dict() or {}
+            if not self._supports_payload(
+                doc_payload,
+                accept_non_tts_steps=accept_non_tts_steps,
+                supported_tts_models=supported_tts_models,
+            ):
+                continue
             tx = self.db.transaction()
 
             @fs.transactional
@@ -65,6 +99,12 @@ class FirestoreQueueRepo:
                     return None
                 data = snap.to_dict() or {}
                 if data.get("state") != "ready":
+                    return None
+                if not self._supports_payload(
+                    data,
+                    accept_non_tts_steps=accept_non_tts_steps,
+                    supported_tts_models=supported_tts_models,
+                ):
                     return None
                 transaction.update(
                     doc.reference,

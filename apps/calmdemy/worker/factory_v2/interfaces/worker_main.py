@@ -35,12 +35,22 @@ class WorkerMain:
         worker_id: str,
         poll_seconds: float = 1.0,
         enable_dispatch: bool = True,
+        can_dispatch: bool | None = None,
+        accept_non_tts_steps: bool = True,
+        supported_tts_models: set[str] | None = None,
         max_step_retries: int = 2,
     ):
         self.db = db
         self.worker_id = worker_id
         self.poll_seconds = poll_seconds
         self.enable_dispatch = enable_dispatch
+        self.can_dispatch = bool(enable_dispatch if can_dispatch is None else can_dispatch)
+        self.accept_non_tts_steps = bool(accept_non_tts_steps)
+        self.supported_tts_models = (
+            {model.strip().lower() for model in supported_tts_models if model.strip()}
+            if supported_tts_models
+            else None
+        )
         self.max_step_retries = max(0, int(max_step_retries))
 
         self.job_repo = FirestoreJobRepo(db)
@@ -177,7 +187,7 @@ class WorkerMain:
                         extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
                     )
 
-            if self.enable_dispatch:
+            if self.can_dispatch:
                 try:
                     dispatched = dispatch_next_content_job(self.db, self.worker_id)
                     if dispatched:
@@ -196,7 +206,11 @@ class WorkerMain:
                         extra={"worker_id": self.worker_id, "error": str(dispatch_exc)},
                     )
 
-            claimed = self.queue_repo.claim_next(self.worker_id)
+            claimed = self.queue_repo.claim_next(
+                self.worker_id,
+                accept_non_tts_steps=self.accept_non_tts_steps,
+                supported_tts_models=self.supported_tts_models,
+            )
             if not claimed:
                 time.sleep(self.poll_seconds)
                 continue

@@ -15,10 +15,11 @@ import { useAuth } from "@core/providers/contexts/AuthContext";
 import { DownloadButton } from "@shared/ui/DownloadButton";
 import { getAudioUrlFromPath } from "@/constants/audioFiles";
 import { useNetwork } from "@core/providers/contexts/NetworkContext";
-import { getDownloadedContentIds, getLocalAudioPath } from "@/services/downloadService";
+import { getDownloadedContentIds } from "@/services/downloadService";
 import { buildSessionMetaInfo } from "@shared/utils/courseCodeParser";
 import { useSubscription } from "@core/providers/contexts/SubscriptionContext";
 import { PaywallModal } from "@shared/ui/PaywallModal";
+import { isCourseSessionLocked } from "@shared/utils/premiumPolicy";
 
 function CourseDetailScreen() {
   const router = useRouter();
@@ -96,8 +97,14 @@ function CourseDetailScreen() {
     
     const index = course.sessions.findIndex(s => s.id === autoOpenItemId);
     if (index !== -1) {
-      hasAutoOpened.current = true;
       const session = course.sessions[index];
+      if (isCourseSessionLocked(session, hasSubscription)) {
+        hasAutoOpened.current = true;
+        setShowPaywall(true);
+        return;
+      }
+
+      hasAutoOpened.current = true;
       router.push({
         pathname: '/course/session/[id]',
         params: {
@@ -116,7 +123,7 @@ function CourseDetailScreen() {
         },
       });
     }
-  }, [course, autoOpenItemId]);
+  }, [course, autoOpenItemId, hasSubscription, router]);
 
   if (loading) {
     return (
@@ -147,8 +154,7 @@ function CourseDetailScreen() {
   const handleSessionPress = (session: FirestoreCourseSession, index: number) => {
     if (!course) return;
     
-    // Check isFree field from Firestore
-    if (!session.isFree && !hasSubscription) {
+    if (isCourseSessionLocked(session, hasSubscription)) {
       setShowPaywall(true);
       return;
     }
@@ -359,12 +365,12 @@ function CourseDetailScreen() {
                         onDownloadComplete={() => {
                           getDownloadedContentIds('course_session').then(setDownloadedIds);
                         }}
-                        isPremiumLocked={!session.isFree && !hasSubscription}
+                        isPremiumLocked={isCourseSessionLocked(session, hasSubscription)}
                         onPremiumRequired={() => setShowPaywall(true)}
                       />
                     )}
                     <View style={styles.playButton}>
-                      {!session.isFree && !hasSubscription ? (
+                      {isCourseSessionLocked(session, hasSubscription) ? (
                         <Ionicons name="lock-closed" size={20} color={isDark ? theme.colors.sleepTextMuted : theme.colors.textMuted} />
                       ) : (
                         <Ionicons name="play" size={20} color={course.color} />

@@ -26,15 +26,19 @@ V1 runtime codepaths are removed. The worker runs V2 only.
 
 - Entry point: `worker/local_worker.py`
 - Companion process manager: `worker/local_companion.py`
-- Stack runtime: `worker/companion/stacks.py` (V2 only)
+- Stack runtime: `worker/companion/stacks.py` (V2 only, multi-stack capable)
+- Stack manifest: `worker/worker_stacks.json`
+- Multi-venv convention: `worker/VENV_STRATEGY.md`
 
 ### Key env vars
 
 - `V2_ENABLE_DISPATCH` (default `true`)
 - `V2_POLL_INTERVAL_SECONDS` (default `1.0`)
 - `V2_MAX_STEP_RETRIES` (default `2`)
-- `V2_STACK_ID` (default `local-v2`)
-- `V2_VENV` (default `.venv`)
+- `WORKER_STACKS_FILE` (optional override for stack manifest path)
+- `WORKER_DISPATCH` (set by companion per stack)
+- `WORKER_ACCEPT_NON_TTS` (set by companion per stack)
+- `WORKER_TTS_MODELS` (set by companion per stack)
 
 ## Step Workflows
 
@@ -64,6 +68,7 @@ V1 runtime codepaths are removed. The worker runs V2 only.
 - Queue stale lease recovery is handled in V2 worker loop.
 - Retry/backoff is handled on step failures for retryable error codes.
 - Admin timeline reads from `factory_step_runs` (V2 and legacy-shape compatibility docs).
+- Queue entries can include `required_tts_model` for synth-step capability routing.
 
 ## Cloud Backend
 

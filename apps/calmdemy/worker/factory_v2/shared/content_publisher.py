@@ -79,7 +79,7 @@ def publish_content(
             "difficulty_level": params.get("difficulty", "beginner"),
             "instructor": voice,
             "ttsVoiceId": voice_id,
-            "isFree": False,
+            "isFree": True,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
         }
@@ -94,7 +94,7 @@ def publish_content(
             "thumbnailUrl": thumbnail_url,
             "instructor": voice,
             "ttsVoiceId": voice_id,
-            "isFree": False,
+            "isFree": True,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
         }
@@ -110,8 +110,7 @@ def publish_content(
             "audio_url": storage_path,
             "thumbnail_url": thumbnail_url,
             "category": params.get("category", "nature"),
-            "is_premium": True,
-            "isFree": False,
+            "isFree": True,
             "generatedBy": "content-factory",
             "createdAt": fs.SERVER_TIMESTAMP,
         }

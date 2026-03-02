@@ -14,6 +14,14 @@ If a field is not listed below, it is not relied on by the app/worker and may be
 - User-owned collections use `user_id` (snake_case) and enforce per-user access in rules.
 - Content collections are read-only for clients; admin/worker writes happen server-side.
 
+**Premium Access Policy (Implemented March 1, 2026)**
+- Only `course_sessions` are premium-gated in app logic.
+- All non-course audio content is treated as free in repositories/UI.
+- `isFree` remains stored on content docs for compatibility, but for non-course collections it is normalized to free.
+- Legacy `bedtime_stories.is_premium` is removed by migration and no longer used by app code.
+- Migration script: `scripts/migrateCoursesOnlyPremium.js` (`npm run migrate:courses-only-premium`).
+- App policy helpers: `src/shared/utils/premiumPolicy.ts`.
+
 ## Collection Inventory
 
 | Collection | Access | Notes |
@@ -186,7 +194,6 @@ Stored as flat fields (not nested) and re-shaped in the repository.
 - `audio_file` (string, optional, local asset key)
 - `thumbnail_url` (string, optional)
 - `category` (string)
-- `is_premium` (boolean)
 - `isFree` (boolean, optional)
 - `created_at` (timestamp, optional)
 
@@ -269,6 +276,7 @@ Common fields:
 - `audioPath` (string)
 - `order` (number)
 - `isFree` (boolean, optional)
+  - Premium gate source of truth: when `isFree !== true`, session is locked for non-subscribers.
 
 ### `subjects`
 Document IDs are slugs (e.g. `cbt`, `act`).

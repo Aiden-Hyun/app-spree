@@ -1,68 +1,72 @@
-# Local Worker Venv Strategy (Multi-Stack)
+# Multi-Venv Worker Convention (Normative)
 
-## Why This Exists
-Some model stacks have **conflicting Python dependencies**. For example:
-- `diffusers` (Flux2) requires `huggingface_hub >= 0.34`.
-- `moshi` (Kyutai DMS) requires `huggingface_hub < 0.34`.
+This document is a required architecture convention for the content factory runtime.
 
-A single venv cannot satisfy both, so we run **multiple local worker processes**,
-**each with its own venv** and a specific role.
+## Why This Convention Exists
 
-## How Stacks Work
-Stacks are defined in `worker_stacks.json`. Each stack has:
-- `id`: Worker ID (used for `worker_status/<id>`)
-- `role`: `pre`, `tts`, or `full`
-- `venv`: Path to the venv for this stack
-- `ttsModels`: Allowlist for TTS models (only used for `role: tts`)
+Some model families require incompatible Python dependency trees. A known example:
 
-The companion (`local_companion.py`) starts all enabled stacks and passes these
-values via environment variables.
+- `diffusers`/Flux stack prefers newer `huggingface_hub`.
+- Kyutai DMS (`moshi` + `sphn`) requires a different range.
 
-## When to Create a New Venv
-Use an existing venv if:
-- The model dependencies are compatible with the current stack.
-- Adding the model does not require downgrading a shared dependency.
+Because of this, a single venv runtime is not a safe default.
 
-Create a new venv (new stack) if:
-- You hit `ResolutionImpossible` in pip.
-- The model requires a conflicting version of a shared library
-  (example: `huggingface_hub`, `torch`, `transformers`).
-- The model requires a different GPU/CUDA setup.
+## Hard Rules (Must Follow)
 
-## Adding a New TTS Model Stack
-1. Add the model adapter in `worker/models/` and register it in
-   `worker/models/registry.py`.
-2. Decide whether it fits an existing stack or needs its own venv.
-3. If it needs its own venv:
-   - Add a new requirements file (or extend `requirements.dms.txt`).
-   - Create the venv:
-     ```bash
-     cd apps/calmdemy/worker
-     python3 -m venv .venv-yourmodel
-     ./.venv-yourmodel/bin/pip install -r requirements.yourmodel.txt
-     ```
-4. Add a new stack entry to `worker_stacks.json`:
-   ```json
-   {"id": "local-tts-yourmodel", "role": "tts", "venv": ".venv-yourmodel", "ttsModels": ["yourmodel"], "enabled": true}
-   ```
-5. Restart the companion to pick it up.
+1. Do not collapse worker runtime to a single venv if incompatible model sets exist.
+2. Keep stack definitions in `worker_stacks.json` as the source of truth.
+3. Preserve capability-based routing:
+   - only compatible stacks claim synth steps for their `ttsModels`.
+   - exactly one enabled stack acts as dispatcher.
+4. Keep per-stack venv isolation (`venv` path per stack).
+5. During refactors, retain backward-compatible normalization for legacy stack manifests.
 
-## Conflict Troubleshooting
-### Pip ResolutionImpossible
-- Split the dependencies into separate venvs.
-- Pin versions explicitly in a dedicated requirements file.
-- Avoid installing both `diffusers` and `moshi` in the same venv.
+## Stack Manifest Contract
 
-### Missing Binaries
-- `ffmpeg`: install via `brew install ffmpeg` or set `FFMPEG_BIN`.
-- `piper`: install via `pip install piper-tts` in the base venv.
+`worker_stacks.json` entries use:
 
-### Model Loads But Errors at Runtime
-- Ensure the stack’s venv includes the model’s **exact** dependency range.
-- Confirm `WORKER_TTS_MODELS` includes the model ID.
-- Check stack logs: `worker/logs/local_worker_<id>.log`.
+- `id`: worker/stack identifier (used in status + logs)
+- `role`: operator label (`v2`, `tts`, etc.)
+- `venv`: venv path (relative to `worker/` or absolute)
+- `enabled`: stack participates in runtime
+- `dispatch`: this stack may dispatch `content_jobs` into V2 runs
+- `acceptNonTtsSteps`: stack can claim non-synth queue steps
+- `ttsModels`: allowed TTS model IDs for synth steps (supports `"*"`)
 
-## Recommended Defaults
-- **Base venv** (`.venv`): LLM + image + common TTS (`piper`, `styletts2`, Gemini TTS).
-- **DMS venv** (`.venv-dms`): Kyutai DMS only (`moshi`, `sphn`, `huggingface_hub < 0.34`).
+## Default Production Shape
 
+Two-stack default:
+
+1. `local-primary`
+   - `venv: .venv`
+   - `dispatch: true`
+   - `acceptNonTtsSteps: true`
+   - `ttsModels: [piper, styletts2, gemini-tts-flash, gemini-tts-pro]`
+2. `local-tts-dms`
+   - `venv: .venv-dms`
+   - `dispatch: false`
+   - `acceptNonTtsSteps: false`
+   - `ttsModels: [dms]`
+
+## When to Add a New Venv
+
+Create a new venv + stack if:
+
+- pip resolver conflicts (`ResolutionImpossible`)
+- model requires conflicting core libs (`torch`, `transformers`, `huggingface_hub`)
+- model requires a distinct native/system dependency surface
+
+## Refactor Checklist (Required)
+
+Any content-factory runtime refactor must include:
+
+1. Dependency conflict review across all registered models.
+2. Confirmation that `worker_stacks.json` + capability routing still function.
+3. Validation that synth steps route to compatible stack/venv.
+4. Smoke run for at least one model from each isolated venv.
+
+## Operations
+
+- Restart companion after stack config changes.
+- Validate stack health in admin (`worker_stacks_status` + per-stack logs).
+- If a model has no capable enabled stack, runtime should fail fast with clear error.

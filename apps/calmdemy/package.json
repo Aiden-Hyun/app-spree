@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "check:legacy-freeze": "node scripts/checkLegacyFreeze.js"
+    "check:legacy-freeze": "node scripts/checkLegacyFreeze.js",
+    "migrate:courses-only-premium": "node scripts/migrateCoursesOnlyPremium.js"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",
