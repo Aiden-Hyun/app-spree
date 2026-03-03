@@ -311,6 +311,90 @@ def _build_course_preview_sessions(
     return sessions
 
 
+def _content_job_id(job: dict) -> str:
+    request = job.get("request") or {}
+    compat = request.get("compat") or {}
+    return str(compat.get("content_job_id") or "").strip()
+
+
+def _count_audio_results(audio_results: dict[str, dict[str, Any]]) -> int:
+    count = 0
+    for payload in audio_results.values():
+        if isinstance(payload, dict) and payload.get("storagePath"):
+            count += 1
+    return count
+
+
+def _persist_course_audio_checkpoint(
+    ctx: StepContext,
+    audio_results: dict[str, dict[str, Any]],
+) -> None:
+    """
+    Persist per-session audio progress so retries can resume from the next session.
+    """
+    job_id = str(ctx.job.get("id") or "").strip()
+    if not job_id:
+        return
+
+    completed = _count_audio_results(audio_results)
+    progress = f"Audio {completed}/{len(SESSION_DEFS)}"
+
+    factory_ref = ctx.db.collection("factory_jobs").document(job_id)
+    try:
+        factory_ref.update(
+            {
+                "runtime.course_audio_results": audio_results,
+                "summary.currentStep": "synthesize_course_audio",
+                "summary.courseAudioCount": completed,
+                "updated_at": fs.SERVER_TIMESTAMP,
+            }
+        )
+    except Exception:
+        factory_ref.set(
+            {
+                "runtime": {"course_audio_results": audio_results},
+                "summary": {
+                    "currentStep": "synthesize_course_audio",
+                    "courseAudioCount": completed,
+                },
+                "updated_at": fs.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+
+    content_job_id = _content_job_id(ctx.job)
+    if not content_job_id:
+        return
+
+    content_ref = ctx.db.collection(config.JOBS_COLLECTION).document(content_job_id)
+    transaction = ctx.db.transaction()
+
+    @fs.transactional
+    def _tx_patch(tx) -> None:
+        snapshot = content_ref.get(transaction=tx)
+        if not snapshot.exists:
+            return
+        data = snapshot.to_dict() or {}
+        active_run_id = str(data.get("v2RunId") or "").strip()
+        if active_run_id and active_run_id != ctx.run_id:
+            return
+        tx.set(
+            content_ref,
+            {
+                "status": "tts_converting",
+                "courseAudioResults": audio_results,
+                "courseProgress": progress,
+                "jobRunId": ctx.run_id,
+                "lastRunStatus": "running",
+                "runEndedAt": None,
+                "updatedAt": fs.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+
+    _tx_patch(transaction)
+
+
 def _publish_course(
     db,
     publish_token: str,
@@ -595,6 +679,7 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
             "storagePath": storage_path,
             "durationSec": duration_sec,
         }
+        _persist_course_audio_checkpoint(ctx, audio_results)
 
         logger.info(
             "Course audio synthesized",

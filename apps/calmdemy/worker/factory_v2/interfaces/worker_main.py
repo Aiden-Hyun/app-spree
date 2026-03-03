@@ -70,9 +70,7 @@ class WorkerMain:
     def _is_retryable(error_code: str) -> bool:
         return error_code in {
             "timeout",
-            "connection_error",
             "firestore_error",
-            "storage_upload_failed",
             "llm_error",
             "tts_error",
             "image_error",
@@ -227,6 +225,101 @@ class WorkerMain:
                 str(payload.get("shard_key") or "root"),
             )
 
+            try:
+                claimed_job = self.job_repo.get(job_id)
+            except Exception as lookup_exc:
+                lookup_error = f"{type(lookup_exc).__name__}: {lookup_exc}"
+                self.step_run_repo.mark_failed(
+                    step_run_id,
+                    "job_lookup_failed",
+                    lookup_error,
+                )
+                self.queue_repo.mark_failed(
+                    queue_id,
+                    "job_lookup_failed",
+                    lookup_error,
+                )
+                self.event_repo.emit(
+                    "step_failed",
+                    job_id,
+                    run_id,
+                    {
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "step_name": step_name,
+                        "error_code": "job_lookup_failed",
+                        "attempt": attempt,
+                    },
+                )
+                logger.exception(
+                    "V2 failed to load job for claimed queue item",
+                    extra={
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "job_id": job_id,
+                        "run_id": run_id,
+                        "step_name": step_name,
+                        "worker_id": self.worker_id,
+                        "error": lookup_error,
+                    },
+                )
+                continue
+            active_run_id = str(claimed_job.get("current_run_id") or "").strip()
+            if active_run_id and active_run_id != run_id:
+                superseded_error = (
+                    f"Run '{run_id}' superseded by active run '{active_run_id}'"
+                )
+                self.step_run_repo.mark_failed(
+                    step_run_id,
+                    "superseded_run",
+                    superseded_error,
+                )
+                self.queue_repo.mark_failed(
+                    queue_id,
+                    "superseded_run",
+                    superseded_error,
+                )
+                self.event_repo.emit(
+                    "step_superseded",
+                    job_id,
+                    run_id,
+                    {
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "step_name": step_name,
+                        "active_run_id": active_run_id,
+                        "worker_id": self.worker_id,
+                    },
+                )
+                logger.info(
+                    "V2 skipped superseded step",
+                    extra={
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "job_id": job_id,
+                        "run_id": run_id,
+                        "active_run_id": active_run_id,
+                        "step_name": step_name,
+                        "worker_id": self.worker_id,
+                    },
+                )
+                continue
+
+            request = claimed_job.get("request") or {}
+            compat = request.get("compat") or {}
+            content_job_id = compat.get("content_job_id")
+            running_status = self._compat_failed_stage(step_name)
+            self.job_repo.patch_compat_content_job_for_run(
+                content_job_id,
+                run_id,
+                {
+                    "status": running_status,
+                    "jobRunId": run_id,
+                    "lastRunStatus": "running",
+                    "runEndedAt": None,
+                },
+            )
+
             self.queue_repo.mark_running(queue_id, self.worker_id)
             self.step_run_repo.mark_running(step_run_id, queue_id, self.worker_id, attempt=attempt)
             self.event_repo.emit(
@@ -257,7 +350,7 @@ class WorkerMain:
 
             job: dict | None = None
             try:
-                job = self.job_repo.get(job_id)
+                job = claimed_job
                 executor = get_executor(step_name)
                 ctx = StepContext(
                     db=self.db,
@@ -284,10 +377,11 @@ class WorkerMain:
                 self.job_repo.patch_runtime(job_id, result.runtime_patch)
                 self.job_repo.patch_summary(job_id, result.summary_patch)
 
-                request = job.get("request") or {}
-                compat = request.get("compat") or {}
-                content_job_id = compat.get("content_job_id")
-                self.job_repo.patch_compat_content_job(content_job_id, result.compat_content_job_patch)
+                self.job_repo.patch_compat_content_job_for_run(
+                    content_job_id,
+                    run_id,
+                    result.compat_content_job_patch,
+                )
 
                 self.orchestrator.on_step_success(job_id, run_id, step_name)
 
@@ -357,11 +451,9 @@ class WorkerMain:
                     },
                 )
 
-                request = (job or {}).get("request") or {}
-                compat = request.get("compat") or {}
-                content_job_id = compat.get("content_job_id")
-                self.job_repo.patch_compat_content_job(
+                self.job_repo.patch_compat_content_job_for_run(
                     content_job_id,
+                    run_id,
                     {
                         "status": "failed",
                         "error": error_msg,

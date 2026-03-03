@@ -82,6 +82,8 @@ def upload_audio(mp3_path: str, job_data: dict) -> tuple[str, float]:
     blob.upload_from_filename(
         mp3_path,
         content_type="audio/mpeg",
+        retry=None,
+        timeout=60,
     )
     blob.cache_control = "public, max-age=31536000"
     blob.patch()

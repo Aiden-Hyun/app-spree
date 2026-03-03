@@ -187,6 +187,8 @@ class FirestoreQueueRepo:
             {
                 "state": "running",
                 "lease_owner": worker_id,
+                "error_code": None,
+                "error_message": None,
                 "updated_at": fs.SERVER_TIMESTAMP,
             }
         )

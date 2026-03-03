@@ -103,6 +103,39 @@ class FirestoreJobRepo:
         payload["updatedAt"] = fs.SERVER_TIMESTAMP
         self.db.collection("content_jobs").document(content_job_id).set(payload, merge=True)
 
+    def patch_compat_content_job_for_run(
+        self,
+        content_job_id: str,
+        run_id: str,
+        patch: dict,
+    ) -> bool:
+        """
+        Patch content_jobs only when this run is still active.
+
+        Returns True when patch was applied, False when skipped as superseded.
+        """
+        if not content_job_id or not patch:
+            return False
+
+        transaction = self.db.transaction()
+        doc_ref = self.db.collection("content_jobs").document(content_job_id)
+        payload = dict(patch)
+        payload["updatedAt"] = fs.SERVER_TIMESTAMP
+
+        @fs.transactional
+        def _tx_apply(tx) -> bool:
+            snap = doc_ref.get(transaction=tx)
+            if not snap.exists:
+                return False
+            data = snap.to_dict() or {}
+            active_run_id = str(data.get("v2RunId") or "").strip()
+            if active_run_id and active_run_id != run_id:
+                return False
+            tx.set(doc_ref, payload, merge=True)
+            return True
+
+        return bool(_tx_apply(transaction))
+
 
 class FirestoreRunRepo:
     def __init__(self, db):
@@ -214,6 +247,11 @@ class FirestoreStepRunRepo:
                 "queue_id": queue_id,
                 "worker_id": worker_id,
                 "attempt": attempt,
+                "error_code": None,
+                "error_message": None,
+                "next_attempt": None,
+                "retry_delay_seconds": None,
+                "ended_at": None,
                 "started_at": fs.SERVER_TIMESTAMP,
                 "updated_at": fs.SERVER_TIMESTAMP,
             },
