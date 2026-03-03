@@ -81,7 +81,7 @@ export function SleepScreen() {
                       fallbackIcon={getCategoryIcon(seriesItem.category)}
                       fallbackColor={seriesItem.color}
                       meta={`${seriesItem.chapterCount} chapters`}
-                      isPremium={true}
+                      isFree={true}
                       onPress={() => handleSeriesPress(seriesItem)}
                       darkMode
                     />
@@ -120,7 +120,7 @@ export function SleepScreen() {
                       fallbackIcon={getCategoryIcon(story.category)}
                       fallbackColor={theme.colors.sleepAccent}
                       meta={`${story.duration_minutes} min`}
-                      isPremium={!story.isFree}
+                      isFree={story.isFree}
                       onPress={() => handleStoryPress(story)}
                       darkMode
                     />
@@ -159,7 +159,7 @@ export function SleepScreen() {
                       fallbackIcon={meditation.icon as keyof typeof Ionicons.glyphMap}
                       fallbackColor={meditation.color}
                       meta={`${meditation.duration_minutes} min`}
-                      isPremium={!meditation.isFree}
+                      isFree={meditation.isFree}
                       onPress={() => handleMeditationPress(meditation)}
                       darkMode
                     />

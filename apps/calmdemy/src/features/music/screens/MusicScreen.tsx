@@ -74,7 +74,7 @@ export function MusicScreen() {
               fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
               fallbackColor={sound.color}
               meta={sound.duration_minutes ? `${sound.duration_minutes} min` : undefined}
-              isPremium={!sound.isFree}
+              isFree={sound.isFree}
               onPress={() => handleSoundPress(sound)}
             />
           </AnimatedView>
@@ -123,7 +123,7 @@ export function MusicScreen() {
               thumbnailUrl={sound.thumbnailUrl}
               fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
               fallbackColor={sound.color}
-              isPremium={!sound.isFree}
+              isFree={sound.isFree}
               onPress={() => handleSoundPress(sound)}
             />
           </AnimatedView>
@@ -179,7 +179,7 @@ export function MusicScreen() {
                   fallbackIcon={getCategoryIcon(album.category)}
                   fallbackColor={album.color}
                   meta={`${album.trackCount} tracks`}
-                  isPremium={true}
+                  isFree={true}
                       onPress={() => handleAlbumPress(album)}
                 />
                   </AnimatedView>

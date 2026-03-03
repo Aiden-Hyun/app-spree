@@ -1,5 +1,15 @@
 # Migration Log
 
+## 2026-03-03
+
+- Fixed false premium lock badges on audio cards:
+  - `src/features/sleep/screens/SleepScreen.tsx` series cards no longer force `isPremium={true}`.
+  - `src/features/music/screens/MusicScreen.tsx` album cards no longer force `isPremium={true}`.
+- Card lock icon rule is now enforced consistently via `ContentCard`:
+  - `ContentCard` now accepts `isFree` (schema-aligned) instead of `isPremium`.
+  - lock badge shows only when `isFree === false` and user is not subscribed.
+  - under the courses-only premium policy, non-course audio cards must pass `isFree={true}` or derive from `item.isFree`.
+
 ## 2026-02-04
 
 - Started legacy-aware freeze and migration plan documentation.
