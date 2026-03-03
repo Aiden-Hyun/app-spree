@@ -62,6 +62,7 @@ export function useMusicViewModel() {
   return {
     theme,
     isDark,
+    hasSubscription,
     sleepSounds,
     whiteNoise,
     music,

@@ -14,6 +14,7 @@ import { useSleepViewModel } from "@features/sleep/hooks/useSleepViewModel";
 export function SleepScreen() {
   const {
     theme,
+    hasSubscription,
     bedtimeStories,
     sleepMeditations,
     series,
@@ -60,7 +61,10 @@ export function SleepScreen() {
             <View style={styles.section}>
               <AnimatedView delay={100} duration={400}>
                 <View style={styles.sectionHeaderNoLink}>
-                  <Text style={styles.sectionTitle}>Series</Text>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.sectionTitle}>Series</Text>
+                    {!hasSubscription && <Text style={styles.freeBadge}>Free</Text>}
+                  </View>
                   <Text style={styles.sectionSubtitle}>
                     Multi-chapter story collections
                   </Text>
@@ -94,7 +98,10 @@ export function SleepScreen() {
             <View style={styles.section}>
               <AnimatedView delay={200} duration={400}>
                 <AnimatedPressable onPress={navigateToBedtimeStories} style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Bedtime Stories</Text>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.sectionTitle}>Bedtime Stories</Text>
+                    {!hasSubscription && <Text style={styles.freeBadge}>Free</Text>}
+                  </View>
                   <View style={styles.seeAllContainer}>
                     <Text style={styles.seeAllText}>See all</Text>
                     <Ionicons
@@ -133,7 +140,10 @@ export function SleepScreen() {
             <View style={styles.section}>
               <AnimatedView delay={300} duration={400}>
                 <AnimatedPressable onPress={navigateToSleepMeditations} style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Sleep Meditations</Text>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.sectionTitle}>Sleep Meditations</Text>
+                    {!hasSubscription && <Text style={styles.freeBadge}>Free</Text>}
+                  </View>
                   <View style={styles.seeAllContainer}>
                     <Text style={styles.seeAllText}>See all</Text>
                     <Ionicons
@@ -233,10 +243,24 @@ const createStyles = (theme: Theme) =>
     sectionHeaderNoLink: {
       marginBottom: theme.spacing.md,
     },
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
     sectionTitle: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
       color: theme.colors.sleepText,
+    },
+    freeBadge: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 11,
+      color: theme.colors.sleepAccent,
+      backgroundColor: "rgba(201, 184, 150, 0.16)",
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.full,
     },
     sectionSubtitle: {
       fontFamily: theme.fonts.ui.regular,

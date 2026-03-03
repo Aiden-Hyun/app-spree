@@ -9,6 +9,11 @@
   - `ContentCard` now accepts `isFree` (schema-aligned) instead of `isPremium`.
   - lock badge shows only when `isFree === false` and user is not subscribed.
   - under the courses-only premium policy, non-course audio cards must pass `isFree={true}` or derive from `item.isFree`.
+- Added section-level `Free` labels (non-subscribers only) on free sections:
+  - Sleep: `Series`, `Bedtime Stories`, `Sleep Meditations`.
+  - Meditate: `Guided Meditation`, `Browse by Techniques`, `Browse by Theme`.
+  - Music: `Albums`, `White Noise`, `Nature Sounds`, `Music`, `ASMR`.
+  - Premium lock icons on cards are unchanged.
 
 ## 2026-02-04
 

@@ -18,6 +18,7 @@ export function MusicScreen() {
   const {
     theme,
     isDark,
+    hasSubscription,
     sleepSounds,
     whiteNoise,
     music,
@@ -42,7 +43,10 @@ export function MusicScreen() {
     <View style={styles.section}>
       <AnimatedView delay={baseDelay} duration={400}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {!hasSubscription && <Text style={styles.freeBadge}>Free</Text>}
+          </View>
           <AnimatedPressable
             onPress={() => navigateToRoute(route)}
             style={styles.seeAllButton}
@@ -92,7 +96,10 @@ export function MusicScreen() {
     <View style={styles.section}>
       <AnimatedView delay={baseDelay} duration={400}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {!hasSubscription && <Text style={styles.freeBadge}>Free</Text>}
+          </View>
           <AnimatedPressable
             onPress={() => navigateToRoute(route)}
             style={styles.seeAllButton}
@@ -157,7 +164,10 @@ export function MusicScreen() {
             <View style={styles.section}>
               <AnimatedView delay={100} duration={400}>
                 <View style={styles.sectionHeaderNoLink}>
-                  <Text style={styles.sectionTitle}>Albums</Text>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.sectionTitle}>Albums</Text>
+                    {!hasSubscription && <Text style={styles.freeBadge}>Free</Text>}
+                  </View>
                   <Text style={styles.sectionSubtitle}>Curated music collections</Text>
                 </View>
               </AnimatedView>
@@ -261,6 +271,20 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 18,
       color: theme.colors.text,
+    },
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    freeBadge: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 11,
+      color: theme.colors.primary,
+      backgroundColor: isDark ? theme.colors.gray[200] : `${theme.colors.primary}18`,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: theme.borderRadius.full,
     },
     sectionHeaderNoLink: {
       paddingHorizontal: theme.spacing.lg,
