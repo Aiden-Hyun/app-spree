@@ -94,7 +94,7 @@ export function useJobDetail(jobId: string) {
 
 // ==================== STEP TIMELINE HOOK ====================
 
-export function useJobStepTimeline(jobId: string) {
+export function useJobStepTimeline(jobId: string, runId?: string) {
   const [timeline, setTimeline] = useState<JobStepTimelineEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -109,10 +109,10 @@ export function useJobStepTimeline(jobId: string) {
     const unsubscribe = subscribeToJobStepTimeline(jobId, (entries) => {
       setTimeline(entries);
       setIsLoading(false);
-    });
+    }, runId);
 
     return unsubscribe;
-  }, [jobId]);
+  }, [jobId, runId]);
 
   return { timeline, isLoading };
 }

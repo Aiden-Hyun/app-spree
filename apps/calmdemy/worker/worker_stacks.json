@@ -9,7 +9,25 @@
     "ttsModels": ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"]
   },
   {
-    "id": "local-tts-dms",
+    "id": "local-tts-dms-1",
+    "role": "tts",
+    "venv": ".venv-dms",
+    "enabled": true,
+    "dispatch": false,
+    "acceptNonTtsSteps": false,
+    "ttsModels": ["dms"]
+  },
+  {
+    "id": "local-tts-dms-2",
+    "role": "tts",
+    "venv": ".venv-dms",
+    "enabled": true,
+    "dispatch": false,
+    "acceptNonTtsSteps": false,
+    "ttsModels": ["dms"]
+  },
+  {
+    "id": "local-tts-dms-3",
     "role": "tts",
     "venv": ".venv-dms",
     "enabled": true,

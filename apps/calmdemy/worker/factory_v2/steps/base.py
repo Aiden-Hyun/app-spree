@@ -11,6 +11,8 @@ class StepContext:
     run_id: str
     step_name: str
     worker_id: str
+    shard_key: str = "root"
+    step_input: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

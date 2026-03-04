@@ -208,6 +208,9 @@ export interface JobStepTimelineEntry {
   jobId: string;
   runId?: string;
   stepName: string;
+  shardKey?: string;
+  workerId?: string;
+  queueId?: string;
   state: string;
   eventType?: string;
   attempt?: number;
@@ -215,6 +218,9 @@ export interface JobStepTimelineEntry {
   retryDelaySec?: number;
   errorCode?: string;
   errorMessage?: string;
+  startedAt?: Timestamp;
+  endedAt?: Timestamp;
+  updatedAt?: Timestamp;
   timestamp?: Timestamp;
 }
 

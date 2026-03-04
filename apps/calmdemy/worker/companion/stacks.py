@@ -67,9 +67,23 @@ def _clear_pid(stack_id: str) -> None:
 def _pid_is_running(pid: int) -> bool:
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    try:
+        # On macOS/Linux, zombie processes still pass kill(pid, 0).
+        # Treat Z-state as not running so companion can respawn workers.
+        result = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(pid)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        status = (result.stdout or "").strip().upper()
+        if not status:
+            return False
+        return not status.startswith("Z")
+    except Exception:
+        return True
 
 
 def is_worker_running(stack_id: str) -> bool:

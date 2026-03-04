@@ -14,7 +14,10 @@ export default function JobDetailScreen() {
   const { theme } = useTheme();
   const styles = createStyles(theme);
   const { job, isLoading, retry, cancel, requestDelete } = useJobDetail(id);
-  const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(id || '');
+  const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
+    id || '',
+    job?.v2RunId
+  );
 
   const handleRetry = () => retry();
   const handleCancel = () => cancel();

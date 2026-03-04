@@ -64,12 +64,18 @@ function toV2TimelineEntry(id: string, data: Record<string, any>): JobStepTimeli
     jobId: String(data.job_id || ''),
     runId: data.run_id ? String(data.run_id) : undefined,
     stepName: String(data.step_name || 'unknown'),
+    shardKey: data.shard_key ? String(data.shard_key) : undefined,
+    workerId: data.worker_id ? String(data.worker_id) : undefined,
+    queueId: data.queue_id ? String(data.queue_id) : undefined,
     state: String(data.state || 'unknown'),
     attempt: parseNumber(data.attempt),
     nextAttempt: parseNumber(data.next_attempt),
     retryDelaySec: parseNumber(data.retry_delay_seconds),
     errorCode: data.error_code ? String(data.error_code) : undefined,
     errorMessage: data.error_message ? String(data.error_message) : undefined,
+    startedAt: asTimestamp(data.started_at),
+    endedAt: asTimestamp(data.ended_at),
+    updatedAt: asTimestamp(data.updated_at),
     timestamp:
       asTimestamp(data.ended_at) ||
       asTimestamp(data.updated_at) ||
@@ -225,7 +231,8 @@ export function subscribeToJob(
 
 export function subscribeToJobStepTimeline(
   jobId: string,
-  callback: (entries: JobStepTimelineEntry[]) => void
+  callback: (entries: JobStepTimelineEntry[]) => void,
+  runId?: string
 ): Unsubscribe {
   if (!jobId) {
     callback([]);
@@ -251,7 +258,10 @@ export function subscribeToJobStepTimeline(
 
   const emit = () => {
     const map = new Map<string, JobStepTimelineEntry>();
-    v2Entries.forEach((entry) => {
+    const filteredEntries = runId
+      ? v2Entries.filter((entry) => entry.runId === runId)
+      : v2Entries;
+    filteredEntries.forEach((entry) => {
       map.set(entry.id, entry);
     });
 

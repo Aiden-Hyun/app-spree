@@ -35,18 +35,31 @@ Because of this, a single venv runtime is not a safe default.
 
 ## Default Production Shape
 
-Two-stack default:
+Four-stack default:
 
 1. `local-primary`
    - `venv: .venv`
    - `dispatch: true`
    - `acceptNonTtsSteps: true`
    - `ttsModels: [piper, styletts2, gemini-tts-flash, gemini-tts-pro]`
-2. `local-tts-dms`
+2. `local-tts-dms-1`
    - `venv: .venv-dms`
    - `dispatch: false`
    - `acceptNonTtsSteps: false`
    - `ttsModels: [dms]`
+3. `local-tts-dms-2`
+   - `venv: .venv-dms`
+   - `dispatch: false`
+   - `acceptNonTtsSteps: false`
+   - `ttsModels: [dms]`
+4. `local-tts-dms-3`
+   - `venv: .venv-dms`
+   - `dispatch: false`
+   - `acceptNonTtsSteps: false`
+   - `ttsModels: [dms]`
+
+This profile supports up to 3 concurrent DMS synth queue items (for example, course session shards)
+while preserving one dispatcher/non-TTS executor.
 
 ## When to Add a New Venv
 
@@ -70,3 +83,4 @@ Any content-factory runtime refactor must include:
 - Restart companion after stack config changes.
 - Validate stack health in admin (`worker_stacks_status` + per-stack logs).
 - If a model has no capable enabled stack, runtime should fail fast with clear error.
+- Increase DMS stack count only when host CPU/RAM and model memory footprint can sustain parallel inference.

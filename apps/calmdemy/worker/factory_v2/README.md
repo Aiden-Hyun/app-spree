@@ -26,9 +26,14 @@ Content Factory now runs on a V2-only workflow engine.
 2. `generate_course_thumbnail`
 3. `generate_course_scripts`
 4. `format_course_scripts`
-5. `synthesize_course_audio`
+5. `synthesize_course_audio` (sharded fan-out: `INT`, `M1L`, `M1P`, `M2L`, `M2P`, `M3L`, `M3P`, `M4L`, `M4P`)
 6. `upload_course_audio`
 7. `publish_course`
+
+`synthesize_course_audio` runs as one queue item per session shard.
+`upload_course_audio` is fan-in gated and is queued only after all expected shards are complete.
+Completed shard outputs are checkpointed immediately to `runtime.course_audio_results` and projected to
+`content_jobs.courseAudioResults`, so retries only enqueue missing shards.
 
 ## Running locally
 
@@ -38,6 +43,7 @@ Content Factory now runs on a V2-only workflow engine.
 
 Companion starts one or more `local_worker.py` processes based on `worker/worker_stacks.json`.
 Capability routing ensures synth steps are claimed only by stacks whose `ttsModels` allowlist matches.
+The default local profile uses 4 stacks: 1 primary dispatcher/non-TTS stack and 3 DMS TTS stacks.
 
 ## Runtime flags
 

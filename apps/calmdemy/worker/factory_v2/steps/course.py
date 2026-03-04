@@ -328,31 +328,42 @@ def _count_audio_results(audio_results: dict[str, dict[str, Any]]) -> int:
 def _persist_course_audio_checkpoint(
     ctx: StepContext,
     audio_results: dict[str, dict[str, Any]],
-) -> None:
+) -> dict[str, dict[str, Any]]:
     """
     Persist per-session audio progress so retries can resume from the next session.
     """
     job_id = str(ctx.job.get("id") or "").strip()
     if not job_id:
-        return
-
-    completed = _count_audio_results(audio_results)
-    progress = f"Audio {completed}/{len(SESSION_DEFS)}"
+        return dict(audio_results)
 
     factory_ref = ctx.db.collection("factory_jobs").document(job_id)
-    try:
-        factory_ref.update(
+    factory_tx = ctx.db.transaction()
+    merged_audio_results: dict[str, dict[str, Any]] = dict(audio_results)
+    completed = _count_audio_results(merged_audio_results)
+    progress = f"Audio {completed}/{len(SESSION_DEFS)}"
+
+    @fs.transactional
+    def _tx_patch_factory(tx) -> None:
+        nonlocal merged_audio_results, completed, progress
+        snapshot = factory_ref.get(transaction=tx)
+        if not snapshot.exists:
+            return
+        data = snapshot.to_dict() or {}
+        active_run_id = str(data.get("current_run_id") or "").strip()
+        if active_run_id and active_run_id != ctx.run_id:
+            return
+
+        runtime = dict(data.get("runtime") or {})
+        existing_audio_results = dict(runtime.get("course_audio_results") or {})
+        existing_audio_results.update(audio_results)
+        merged_audio_results = existing_audio_results
+        completed = _count_audio_results(merged_audio_results)
+        progress = f"Audio {completed}/{len(SESSION_DEFS)}"
+
+        tx.set(
+            factory_ref,
             {
-                "runtime.course_audio_results": audio_results,
-                "summary.currentStep": "synthesize_course_audio",
-                "summary.courseAudioCount": completed,
-                "updated_at": fs.SERVER_TIMESTAMP,
-            }
-        )
-    except Exception:
-        factory_ref.set(
-            {
-                "runtime": {"course_audio_results": audio_results},
+                "runtime": {"course_audio_results": merged_audio_results},
                 "summary": {
                     "currentStep": "synthesize_course_audio",
                     "courseAudioCount": completed,
@@ -362,15 +373,18 @@ def _persist_course_audio_checkpoint(
             merge=True,
         )
 
+    _tx_patch_factory(factory_tx)
+
     content_job_id = _content_job_id(ctx.job)
     if not content_job_id:
-        return
+        return merged_audio_results
 
     content_ref = ctx.db.collection(config.JOBS_COLLECTION).document(content_job_id)
     transaction = ctx.db.transaction()
 
     @fs.transactional
     def _tx_patch(tx) -> None:
+        nonlocal merged_audio_results, completed, progress
         snapshot = content_ref.get(transaction=tx)
         if not snapshot.exists:
             return
@@ -378,11 +392,18 @@ def _persist_course_audio_checkpoint(
         active_run_id = str(data.get("v2RunId") or "").strip()
         if active_run_id and active_run_id != ctx.run_id:
             return
+
+        existing_audio_results = dict(data.get("courseAudioResults") or {})
+        existing_audio_results.update(merged_audio_results)
+        merged_audio_results = existing_audio_results
+        completed = _count_audio_results(merged_audio_results)
+        progress = f"Audio {completed}/{len(SESSION_DEFS)}"
+
         tx.set(
             content_ref,
             {
                 "status": "tts_converting",
-                "courseAudioResults": audio_results,
+                "courseAudioResults": merged_audio_results,
                 "courseProgress": progress,
                 "jobRunId": ctx.run_id,
                 "lastRunStatus": "running",
@@ -393,6 +414,55 @@ def _persist_course_audio_checkpoint(
         )
 
     _tx_patch(transaction)
+    return merged_audio_results
+
+
+def _session_def_by_shard(shard_key: str) -> dict[str, Any] | None:
+    shard = str(shard_key or "").strip().upper()
+    for session_def in SESSION_DEFS:
+        if session_def["suffix"] == shard:
+            return session_def
+    return None
+
+
+def _synthesize_course_session_audio(
+    *,
+    ctx: StepContext,
+    job_data: dict[str, Any],
+    formatted_scripts: dict[str, str],
+    audio_results: dict[str, dict[str, Any]],
+    course_code: str,
+    session_def: dict[str, Any],
+) -> str:
+    from factory_v2.shared.audio_processor import post_process_audio
+    from factory_v2.shared.storage_uploader import upload_audio
+    from factory_v2.shared.tts_converter import convert_to_audio
+
+    session_code = f"{course_code}{session_def['suffix']}"
+    script = formatted_scripts.get(session_code)
+    if not script:
+        raise ValueError(f"Missing formatted script for {session_code}")
+
+    wav_path = convert_to_audio(script, job_data)
+    mp3_path = post_process_audio(wav_path)
+
+    session_job_data = {
+        **job_data,
+        "contentType": "course_session",
+        "params": {
+            **(job_data.get("params") or {}),
+            "topic": f"{course_code} {session_def['label']}",
+        },
+    }
+    storage_path, duration_sec = upload_audio(mp3_path, session_job_data)
+    audio_results[session_code] = {
+        "storagePath": storage_path,
+        "durationSec": duration_sec,
+    }
+    merged_audio_results = _persist_course_audio_checkpoint(ctx, audio_results)
+    audio_results.clear()
+    audio_results.update(merged_audio_results)
+    return session_code
 
 
 def _publish_course(
@@ -640,10 +710,6 @@ def execute_format_course_scripts(ctx: StepContext) -> StepResult:
 
 
 def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
-    from factory_v2.shared.audio_processor import post_process_audio
-    from factory_v2.shared.storage_uploader import upload_audio
-    from factory_v2.shared.tts_converter import convert_to_audio
-
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -654,52 +720,63 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
 
     audio_results: dict[str, dict[str, Any]] = dict(runtime.get("course_audio_results") or job_data.get("courseAudioResults") or {})
 
+    requested_shard = str(ctx.shard_key or "root").strip().upper()
+    if requested_shard and requested_shard != "ROOT":
+        session_def = _session_def_by_shard(requested_shard)
+        if session_def is None:
+            raise ValueError(f"Unknown course synth shard '{requested_shard}'")
+
+        session_code = f"{course_code}{session_def['suffix']}"
+        if not audio_results.get(session_code, {}).get("storagePath"):
+            session_code = _synthesize_course_session_audio(
+                ctx=ctx,
+                job_data=job_data,
+                formatted_scripts=formatted_scripts,
+                audio_results=audio_results,
+                course_code=course_code,
+                session_def=session_def,
+            )
+            logger.info(
+                "Course audio synthesized",
+                extra={
+                    "job_id": ctx.job.get("id"),
+                    "session_code": session_code,
+                    "shard_key": requested_shard,
+                },
+            )
+        completed = _count_audio_results(audio_results)
+        return StepResult(
+            output={"audio_count": completed, "session_code": session_code, "shard_key": requested_shard},
+            summary_patch={"currentStep": "synthesize_course_audio"},
+        )
+
+    # Backward-compatibility fallback for old in-flight root queue items.
     for index, session_def in enumerate(SESSION_DEFS):
         session_code = f"{course_code}{session_def['suffix']}"
         if audio_results.get(session_code, {}).get("storagePath"):
             continue
-
-        script = formatted_scripts.get(session_code)
-        if not script:
-            raise ValueError(f"Missing formatted script for {session_code}")
-
-        wav_path = convert_to_audio(script, job_data)
-        mp3_path = post_process_audio(wav_path)
-
-        session_job_data = {
-            **job_data,
-            "contentType": "course_session",
-            "params": {
-                **(job_data.get("params") or {}),
-                "topic": f"{course_code} {session_def['label']}",
-            },
-        }
-        storage_path, duration_sec = upload_audio(mp3_path, session_job_data)
-        audio_results[session_code] = {
-            "storagePath": storage_path,
-            "durationSec": duration_sec,
-        }
-        _persist_course_audio_checkpoint(ctx, audio_results)
-
+        session_code = _synthesize_course_session_audio(
+            ctx=ctx,
+            job_data=job_data,
+            formatted_scripts=formatted_scripts,
+            audio_results=audio_results,
+            course_code=course_code,
+            session_def=session_def,
+        )
         logger.info(
             "Course audio synthesized",
             extra={
                 "job_id": ctx.job.get("id"),
                 "session_code": session_code,
                 "index": index,
+                "shard_key": "root",
             },
         )
 
+    completed = _count_audio_results(audio_results)
     return StepResult(
-        output={"audio_count": len(audio_results)},
-        runtime_patch={"course_audio_results": audio_results},
+        output={"audio_count": completed},
         summary_patch={"currentStep": "synthesize_course_audio"},
-        compat_content_job_patch={
-            "status": "tts_converting",
-            "courseAudioResults": audio_results,
-            "courseProgress": f"Audio {len(audio_results)}/{len(SESSION_DEFS)}",
-            "jobRunId": ctx.run_id,
-        },
     )
 
 

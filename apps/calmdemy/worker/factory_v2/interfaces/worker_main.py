@@ -217,12 +217,15 @@ class WorkerMain:
             job_id = str(payload.get("job_id"))
             run_id = str(payload.get("run_id"))
             step_name = str(payload.get("step_name"))
+            shard_key = str(payload.get("shard_key") or "root")
+            raw_step_input = payload.get("step_input")
+            step_input = dict(raw_step_input) if isinstance(raw_step_input, dict) else {}
             retry_count = int(payload.get("retry_count") or 0)
             attempt = retry_count + 1
             step_run_id = payload.get("step_run_id") or self.step_run_repo.make_step_run_id(
                 run_id,
                 step_name,
-                str(payload.get("shard_key") or "root"),
+                shard_key,
             )
 
             try:
@@ -304,6 +307,46 @@ class WorkerMain:
                     },
                 )
                 continue
+            run_state_before_step = self.run_repo.run_state(run_id)
+            if run_state_before_step != "running":
+                superseded_error = (
+                    f"Run '{run_id}' is not running (state={run_state_before_step or 'missing'})"
+                )
+                self.step_run_repo.mark_failed(
+                    step_run_id,
+                    "superseded_run",
+                    superseded_error,
+                )
+                self.queue_repo.mark_failed(
+                    queue_id,
+                    "superseded_run",
+                    superseded_error,
+                )
+                self.event_repo.emit(
+                    "step_superseded",
+                    job_id,
+                    run_id,
+                    {
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "step_name": step_name,
+                        "run_state": run_state_before_step,
+                        "worker_id": self.worker_id,
+                    },
+                )
+                logger.info(
+                    "V2 skipped step for non-running run",
+                    extra={
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "job_id": job_id,
+                        "run_id": run_id,
+                        "step_name": step_name,
+                        "run_state": run_state_before_step,
+                        "worker_id": self.worker_id,
+                    },
+                )
+                continue
 
             request = claimed_job.get("request") or {}
             compat = request.get("compat") or {}
@@ -358,8 +401,52 @@ class WorkerMain:
                     run_id=run_id,
                     step_name=step_name,
                     worker_id=self.worker_id,
+                    shard_key=shard_key,
+                    step_input=step_input,
                 )
                 result = executor(ctx)
+
+                run_state_after_step = self.run_repo.run_state(run_id)
+                if run_state_after_step != "running":
+                    superseded_error = (
+                        f"Run '{run_id}' changed state to '{run_state_after_step or 'missing'}' "
+                        "before success projection."
+                    )
+                    self.step_run_repo.mark_failed(
+                        step_run_id,
+                        "superseded_run",
+                        superseded_error,
+                    )
+                    self.queue_repo.mark_failed(
+                        queue_id,
+                        "superseded_run",
+                        superseded_error,
+                    )
+                    self.event_repo.emit(
+                        "step_superseded",
+                        job_id,
+                        run_id,
+                        {
+                            "queue_id": queue_id,
+                            "step_run_id": step_run_id,
+                            "step_name": step_name,
+                            "run_state": run_state_after_step,
+                            "worker_id": self.worker_id,
+                        },
+                    )
+                    logger.info(
+                        "V2 skipped success projection for non-running run",
+                        extra={
+                            "queue_id": queue_id,
+                            "step_run_id": step_run_id,
+                            "job_id": job_id,
+                            "run_id": run_id,
+                            "step_name": step_name,
+                            "run_state": run_state_after_step,
+                            "worker_id": self.worker_id,
+                        },
+                    )
+                    continue
 
                 self.step_run_repo.mark_succeeded(step_run_id, result.output)
                 self.queue_repo.mark_done(queue_id)
@@ -383,7 +470,7 @@ class WorkerMain:
                     result.compat_content_job_patch,
                 )
 
-                self.orchestrator.on_step_success(job_id, run_id, step_name)
+                self.orchestrator.on_step_success(job_id, run_id, step_name, shard_key=shard_key)
 
             except Exception as exc:
                 error_msg = f"{type(exc).__name__}: {exc}"

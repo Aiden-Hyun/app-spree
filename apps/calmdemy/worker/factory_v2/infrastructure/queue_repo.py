@@ -21,6 +21,7 @@ class FirestoreQueueRepo:
         step_name: str,
         step_run_id: str,
         shard_key: str = "root",
+        step_input: dict | None = None,
         available_at: datetime | None = None,
         required_tts_model: str | None = None,
     ) -> str:
@@ -32,6 +33,7 @@ class FirestoreQueueRepo:
             "step_name": step_name,
             "step_run_id": step_run_id,
             "shard_key": shard_key,
+            "step_input": dict(step_input or {}),
             "state": "ready",
             "available_at": available_at or datetime.now(timezone.utc),
             "retry_count": 0,
@@ -238,3 +240,56 @@ class FirestoreQueueRepo:
                 "updated_at": fs.SERVER_TIMESTAMP,
             }
         )
+
+    def cancel_ready_for_run(
+        self,
+        run_id: str,
+        step_name: str | None = None,
+        error_code: str = "run_failed",
+        error_message: str = "Run failed; pending work cancelled.",
+    ) -> int:
+        """
+        Cancel queued work for a run that should no longer continue.
+
+        Only READY/LEASED items are cancelled; RUNNING items are handled by run-state guards.
+        """
+        query = self.db.collection("factory_step_queue").where("run_id", "==", run_id)
+        if step_name:
+            query = query.where("step_name", "==", step_name)
+        docs = list(query.stream())
+
+        cancelled = 0
+        for doc in docs:
+            tx = self.db.transaction()
+
+            @fs.transactional
+            def _cancel(transaction):
+                snap = doc.reference.get(transaction=transaction)
+                if not snap.exists:
+                    return False
+                data = snap.to_dict() or {}
+                state = str(data.get("state") or "")
+                if state not in {"ready", "leased"}:
+                    return False
+                if str(data.get("run_id") or "") != run_id:
+                    return False
+                if step_name and str(data.get("step_name") or "") != step_name:
+                    return False
+
+                transaction.update(
+                    doc.reference,
+                    {
+                        "state": "failed",
+                        "error_code": error_code,
+                        "error_message": error_message,
+                        "lease_owner": None,
+                        "lease_expires_at": None,
+                        "updated_at": fs.SERVER_TIMESTAMP,
+                    },
+                )
+                return True
+
+            if _cancel(tx):
+                cancelled += 1
+
+        return cancelled

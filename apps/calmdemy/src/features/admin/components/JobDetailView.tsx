@@ -12,6 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { PipelineStepper } from './PipelineStepper';
 import { CollapsibleSection, SummaryItem } from './CollapsibleSection';
+import { CoursePipelineMap } from './progress/CoursePipelineMap';
+import { WorkerSwimlanes } from './progress/WorkerSwimlanes';
+import {
+  CourseProgressModel,
+  deriveCourseProgressModel,
+} from './progress/courseProgressModel';
 import {
   BACKEND_LABELS,
   CONTENT_TYPE_LABELS,
@@ -71,12 +77,20 @@ export function JobDetailView({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [errorManuallyCollapsed, setErrorManuallyCollapsed] = useState(false);
   const [selectedCourseScript, setSelectedCourseScript] = useState<string>('');
+  const [pipelineTab, setPipelineTab] = useState<'pipeline' | 'workers'>('pipeline');
 
   const courseScripts = job.courseFormattedScripts || job.courseRawScripts || {};
   const courseScriptKeys = Object.keys(courseScripts).sort(
     (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
   );
   const activeCourseScript = selectedCourseScript || courseScriptKeys[0] || '';
+  const courseProgressModel = useMemo(
+    () =>
+      job.contentType === 'course'
+        ? deriveCourseProgressModel(job, timeline, job.v2RunId)
+        : null,
+    [job, timeline]
+  );
 
   useEffect(() => {
     const initial: Record<string, boolean> = {};
@@ -98,6 +112,10 @@ export function JobDetailView({
     }
   }, [job.id, job.error, job.courseFormattedScripts, job.courseRawScripts, job.contentType]);
 
+  useEffect(() => {
+    setPipelineTab('pipeline');
+  }, [job.id]);
+
   const createdDate = job.createdAt?.toDate
     ? job.createdAt.toDate().toLocaleString()
     : 'Unknown';
@@ -113,6 +131,9 @@ export function JobDetailView({
     activeCourseScript,
     courseScripts,
     setSelectedCourseScript,
+    courseProgressModel,
+    pipelineTab,
+    setPipelineTab,
   });
 
   const visibleSections = sections.filter((section) => section.shouldRender);
@@ -275,6 +296,9 @@ function buildSections(params: {
   activeCourseScript: string;
   courseScripts: Record<string, string>;
   setSelectedCourseScript: (code: string) => void;
+  courseProgressModel: CourseProgressModel | null;
+  pipelineTab: 'pipeline' | 'workers';
+  setPipelineTab: (tab: 'pipeline' | 'workers') => void;
 }) {
   const {
     job,
@@ -287,7 +311,23 @@ function buildSections(params: {
     activeCourseScript,
     courseScripts,
     setSelectedCourseScript,
+    courseProgressModel,
+    pipelineTab,
+    setPipelineTab,
   } = params;
+
+  const hasCourseConcurrencyData = Boolean(
+    courseProgressModel &&
+      courseProgressModel.runEntries.length > 0
+  );
+  const showCourseConcurrency =
+    job.contentType === 'course' &&
+    !isTimelineLoading &&
+    hasCourseConcurrencyData;
+  const showCourseFallbackNotice =
+    job.contentType === 'course' &&
+    !isTimelineLoading &&
+    !showCourseConcurrency;
 
   const sections = [
     {
@@ -295,9 +335,70 @@ function buildSections(params: {
       title: 'Pipeline Progress',
       summaryItems: toSummaryItems([
         { label: 'Current', value: JOB_STATUS_LABELS[job.status] },
+        {
+          label: 'Run',
+          value: showCourseConcurrency
+            ? truncate(courseProgressModel?.selectedRunId || '', 12)
+            : undefined,
+        },
       ]),
       shouldRender: true,
-      content: <PipelineStepper currentStatus={job.status} />,
+      content: (
+        <View style={styles.pipelinePanel}>
+          {showCourseConcurrency && courseProgressModel ? (
+            <>
+              <View style={styles.pipelineTabsRow}>
+                <Pressable
+                  onPress={() => setPipelineTab('pipeline')}
+                  style={[
+                    styles.pipelineTab,
+                    pipelineTab === 'pipeline' && styles.pipelineTabActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.pipelineTabText,
+                      pipelineTab === 'pipeline' && styles.pipelineTabTextActive,
+                    ]}
+                  >
+                    Pipeline
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setPipelineTab('workers')}
+                  style={[
+                    styles.pipelineTab,
+                    pipelineTab === 'workers' && styles.pipelineTabActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.pipelineTabText,
+                      pipelineTab === 'workers' && styles.pipelineTabTextActive,
+                    ]}
+                  >
+                    Workers
+                  </Text>
+                </Pressable>
+              </View>
+              {pipelineTab === 'pipeline' ? (
+                <CoursePipelineMap model={courseProgressModel} />
+              ) : (
+                <WorkerSwimlanes model={courseProgressModel} />
+              )}
+            </>
+          ) : (
+            <>
+              {showCourseFallbackNotice && (
+                <Text style={styles.pipelineFallbackNotice}>
+                  Detailed timeline unavailable or not yet populated; showing compatibility progress.
+                </Text>
+              )}
+              <PipelineStepper currentStatus={job.status} />
+            </>
+          )}
+        </View>
+      ),
     },
     {
       id: 'stepTimeline',
@@ -340,6 +441,11 @@ function buildSections(params: {
                   {entry.runId && (
                     <Text style={styles.timelineMetaText}>
                       Run {truncate(entry.runId, 10)}
+                    </Text>
+                  )}
+                  {entry.shardKey && entry.shardKey !== 'root' && (
+                    <Text style={styles.timelineMetaText}>
+                      Session {entry.shardKey}
                     </Text>
                   )}
                   {typeof entry.attempt === 'number' && (
@@ -954,6 +1060,41 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.gray[200],
+    },
+    pipelinePanel: {
+      gap: 10,
+    },
+    pipelineTabsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 2,
+    },
+    pipelineTab: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      backgroundColor: theme.colors.gray[50],
+    },
+    pipelineTabActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    pipelineTabText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.text,
+    },
+    pipelineTabTextActive: {
+      color: '#fff',
+    },
+    pipelineFallbackNotice: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.warning,
+      lineHeight: 18,
     },
     scrollBox: {
       maxHeight: 320,

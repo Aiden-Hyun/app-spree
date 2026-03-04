@@ -58,9 +58,16 @@ V1 runtime codepaths are removed. The worker runs V2 only.
 2. `generate_course_thumbnail`
 3. `generate_course_scripts`
 4. `format_course_scripts`
-5. `synthesize_course_audio`
+5. `synthesize_course_audio` (9 session shards: `INT`, `M1L`, `M1P`, `M2L`, `M2P`, `M3L`, `M3P`, `M4L`, `M4P`)
 6. `upload_course_audio`
 7. `publish_course`
+
+Course audio is fan-out/fan-in:
+
+- Fan-out: enqueue one synth shard per missing session.
+- Fan-in: enqueue `upload_course_audio` only after all session shards are complete.
+- Checkpointing: each successful shard immediately updates `runtime.course_audio_results` and
+  `content_jobs.courseAudioResults` for resume-on-retry behavior.
 
 ## Operational Notes
 
@@ -69,6 +76,8 @@ V1 runtime codepaths are removed. The worker runs V2 only.
 - Retry/backoff is handled on step failures for retryable error codes.
 - Admin timeline reads from `factory_step_runs` (V2 and legacy-shape compatibility docs).
 - Queue entries can include `required_tts_model` for synth-step capability routing.
+- Default stack profile is one dispatcher/non-TTS stack plus three DMS TTS stacks for
+  parallel course synth execution.
 
 ## Cloud Backend
 

@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from .scheduler import workflow_for_job_type
 
+COURSE_AUDIO_SHARDS = ("INT", "M1L", "M1P", "M2L", "M2P", "M3L", "M3P", "M4L", "M4P")
+
 
 class Orchestrator:
     """Coordinates run creation and downstream step enqueueing."""
@@ -26,6 +28,43 @@ class Orchestrator:
             return self._content_job_tts_model(job)
         return None
 
+    @staticmethod
+    def _completed_course_audio_shards(job: dict) -> set[str]:
+        runtime = dict(job.get("runtime") or {})
+        audio_results = dict(runtime.get("course_audio_results") or {})
+        completed: set[str] = set()
+        for session_code, payload in audio_results.items():
+            if not isinstance(payload, dict) or not payload.get("storagePath"):
+                continue
+            key = str(session_code).strip()
+            if not key:
+                continue
+            for shard in COURSE_AUDIO_SHARDS:
+                if key.endswith(shard):
+                    completed.add(shard)
+                    break
+        return completed
+
+    def _ensure_step_enqueued(
+        self,
+        job: dict,
+        job_id: str,
+        run_id: str,
+        step_name: str,
+        shard_key: str = "root",
+        step_input: dict | None = None,
+    ) -> None:
+        step_run_id = self.step_run_repo.ensure_ready(job_id, run_id, step_name, shard_key=shard_key)
+        self.queue_repo.enqueue(
+            job_id=job_id,
+            run_id=run_id,
+            step_name=step_name,
+            step_run_id=step_run_id,
+            shard_key=shard_key,
+            step_input=step_input,
+            required_tts_model=self._required_tts_model_for_step(job, step_name),
+        )
+
     def start_new_run(
         self,
         job_id: str,
@@ -47,19 +86,64 @@ class Orchestrator:
 
         workflow = workflow_for_job_type(job["job_type"])
         first = first_step or workflow.steps[0]
-        step_run_id = self.step_run_repo.ensure_ready(job_id, run_id, first)
-        self.queue_repo.enqueue(
-            job_id=job_id,
-            run_id=run_id,
-            step_name=first,
-            step_run_id=step_run_id,
-            required_tts_model=self._required_tts_model_for_step(job, first),
-        )
+        self._ensure_step_enqueued(job, job_id, run_id, first)
         return run_id
 
-    def on_step_success(self, job_id: str, run_id: str, step_name: str) -> None:
+    def _fan_out_course_audio(self, job: dict, job_id: str, run_id: str) -> None:
+        completed_shards = self._completed_course_audio_shards(job)
+        missing_shards = [shard for shard in COURSE_AUDIO_SHARDS if shard not in completed_shards]
+
+        if not missing_shards:
+            self._ensure_step_enqueued(job, job_id, run_id, "upload_course_audio")
+            return
+
+        for shard in missing_shards:
+            self._ensure_step_enqueued(
+                job,
+                job_id,
+                run_id,
+                "synthesize_course_audio",
+                shard_key=shard,
+                step_input={"session_code": shard},
+            )
+
+    def _maybe_fan_in_course_audio(self, job: dict, job_id: str, run_id: str) -> bool:
+        runtime_shards = self._completed_course_audio_shards(job)
+        succeeded_shards = self.step_run_repo.succeeded_shard_keys(
+            job_id,
+            run_id,
+            "synthesize_course_audio",
+        )
+        failed_shards = self.step_run_repo.failed_shard_keys(
+            job_id,
+            run_id,
+            "synthesize_course_audio",
+        )
+        if failed_shards:
+            return False
+        completed = runtime_shards | succeeded_shards
+        if all(shard in completed for shard in COURSE_AUDIO_SHARDS):
+            self._ensure_step_enqueued(job, job_id, run_id, "upload_course_audio")
+            return True
+        return False
+
+    def on_step_success(
+        self,
+        job_id: str,
+        run_id: str,
+        step_name: str,
+        shard_key: str = "root",
+    ) -> None:
         job = self.job_repo.get(job_id)
         workflow = workflow_for_job_type(job["job_type"])
+
+        if job["job_type"] == "course":
+            if step_name == "format_course_scripts":
+                self._fan_out_course_audio(job, job_id, run_id)
+                return
+            if step_name == "synthesize_course_audio":
+                self._maybe_fan_in_course_audio(job, job_id, run_id)
+                return
 
         next_steps = workflow.next_steps(step_name)
         is_terminal = step_name == workflow.terminal_step or not next_steps
@@ -75,15 +159,13 @@ class Orchestrator:
                 for prereq in prerequisites
             ):
                 continue
-            step_run_id = self.step_run_repo.ensure_ready(job_id, run_id, next_step)
-            self.queue_repo.enqueue(
-                job_id=job_id,
-                run_id=run_id,
-                step_name=next_step,
-                step_run_id=step_run_id,
-                required_tts_model=self._required_tts_model_for_step(job, next_step),
-            )
+            self._ensure_step_enqueued(job, job_id, run_id, next_step)
 
     def on_step_failed(self, job_id: str, run_id: str, step_name: str, error_code: str) -> None:
         self.job_repo.mark_failed(job_id, run_id, step_name, error_code)
         self.run_repo.mark_failed(run_id, step_name, error_code)
+        self.queue_repo.cancel_ready_for_run(
+            run_id,
+            error_code="run_failed",
+            error_message=f"Run failed at step '{step_name}' ({error_code}). Pending work cancelled.",
+        )

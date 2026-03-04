@@ -195,6 +195,14 @@ class FirestoreRunRepo:
             merge=True,
         )
 
+    def run_state(self, run_id: str) -> str | None:
+        snap = self.db.collection("factory_job_runs").document(run_id).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        state = str(data.get("state") or "").strip()
+        return state or None
+
 
 class FirestoreStepRunRepo:
     def __init__(self, db):
@@ -233,6 +241,34 @@ class FirestoreStepRunRepo:
             .limit(1)
         )
         return any(query.stream())
+
+    def _shard_keys_by_state(
+        self,
+        job_id: str,
+        run_id: str,
+        step_name: str,
+        state: str,
+    ) -> set[str]:
+        query = (
+            self.db.collection("factory_step_runs")
+            .where("job_id", "==", job_id)
+            .where("run_id", "==", run_id)
+            .where("step_name", "==", step_name)
+            .where("state", "==", state)
+        )
+        shard_keys: set[str] = set()
+        for doc in query.stream():
+            data = doc.to_dict() or {}
+            shard_key = str(data.get("shard_key") or "root").strip()
+            if shard_key:
+                shard_keys.add(shard_key)
+        return shard_keys
+
+    def succeeded_shard_keys(self, job_id: str, run_id: str, step_name: str) -> set[str]:
+        return self._shard_keys_by_state(job_id, run_id, step_name, "succeeded")
+
+    def failed_shard_keys(self, job_id: str, run_id: str, step_name: str) -> set[str]:
+        return self._shard_keys_by_state(job_id, run_id, step_name, "failed")
 
     def mark_running(
         self,
