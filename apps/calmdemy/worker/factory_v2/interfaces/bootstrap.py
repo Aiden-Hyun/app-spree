@@ -28,6 +28,7 @@ def _extract_runtime(content_job: dict) -> dict:
         "course_formatted_scripts": content_job.get("courseFormattedScripts"),
         "course_audio_results": content_job.get("courseAudioResults"),
         "course_preview_sessions": content_job.get("coursePreviewSessions"),
+        "course_regeneration": content_job.get("courseRegeneration"),
         "course_id": content_job.get("courseId"),
         "course_session_ids": content_job.get("courseSessionIds"),
     }
@@ -53,6 +54,15 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
 
     trigger = "bootstrap"
     first_step = "generate_course_plan" if is_course else None
+    if status == "pending" and is_course:
+        regeneration = content_job.get("courseRegeneration") or {}
+        if isinstance(regeneration, dict) and regeneration.get("active"):
+            mode = str(regeneration.get("mode") or "audio_only").strip().lower()
+            first_step = (
+                "generate_course_scripts"
+                if mode == "script_and_audio"
+                else "format_course_scripts"
+            )
     if status == "publishing":
         trigger = "manual_publish"
         first_step = "publish_course" if is_course else "publish_content"

@@ -9,6 +9,7 @@ import {
   retryJob,
   cancelJob,
   requestDeleteJob,
+  regenerateCourseSessions,
   subscribeToJobStepTimeline,
   setWorkerDesiredState,
   setWorkerIdleTimeout,
@@ -25,6 +26,7 @@ import {
   FactoryMetrics,
   WorkerLogTail,
   JobStepTimelineEntry,
+  CourseRegenerationMode,
 } from '../types';
 import { getDrafts, deleteDraft as removeDraft } from '../data/draftRepository';
 import {
@@ -89,7 +91,19 @@ export function useJobDetail(jobId: string) {
     await requestDeleteJob(jobId);
   }, [jobId]);
 
-  return { job, isLoading, retry, cancel, requestDelete };
+  const regenerateCourse = useCallback(
+    async (input: {
+      mode: CourseRegenerationMode;
+      targetSessionCodes: string[];
+      formattedScriptEdits?: Record<string, string>;
+    }) => {
+      if (!jobId || !job) return;
+      await regenerateCourseSessions(job, input);
+    },
+    [job, jobId]
+  );
+
+  return { job, isLoading, retry, cancel, requestDelete, regenerateCourse };
 }
 
 // ==================== STEP TIMELINE HOOK ====================

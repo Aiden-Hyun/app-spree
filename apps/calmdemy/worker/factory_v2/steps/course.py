@@ -800,6 +800,16 @@ def execute_upload_course_audio(ctx: StepContext) -> StepResult:
     )
 
 
+def _course_regeneration(runtime: dict[str, Any], job_data: dict[str, Any]) -> dict[str, Any]:
+    regeneration = runtime.get("course_regeneration")
+    if isinstance(regeneration, dict):
+        return dict(regeneration)
+    payload = job_data.get("courseRegeneration")
+    if isinstance(payload, dict):
+        return dict(payload)
+    return {}
+
+
 def execute_publish_course(ctx: StepContext) -> StepResult:
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
@@ -816,19 +826,28 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
     request_status = str(job_data.get("status") or "").strip().lower()
     auto_publish = bool(job_data.get("autoPublish", True))
     manual_publish = request_status == "publishing"
+    regeneration = _course_regeneration(runtime, job_data)
+    regeneration_active = bool(regeneration.get("active"))
+    requires_publish_approval = bool(regeneration.get("requiresPublishApproval"))
     should_publish = auto_publish or manual_publish
+    if regeneration_active and requires_publish_approval and not manual_publish:
+        should_publish = False
 
     if not should_publish:
         preview_sessions = _build_course_preview_sessions(course_code, plan, audio_results)
         return StepResult(
             output={"awaiting_approval": True, "preview_count": len(preview_sessions)},
-            runtime_patch={"course_preview_sessions": preview_sessions},
+            runtime_patch={
+                "course_preview_sessions": preview_sessions,
+                "course_regeneration": regeneration if regeneration_active else None,
+            },
             summary_patch={"currentStep": "publish_course", "awaitingApproval": True},
             compat_content_job_patch={
                 "status": "completed",
                 "coursePreviewSessions": preview_sessions,
                 "courseProgress": "Completed (awaiting approval)",
                 "jobRunId": ctx.run_id,
+                "courseRegeneration": regeneration if regeneration_active else None,
             },
         )
 
@@ -836,7 +855,10 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
 
     existing_course_id = runtime.get("course_id") or job_data.get("courseId")
     existing_session_ids = runtime.get("course_session_ids") or job_data.get("courseSessionIds")
-    if existing_course_id and existing_session_ids:
+    if existing_course_id and (regeneration_active or manual_publish):
+        publish_token = str(existing_course_id)
+
+    if existing_course_id and existing_session_ids and not regeneration_active and not manual_publish:
         return StepResult(
             output={"course_id": existing_course_id, "session_count": len(existing_session_ids)},
             summary_patch={"currentStep": "publish_course", "courseId": existing_course_id},
@@ -849,6 +871,20 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
             },
         )
 
+    replaced_old_paths: list[str] = []
+    if regeneration_active:
+        previous_audio_by_session = regeneration.get("previousAudioBySession") or {}
+        if isinstance(previous_audio_by_session, dict):
+            for session_code, old_path in previous_audio_by_session.items():
+                old_storage_path = str(old_path or "").strip()
+                if not old_storage_path:
+                    continue
+                next_storage_path = str(
+                    (audio_results.get(str(session_code)) or {}).get("storagePath") or ""
+                ).strip()
+                if next_storage_path and next_storage_path != old_storage_path:
+                    replaced_old_paths.append(old_storage_path)
+
     course_id, session_ids = _publish_course(
         ctx.db,
         publish_token=publish_token,
@@ -860,9 +896,18 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
         },
     )
 
+    if replaced_old_paths:
+        from factory_v2.shared.storage_cleanup import delete_storage_paths
+
+        delete_storage_paths(replaced_old_paths, allowed_prefixes=("audio/",))
+
     return StepResult(
         output={"course_id": course_id, "session_count": len(session_ids)},
-        runtime_patch={"course_id": course_id, "course_session_ids": session_ids},
+        runtime_patch={
+            "course_id": course_id,
+            "course_session_ids": session_ids,
+            "course_regeneration": None,
+        },
         summary_patch={"currentStep": "publish_course", "courseId": course_id},
         compat_content_job_patch={
             "status": "completed",
@@ -870,5 +915,6 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
             "courseSessionIds": session_ids,
             "courseProgress": "Published",
             "jobRunId": ctx.run_id,
+            "courseRegeneration": None,
         },
     )

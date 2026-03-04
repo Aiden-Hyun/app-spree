@@ -18,6 +18,7 @@ import {
 import { db, getCurrentUserId } from '../../../firebase';
 import {
   ContentJob,
+  CourseRegenerationMode,
   CreateJobInput,
   JobStatus,
   WorkerControl,
@@ -42,6 +43,7 @@ const jobsCollection = collection(db, 'content_jobs');
 const usersCollection = collection(db, 'users');
 const workerControlCollection = collection(db, 'worker_control');
 const stepRunsCollection = collection(db, 'factory_step_runs');
+const COURSE_SHARD_SUFFIXES = ['INT', 'M1L', 'M1P', 'M2L', 'M2P', 'M3L', 'M3P', 'M4L', 'M4P'];
 
 function parseNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -455,6 +457,110 @@ export async function retryJob(jobId: string): Promise<void> {
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
   });
+}
+
+export interface RegenerateCourseSessionsInput {
+  mode: CourseRegenerationMode;
+  targetSessionCodes: string[];
+  formattedScriptEdits?: Record<string, string>;
+}
+
+function validateCourseSessionCodes(codes: string[]): string[] {
+  const result: string[] = [];
+  for (const rawCode of codes) {
+    const code = String(rawCode || '').trim();
+    if (!code) continue;
+    const upper = code.toUpperCase();
+    if (!COURSE_SHARD_SUFFIXES.some((suffix) => upper.endsWith(suffix))) continue;
+    if (!result.includes(code)) result.push(code);
+  }
+  return result;
+}
+
+export async function regenerateCourseSessions(
+  job: ContentJob,
+  input: RegenerateCourseSessionsInput
+): Promise<void> {
+  if (job.contentType !== 'course') {
+    throw new Error('Session regeneration is only supported for course jobs.');
+  }
+  if (job.status !== 'completed') {
+    throw new Error('Session regeneration is only available for completed jobs.');
+  }
+
+  const mode = input.mode;
+  const targetSessionCodes = validateCourseSessionCodes(input.targetSessionCodes || []);
+  if (targetSessionCodes.length === 0) {
+    throw new Error('Select at least one session to regenerate.');
+  }
+
+  const nextAudioResults: Record<string, { storagePath: string; durationSec: number }> = {
+    ...(job.courseAudioResults || {}),
+  };
+  const nextRawScripts: Record<string, string> = { ...(job.courseRawScripts || {}) };
+  const nextFormattedScripts: Record<string, string> = { ...(job.courseFormattedScripts || {}) };
+  const edits = input.formattedScriptEdits || {};
+  const previousAudioBySession: Record<string, string> = {};
+
+  for (const sessionCode of targetSessionCodes) {
+    const oldAudioPath = String(nextAudioResults[sessionCode]?.storagePath || '').trim();
+    if (oldAudioPath) {
+      previousAudioBySession[sessionCode] = oldAudioPath;
+    }
+    delete nextAudioResults[sessionCode];
+
+    if (mode === 'script_and_audio') {
+      delete nextRawScripts[sessionCode];
+      delete nextFormattedScripts[sessionCode];
+      continue;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(edits, sessionCode)) {
+      const edited = String(edits[sessionCode] || '').trim();
+      if (!edited) {
+        throw new Error(`Script cannot be empty for ${sessionCode}.`);
+      }
+      nextFormattedScripts[sessionCode] = edited;
+    }
+
+    const formatted = String(nextFormattedScripts[sessionCode] || '').trim();
+    if (!formatted) {
+      throw new Error(`Missing formatted script for ${sessionCode}.`);
+    }
+  }
+
+  const userId = getCurrentUserId();
+  const requiresPublishApproval = Boolean(job.courseId);
+  const payload: Record<string, any> = {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
+    courseAudioResults: nextAudioResults,
+    courseFormattedScripts: nextFormattedScripts,
+    courseRegeneration: {
+      active: true,
+      mode,
+      targetSessionCodes,
+      requiresPublishApproval,
+      previousAudioBySession,
+      requestedBy: userId || null,
+      requestedAt: serverTimestamp(),
+    },
+    updatedAt: serverTimestamp(),
+  };
+  if (mode === 'script_and_audio') {
+    payload.courseRawScripts = nextRawScripts;
+  }
+
+  await updateDoc(doc(jobsCollection, job.id), payload);
 }
 
 // ==================== CANCEL JOB ====================

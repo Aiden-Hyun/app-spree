@@ -78,6 +78,20 @@ export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   course: 'Full Course (9 audio)',
 };
 
+// ==================== COURSE REGENERATION ====================
+
+export type CourseRegenerationMode = 'audio_only' | 'script_and_audio';
+
+export interface CourseRegenerationRequest {
+  active: boolean;
+  mode: CourseRegenerationMode;
+  targetSessionCodes: string[];
+  requiresPublishApproval: boolean;
+  previousAudioBySession?: Record<string, string>;
+  requestedBy?: string;
+  requestedAt?: Timestamp;
+}
+
 // ==================== JOB PARAMS ====================
 
 export interface ContentJobParams {
@@ -174,6 +188,7 @@ export interface ContentJob {
     audioPath: string;
     durationSec: number;
   }>;
+  courseRegeneration?: CourseRegenerationRequest;
   courseSessionIds?: string[];     // published session doc IDs
   courseId?: string;               // published course doc ID
 

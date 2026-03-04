@@ -13,7 +13,7 @@ export default function JobDetailScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = createStyles(theme);
-  const { job, isLoading, retry, cancel, requestDelete } = useJobDetail(id);
+  const { job, isLoading, retry, cancel, requestDelete, regenerateCourse } = useJobDetail(id);
   const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
     id || '',
     job?.v2RunId
@@ -23,9 +23,16 @@ export default function JobDetailScreen() {
   const handleCancel = () => cancel();
   const handlePublish = async () => {
     if (!job) return;
+    const isPublishingRegeneratedSessions =
+      job.contentType === 'course' &&
+      job.status === 'completed' &&
+      Boolean(job.courseRegeneration?.active && job.courseRegeneration.requiresPublishApproval);
+
     Alert.alert(
-      'Publish Content',
-      'This will make the content visible to users. Continue?',
+      isPublishingRegeneratedSessions ? 'Publish Regenerated Sessions' : 'Publish Content',
+      isPublishingRegeneratedSessions
+        ? 'This will replace the selected live course sessions with regenerated audio. Continue?'
+        : 'This will make the content visible to users. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -60,12 +67,20 @@ export default function JobDetailScreen() {
     );
   }
 
+  const isCourseRegenAwaitingPublish =
+    job.contentType === 'course' &&
+    job.status === 'completed' &&
+    Boolean(job.courseRegeneration?.active && job.courseRegeneration.requiresPublishApproval);
   const isAwaitingApproval =
-    job.status === 'completed' && !job.autoPublish && !job.publishedContentId;
+    isCourseRegenAwaitingPublish ||
+    (job.status === 'completed' && !job.autoPublish && !job.publishedContentId);
   const isReviewable =
-    job.status === 'completed' && !job.autoPublish;
+    job.status === 'completed' && (!job.autoPublish || isCourseRegenAwaitingPublish);
   const isDeletable =
     job.status === 'failed' || (job.status === 'completed' && !job.autoPublish);
+  const publishButtonLabel = isCourseRegenAwaitingPublish
+    ? 'Publish Regenerated Sessions'
+    : 'Publish Now';
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -84,6 +99,8 @@ export default function JobDetailScreen() {
         onRetry={handleRetry}
         onCancel={handleCancel}
         onPublish={handlePublish}
+        publishButtonLabel={publishButtonLabel}
+        onRegenerateCourse={regenerateCourse}
         onDelete={handleDelete}
         onReview={handleReview}
       />
