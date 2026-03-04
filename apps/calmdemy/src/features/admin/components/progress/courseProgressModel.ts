@@ -137,6 +137,24 @@ function normalizeShardKey(value?: string): CourseShardKey | undefined {
   return key as CourseShardKey;
 }
 
+function completedShardsFromContentJob(job: ContentJob): Set<CourseShardKey> {
+  const completed = new Set<CourseShardKey>();
+  const results = job.courseAudioResults || {};
+  for (const [sessionCode, payload] of Object.entries(results)) {
+    if (!payload || typeof payload !== 'object') continue;
+    const storagePath = String((payload as { storagePath?: unknown }).storagePath || '').trim();
+    if (!storagePath) continue;
+    const normalized = String(sessionCode || '').trim().toUpperCase();
+    for (const shard of COURSE_SHARD_KEYS) {
+      if (normalized.endsWith(shard)) {
+        completed.add(shard);
+        break;
+      }
+    }
+  }
+  return completed;
+}
+
 function pickNewestEntry(entries: JobStepTimelineEntry[]): JobStepTimelineEntry | undefined {
   if (entries.length === 0) return undefined;
   return [...entries].sort((a, b) => timestampMs(b) - timestampMs(a))[0];
@@ -340,6 +358,17 @@ export function deriveCourseProgressModel(
     };
   });
 
+  const checkpointCompletedShards = completedShardsFromContentJob(job);
+  checkpointCompletedShards.forEach((shardKey) => {
+    const current = audioShards[shardKey];
+    if (current.state !== 'waiting') return;
+    audioShards[shardKey] = {
+      ...current,
+      state: 'succeeded',
+      workerId: 'checkpoint',
+    };
+  });
+
   const audioSummary: Record<ProgressState, number> = {
     waiting: 0,
     queued: 0,
@@ -366,7 +395,7 @@ export function deriveCourseProgressModel(
       'synthesize_course_audio',
       rootSynthEntries
     );
-  } else if (latestShardEntries.size > 0) {
+  } else if (latestShardEntries.size > 0 || checkpointCompletedShards.size > 0) {
     const shardStates = COURSE_SHARD_KEYS.map((shardKey) => audioShards[shardKey].state);
     const synthState = mergeState(shardStates);
     const representative = pickNewestEntry(
