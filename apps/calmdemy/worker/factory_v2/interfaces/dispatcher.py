@@ -72,7 +72,7 @@ def _claim_for_v2(db, doc_ref, worker_id: str, stack_defs: list[dict]) -> Option
                     },
                 )
                 return None
-            required_tts_model = str(data.get("ttsModel") or "").strip().lower() or "piper"
+            required_tts_model = str(data.get("ttsModel") or "").strip().lower() or "dms"
             if not any_enabled_stack_supports_tts_model(stack_defs, required_tts_model):
                 message = (
                     f"No enabled worker stack supports ttsModel '{required_tts_model}'. "

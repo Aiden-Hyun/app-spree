@@ -6,7 +6,7 @@
     "enabled": true,
     "dispatch": true,
     "acceptNonTtsSteps": true,
-    "ttsModels": ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"]
+    "ttsModels": ["gemini-tts-flash", "gemini-tts-pro"]
   },
   {
     "id": "local-tts-dms-1",

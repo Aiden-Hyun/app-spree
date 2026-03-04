@@ -62,9 +62,7 @@ LLM_FACTORIES.update({
 # ==================== TTS REGISTRY ====================
 
 TTS_FACTORIES: dict[str, Callable[[], TTSBase]] = {
-    "piper": lambda: _factory(".tts_piper", "PiperAdapter"),
     "dms": lambda: _factory(".tts_dms", "DMSTTSAdapter"),
-    "styletts2": lambda: _factory(".tts_styletts2", "StyleTTS2Adapter"),
     "gemini-tts-flash": _gemini_tts_flash_factory,
     "gemini-tts-pro": _gemini_tts_pro_factory,
 }
@@ -72,11 +70,7 @@ TTS_FACTORIES: dict[str, Callable[[], TTSBase]] = {
 # Keep backward-compatible dict names
 LLM_MODELS: dict[str, Callable[[], LLMBase]] = {}
 
-TTS_MODELS: dict[str, Callable[[], TTSBase]] = {
-    "piper": TTS_FACTORIES["piper"],
-    "dms": TTS_FACTORIES["dms"],
-    "styletts2": TTS_FACTORIES["styletts2"],
-}
+TTS_MODELS: dict[str, Callable[[], TTSBase]] = dict(TTS_FACTORIES)
 
 
 def get_llm(model_id: str) -> LLMBase:

@@ -6,14 +6,6 @@ import re
 
 
 DEFAULT_VOICE_NAME_OVERRIDES = {
-    # Piper voices
-    "en_US-amy-medium": "Amy",
-    "en_US-danny-low": "Danny",
-    "en_GB-alba-medium": "Alba",
-    # Use a friendlier narrator name for Lessac by default
-    "en_US-lessac-medium": "Rachel",
-    # StyleTTS2
-    "styletts2-default": "Ava",
     # Coqui XTTS
     "xtts-female-calm": "Emma",
     "xtts-male-soothing": "James",
@@ -57,11 +49,6 @@ def get_voice_display_name(voice_id: str | None) -> str:
     overrides = {**DEFAULT_VOICE_NAME_OVERRIDES, **_load_env_overrides()}
     if voice_id in overrides:
         return overrides[voice_id]
-
-    # Try to extract a name from common patterns like en_US-amy-medium
-    match = re.match(r"^[a-z]{2}_[A-Z]{2}-([a-zA-Z]+)-", voice_id)
-    if match:
-        return match.group(1).capitalize()
 
     # Fallback: use the first segment, title-cased
     name = re.split(r"[-_]", voice_id)[0]

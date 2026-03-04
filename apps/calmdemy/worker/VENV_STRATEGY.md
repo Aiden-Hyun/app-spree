@@ -41,7 +41,7 @@ Four-stack default:
    - `venv: .venv`
    - `dispatch: true`
    - `acceptNonTtsSteps: true`
-   - `ttsModels: [piper, styletts2, gemini-tts-flash, gemini-tts-pro]`
+   - `ttsModels: [gemini-tts-flash, gemini-tts-pro]`
 2. `local-tts-dms-1`
    - `venv: .venv-dms`
    - `dispatch: false`

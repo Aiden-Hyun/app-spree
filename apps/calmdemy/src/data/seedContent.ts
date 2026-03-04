@@ -881,7 +881,7 @@ export const seedBedtimeStories: SeedBedtimeStory[] = [
       "A classic fairy tale about a kind shoemaker who receives magical help from tiny elves. Let this gentle story carry you off to dreamland.",
     duration_minutes: 19,
     category: "fairytale",
-    narrator: "Rachel",
+    narrator: "Nolan",
     audio_file: "story_shoemaker_elves",
     image: "story_fairytale_shoemaker",
     isFree: true,

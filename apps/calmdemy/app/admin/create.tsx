@@ -150,6 +150,21 @@ export default function CreateContentScreen() {
       if (!isMounted) return;
 
       if (draft) {
+        const availableLLMModels = getLLMModelsForBackend(draft.llmBackend);
+        const normalizedLLMModel = availableLLMModels.some((m) => m.id === draft.llmModel)
+          ? draft.llmModel
+          : getDefaultLLMModel(draft.llmBackend);
+
+        const availableTTSModels = getTTSModelsForBackend(draft.ttsBackend);
+        const normalizedTTSModel = availableTTSModels.some((m) => m.id === draft.ttsModel)
+          ? draft.ttsModel
+          : getDefaultTTSModel(draft.ttsBackend);
+
+        const availableVoices = getVoicesForTTSModel(normalizedTTSModel);
+        const normalizedTTSVoice = availableVoices.some((v) => v.id === draft.ttsVoice)
+          ? draft.ttsVoice
+          : getDefaultVoice(normalizedTTSModel);
+
         setContentType(draft.contentType);
         setTitle(draft.title);
         setTopic(draft.topic);
@@ -169,9 +184,9 @@ export default function CreateContentScreen() {
 
         setLlmBackend(draft.llmBackend);
         setTtsBackend(draft.ttsBackend);
-        setLlmModel(draft.llmModel);
-        setTtsModel(draft.ttsModel);
-        setTtsVoice(draft.ttsVoice);
+        setLlmModel(normalizedLLMModel);
+        setTtsModel(normalizedTTSModel);
+        setTtsVoice(normalizedTTSVoice);
 
         setActiveDraftId(draft.id);
         initialDraftRef.current = {
@@ -192,9 +207,9 @@ export default function CreateContentScreen() {
           tone: draft.tone,
           llmBackend: draft.llmBackend,
           ttsBackend: draft.ttsBackend,
-          llmModel: draft.llmModel,
-          ttsModel: draft.ttsModel,
-          ttsVoice: draft.ttsVoice,
+          llmModel: normalizedLLMModel,
+          ttsModel: normalizedTTSModel,
+          ttsVoice: normalizedTTSVoice,
         };
       }
 
@@ -538,4 +553,3 @@ export default function CreateContentScreen() {
     </View>
   );
 }
-

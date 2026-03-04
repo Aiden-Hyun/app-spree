@@ -7,8 +7,6 @@ worker/service-account-key.json
 .env
 .env.local
 
-# Piper TTS downloaded voice models
-worker/.piper_voices/
 # Bundled TTS model repos
 worker/tts_models/
 

@@ -22,7 +22,7 @@ _cached_tts = None
 _cached_tts_id = None
 _cached_voice_id = None
 
-DEFAULT_SAMPLE_RATE = 22050  # Standard for Piper
+DEFAULT_SAMPLE_RATE = 22050
 DEFAULT_CHANNELS = 1
 DEFAULT_SAMPLE_WIDTH = 2  # 16-bit
 
@@ -107,8 +107,8 @@ def convert_to_audio(script: str, job_data: dict) -> str:
     """Convert script to WAV audio, handling pause markers."""
     global _cached_tts, _cached_tts_id, _cached_voice_id
 
-    tts_model_id = job_data.get("ttsModel", "piper")
-    voice_id = job_data.get("ttsVoice", "en_US-amy-medium")
+    tts_model_id = job_data.get("ttsModel", "dms")
+    voice_id = job_data.get("ttsVoice", "expresso/ex03-ex01_happy_001_channel1_334s.wav")
 
     logger.info(
         "Converting to audio",

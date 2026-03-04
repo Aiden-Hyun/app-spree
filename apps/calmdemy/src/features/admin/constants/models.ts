@@ -53,23 +53,11 @@ export const LLM_MODELS: ModelOption[] = [
 // ==================== TTS MODELS ====================
 
 export const TTS_MODELS: ModelOption[] = [
-  // Local TTS — primary
-  {
-    id: 'piper',
-    label: 'Piper TTS',
-    description: 'Fast, lightweight, runs on CPU, many voices',
-    backend: 'local',
-  },
+  // Local TTS
   {
     id: 'dms',
     label: 'Kyutai DMS TTS 1.6B',
     description: 'Kyutai delayed-streams TTS (GPU recommended)',
-    backend: 'local',
-  },
-  {
-    id: 'styletts2',
-    label: 'StyleTTS2 (Local)',
-    description: 'High quality local TTS (MPS preferred)',
     backend: 'local',
   },
   // API TTS
@@ -90,31 +78,6 @@ export const TTS_MODELS: ModelOption[] = [
 // ==================== VOICES ====================
 
 export const TTS_VOICES: VoiceOption[] = [
-  // Piper voices
-  {
-    id: 'en_US-amy-medium',
-    label: 'Amy (US Female)',
-    ttsModel: 'piper',
-    description: 'Calm, clear American female voice',
-  },
-  {
-    id: 'en_US-danny-low',
-    label: 'Danny (US Male)',
-    ttsModel: 'piper',
-    description: 'Deep, soothing American male voice',
-  },
-  {
-    id: 'en_GB-alba-medium',
-    label: 'Alba (UK Female)',
-    ttsModel: 'piper',
-    description: 'Warm British female voice',
-  },
-  {
-    id: 'en_US-lessac-medium',
-    label: 'Lessac (US Female)',
-    ttsModel: 'piper',
-    description: 'Natural, expressive American female voice',
-  },
   // DMS voices (Kyutai)
   {
     id: 'expresso/ex03-ex01_happy_001_channel1_334s.wav',
@@ -199,13 +162,6 @@ export const TTS_VOICES: VoiceOption[] = [
     ttsModel: 'dms',
     description: 'Kyutai DMS voice (VCTK)',
     sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p234_023.wav',
-  },
-  // StyleTTS2 voices
-  {
-    id: 'styletts2-default',
-    label: 'StyleTTS2 Default',
-    ttsModel: 'styletts2',
-    description: 'Default StyleTTS2 English voice',
   },
   // Gemini TTS voices
   {

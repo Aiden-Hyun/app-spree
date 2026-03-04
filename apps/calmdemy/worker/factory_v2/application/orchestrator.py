@@ -21,7 +21,7 @@ class Orchestrator:
         request = job.get("request") or {}
         payload = request.get("content_job") or request.get("job_data") or {}
         model = str(payload.get("ttsModel") or "").strip().lower()
-        return model or "piper"
+        return model or "dms"
 
     def _required_tts_model_for_step(self, job: dict, step_name: str) -> str | None:
         if step_name in {"synthesize_audio", "synthesize_course_audio"}:

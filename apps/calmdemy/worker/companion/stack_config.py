@@ -12,7 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WORKER_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 DEFAULT_STACKS_FILE = os.path.join(WORKER_DIR, "worker_stacks.json")
 
-_NON_DMS_TTS_MODELS = ["piper", "styletts2", "gemini-tts-flash", "gemini-tts-pro"]
+_NON_DMS_TTS_MODELS = ["gemini-tts-flash", "gemini-tts-pro"]
 
 _DEFAULT_STACKS = [
     {

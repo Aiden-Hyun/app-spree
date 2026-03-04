@@ -74,9 +74,7 @@ def is_voice_id(value: str) -> bool:
     if value in DEFAULT_VOICE_NAME_OVERRIDES:
         return True
     return bool(
-        value.startswith("en_")
-        or value.startswith("xtts-")
-        or value.startswith("styletts2-")
+        value.startswith("xtts-")
         or value.startswith("gemini-")
     )
 
