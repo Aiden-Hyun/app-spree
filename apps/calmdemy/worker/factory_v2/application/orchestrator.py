@@ -91,6 +91,26 @@ class Orchestrator:
 
     def _fan_out_course_audio(self, job: dict, job_id: str, run_id: str) -> None:
         completed_shards = self._completed_course_audio_shards(job)
+        if completed_shards:
+            # Surface checkpoint-reused shards in this run's timeline so UI does not
+            # show them as "waiting" when they are already completed.
+            for shard in COURSE_AUDIO_SHARDS:
+                if shard not in completed_shards:
+                    continue
+                step_run_id = self.step_run_repo.ensure_ready(
+                    job_id,
+                    run_id,
+                    "synthesize_course_audio",
+                    shard_key=shard,
+                )
+                self.step_run_repo.mark_succeeded_from_checkpoint(
+                    step_run_id,
+                    {
+                        "reused_from_checkpoint": True,
+                        "session_code": shard,
+                    },
+                )
+
         missing_shards = [shard for shard in COURSE_AUDIO_SHARDS if shard not in completed_shards]
 
         if not missing_shards:

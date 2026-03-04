@@ -305,6 +305,29 @@ class FirestoreStepRunRepo:
             merge=True,
         )
 
+    def mark_succeeded_from_checkpoint(
+        self,
+        step_run_id: str,
+        output: dict,
+    ) -> None:
+        """
+        Mark a step run as succeeded without execution on this run.
+
+        Used when a shard is reused from an existing checkpoint result.
+        """
+        self.db.collection("factory_step_runs").document(step_run_id).set(
+            {
+                "state": "succeeded",
+                "output": output,
+                "worker_id": "checkpoint",
+                "attempt": 1,
+                "started_at": fs.SERVER_TIMESTAMP,
+                "ended_at": fs.SERVER_TIMESTAMP,
+                "updated_at": fs.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+
     def mark_failed(self, step_run_id: str, error_code: str, error_message: str) -> None:
         self.db.collection("factory_step_runs").document(step_run_id).set(
             {
