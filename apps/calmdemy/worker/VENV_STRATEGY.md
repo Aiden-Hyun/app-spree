@@ -35,7 +35,7 @@ Because of this, a single venv runtime is not a safe default.
 
 ## Default Production Shape
 
-Four-stack default:
+Five-stack default:
 
 1. `local-primary`
    - `venv: .venv`
@@ -57,8 +57,13 @@ Four-stack default:
    - `dispatch: false`
    - `acceptNonTtsSteps: false`
    - `ttsModels: [dms]`
+5. `local-tts-qwen`
+   - `venv: .venv-qwen`
+   - `dispatch: false`
+   - `acceptNonTtsSteps: false`
+   - `ttsModels: [qwen3-base]`
 
-This profile supports up to 3 concurrent DMS synth queue items (for example, course session shards)
+This profile supports up to 3 concurrent DMS synth queue items plus one dedicated Qwen stack,
 while preserving one dispatcher/non-TTS executor.
 
 ## When to Add a New Venv

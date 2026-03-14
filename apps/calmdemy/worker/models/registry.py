@@ -41,6 +41,10 @@ def _gemini_tts_pro_factory():
     return _factory(".tts_gemini", "GeminiTTSAdapter", model_id="gemini-tts-pro")
 
 
+def _qwen3_base_tts_factory():
+    return _factory(".tts_qwen3_base", "Qwen3BaseTTSAdapter")
+
+
 def _ollama_factory():
     return _factory(".llm_ollama", "OllamaAdapter")
 
@@ -63,6 +67,7 @@ LLM_FACTORIES.update({
 
 TTS_FACTORIES: dict[str, Callable[[], TTSBase]] = {
     "dms": lambda: _factory(".tts_dms", "DMSTTSAdapter"),
+    "qwen3-base": _qwen3_base_tts_factory,
     "gemini-tts-flash": _gemini_tts_flash_factory,
     "gemini-tts-pro": _gemini_tts_pro_factory,
 }

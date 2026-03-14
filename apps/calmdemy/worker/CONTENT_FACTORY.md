@@ -76,8 +76,8 @@ Course audio is fan-out/fan-in:
 - Retry/backoff is handled on step failures for retryable error codes.
 - Admin timeline reads from `factory_step_runs` (V2 and legacy-shape compatibility docs).
 - Queue entries can include `required_tts_model` for synth-step capability routing.
-- Default stack profile is one dispatcher/non-TTS stack plus three DMS TTS stacks for
-  parallel course synth execution.
+- Default stack profile is one dispatcher/non-TTS stack, three DMS TTS stacks for
+  parallel course synth execution, and one dedicated Qwen voice-clone TTS stack.
 
 ## Cloud Backend
 

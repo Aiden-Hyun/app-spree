@@ -34,5 +34,14 @@
     "dispatch": false,
     "acceptNonTtsSteps": false,
     "ttsModels": ["dms"]
+  },
+  {
+    "id": "local-tts-qwen",
+    "role": "tts",
+    "venv": ".venv-qwen",
+    "enabled": true,
+    "dispatch": false,
+    "acceptNonTtsSteps": false,
+    "ttsModels": ["qwen3-base"]
   }
 ]

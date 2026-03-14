@@ -55,6 +55,12 @@ export const LLM_MODELS: ModelOption[] = [
 export const TTS_MODELS: ModelOption[] = [
   // Local TTS
   {
+    id: 'qwen3-base',
+    label: 'Qwen3 Base Clone',
+    description: 'Local voice cloning using sample_voices reference pairs',
+    backend: 'local',
+  },
+  {
     id: 'dms',
     label: 'Kyutai DMS TTS 1.6B',
     description: 'Kyutai delayed-streams TTS (GPU recommended)',
@@ -162,6 +168,19 @@ export const TTS_VOICES: VoiceOption[] = [
     ttsModel: 'dms',
     description: 'Kyutai DMS voice (VCTK)',
     sampleUrl: 'https://huggingface.co/kyutai/tts-voices/resolve/main/vctk/p234_023.wav',
+  },
+  // Qwen3 Base cloned voices
+  {
+    id: 'declutter_the_mind_7s',
+    label: 'Declutter Sample (7s)',
+    ttsModel: 'qwen3-base',
+    description: 'Clone voice from sample_voices/declutter_the_mind_7s.wav',
+  },
+  {
+    id: 'laura_qwen',
+    label: 'Laura Qwen',
+    ttsModel: 'qwen3-base',
+    description: 'Clone voice from sample_voices/laura_qwen.wav',
   },
   // Gemini TTS voices
   {

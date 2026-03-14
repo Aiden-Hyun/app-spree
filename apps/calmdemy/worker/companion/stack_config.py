@@ -51,6 +51,15 @@ _DEFAULT_STACKS = [
         "acceptNonTtsSteps": False,
         "ttsModels": ["dms"],
     },
+    {
+        "id": "local-tts-qwen",
+        "role": "tts",
+        "venv": ".venv-qwen",
+        "enabled": True,
+        "dispatch": False,
+        "acceptNonTtsSteps": False,
+        "ttsModels": ["qwen3-base"],
+    },
 ]
 
 
