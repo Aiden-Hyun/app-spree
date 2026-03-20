@@ -113,7 +113,7 @@ def _resolve_device() -> tuple[str, object, object]:
             "torch is required for Qwen3 Base TTS. Install worker dependencies first."
         ) from exc
 
-    device_arg = os.getenv("QWEN_TTS_DEVICE", "cpu").strip().lower() or "cpu"
+    device_arg = os.getenv("QWEN_TTS_DEVICE", "auto").strip().lower() or "auto"
 
     if device_arg == "auto":
         if torch.cuda.is_available():

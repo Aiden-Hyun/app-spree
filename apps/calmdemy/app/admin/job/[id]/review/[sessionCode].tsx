@@ -24,7 +24,10 @@ export default function AdminCourseSessionReviewScreen() {
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
   const [loadingAudio, setLoadingAudio] = useState(false);
 
-  const canReview = job?.status === "completed" && !job.autoPublish;
+  const canReview =
+    job?.status === "completed" &&
+    !job.autoPublish &&
+    !job.courseRegeneration?.awaitingScriptApproval;
   const session = job?.coursePreviewSessions?.find((s) => s.code === sessionCode);
 
   useEffect(() => {

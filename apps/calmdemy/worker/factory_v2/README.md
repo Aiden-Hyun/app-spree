@@ -37,13 +37,15 @@ Completed shard outputs are checkpointed immediately to `runtime.course_audio_re
 
 ## Running locally
 
-1. Start companion as usual: `python local_companion.py`
+1. Start companion with bootstrap: `./run_companion.sh`
 2. Ensure worker control desired state is `running` or `auto`.
 3. Create jobs from Admin UI.
 
 Companion starts one or more `local_worker.py` processes based on `worker/worker_stacks.json`.
+Manifest entries may set `replicas` to expand into multiple concrete worker processes.
 Capability routing ensures synth steps are claimed only by stacks whose `ttsModels` allowlist matches.
-The default local profile uses 4 stacks: 1 primary dispatcher/non-TTS stack and 3 DMS TTS stacks.
+The default local profile expands to 7 stacks: 1 primary dispatcher/non-TTS stack, 3 DMS TTS stacks,
+and a 3-worker Qwen TTS pool.
 
 ## Runtime flags
 
@@ -54,5 +56,6 @@ The default local profile uses 4 stacks: 1 primary dispatcher/non-TTS stack and 
 - `WORKER_DISPATCH` (per-stack, injected by companion)
 - `WORKER_ACCEPT_NON_TTS` (per-stack, injected by companion)
 - `WORKER_TTS_MODELS` (per-stack, injected by companion)
+- `QWEN_TTS_DEVICE` (default: `auto`, resolves `cuda`, then `mps`, then `cpu`)
 
 See `worker/VENV_STRATEGY.md` for the normative multi-venv convention.

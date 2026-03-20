@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from datetime import datetime, timezone
 from typing import Optional
 
 from firebase_admin import firestore
@@ -15,13 +17,61 @@ from .bootstrap import bootstrap_from_content_job
 logger = get_logger(__name__)
 
 _DISPATCH_STATUSES = ("pending", "publishing")
+_DISPATCH_LOCK_TIMEOUT_SECONDS = max(
+    15,
+    int(os.getenv("V2_DISPATCH_LOCK_TIMEOUT_SECONDS", "60")),
+)
+
+
+def _coerce_datetime(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if hasattr(value, "to_datetime"):
+        return value.to_datetime()
+    if hasattr(value, "toDate"):
+        return value.toDate()
+    return None
+
+
+def _is_stale_dispatch_lock(data: dict) -> bool:
+    if not data.get("v2Locked"):
+        return False
+
+    dispatched_at = _coerce_datetime(data.get("v2DispatchedAt"))
+    if dispatched_at is None:
+        return True
+    if dispatched_at.tzinfo is None:
+        dispatched_at = dispatched_at.replace(tzinfo=timezone.utc)
+
+    age_seconds = (datetime.now(timezone.utc) - dispatched_at).total_seconds()
+    return age_seconds >= _DISPATCH_LOCK_TIMEOUT_SECONDS
 
 
 def _is_cloud_job(data: dict) -> bool:
     return data.get("llmBackend") == "cloud" or data.get("ttsBackend") == "cloud"
 
 
-def _claim_for_v2(db, doc_ref, worker_id: str, stack_defs: list[dict]) -> Optional[dict]:
+def _has_active_v2_run(transaction, db, data: dict) -> bool:
+    run_id = str(data.get("v2RunId") or "").strip()
+    if not run_id:
+        return False
+
+    run_snap = db.collection("factory_job_runs").document(run_id).get(transaction=transaction)
+    if not run_snap.exists:
+        return False
+
+    run_state = str((run_snap.to_dict() or {}).get("state") or "").strip().lower()
+    return run_state == "running"
+
+
+def _claim_for_v2(
+    db,
+    doc_ref,
+    worker_id: str,
+    stack_defs: list[dict],
+) -> Optional[tuple[dict, bool]]:
     tx = db.transaction()
 
     @firestore.transactional
@@ -92,7 +142,10 @@ def _claim_for_v2(db, doc_ref, worker_id: str, stack_defs: list[dict]) -> Option
                     },
                 )
                 return None
-        if data.get("v2Locked"):
+        if _has_active_v2_run(transaction, db, data):
+            return None
+        recovered_stale_lock = _is_stale_dispatch_lock(data)
+        if data.get("v2Locked") and not recovered_stale_lock:
             return None
 
         transaction.update(
@@ -106,7 +159,7 @@ def _claim_for_v2(db, doc_ref, worker_id: str, stack_defs: list[dict]) -> Option
                 "updatedAt": fs.SERVER_TIMESTAMP,
             },
         )
-        return data
+        return data, recovered_stale_lock
 
     return _tx_claim(tx)
 
@@ -122,10 +175,19 @@ def dispatch_next_content_job(db, worker_id: str) -> Optional[tuple[str, str]]:
             claimed = _claim_for_v2(db, doc.reference, worker_id, stack_defs)
             if claimed is None:
                 continue
+            claimed_data, recovered_stale_lock = claimed
 
             content_job_id = doc.id
+            if recovered_stale_lock:
+                logger.warning(
+                    "Recovered stale V2 dispatch lock",
+                    extra={
+                        "content_job_id": content_job_id,
+                        "worker_id": worker_id,
+                    },
+                )
             try:
-                run_id = bootstrap_from_content_job(db, content_job_id, claimed)
+                run_id = bootstrap_from_content_job(db, content_job_id, claimed_data)
                 doc.reference.update(
                     {
                         "v2Locked": False,

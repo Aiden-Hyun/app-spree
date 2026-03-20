@@ -39,6 +39,7 @@ V1 runtime codepaths are removed. The worker runs V2 only.
 - `WORKER_DISPATCH` (set by companion per stack)
 - `WORKER_ACCEPT_NON_TTS` (set by companion per stack)
 - `WORKER_TTS_MODELS` (set by companion per stack)
+- `QWEN_TTS_DEVICE` (default `auto`, resolves `cuda`, then `mps`, then `cpu`)
 
 ## Step Workflows
 
@@ -76,8 +77,9 @@ Course audio is fan-out/fan-in:
 - Retry/backoff is handled on step failures for retryable error codes.
 - Admin timeline reads from `factory_step_runs` (V2 and legacy-shape compatibility docs).
 - Queue entries can include `required_tts_model` for synth-step capability routing.
+- Stack manifest entries may set `replicas` to expand into `id`, `id-2`, `id-3`, etc.
 - Default stack profile is one dispatcher/non-TTS stack, three DMS TTS stacks for
-  parallel course synth execution, and one dedicated Qwen voice-clone TTS stack.
+  parallel course synth execution, and a three-worker Qwen voice-clone TTS pool.
 
 ## Cloud Backend
 

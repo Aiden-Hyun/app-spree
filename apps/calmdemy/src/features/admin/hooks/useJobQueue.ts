@@ -10,6 +10,7 @@ import {
   cancelJob,
   requestDeleteJob,
   regenerateCourseSessions,
+  approveRegeneratedCourseScripts,
   subscribeToJobStepTimeline,
   setWorkerDesiredState,
   setWorkerIdleTimeout,
@@ -103,7 +104,20 @@ export function useJobDetail(jobId: string) {
     [job, jobId]
   );
 
-  return { job, isLoading, retry, cancel, requestDelete, regenerateCourse };
+  const approveRegeneratedScripts = useCallback(async (rawScriptEdits?: Record<string, string>) => {
+    if (!jobId || !job) return;
+    await approveRegeneratedCourseScripts(job, rawScriptEdits);
+  }, [job, jobId]);
+
+  return {
+    job,
+    isLoading,
+    retry,
+    cancel,
+    requestDelete,
+    regenerateCourse,
+    approveRegeneratedScripts,
+  };
 }
 
 // ==================== STEP TIMELINE HOOK ====================

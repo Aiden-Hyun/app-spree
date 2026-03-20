@@ -37,6 +37,8 @@ export type CourseShardKey = (typeof COURSE_SHARD_KEYS)[number];
 
 const CANCELLED_ERROR_CODES = new Set(['superseded_run', 'run_failed']);
 const VALID_SHARDS = new Set<string>(COURSE_SHARD_KEYS);
+const SYNTH_STAGE_STEP_NAMES = new Set(['synthesize_course_audio', 'synthesize_course_audio_chunk']);
+const CHUNK_SYNTH_STEP = 'synthesize_course_audio_chunk';
 
 const STAGE_LABELS: Record<CourseStageStep, string> = {
   generate_course_plan: 'Generate Course Plan',
@@ -124,6 +126,7 @@ function timestampMs(entry: JobStepTimelineEntry): number {
 function stepNameLabel(stepName: string): string {
   const known = STAGE_LABELS[stepName as CourseStageStep];
   if (known) return known;
+  if (stepName === CHUNK_SYNTH_STEP) return 'Synthesize Course Audio Chunk';
   return stepName
     .split('_')
     .filter(Boolean)
@@ -133,8 +136,10 @@ function stepNameLabel(stepName: string): string {
 
 function normalizeShardKey(value?: string): CourseShardKey | undefined {
   const key = String(value || '').trim().toUpperCase();
-  if (!key || !VALID_SHARDS.has(key)) return undefined;
-  return key as CourseShardKey;
+  if (!key) return undefined;
+  if (VALID_SHARDS.has(key)) return key as CourseShardKey;
+  const matched = COURSE_SHARD_KEYS.find((shard) => key === shard || key.startsWith(`${shard}-P`));
+  return matched;
 }
 
 function completedShardsFromContentJob(job: ContentJob): Set<CourseShardKey> {
@@ -271,6 +276,8 @@ function sortWorkerIds(ids: string[]): string[] {
     if (workerId === 'local-primary') return [0, 0, workerId];
     const dmsMatch = workerId.match(/^local-tts-dms-(\d+)$/);
     if (dmsMatch) return [1, Number(dmsMatch[1] || 0), workerId];
+    const qwenMatch = workerId.match(/^local-tts-qwen(?:-(\d+))?$/);
+    if (qwenMatch) return [2, Number(qwenMatch[1] || 1), workerId];
     if (workerId === 'unknown') return [9, 0, workerId];
     return [5, 0, workerId];
   };
@@ -316,9 +323,10 @@ export function deriveCourseProgressModel(
   const synthEntries: JobStepTimelineEntry[] = [];
   for (const entry of runEntries) {
     const stepName = entry.stepName as CourseStageStep;
-    if (!stageEntries.has(stepName)) continue;
-    stageEntries.get(stepName)?.push(entry);
-    if (stepName === 'synthesize_course_audio') {
+    if (stageEntries.has(stepName)) {
+      stageEntries.get(stepName)?.push(entry);
+    }
+    if (SYNTH_STAGE_STEP_NAMES.has(entry.stepName)) {
       synthEntries.push(entry);
     }
   }
@@ -332,7 +340,7 @@ export function deriveCourseProgressModel(
     };
   });
 
-  const latestShardEntries = new Map<CourseShardKey, JobStepTimelineEntry>();
+  const shardSynthEntries = new Map<CourseShardKey, JobStepTimelineEntry[]>();
   const rootSynthEntries: JobStepTimelineEntry[] = [];
   for (const entry of synthEntries) {
     const shardKey = normalizeShardKey(entry.shardKey);
@@ -340,21 +348,35 @@ export function deriveCourseProgressModel(
       rootSynthEntries.push(entry);
       continue;
     }
-    const prev = latestShardEntries.get(shardKey);
-    if (!prev || timestampMs(entry) >= timestampMs(prev)) {
-      latestShardEntries.set(shardKey, entry);
-    }
+    const list = shardSynthEntries.get(shardKey) || [];
+    list.push(entry);
+    shardSynthEntries.set(shardKey, list);
   }
 
-  latestShardEntries.forEach((entry, shardKey) => {
+  shardSynthEntries.forEach((entries, shardKey) => {
+    const sessionEntries = entries.filter((entry) => entry.stepName === 'synthesize_course_audio');
+    const chunkEntries = entries.filter((entry) => entry.stepName === CHUNK_SYNTH_STEP);
+    const representative = pickNewestEntry(
+      (sessionEntries.length > 0 ? sessionEntries : chunkEntries).sort((a, b) => timestampMs(b) - timestampMs(a))
+    );
+    let state: ProgressState;
+    if (sessionEntries.length > 0) {
+      state = mergeState(sessionEntries.map(progressStateFromEntry));
+    } else {
+      const chunkStates = chunkEntries.map(progressStateFromEntry);
+      state = mergeState(chunkStates);
+      if (state === 'succeeded') {
+        state = 'running';
+      }
+    }
     audioShards[shardKey] = {
       shardKey,
       label: SHARD_LABELS[shardKey],
-      state: progressStateFromEntry(entry),
-      attempt: entry.attempt,
-      workerId: entry.workerId,
-      errorCode: entry.errorCode,
-      errorMessage: entry.errorMessage,
+      state,
+      attempt: representative?.attempt,
+      workerId: representative?.workerId,
+      errorCode: representative?.errorCode,
+      errorMessage: representative?.errorMessage,
     };
   });
 
@@ -389,22 +411,20 @@ export function deriveCourseProgressModel(
   });
 
   const hasLegacyRootSynth =
-    rootSynthEntries.length > 0 && latestShardEntries.size === 0;
+    rootSynthEntries.length > 0 && shardSynthEntries.size === 0;
   if (hasLegacyRootSynth) {
     stages.synthesize_course_audio = buildStageProgress(
       'synthesize_course_audio',
       rootSynthEntries
     );
-  } else if (latestShardEntries.size > 0 || checkpointCompletedShards.size > 0) {
+  } else if (shardSynthEntries.size > 0 || checkpointCompletedShards.size > 0) {
     const shardStates = COURSE_SHARD_KEYS.map((shardKey) => audioShards[shardKey].state);
     const synthState = mergeState(shardStates);
-    const representative = pickNewestEntry(
-      [...latestShardEntries.values()].sort((a, b) => timestampMs(b) - timestampMs(a))
-    );
+    const representative = pickNewestEntry([...synthEntries].sort((a, b) => timestampMs(b) - timestampMs(a)));
     const runningWorkers = new Set(
-      COURSE_SHARD_KEYS.map((key) => audioShards[key])
-        .filter((shard) => shard.state === 'running')
-        .map((shard) => String(shard.workerId || '').trim())
+      synthEntries
+        .filter((entry) => progressStateFromEntry(entry) === 'running')
+        .map((entry) => String(entry.workerId || '').trim())
         .filter(Boolean)
     );
     stages.synthesize_course_audio = {
@@ -418,7 +438,7 @@ export function deriveCourseProgressModel(
           : runningWorkers.size === 1
             ? [...runningWorkers][0]
             : stages.synthesize_course_audio.workerLabel,
-      entryCount: latestShardEntries.size,
+      entryCount: shardSynthEntries.size,
     };
   }
 
@@ -439,11 +459,15 @@ export function deriveCourseProgressModel(
   for (const entry of runEntries) {
     const workerId = String(entry.workerId || 'unknown').trim() || 'unknown';
     const shardKey = normalizeShardKey(entry.shardKey);
+    const rawShardKey = String(entry.shardKey || '').trim();
     const laneItem: WorkerLaneItem = {
       id: entry.id,
       stepName: entry.stepName,
       stepLabel: stepNameLabel(entry.stepName),
-      shardKey: shardKey || (entry.shardKey && entry.shardKey !== 'root' ? entry.shardKey : undefined),
+      shardKey:
+        entry.stepName === CHUNK_SYNTH_STEP && rawShardKey && rawShardKey !== 'root'
+          ? rawShardKey
+          : shardKey || (rawShardKey && rawShardKey !== 'root' ? rawShardKey : undefined),
       shardLabel: shardKey ? SHARD_LABELS[shardKey] : undefined,
       state: progressStateFromEntry(entry),
       attempt: entry.attempt,

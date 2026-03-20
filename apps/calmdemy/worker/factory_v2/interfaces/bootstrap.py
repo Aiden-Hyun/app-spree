@@ -58,19 +58,37 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
         regeneration = content_job.get("courseRegeneration") or {}
         if isinstance(regeneration, dict) and regeneration.get("active"):
             mode = str(regeneration.get("mode") or "audio_only").strip().lower()
-            first_step = (
-                "generate_course_scripts"
-                if mode == "script_and_audio"
-                else "format_course_scripts"
-            )
+            if mode == "script_and_audio":
+                awaiting_script_approval = bool(regeneration.get("awaitingScriptApproval"))
+                script_approved = bool(
+                    regeneration.get("scriptApprovedAt") or regeneration.get("scriptApprovedBy")
+                )
+                first_step = (
+                    "format_course_scripts"
+                    if script_approved and not awaiting_script_approval
+                    else "generate_course_scripts"
+                )
+            else:
+                first_step = "format_course_scripts"
     if status == "publishing":
         trigger = "manual_publish"
         first_step = "publish_course" if is_course else "publish_content"
 
     v2_job_id = content_job_id
-    db.collection("factory_jobs").document(v2_job_id).set(
+    job_ref = db.collection("factory_jobs").document(v2_job_id)
+    job_ref.set(
         {
             "job_type": "course" if is_course else "single_content",
+            "current_state": "queued",
+            "updated_at": fs.SERVER_TIMESTAMP,
+            "created_at": fs.SERVER_TIMESTAMP,
+        },
+        merge=True,
+    )
+    # Replace the nested request/runtime maps wholesale so reruns do not inherit
+    # stale per-session script/audio fields from prior runs.
+    job_ref.update(
+        {
             "request": {
                 "content_job": content_job,
                 "compat": {
@@ -78,11 +96,7 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
                 },
             },
             "runtime": _extract_runtime(content_job),
-            "current_state": "queued",
-            "updated_at": fs.SERVER_TIMESTAMP,
-            "created_at": fs.SERVER_TIMESTAMP,
-        },
-        merge=True,
+        }
     )
 
     job_repo = FirestoreJobRepo(db)

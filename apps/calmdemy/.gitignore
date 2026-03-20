@@ -13,6 +13,7 @@ worker/tts_models/
 # Python virtualenv
 worker/.venv/
 worker/.venv-dms/
+worker/.venv-qwen
 
 # Local worker companion artifacts
 worker/logs/

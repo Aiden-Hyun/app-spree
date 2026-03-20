@@ -28,6 +28,7 @@ Because of this, a single venv runtime is not a safe default.
 - `id`: worker/stack identifier (used in status + logs)
 - `role`: operator label (`v2`, `tts`, etc.)
 - `venv`: venv path (relative to `worker/` or absolute)
+- `replicas`: optional number of concrete worker processes to expand from one manifest entry (default `1`); replicas keep the base id for the first stack and suffix later ones as `-2`, `-3`, etc.
 - `enabled`: stack participates in runtime
 - `dispatch`: this stack may dispatch `content_jobs` into V2 runs
 - `acceptNonTtsSteps`: stack can claim non-synth queue steps
@@ -35,7 +36,7 @@ Because of this, a single venv runtime is not a safe default.
 
 ## Default Production Shape
 
-Five-stack default:
+Five-entry manifest / seven-stack runtime default:
 
 1. `local-primary`
    - `venv: .venv`
@@ -59,11 +60,13 @@ Five-stack default:
    - `ttsModels: [dms]`
 5. `local-tts-qwen`
    - `venv: .venv-qwen`
+   - `replicas: 3`
    - `dispatch: false`
    - `acceptNonTtsSteps: false`
    - `ttsModels: [qwen3-base]`
 
-This profile supports up to 3 concurrent DMS synth queue items plus one dedicated Qwen stack,
+This profile expands to `local-tts-qwen`, `local-tts-qwen-2`, and `local-tts-qwen-3`,
+supporting up to 3 concurrent DMS synth queue items plus 3 concurrent Qwen synth queue items,
 while preserving one dispatcher/non-TTS executor.
 
 ## When to Add a New Venv
@@ -86,6 +89,8 @@ Any content-factory runtime refactor must include:
 ## Operations
 
 - Restart companion after stack config changes.
+- Use `./run_companion.sh` to provision `.venv`, `.venv-dms`, and `.venv-qwen` together before starting the companion.
 - Validate stack health in admin (`worker_stacks_status` + per-stack logs).
 - If a model has no capable enabled stack, runtime should fail fast with clear error.
 - Increase DMS stack count only when host CPU/RAM and model memory footprint can sustain parallel inference.
+- Qwen defaults `QWEN_TTS_DEVICE=auto`, which resolves `cuda`, then `mps`, then `cpu` unless explicitly overridden.

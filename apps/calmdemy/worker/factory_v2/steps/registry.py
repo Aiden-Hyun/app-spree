@@ -21,6 +21,7 @@ EXECUTOR_PATHS: dict[str, tuple[str, str]] = {
     "generate_course_thumbnail": ("course", "execute_generate_course_thumbnail"),
     "generate_course_scripts": ("course", "execute_generate_course_scripts"),
     "format_course_scripts": ("course", "execute_format_course_scripts"),
+    "synthesize_course_audio_chunk": ("course", "execute_synthesize_course_audio_chunk"),
     "synthesize_course_audio": ("course", "execute_synthesize_course_audio"),
     "upload_course_audio": ("course", "execute_upload_course_audio"),
     "publish_course": ("course", "execute_publish_course"),

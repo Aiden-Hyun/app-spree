@@ -8,33 +8,80 @@ from observability import get_logger
 
 logger = get_logger(__name__)
 
+_PAUSE_RE = re.compile(
+    r'\[pause\s*(\d+)\s*s(?:econds?)?\s*\]',
+    flags=re.IGNORECASE,
+)
+_PREFIX_RE = re.compile(
+    r'^(Title|Script|Narration|Scene)\s*:.*\n?',
+    flags=re.MULTILINE | re.IGNORECASE,
+)
+_SPEAKER_LINE_RE = re.compile(
+    r'^\s*(Narrator|Host|Guide|Speaker)(?:\s*\([^)]*\))?\s*:?\s*$',
+    flags=re.IGNORECASE,
+)
+_SPEAKER_PREFIX_RE = re.compile(
+    r'^\s*(Narrator|Host|Guide|Speaker)(?:\s*\([^)]*\))?\s*:\s*',
+    flags=re.IGNORECASE,
+)
+_LIST_MARKER_RE = re.compile(r'^\s*(?:[-*•]+|\d+[.)])\s+')
+_FORWARD_REF_RE = re.compile(
+    r'\s+In (?:the|our) next (?:module|lesson|practice)\b.*$',
+    flags=re.IGNORECASE,
+)
+
+
+def sanitize_narration_script(script: str) -> str:
+    """Strip article-style formatting so narration stays TTS-friendly."""
+    text = script.strip().replace("\r\n", "\n")
+    text = _PAUSE_RE.sub(lambda m: f"[PAUSE {m.group(1)}s]", text)
+    text = re.sub(r'```[\s\S]*?```', '', text)
+    text = _PREFIX_RE.sub('', text)
+
+    cleaned_lines: list[str] = []
+    for raw_line in text.split("\n"):
+        original = raw_line.rstrip()
+        stripped = original.strip()
+
+        if not stripped:
+            cleaned_lines.append("")
+            continue
+        if stripped in {"---END---", "<end_of_script>"}:
+            continue
+        if re.fullmatch(r'-{3,}', stripped):
+            continue
+        if re.fullmatch(r'#{1,6}\s+.+', stripped):
+            continue
+        if re.fullmatch(r'\*{1,2}[^*]+\*{1,2}', stripped):
+            # Bold/italic stand-alone lines are usually headings, not narration.
+            continue
+        if _SPEAKER_LINE_RE.fullmatch(stripped):
+            continue
+
+        line = original
+        line = re.sub(r'\*\*(.*?)\*\*', r'\1', line)
+        line = re.sub(r'\*(.*?)\*', r'\1', line)
+        line = re.sub(r'__(.*?)__', r'\1', line)
+        line = re.sub(r'_(.*?)_', r'\1', line)
+        line = _SPEAKER_PREFIX_RE.sub('', line)
+        line = _LIST_MARKER_RE.sub('', line)
+        line = _FORWARD_REF_RE.sub('', line)
+        line = re.sub(r'\s{2,}', ' ', line).strip()
+
+        if not line:
+            continue
+        cleaned_lines.append(line)
+
+    text = "\n".join(cleaned_lines)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
 def format_script(script: str, job_data: dict) -> str:
     """Validate structure and normalize pause markers in the script."""
     logger.info("Formatting script")
 
-    text = script.strip()
-
-    # Normalize pause markers to consistent format: [PAUSE Xs]
-    text = re.sub(
-        r'\[pause\s*(\d+)\s*s(?:econds?)?\s*\]',
-        lambda m: f"[PAUSE {m.group(1)}s]",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    # Remove any markdown formatting the LLM may have added
-    text = re.sub(r'^#+\s+.*$', '', text, flags=re.MULTILINE)  # headers
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)                # bold
-    text = re.sub(r'\*(.*?)\*', r'\1', text)                    # italic
-    text = re.sub(r'```[\s\S]*?```', '', text)                  # code blocks
-
-    # Remove blank lines that are more than double
-    text = re.sub(r'\n{3,}', '\n\n', text)
-
-    # Remove any "Title:" or "Script:" prefix lines
-    text = re.sub(r'^(Title|Script|Narration|Scene)\s*:.*\n?', '', text, flags=re.MULTILINE | re.IGNORECASE)
-
-    text = text.strip()
+    text = sanitize_narration_script(script)
 
     word_count = len(text.split())
     pause_count = len(re.findall(r'\[PAUSE \d+s\]', text))

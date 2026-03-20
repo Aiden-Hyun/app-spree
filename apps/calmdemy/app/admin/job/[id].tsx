@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, Text, Alert, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Text, Alert, StyleSheet, Platform } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
@@ -13,7 +13,15 @@ export default function JobDetailScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = createStyles(theme);
-  const { job, isLoading, retry, cancel, requestDelete, regenerateCourse } = useJobDetail(id);
+  const {
+    job,
+    isLoading,
+    retry,
+    cancel,
+    requestDelete,
+    regenerateCourse,
+    approveRegeneratedScripts,
+  } = useJobDetail(id);
   const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
     id || '',
     job?.v2RunId
@@ -21,30 +29,102 @@ export default function JobDetailScreen() {
 
   const handleRetry = () => retry();
   const handleCancel = () => cancel();
+  const confirmAction = (message: string) => {
+    if (Platform.OS !== 'web') {
+      return Promise.resolve(true);
+    }
+
+    const webConfirm = (
+      globalThis as typeof globalThis & { confirm?: (value?: string) => boolean }
+    ).confirm;
+    return Promise.resolve(typeof webConfirm === 'function' ? webConfirm(message) : true);
+  };
+
+  const startPublish = async () => {
+    if (!job) {
+      return;
+    }
+
+    await publishCompletedJob(job.id);
+  };
+
   const handlePublish = async () => {
     if (!job) return;
     const isPublishingRegeneratedSessions =
       job.contentType === 'course' &&
       job.status === 'completed' &&
       Boolean(job.courseRegeneration?.active && job.courseRegeneration.requiresPublishApproval);
+    const message = isPublishingRegeneratedSessions
+      ? 'This will replace the selected live course sessions with regenerated audio. Continue?'
+      : 'This will make the content visible to users. Continue?';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+      await startPublish();
+      return;
+    }
 
     Alert.alert(
       isPublishingRegeneratedSessions ? 'Publish Regenerated Sessions' : 'Publish Content',
-      isPublishingRegeneratedSessions
-        ? 'This will replace the selected live course sessions with regenerated audio. Continue?'
-        : 'This will make the content visible to users. Continue?',
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Publish',
           onPress: async () => {
-            await publishCompletedJob(job.id);
+            await startPublish();
           },
         },
       ]
     );
   };
   const handleDelete = () => requestDelete();
+  const startApproveRegeneratedScripts = async (rawScriptEdits?: Record<string, string>) => {
+    await approveRegeneratedScripts(rawScriptEdits);
+  };
+
+  const handleApproveRegeneratedScripts = async (rawScriptEdits?: Record<string, string>) => {
+    if (!job) {
+      return;
+    }
+
+    const message =
+      'This will confirm the regenerated scripts and continue with formatting and audio generation.';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+
+      await startApproveRegeneratedScripts(rawScriptEdits);
+      return;
+    }
+
+    Alert.alert(
+      'Approve Regenerated Scripts',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            try {
+              await startApproveRegeneratedScripts(rawScriptEdits);
+            } catch (error) {
+              Alert.alert(
+                'Approval Failed',
+                error instanceof Error ? error.message : 'Unable to approve regenerated scripts.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
   const handleReview = () => {
     if (!job) return;
     router.push({ pathname: '/admin/job/[id]/review', params: { id: job.id } });
@@ -70,12 +150,27 @@ export default function JobDetailScreen() {
   const isCourseRegenAwaitingPublish =
     job.contentType === 'course' &&
     job.status === 'completed' &&
-    Boolean(job.courseRegeneration?.active && job.courseRegeneration.requiresPublishApproval);
+    Boolean(
+      job.courseRegeneration?.active &&
+        job.courseRegeneration.requiresPublishApproval &&
+        !job.courseRegeneration.awaitingScriptApproval
+    );
+  const isCourseRegenAwaitingScriptApproval =
+    job.contentType === 'course' &&
+    job.status === 'completed' &&
+    Boolean(
+      job.courseRegeneration?.active &&
+        job.courseRegeneration.mode === 'script_and_audio' &&
+        job.courseRegeneration.awaitingScriptApproval
+    );
   const isAwaitingApproval =
-    isCourseRegenAwaitingPublish ||
-    (job.status === 'completed' && !job.autoPublish && !job.publishedContentId);
+    !isCourseRegenAwaitingScriptApproval &&
+    (isCourseRegenAwaitingPublish ||
+      (job.status === 'completed' && !job.autoPublish && !job.publishedContentId));
   const isReviewable =
-    job.status === 'completed' && (!job.autoPublish || isCourseRegenAwaitingPublish);
+    job.status === 'completed' &&
+    !isCourseRegenAwaitingScriptApproval &&
+    (!job.autoPublish || isCourseRegenAwaitingPublish);
   const isDeletable =
     job.status === 'failed' || (job.status === 'completed' && !job.autoPublish);
   const publishButtonLabel = isCourseRegenAwaitingPublish
@@ -101,6 +196,7 @@ export default function JobDetailScreen() {
         onPublish={handlePublish}
         publishButtonLabel={publishButtonLabel}
         onRegenerateCourse={regenerateCourse}
+        onApproveRegeneratedScripts={handleApproveRegeneratedScripts}
         onDelete={handleDelete}
         onReview={handleReview}
       />

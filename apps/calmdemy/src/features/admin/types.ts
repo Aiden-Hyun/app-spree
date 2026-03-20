@@ -87,6 +87,9 @@ export interface CourseRegenerationRequest {
   mode: CourseRegenerationMode;
   targetSessionCodes: string[];
   requiresPublishApproval: boolean;
+  awaitingScriptApproval?: boolean;
+  scriptApprovedBy?: string;
+  scriptApprovedAt?: Timestamp;
   previousAudioBySession?: Record<string, string>;
   requestedBy?: string;
   requestedAt?: Timestamp;

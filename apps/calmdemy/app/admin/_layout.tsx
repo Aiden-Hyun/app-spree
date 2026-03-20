@@ -60,7 +60,7 @@ export default function AdminLayout() {
       />
       <Stack.Screen
         name="job/[id]"
-        options={{ title: 'Job Details' }}
+        options={{ headerTitle: () => null }}
       />
       <Stack.Screen
         name="job/[id]/review"

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Modal,
   View,
   Text,
   ScrollView,
@@ -9,6 +10,8 @@ import {
   ActivityIndicator,
   Image,
   TextInput,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
@@ -47,6 +50,7 @@ type Props = {
     targetSessionCodes: string[];
     formattedScriptEdits?: Record<string, string>;
   }) => Promise<void>;
+  onApproveRegeneratedScripts: (rawScriptEdits?: Record<string, string>) => Promise<void>;
   onDelete: () => void;
   onReview: () => void;
 };
@@ -81,10 +85,12 @@ export function JobDetailView({
   onPublish,
   publishButtonLabel = 'Publish Now',
   onRegenerateCourse,
+  onApproveRegeneratedScripts,
   onDelete,
   onReview,
 }: Props) {
   const { theme } = useTheme();
+  const { width: viewportWidth } = useWindowDimensions();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [errorManuallyCollapsed, setErrorManuallyCollapsed] = useState(false);
@@ -94,8 +100,14 @@ export function JobDetailView({
   const [selectedRegenerationSessions, setSelectedRegenerationSessions] = useState<string[]>([]);
   const [regenerationScriptEdits, setRegenerationScriptEdits] = useState<Record<string, string>>({});
   const [regenerating, setRegenerating] = useState(false);
+  const [approvingScripts, setApprovingScripts] = useState(false);
+  const [approvalScriptEdits, setApprovalScriptEdits] = useState<Record<string, string>>({});
+  const [showScriptApprovalModal, setShowScriptApprovalModal] = useState(false);
 
-  const courseScripts = job.courseFormattedScripts || job.courseRawScripts || {};
+  const courseScripts = useMemo(
+    () => mergeCourseScripts(job.courseRawScripts, job.courseFormattedScripts),
+    [job.courseFormattedScripts, job.courseRawScripts]
+  );
   const courseScriptKeys = Object.keys(courseScripts).sort(
     (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
   );
@@ -107,6 +119,19 @@ export function JobDetailView({
         : null,
     [job, timeline]
   );
+  const isAwaitingRegeneratedScriptApproval = Boolean(
+    job.contentType === 'course' &&
+      job.status === 'completed' &&
+      job.courseRegeneration?.active &&
+      job.courseRegeneration.mode === 'script_and_audio' &&
+      job.courseRegeneration.awaitingScriptApproval
+  );
+  const approvalSessionCodes =
+    isAwaitingRegeneratedScriptApproval &&
+    Array.isArray(job.courseRegeneration?.targetSessionCodes)
+      ? job.courseRegeneration.targetSessionCodes
+      : [];
+  const approvalSessionCodesKey = approvalSessionCodes.join('|');
 
   useEffect(() => {
     const initial: Record<string, boolean> = {};
@@ -116,24 +141,175 @@ export function JobDetailView({
     if (job.error) {
       initial.error = true;
     }
+    if (isAwaitingRegeneratedScriptApproval) {
+      initial.courseRegeneration = true;
+      initial.courseScripts = true;
+    }
     setExpandedSections(initial);
     setErrorManuallyCollapsed(false);
     if (job.contentType === 'course') {
-      const scripts = job.courseFormattedScripts || job.courseRawScripts || {};
+      const scripts = mergeCourseScripts(job.courseRawScripts, job.courseFormattedScripts);
       const sorted = Object.keys(scripts).sort(
         (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
       );
-      const firstScript = sorted[0] || '';
+      const awaitingScriptApproval = Boolean(
+        job.courseRegeneration?.active &&
+          job.courseRegeneration.mode === 'script_and_audio' &&
+          job.courseRegeneration.awaitingScriptApproval
+      );
+      const firstTargetScript =
+        awaitingScriptApproval &&
+        Array.isArray(job.courseRegeneration?.targetSessionCodes)
+          ? job.courseRegeneration?.targetSessionCodes.find((code) => sorted.includes(code))
+          : '';
+      const firstScript = firstTargetScript || sorted[0] || '';
       setSelectedCourseScript(firstScript);
       setRegenerationMode('audio_only');
       setRegenerationScriptEdits({});
       setSelectedRegenerationSessions([]);
     }
-  }, [job.id, job.error, job.courseFormattedScripts, job.courseRawScripts, job.contentType]);
+  }, [
+    job.id,
+    job.error,
+    job.courseFormattedScripts,
+    job.courseRawScripts,
+    job.contentType,
+    isAwaitingRegeneratedScriptApproval,
+  ]);
 
   useEffect(() => {
     setPipelineTab('pipeline');
   }, [job.id]);
+
+  useEffect(() => {
+    if (isAwaitingRegeneratedScriptApproval) {
+      setShowScriptApprovalModal(true);
+      return;
+    }
+    setShowScriptApprovalModal(false);
+  }, [isAwaitingRegeneratedScriptApproval, job.id]);
+
+  useEffect(() => {
+    if (!isAwaitingRegeneratedScriptApproval) {
+      setApprovalScriptEdits({});
+      return;
+    }
+
+    const nextApprovalEdits: Record<string, string> = {};
+    approvalSessionCodes.forEach((sessionCode) => {
+      nextApprovalEdits[sessionCode] = String(
+        (job.courseRawScripts || {})[sessionCode] ||
+          courseScripts[sessionCode] ||
+          ''
+      );
+    });
+    setApprovalScriptEdits(nextApprovalEdits);
+  }, [
+    job.id,
+    isAwaitingRegeneratedScriptApproval,
+    approvalSessionCodesKey,
+    job.courseRawScripts,
+    courseScripts,
+  ]);
+
+  const handleApprovePendingScripts = async () => {
+    if (approvingScripts) {
+      return;
+    }
+
+    const nextEdits: Record<string, string> = {};
+
+    for (const sessionCode of approvalSessionCodes) {
+      const script = String(approvalScriptEdits[sessionCode] || '').trim();
+      if (!script) {
+        Alert.alert(
+          'Script Required',
+          `${getCourseScriptTitle(sessionCode, job.coursePlan)} cannot be empty.`
+        );
+        return;
+      }
+      nextEdits[sessionCode] = script;
+    }
+
+    try {
+      setApprovingScripts(true);
+      await onApproveRegeneratedScripts(nextEdits);
+      setShowScriptApprovalModal(false);
+      Alert.alert(
+        'Approval Started',
+        `Approved ${approvalSessionCodes.length} session${approvalSessionCodes.length > 1 ? 's' : ''}. Audio generation will begin shortly.`
+      );
+    } catch (error) {
+      Alert.alert(
+        'Approval Failed',
+        error instanceof Error ? error.message : 'Unable to approve regenerated scripts.'
+      );
+    } finally {
+      setApprovingScripts(false);
+    }
+  };
+
+  const startPendingScriptRegeneration = async () => {
+    if (approvalSessionCodes.length === 0 || regenerating) {
+      return;
+    }
+
+    try {
+      setRegenerating(true);
+      await onRegenerateCourse({
+        mode: 'script_and_audio',
+        targetSessionCodes: approvalSessionCodes,
+      });
+      setShowScriptApprovalModal(false);
+      Alert.alert(
+        'Regeneration Started',
+        `Queued regeneration for ${approvalSessionCodes.length} session${approvalSessionCodes.length > 1 ? 's' : ''}.`
+      );
+    } catch (error) {
+      Alert.alert(
+        'Regeneration Failed',
+        error instanceof Error ? error.message : 'Unable to regenerate scripts.'
+      );
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleRegeneratePendingScripts = () => {
+    if (approvalSessionCodes.length === 0 || regenerating) {
+      return;
+    }
+
+    const message =
+      'This will discard the current regenerated scripts and generate a new version for the same sessions. Continue?';
+
+    if (Platform.OS === 'web') {
+      const webConfirm = (
+        globalThis as typeof globalThis & { confirm?: (value?: string) => boolean }
+      ).confirm;
+      const confirmed =
+        typeof webConfirm === 'function' ? webConfirm(message) : true;
+      if (!confirmed) {
+        return;
+      }
+      void startPendingScriptRegeneration();
+      return;
+    }
+
+    Alert.alert(
+      'Regenerate Again',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Regenerate',
+          onPress: () => {
+            void startPendingScriptRegeneration();
+          },
+        },
+      ]
+    );
+  };
 
   const createdDate = job.createdAt?.toDate
     ? job.createdAt.toDate().toLocaleString()
@@ -162,9 +338,20 @@ export function JobDetailView({
     regenerating,
     setRegenerating,
     onRegenerateCourse,
+    onOpenScriptApprovalModal: () => setShowScriptApprovalModal(true),
+    onRegeneratePendingScripts: handleRegeneratePendingScripts,
   });
 
   const visibleSections = sections.filter((section) => section.shouldRender);
+  const webSectionColumns = getWebSectionColumns(viewportWidth);
+  const useWebSectionColumns = Platform.OS === 'web' && webSectionColumns > 1;
+  const webSectionLayout = useMemo(
+    () =>
+      useWebSectionColumns
+        ? buildWebSectionColumns(visibleSections, expandedSections, webSectionColumns)
+        : [],
+    [visibleSections, expandedSections, webSectionColumns, useWebSectionColumns]
+  );
   const allExpanded =
     visibleSections.length > 0 &&
     visibleSections.every((section) => expandedSections[section.id]);
@@ -205,111 +392,260 @@ export function JobDetailView({
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Job Details</Text>
-        <Pressable
-          style={({ pressed }) => [
-            styles.controlButton,
-            pressed && { opacity: 0.85 },
-          ]}
-          onPress={allExpanded ? handleCollapseAll : handleExpandAll}
-        >
-          <Ionicons
-            name={allExpanded ? 'contract-outline' : 'expand-outline'}
-            size={16}
-            color={theme.colors.text}
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Job Details</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.controlButton,
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={allExpanded ? handleCollapseAll : handleExpandAll}
+          >
+            <Ionicons
+              name={allExpanded ? 'contract-outline' : 'expand-outline'}
+              size={16}
+              color={theme.colors.text}
+            />
+          </Pressable>
+        </View>
+
+        <View style={styles.statusCard}>
+          <Text style={styles.statusLabel}>Current Status</Text>
+          <Text
+            style={[
+              styles.statusValue,
+              {
+                color:
+                  job.status === 'completed'
+                    ? theme.colors.success
+                    : job.status === 'failed'
+                      ? theme.colors.error
+                      : theme.colors.primary,
+              },
+            ]}
+          >
+            {JOB_STATUS_LABELS[job.status]}
+          </Text>
+        </View>
+
+        {useWebSectionColumns ? (
+          <View style={styles.sectionColumns}>
+            {webSectionLayout.map((column, columnIndex) => (
+              <View key={`section-column-${columnIndex}`} style={styles.sectionColumn}>
+                {column.map((section) => {
+                  const isExpanded = Boolean(expandedSections[section.id]);
+
+                  return (
+                    <CollapsibleSection
+                      key={section.id}
+                      title={section.title}
+                      summaryItems={section.summaryItems}
+                      expanded={isExpanded}
+                      onToggle={() => toggleSection(section.id)}
+                    >
+                      {section.content}
+                    </CollapsibleSection>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.sectionStack}>
+            {visibleSections.map((section) => {
+              const isExpanded = Boolean(expandedSections[section.id]);
+
+              return (
+                <CollapsibleSection
+                  key={section.id}
+                  title={section.title}
+                  summaryItems={section.summaryItems}
+                  expanded={isExpanded}
+                  onToggle={() => toggleSection(section.id)}
+                >
+                  {section.content}
+                </CollapsibleSection>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Actions */}
+        {job.status === 'failed' && (
+          <PrimaryButton
+            label="Retry Job"
+            icon="refresh"
+            color={theme.colors.primary}
+            onPress={onRetry}
           />
-        </Pressable>
-      </View>
+        )}
 
-      <View style={styles.statusCard}>
-        <Text style={styles.statusLabel}>Current Status</Text>
-        <Text
-          style={[
-            styles.statusValue,
-            {
-              color:
-                job.status === 'completed'
-                  ? theme.colors.success
-                  : job.status === 'failed'
-                    ? theme.colors.error
-                    : theme.colors.primary,
-            },
-          ]}
-        >
-          {JOB_STATUS_LABELS[job.status]}
-        </Text>
-      </View>
+        {isAwaitingRegeneratedScriptApproval && (
+          <PrimaryButton
+            label="Review & Approve Scripts"
+            icon="document-text-outline"
+            color={theme.colors.success}
+            onPress={() => setShowScriptApprovalModal(true)}
+          />
+        )}
 
-      {visibleSections.map((section) => (
-        <CollapsibleSection
-          key={section.id}
-          title={section.title}
-          summaryItems={section.summaryItems}
-          expanded={Boolean(expandedSections[section.id])}
-          onToggle={() => toggleSection(section.id)}
-        >
-          {section.content}
-        </CollapsibleSection>
-      ))}
+        {isReviewable && (
+          <PrimaryButton
+            label="Review Audio"
+            icon="play-circle-outline"
+            color={theme.colors.primary}
+            onPress={onReview}
+          />
+        )}
 
-      {/* Actions */}
-      {job.status === 'failed' && (
-        <PrimaryButton
-          label="Retry Job"
-          icon="refresh"
-          color={theme.colors.primary}
-          onPress={onRetry}
-        />
-      )}
+        {isAwaitingApproval && (
+          <PrimaryButton
+            label={publishButtonLabel}
+            icon="cloud-upload-outline"
+            color={theme.colors.success}
+            onPress={onPublish}
+          />
+        )}
 
-      {isReviewable && (
-        <PrimaryButton
-          label="Review Audio"
-          icon="play-circle-outline"
-          color={theme.colors.primary}
-          onPress={onReview}
-        />
-      )}
+        {isDeletable && (
+          <PrimaryButton
+            label="Delete Job"
+            icon="trash-outline"
+            color={theme.colors.error}
+            onPress={onDelete}
+          />
+        )}
 
-      {isAwaitingApproval && (
-        <PrimaryButton
-          label={publishButtonLabel}
-          icon="cloud-upload-outline"
-          color={theme.colors.success}
-          onPress={onPublish}
-        />
-      )}
+        {job.status !== 'completed' && job.status !== 'failed' && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.cancelButton,
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={onCancel}
+          >
+            <Ionicons name="close-circle-outline" size={20} color={theme.colors.error} />
+            <Text style={styles.cancelText}>Cancel Job</Text>
+          </Pressable>
+        )}
 
-      {isDeletable && (
-        <PrimaryButton
-          label="Delete Job"
-          icon="trash-outline"
-          color={theme.colors.error}
-          onPress={onDelete}
-        />
-      )}
+        <View style={{ height: 40 }} />
+      </ScrollView>
 
-      {job.status !== 'completed' && job.status !== 'failed' && (
-        <Pressable
-          style={({ pressed }) => [
-            styles.cancelButton,
-            pressed && { opacity: 0.85 },
-          ]}
-          onPress={onCancel}
-        >
-          <Ionicons name="close-circle-outline" size={20} color={theme.colors.error} />
-          <Text style={styles.cancelText}>Cancel Job</Text>
-        </Pressable>
-      )}
+      <Modal
+        visible={isAwaitingRegeneratedScriptApproval && showScriptApprovalModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowScriptApprovalModal(false)}
+      >
+        <View style={styles.approvalModalOverlay}>
+          <View style={styles.approvalModalCard}>
+            <View style={styles.approvalModalHeader}>
+              <View style={styles.approvalModalTitleBlock}>
+                <Text style={styles.approvalModalTitle}>Approve Regenerated Scripts</Text>
+                <Text style={styles.approvalModalSubtitle}>
+                  Review {approvalSessionCodes.length} regenerated session
+                  {approvalSessionCodes.length === 1 ? '' : 's'} before audio generation begins.
+                </Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.approvalModalCloseButton,
+                  pressed && { opacity: 0.75 },
+                ]}
+                onPress={() => setShowScriptApprovalModal(false)}
+              >
+                <Ionicons name="close" size={18} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
 
-      <View style={{ height: 40 }} />
-    </ScrollView>
+            <ScrollView
+              style={styles.approvalModalScroll}
+              contentContainerStyle={styles.approvalModalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.approvalModalBody}>
+                These regenerated scripts are waiting on your approval. Audio generation will stay
+                paused until you confirm them.
+              </Text>
+              <View style={styles.scriptEditorList}>
+                {approvalSessionCodes.map((sessionCode) => {
+                  const script = approvalScriptEdits[sessionCode] ?? '';
+                  return (
+                    <View key={sessionCode} style={styles.scriptEditorCard}>
+                      <Text style={styles.scriptEditorTitle}>
+                        {getCourseScriptTitle(sessionCode, job.coursePlan)}
+                      </Text>
+                      <Text style={styles.scriptEditorMeta}>{sessionCode}</Text>
+                      <TextInput
+                        multiline
+                        editable={!regenerating && !approvingScripts}
+                        style={[styles.scriptEditorInput, styles.approvalScriptEditorInput]}
+                        value={script}
+                        onChangeText={(value) =>
+                          setApprovalScriptEdits((prev) => ({ ...prev, [sessionCode]: value }))
+                        }
+                        placeholder="Edit regenerated script for this session"
+                        placeholderTextColor={theme.colors.textMuted}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.approvalModalActions}>
+              <View style={styles.approvalModalSecondaryRow}>
+                <Pressable
+                  onPress={() => setShowScriptApprovalModal(false)}
+                  style={({ pressed }) => [
+                    styles.approvalModalSecondaryButton,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text style={styles.approvalModalSecondaryButtonText}>Close</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleRegeneratePendingScripts}
+                  disabled={regenerating || approvingScripts}
+                  style={({ pressed }) => [
+                    styles.approvalModalRegenerateButton,
+                    (regenerating || approvingScripts) && { opacity: 0.6 },
+                    pressed && !regenerating && !approvingScripts && { opacity: 0.85 },
+                  ]}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={theme.colors.warning} />
+                  <Text style={styles.approvalModalRegenerateButtonText}>
+                    {regenerating ? 'Starting...' : 'Regenerate Again'}
+                  </Text>
+                </Pressable>
+              </View>
+              <Pressable
+                onPress={() => {
+                  void handleApprovePendingScripts();
+                }}
+                disabled={approvingScripts || regenerating}
+                style={({ pressed }) => [
+                  styles.approvalModalPrimaryButton,
+                  (pressed || approvingScripts || regenerating) && { opacity: 0.85 },
+                ]}
+              >
+                <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+                <Text style={styles.approvalModalPrimaryButtonText}>
+                  {approvingScripts ? 'Starting Audio...' : 'Approve Scripts & Generate Audio'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -340,6 +676,8 @@ function buildSections(params: {
     targetSessionCodes: string[];
     formattedScriptEdits?: Record<string, string>;
   }) => Promise<void>;
+  onOpenScriptApprovalModal: () => void;
+  onRegeneratePendingScripts: () => void;
 }) {
   const {
     job,
@@ -364,6 +702,8 @@ function buildSections(params: {
     regenerating,
     setRegenerating,
     onRegenerateCourse,
+    onOpenScriptApprovalModal,
+    onRegeneratePendingScripts,
   } = params;
 
   const hasCourseConcurrencyData = Boolean(
@@ -383,6 +723,11 @@ function buildSections(params: {
     job.contentType === 'course' && job.status === 'completed';
   const publishedCourseRegeneration = Boolean(job.courseId);
   const requestedRegeneration = job.courseRegeneration;
+  const isAwaitingRegeneratedScriptApproval = Boolean(
+    requestedRegeneration?.active &&
+      requestedRegeneration.mode === 'script_and_audio' &&
+      requestedRegeneration.awaitingScriptApproval
+  );
   const selectedSessionSet = new Set(selectedRegenerationSessions);
 
   const toggleSessionSelection = (sessionCode: string) => {
@@ -905,6 +1250,10 @@ function buildSections(params: {
           label: 'Selected',
           value: selectedRegenerationSessions.length || undefined,
         },
+        {
+          label: 'Approval',
+          value: isAwaitingRegeneratedScriptApproval ? 'Pending script approval' : undefined,
+        },
       ]),
       shouldRender: isCourseRegenerationEligible,
       content: (
@@ -916,9 +1265,63 @@ function buildSections(params: {
           )}
           {requestedRegeneration?.active && (
             <Text style={styles.regenerationActiveMeta}>
-              Pending regeneration: {requestedRegeneration.targetSessionCodes.length} sessions •{' '}
+              {isAwaitingRegeneratedScriptApproval ? 'Scripts ready for approval' : 'Pending regeneration'}:{' '}
+              {requestedRegeneration.targetSessionCodes.length} sessions •{' '}
               {requestedRegeneration.mode === 'script_and_audio' ? 'Script + Audio' : 'Audio only'}
             </Text>
+          )}
+
+          {isAwaitingRegeneratedScriptApproval && (
+            <View style={styles.regenerationApprovalCard}>
+              <Text style={styles.regenerationBanner}>
+                Review the regenerated scripts below or in Course Scripts, then confirm before audio generation starts.
+              </Text>
+              <View style={styles.scriptEditorList}>
+                {requestedRegeneration?.targetSessionCodes.map((sessionCode) => {
+                  const script = courseScripts[sessionCode] || '';
+                  return (
+                    <View key={sessionCode} style={styles.scriptEditorCard}>
+                      <Text style={styles.scriptEditorTitle}>
+                        {getCourseScriptTitle(sessionCode, job.coursePlan)}
+                      </Text>
+                      <Text style={styles.scriptEditorMeta}>{sessionCode}</Text>
+                      <View style={styles.regeneratedScriptPreview}>
+                        <ScrollView nestedScrollEnabled>
+                          <Text style={styles.scriptText}>
+                            {script || 'Script preview unavailable.'}
+                          </Text>
+                        </ScrollView>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={styles.regenerationButtonRow}>
+                <Pressable
+                  onPress={onOpenScriptApprovalModal}
+                  style={({ pressed }) => [
+                    styles.regenerationButton,
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Ionicons name="create-outline" size={16} color="#fff" />
+                  <Text style={styles.regenerationButtonText}>Review / Edit Scripts</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onRegeneratePendingScripts}
+                  disabled={regenerating}
+                  style={({ pressed }) => [
+                    styles.regenerationSecondaryButton,
+                    regenerating && { opacity: 0.6 },
+                    pressed && !regenerating && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text style={styles.regenerationSecondaryButtonText}>
+                    {regenerating ? 'Starting...' : 'Regenerate Again'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
           )}
 
           <View style={styles.regenerationModeRow}>
@@ -1186,6 +1589,80 @@ function getErrorType(error?: string) {
   return (parts[0] || 'Error').trim();
 }
 
+function getWebSectionColumns(viewportWidth: number) {
+  if (Platform.OS !== 'web') return 1;
+  if (viewportWidth >= 1680) return 4;
+  if (viewportWidth >= 1180) return 3;
+  if (viewportWidth >= 860) return 2;
+  return 1;
+}
+
+function buildWebSectionColumns<T extends { id: string; summaryItems?: SummaryItem[] }>(
+  sections: T[],
+  expandedSections: Record<string, boolean>,
+  columnCount: number
+) {
+  const columns = Array.from({ length: columnCount }, () => [] as T[]);
+  const heights = Array.from({ length: columnCount }, () => 0);
+
+  sections.forEach((section) => {
+    const estimatedHeight = estimateWebSectionHeight(
+      section.id,
+      Boolean(expandedSections[section.id]),
+      section.summaryItems?.length || 0
+    );
+    const preferredColumn = getPreferredWebSectionColumn(section.id, columnCount);
+    const targetColumn =
+      preferredColumn !== null
+        ? preferredColumn
+        : heights.indexOf(Math.min(...heights));
+    columns[targetColumn].push(section);
+    heights[targetColumn] += estimatedHeight;
+  });
+
+  return columns;
+}
+
+function estimateWebSectionHeight(sectionId: string, expanded: boolean, summaryCount: number) {
+  if (!expanded) {
+    return 1.4 + summaryCount * 0.3;
+  }
+
+  const expandedWeights: Record<string, number> = {
+    pipeline: 7.5,
+    stepTimeline: 6.5,
+    courseProgress: 2.4,
+    jobDetails: 5.2,
+    watchdog: 3.2,
+    coursePlan: 6.8,
+    publishedCourse: 2.6,
+    customInstructions: 4.6,
+    generatedScript: 6.2,
+    error: 3.8,
+    imagePrompt: 5.4,
+    thumbnail: 4.8,
+    courseRegeneration: 7.8,
+    output: 3.2,
+    courseScripts: 7.2,
+  };
+
+  return expandedWeights[sectionId] || 4.5;
+}
+
+function getPreferredWebSectionColumn(sectionId: string, columnCount: number) {
+  const preferredColumns: Record<string, number> = {
+    thumbnail: 1,
+    courseScripts: 2,
+  };
+
+  const preferredColumn = preferredColumns[sectionId];
+  if (preferredColumn === undefined) {
+    return null;
+  }
+
+  return Math.min(preferredColumn, columnCount - 1);
+}
+
 const COURSE_LABELS: Record<string, string> = {
   INT: 'Course Intro',
   M1L: 'Module 1 — Lesson',
@@ -1199,6 +1676,16 @@ const COURSE_LABELS: Record<string, string> = {
 };
 
 const COURSE_SUFFIX_ORDER = Object.keys(COURSE_LABELS);
+
+function mergeCourseScripts(
+  rawScripts?: Record<string, string>,
+  formattedScripts?: Record<string, string>
+): Record<string, string> {
+  return {
+    ...(rawScripts || {}),
+    ...(formattedScripts || {}),
+  };
+}
 
 function getCanonicalCourseSessionCodes(job: ContentJob): string[] {
   const knownCodes = new Set<string>();
@@ -1253,16 +1740,27 @@ function truncate(value: string, max: number) {
   return value.slice(0, max) + '...';
 }
 
+function getDisplayValue(value: string) {
+  if (Platform.OS !== 'web' || value.length < 48) {
+    return value;
+  }
+
+  return value
+    .replace(/([/:?&#=._-])/g, '$1\u200b')
+    .replace(/([A-Za-z0-9]{18})(?=[A-Za-z0-9])/g, '$1\u200b');
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   const { theme } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', paddingVertical: 8 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 8 }}>
       <Text
         style={{
           fontFamily: 'DMSans-Medium',
           fontSize: 14,
           color: theme.colors.textMuted,
           width: 120,
+          paddingRight: 12,
         }}
       >
         {label}
@@ -1273,9 +1771,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
           fontSize: 14,
           color: theme.colors.text,
           flex: 1,
+          width: 0,
+          minWidth: 0,
+          flexShrink: 1,
         }}
       >
-        {value}
+        {getDisplayValue(value)}
       </Text>
     </View>
   );
@@ -1372,6 +1873,18 @@ const createStyles = (theme: Theme) =>
       borderWidth: 1,
       borderColor: theme.colors.gray[200],
     },
+    sectionStack: {
+      width: '100%',
+    },
+    sectionColumns: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 16,
+    },
+    sectionColumn: {
+      flex: 1,
+      minWidth: 0,
+    },
     pipelinePanel: {
       gap: 12,
     },
@@ -1425,6 +1938,14 @@ const createStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.textMuted,
       marginBottom: 8,
+    },
+    regenerationApprovalCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      borderRadius: 14,
+      backgroundColor: theme.colors.gray[50],
+      padding: 12,
+      marginBottom: 12,
     },
     regenerationModeRow: {
       flexDirection: 'row',
@@ -1539,6 +2060,132 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.text,
       textAlignVertical: 'top',
       backgroundColor: theme.colors.gray[50],
+    },
+    regeneratedScriptPreview: {
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      borderRadius: 10,
+      backgroundColor: theme.colors.background,
+      maxHeight: 220,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    approvalModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 24,
+    },
+    approvalModalCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 20,
+      padding: 16,
+      maxHeight: '88%',
+      gap: 12,
+      ...theme.shadows.md,
+    },
+    approvalModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    approvalModalTitleBlock: {
+      flex: 1,
+      gap: 4,
+    },
+    approvalModalTitle: {
+      fontFamily: 'DMSans-Bold',
+      fontSize: 18,
+      color: theme.colors.text,
+    },
+    approvalModalSubtitle: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 13,
+      lineHeight: 19,
+      color: theme.colors.textMuted,
+    },
+    approvalModalCloseButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.gray[100],
+    },
+    approvalModalScroll: {
+      flexGrow: 0,
+    },
+    approvalModalScrollContent: {
+      paddingBottom: 4,
+    },
+    approvalModalBody: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 13,
+      lineHeight: 20,
+      color: theme.colors.text,
+      marginBottom: 10,
+    },
+    approvalModalActions: {
+      gap: 10,
+    },
+    approvalModalSecondaryRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    approvalModalSecondaryButton: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[300],
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.background,
+    },
+    approvalModalSecondaryButtonText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    approvalModalRegenerateButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: theme.colors.warning,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      backgroundColor: theme.colors.background,
+    },
+    approvalModalRegenerateButtonText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.warning,
+    },
+    approvalModalPrimaryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      backgroundColor: theme.colors.primary,
+    },
+    approvalModalPrimaryButtonText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: '#fff',
+    },
+    approvalScriptEditorInput: {
+      minHeight: 180,
+      backgroundColor: theme.colors.background,
     },
     regenerationButtonRow: {
       flexDirection: 'row',

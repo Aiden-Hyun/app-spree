@@ -66,6 +66,44 @@ class WorkerMain:
         )
         self._last_recovery_at = 0.0
 
+    def _recover_stuck_course_publish_steps(self) -> int:
+        recovered = 0
+        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
+        for doc in query.stream():
+            data = doc.to_dict() or {}
+            if str(data.get("job_type") or "").strip().lower() != "course":
+                continue
+
+            run_id = str(data.get("current_run_id") or "").strip()
+            if not run_id:
+                continue
+            if self.run_repo.run_state(run_id) != "running":
+                continue
+
+            if self.orchestrator.recover_course_publish_if_ready(doc.id, run_id):
+                recovered += 1
+
+        return recovered
+
+    def _recover_stuck_course_upload_steps(self) -> int:
+        recovered = 0
+        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
+        for doc in query.stream():
+            data = doc.to_dict() or {}
+            if str(data.get("job_type") or "").strip().lower() != "course":
+                continue
+
+            run_id = str(data.get("current_run_id") or "").strip()
+            if not run_id:
+                continue
+            if self.run_repo.run_state(run_id) != "running":
+                continue
+
+            if self.orchestrator.recover_course_upload_if_ready(doc.id, run_id):
+                recovered += 1
+
+        return recovered
+
     @staticmethod
     def _is_retryable(error_code: str) -> bool:
         return error_code in {
@@ -95,6 +133,7 @@ class WorkerMain:
             "generate_course_scripts": "llm_generating",
             "format_course_scripts": "qa_formatting",
             "generate_course_thumbnail": "image_generating",
+            "synthesize_course_audio_chunk": "tts_converting",
             "synthesize_course_audio": "tts_converting",
             "upload_course_audio": "uploading",
             "publish_course": "publishing",
@@ -182,6 +221,38 @@ class WorkerMain:
                 except Exception as recovery_exc:
                     logger.warning(
                         "V2 queue lease recovery failed",
+                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
+                    )
+
+                try:
+                    upload_recovered = self._recover_stuck_course_upload_steps()
+                    if upload_recovered:
+                        logger.info(
+                            "V2 recovered stuck course upload steps",
+                            extra={
+                                "worker_id": self.worker_id,
+                                "recovered": upload_recovered,
+                            },
+                        )
+                except Exception as recovery_exc:
+                    logger.warning(
+                        "V2 course upload recovery failed",
+                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
+                    )
+
+                try:
+                    publish_recovered = self._recover_stuck_course_publish_steps()
+                    if publish_recovered:
+                        logger.info(
+                            "V2 recovered stuck course publish steps",
+                            extra={
+                                "worker_id": self.worker_id,
+                                "recovered": publish_recovered,
+                            },
+                        )
+                except Exception as recovery_exc:
+                    logger.warning(
+                        "V2 course publish recovery failed",
                         extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
                     )
 

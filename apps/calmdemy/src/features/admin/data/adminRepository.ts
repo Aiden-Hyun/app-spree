@@ -45,6 +45,22 @@ const workerControlCollection = collection(db, 'worker_control');
 const stepRunsCollection = collection(db, 'factory_step_runs');
 const COURSE_SHARD_SUFFIXES = ['INT', 'M1L', 'M1P', 'M2L', 'M2P', 'M3L', 'M3P', 'M4L', 'M4P'];
 
+function freshDispatchResetFields(): Record<string, null | false> {
+  return {
+    jobRunId: null,
+    runAttempt: null,
+    runWorkerId: null,
+    runWorkerRole: null,
+    runStartedAt: null,
+    runContinuedAt: null,
+    v2RunId: null,
+    v2Locked: false,
+    v2DispatchError: null,
+    v2DispatchedBy: null,
+    v2DispatchedAt: null,
+  };
+}
+
 function parseNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
@@ -456,6 +472,7 @@ export async function retryJob(jobId: string): Promise<void> {
     publishInProgress: false,
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
+    ...freshDispatchResetFields(),
   });
 }
 
@@ -545,11 +562,15 @@ export async function regenerateCourseSessions(
     publishLeaseExpiresAt: null,
     courseAudioResults: nextAudioResults,
     courseFormattedScripts: nextFormattedScripts,
+    ...freshDispatchResetFields(),
     courseRegeneration: {
       active: true,
       mode,
       targetSessionCodes,
       requiresPublishApproval,
+      awaitingScriptApproval: false,
+      scriptApprovedBy: null,
+      scriptApprovedAt: null,
       previousAudioBySession,
       requestedBy: userId || null,
       requestedAt: serverTimestamp(),
@@ -561,6 +582,71 @@ export async function regenerateCourseSessions(
   }
 
   await updateDoc(doc(jobsCollection, job.id), payload);
+}
+
+export async function approveRegeneratedCourseScripts(
+  job: ContentJob,
+  rawScriptEdits?: Record<string, string>
+): Promise<void> {
+  if (job.contentType !== 'course') {
+    throw new Error('Script approval is only supported for course jobs.');
+  }
+
+  const regeneration = job.courseRegeneration;
+  if (!regeneration?.active || regeneration.mode !== 'script_and_audio') {
+    throw new Error('There are no regenerated scripts awaiting approval.');
+  }
+  if (!regeneration.awaitingScriptApproval) {
+    throw new Error('This regeneration is not waiting for script approval.');
+  }
+
+  const targetSessionCodes = validateCourseSessionCodes(regeneration.targetSessionCodes || []);
+  if (targetSessionCodes.length === 0) {
+    throw new Error('There are no regenerated sessions awaiting approval.');
+  }
+
+  const nextRawScripts: Record<string, string> = { ...(job.courseRawScripts || {}) };
+  const nextFormattedScripts: Record<string, string> = { ...(job.courseFormattedScripts || {}) };
+  const edits = rawScriptEdits || {};
+
+  for (const sessionCode of targetSessionCodes) {
+    const nextRawScript = Object.prototype.hasOwnProperty.call(edits, sessionCode)
+      ? String(edits[sessionCode] || '').trim()
+      : String(nextRawScripts[sessionCode] || '').trim();
+
+    if (!nextRawScript) {
+      throw new Error(`Script cannot be empty for ${sessionCode}.`);
+    }
+
+    nextRawScripts[sessionCode] = nextRawScript;
+    delete nextFormattedScripts[sessionCode];
+  }
+
+  const userId = getCurrentUserId();
+  await updateDoc(doc(jobsCollection, job.id), {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
+    courseProgress: 'Approved regenerated scripts. Preparing audio generation',
+    courseRawScripts: nextRawScripts,
+    courseFormattedScripts: nextFormattedScripts,
+    ...freshDispatchResetFields(),
+    courseRegeneration: {
+      ...regeneration,
+      awaitingScriptApproval: false,
+      scriptApprovedBy: userId || null,
+      scriptApprovedAt: serverTimestamp(),
+    },
+    updatedAt: serverTimestamp(),
+  });
 }
 
 // ==================== CANCEL JOB ====================
@@ -606,6 +692,7 @@ export async function publishCompletedJob(jobId: string): Promise<void> {
     publishInProgress: false,
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
+    ...freshDispatchResetFields(),
     updatedAt: serverTimestamp(),
   });
 }

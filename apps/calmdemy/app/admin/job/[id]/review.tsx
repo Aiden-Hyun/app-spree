@@ -54,7 +54,10 @@ export default function AdminJobReviewScreen() {
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
   const [loadingAudio, setLoadingAudio] = useState(false);
 
-  const canReview = job?.status === "completed" && !job.autoPublish;
+  const canReview =
+    job?.status === "completed" &&
+    !job.autoPublish &&
+    !job.courseRegeneration?.awaitingScriptApproval;
 
   useEffect(() => {
     let isMounted = true;

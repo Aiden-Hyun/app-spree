@@ -5,12 +5,23 @@ import json
 import math
 import os
 import re
+import shutil
 from typing import Any
 
 import config
 from firebase_admin import firestore as fs
 
 from observability import get_logger
+from factory_v2.shared.voice_utils import get_voice_display_name
+from factory_v2.shared.course_tts_chunks import (
+    assembled_wav_path,
+    chunk_wav_path,
+    cleanup_session_temp_dir,
+    concatenate_wavs,
+    parse_chunk_shard_key,
+    split_course_tts_chunks,
+)
+from factory_v2.shared.qa_formatter import sanitize_narration_script
 
 from .base import StepContext, StepResult
 
@@ -199,6 +210,7 @@ def _build_session_script_prompt(
     approach = params.get("subjectLabel", "CBT")
     tone = params.get("tone", "gentle")
     audience = params.get("targetAudience", "beginner")
+    narrator_name = get_voice_display_name(job_data.get("ttsVoice", "Calmdemy"))
 
     session_type = session_def["type"]
     duration_min = session_def["duration_min"]
@@ -216,8 +228,11 @@ def _build_session_script_prompt(
             f"Intro outline from the course plan:\\n{intro_outline}\\n\\n"
             f"Course goal: {plan.get('courseGoal', '')}\\n\\n"
             f"Rules:\\n"
-            f"- Narrator is Britney Irvine.\\n"
+            f"- Narrator display name: {narrator_name}.\\n"
+            f"- Open with a brief self-introduction using that exact narrator name.\\n"
             f"- Include a short educational disclaimer (not treatment).\\n"
+            f"- Spoken narration only. No markdown, headings, bullets, numbered lists, separators, or speaker labels.\\n"
+            f"- Use natural spoken paragraphs, not article sections.\\n"
             f"- Use [PAUSE Xs] markers for pauses (e.g. [PAUSE 3s]).\\n"
             f"- Write ONLY the narration script. No titles or metadata at the top.\\n"
             f"- End with ---END---"
@@ -243,9 +258,13 @@ def _build_session_script_prompt(
             f"Duration: about {duration_min} minutes (~{words} words)\\n\\n"
             f"Rules:\\n"
             f"- Clear teaching with one example and one tool.\\n"
+            f"- Spoken narration only. No markdown, headings, bullets, numbered lists, speaker labels, or separators.\\n"
+            f"- Use natural spoken paragraphs, not article sections or list formatting.\\n"
+            f"- Define ideas in plain language instead of quoting textbook definitions.\\n"
             f"- Use [PAUSE Xs] markers for pauses.\\n"
             f"- Include a gentle closing and takeaway line.\\n"
             f"- Start with a brief intro connecting to the course theme.\\n"
+            f"- Avoid teaser lines about the next module or next lesson. Keep the close grounded in the current lesson.\\n"
             f"- Write ONLY the narration script. No titles or metadata at the top.\\n"
             f"- End with ---END---"
         )
@@ -268,9 +287,12 @@ def _build_session_script_prompt(
         f"Duration: about {duration_min} minutes (~{words} words)\\n\\n"
         f"Rules:\\n"
         f"- Guided exercise with varied prompts and intentional pauses.\\n"
+        f"- Spoken narration only. No markdown, headings, bullets, numbered lists, speaker labels, or separators.\\n"
+        f"- Use natural spoken paragraphs, not article sections or checklist formatting.\\n"
         f"- Use [PAUSE Xs] markers for pauses (3s-10s).\\n"
         f"- Include re-centering language and reflection.\\n"
         f"- Clear start and end.\\n"
+        f"- Avoid teaser lines about future modules or lessons.\\n"
         f"- Write ONLY the narration script. No titles or metadata at the top.\\n"
         f"- End with ---END---"
     )
@@ -425,7 +447,28 @@ def _session_def_by_shard(shard_key: str) -> dict[str, Any] | None:
     return None
 
 
-def _synthesize_course_session_audio(
+def _course_session_chunks(
+    formatted_scripts: dict[str, str],
+    course_code: str,
+    session_def: dict[str, Any],
+) -> tuple[str, list[str]]:
+    session_code = f"{course_code}{session_def['suffix']}"
+    script = formatted_scripts.get(session_code)
+    if not script:
+        raise ValueError(f"Missing formatted script for {session_code}")
+    chunks = split_course_tts_chunks(script)
+    if not chunks:
+        raise ValueError(f"Unable to derive TTS chunks for {session_code}")
+    return session_code, chunks
+
+
+def _stash_generated_wav(tmp_wav_path: str, output_path: str) -> None:
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    shutil.move(tmp_wav_path, output_path)
+    shutil.rmtree(os.path.dirname(tmp_wav_path), ignore_errors=True)
+
+
+def _synthesize_course_session_audio_inline(
     *,
     ctx: StepContext,
     job_data: dict[str, Any],
@@ -465,6 +508,60 @@ def _synthesize_course_session_audio(
     return session_code
 
 
+def _assemble_course_session_audio(
+    *,
+    ctx: StepContext,
+    job_data: dict[str, Any],
+    formatted_scripts: dict[str, str],
+    audio_results: dict[str, dict[str, Any]],
+    course_code: str,
+    session_def: dict[str, Any],
+) -> str:
+    from factory_v2.shared.audio_processor import post_process_audio
+    from factory_v2.shared.storage_uploader import upload_audio
+    from factory_v2.shared.tts_converter import convert_to_audio
+
+    session_code, chunks = _course_session_chunks(formatted_scripts, course_code, session_def)
+    wav_paths: list[str] = []
+    for chunk_index, chunk_text in enumerate(chunks):
+        part_path = chunk_wav_path(ctx.run_id, session_code, chunk_index)
+        if not part_path.is_file():
+            logger.warning(
+                "Course chunk WAV missing; regenerating during assembly",
+                extra={
+                    "job_id": ctx.job.get("id"),
+                    "session_code": session_code,
+                    "chunk_index": chunk_index,
+                },
+            )
+            tmp_wav_path = convert_to_audio(chunk_text, job_data)
+            _stash_generated_wav(tmp_wav_path, str(part_path))
+        wav_paths.append(str(part_path))
+
+    merged_wav_path = assembled_wav_path(ctx.run_id, session_code)
+    concatenate_wavs(wav_paths, str(merged_wav_path))
+    mp3_path = post_process_audio(str(merged_wav_path))
+
+    session_job_data = {
+        **job_data,
+        "contentType": "course_session",
+        "params": {
+            **(job_data.get("params") or {}),
+            "topic": f"{course_code} {session_def['label']}",
+        },
+    }
+    storage_path, duration_sec = upload_audio(mp3_path, session_job_data)
+    audio_results[session_code] = {
+        "storagePath": storage_path,
+        "durationSec": duration_sec,
+    }
+    merged_audio_results = _persist_course_audio_checkpoint(ctx, audio_results)
+    audio_results.clear()
+    audio_results.update(merged_audio_results)
+    cleanup_session_temp_dir(ctx.run_id, session_code)
+    return session_code
+
+
 def _publish_course(
     db,
     publish_token: str,
@@ -472,8 +569,6 @@ def _publish_course(
     audio_results: dict[str, dict[str, Any]],
     job_data: dict,
 ) -> tuple[str, list[str]]:
-    from factory_v2.shared.voice_utils import get_voice_display_name
-
     params = job_data.get("params", {})
     course_code = params.get("courseCode", "COURSE101")
     course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled"))
@@ -640,7 +735,7 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
         for marker in ["---END---", "<end_of_script>"]:
             if marker in raw_script:
                 raw_script = raw_script[: raw_script.index(marker)].strip()
-        raw_scripts[session_code] = raw_script
+        raw_scripts[session_code] = sanitize_narration_script(raw_script)
 
         logger.info(
             "Course script generated",
@@ -652,6 +747,38 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
         )
 
     preview = {k: f"{v[:200]}..." for k, v in raw_scripts.items()}
+    regeneration = _course_regeneration(runtime, job_data)
+    await_script_approval = (
+        bool(regeneration.get("active"))
+        and str(regeneration.get("mode") or "").strip().lower() == "script_and_audio"
+        and not bool(regeneration.get("scriptApprovedAt") or regeneration.get("scriptApprovedBy"))
+    )
+    if await_script_approval:
+        regeneration["awaitingScriptApproval"] = True
+        target_session_codes = regeneration.get("targetSessionCodes") or []
+        target_count = len(target_session_codes) if isinstance(target_session_codes, list) else 0
+        progress_label = (
+            f"Scripts ready for approval ({target_count} session{'s' if target_count != 1 else ''})"
+        )
+        return StepResult(
+            output={"script_count": len(raw_scripts), "awaiting_script_approval": True},
+            runtime_patch={
+                "course_raw_scripts": raw_scripts,
+                "course_regeneration": regeneration,
+            },
+            summary_patch={
+                "currentStep": "generate_course_scripts",
+                "awaitingScriptApproval": True,
+            },
+            compat_content_job_patch={
+                "status": "completed",
+                "generatedScript": json.dumps(preview, indent=2),
+                "courseRawScripts": raw_scripts,
+                "courseProgress": progress_label,
+                "jobRunId": ctx.run_id,
+                "courseRegeneration": regeneration,
+            },
+        )
 
     return StepResult(
         output={"script_count": len(raw_scripts)},
@@ -728,7 +855,7 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
 
         session_code = f"{course_code}{session_def['suffix']}"
         if not audio_results.get(session_code, {}).get("storagePath"):
-            session_code = _synthesize_course_session_audio(
+            session_code = _assemble_course_session_audio(
                 ctx=ctx,
                 job_data=job_data,
                 formatted_scripts=formatted_scripts,
@@ -755,7 +882,7 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
         session_code = f"{course_code}{session_def['suffix']}"
         if audio_results.get(session_code, {}).get("storagePath"):
             continue
-        session_code = _synthesize_course_session_audio(
+        session_code = _synthesize_course_session_audio_inline(
             ctx=ctx,
             job_data=job_data,
             formatted_scripts=formatted_scripts,
@@ -776,6 +903,69 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
     completed = _count_audio_results(audio_results)
     return StepResult(
         output={"audio_count": completed},
+        summary_patch={"currentStep": "synthesize_course_audio"},
+    )
+
+
+def execute_synthesize_course_audio_chunk(ctx: StepContext) -> StepResult:
+    from factory_v2.shared.tts_converter import convert_to_audio
+
+    job_data = _content_job_data(ctx.job)
+    runtime = _runtime(ctx.job)
+
+    course_code = _course_code(job_data)
+    formatted_scripts: dict[str, str] = dict(
+        runtime.get("course_formatted_scripts") or job_data.get("courseFormattedScripts") or {}
+    )
+    if not formatted_scripts:
+        raise ValueError("Missing runtime.course_formatted_scripts")
+
+    parsed = parse_chunk_shard_key(ctx.shard_key)
+    session_shard = str(
+        (ctx.step_input.get("session_shard") or ctx.step_input.get("session_code") or (parsed[0] if parsed else "")) or ""
+    ).strip().upper()
+    if not session_shard:
+        raise ValueError(f"Missing session shard for course synth chunk '{ctx.shard_key}'")
+
+    session_def = _session_def_by_shard(session_shard)
+    if session_def is None:
+        raise ValueError(f"Unknown course synth chunk shard '{ctx.shard_key}'")
+
+    session_code, chunks = _course_session_chunks(formatted_scripts, course_code, session_def)
+
+    chunk_index_raw = ctx.step_input.get("chunk_index")
+    if chunk_index_raw is None and parsed is not None:
+        chunk_index_raw = parsed[1]
+    chunk_index = int(chunk_index_raw or 0)
+    if chunk_index < 0 or chunk_index >= len(chunks):
+        raise ValueError(
+            f"Chunk index {chunk_index} out of range for {session_code} (chunk_count={len(chunks)})"
+        )
+
+    output_path = chunk_wav_path(ctx.run_id, session_code, chunk_index)
+    if not output_path.is_file():
+        tmp_wav_path = convert_to_audio(chunks[chunk_index], job_data)
+        _stash_generated_wav(tmp_wav_path, str(output_path))
+
+    logger.info(
+        "Course audio chunk synthesized",
+        extra={
+            "job_id": ctx.job.get("id"),
+            "session_code": session_code,
+            "chunk_index": chunk_index,
+            "chunk_count": len(chunks),
+            "shard_key": ctx.shard_key,
+        },
+    )
+
+    return StepResult(
+        output={
+            "session_code": session_code,
+            "session_shard": session_shard,
+            "chunk_index": chunk_index,
+            "chunk_count": len(chunks),
+            "chunk_wav_path": str(output_path),
+        },
         summary_patch={"currentStep": "synthesize_course_audio"},
     )
 

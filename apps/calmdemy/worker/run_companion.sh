@@ -13,6 +13,11 @@ DMS_PY="$DMS_VENV/bin/python"
 DMS_REQ="$WORKER_DIR/requirements.dms.txt"
 DMS_MARKER="$DMS_VENV/.deps_installed"
 
+QWEN_VENV="$WORKER_DIR/.venv-qwen"
+QWEN_PY="$QWEN_VENV/bin/python"
+QWEN_REQ="$WORKER_DIR/requirements.qwen.txt"
+QWEN_MARKER="$QWEN_VENV/.deps_installed"
+
 ensure_venv() {
   local venv_dir="$1"
   local python_bin="$2"
@@ -35,6 +40,7 @@ ensure_venv() {
 
 ensure_venv "$BASE_VENV" "$BASE_PY" "$BASE_REQ" "$BASE_MARKER"
 ensure_venv "$DMS_VENV" "$DMS_PY" "$DMS_REQ" "$DMS_MARKER"
+ensure_venv "$QWEN_VENV" "$QWEN_PY" "$QWEN_REQ" "$QWEN_MARKER"
 
 echo "[companion] Starting local companion..."
 export DMS_DEVICE="cpu"

@@ -56,7 +56,11 @@ class FirestoreQueueRepo:
         supported_tts_models: set[str] | None,
     ) -> bool:
         step_name = str(payload.get("step_name") or "")
-        is_tts_step = step_name in {"synthesize_audio", "synthesize_course_audio"}
+        is_tts_step = step_name in {
+            "synthesize_audio",
+            "synthesize_course_audio",
+            "synthesize_course_audio_chunk",
+        }
         if not is_tts_step:
             return accept_non_tts_steps
 

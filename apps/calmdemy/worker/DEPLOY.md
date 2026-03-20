@@ -10,8 +10,8 @@ This deployment guide covers the V2-only content factory runtime.
 
 ## Prerequisites
 
-- Python venv at `worker/.venv`
-- Python venv at `worker/.venv-dms` (for DMS stack isolation)
+- Python 3 with `venv` support
+- `./run_companion.sh` provisions `worker/.venv`, `worker/.venv-dms`, and `worker/.venv-qwen`
 - Firebase Admin credentials available (`GOOGLE_APPLICATION_CREDENTIALS` or `worker/service-account-key.json`)
 - App dependencies installed (`npm install` in app root)
 - Stack manifest configured in `worker/worker_stacks.json`
@@ -30,11 +30,14 @@ firebase deploy --only firestore:indexes
 From `apps/calmdemy/worker`:
 
 ```bash
-python3 local_companion.py
+./run_companion.sh
 ```
 
 Companion starts/stops `local_worker.py` automatically based on `worker_control/local` and queue state.
-In multi-stack mode, it starts one process per enabled stack definition.
+In multi-stack mode, it starts one process per expanded stack definition.
+The bootstrap script provisions `.venv`, `.venv-dms`, and `.venv-qwen` before launch.
+`desiredState=auto` is the demand-based mode: it starts only the stacks needed for current queue work and scales unused stacks back down.
+`desiredState=running` remains the manual override that keeps all enabled stacks up.
 
 ## 3) Optional Runtime Tuning
 
@@ -44,12 +47,14 @@ Set env vars in `worker/.env` as needed:
 - `V2_POLL_INTERVAL_SECONDS=1.0`
 - `V2_MAX_STEP_RETRIES=2`
 - `WORKER_STACKS_FILE=/absolute/path/to/worker_stacks.json` (optional)
+- `QWEN_TTS_DEVICE=auto` (default; resolves `cuda`, then `mps`, then `cpu`)
 
 ## 4) Verify Worker Health
 
 - `worker_stacks_status/local` shows expected enabled stacks + capabilities
 - each enabled stack has running PID in `worker_stacks_status/local.stacks[*].pid`
 - `worker_log_tails/<stackId>` streams logs per stack
+- Qwen replicas appear as distinct stack ids such as `local-tts-qwen-2`
 
 ## 5) Validate End-to-End
 

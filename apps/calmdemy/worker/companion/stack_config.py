@@ -55,6 +55,7 @@ _DEFAULT_STACKS = [
         "id": "local-tts-qwen",
         "role": "tts",
         "venv": ".venv-qwen",
+        "replicas": 3,
         "enabled": True,
         "dispatch": False,
         "acceptNonTtsSteps": False,
@@ -95,6 +96,21 @@ def _normalize_tts_models(raw: Any) -> list[str]:
     return normalized
 
 
+def _as_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return default
+    return default
+
+
 def _legacy_single_stack() -> list[dict]:
     return [
         {
@@ -114,6 +130,7 @@ def _normalize_stack(raw: dict, index: int) -> dict:
     role = str(raw.get("role") or "v2").strip()
     venv = str(raw.get("venv") or ".venv").strip()
     enabled = _as_bool(raw.get("enabled"), True)
+    replicas = max(1, _as_int(raw.get("replicas"), 1))
 
     dispatch_raw = raw.get("dispatch")
     dispatch = _as_bool(dispatch_raw, role in {"pre", "dispatcher"})
@@ -130,11 +147,26 @@ def _normalize_stack(raw: dict, index: int) -> dict:
         "id": stack_id,
         "role": role or "v2",
         "venv": venv or ".venv",
+        "replicas": replicas,
         "enabled": enabled,
         "dispatch": dispatch,
         "acceptNonTtsSteps": accept_non_tts,
         "ttsModels": tts_models,
     }
+
+
+def _expand_replicated_stacks(stacks: list[dict]) -> list[dict]:
+    expanded: list[dict] = []
+    for stack in stacks:
+        replicas = max(1, _as_int(stack.get("replicas"), 1))
+        for replica_index in range(1, replicas + 1):
+            concrete = dict(stack)
+            concrete["replicas"] = replicas
+            concrete["replicaIndex"] = replica_index
+            if replica_index > 1:
+                concrete["id"] = f"{stack['id']}-{replica_index}"
+            expanded.append(concrete)
+    return expanded
 
 
 def _enforce_dispatcher(stacks: list[dict]) -> list[dict]:
@@ -196,7 +228,8 @@ def load_stack_config(config_path: str | None = None) -> list[dict]:
             raw_stacks = list(_DEFAULT_STACKS)
 
     normalized = [_normalize_stack(stack, idx) for idx, stack in enumerate(raw_stacks)]
-    return _enforce_dispatcher(normalized)
+    expanded = _expand_replicated_stacks(normalized)
+    return _enforce_dispatcher(expanded)
 
 
 def stack_supports_tts_model(stack: dict, tts_model: str) -> bool:

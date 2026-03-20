@@ -20,13 +20,12 @@ from observability import configure_logging, get_logger  # noqa: E402
 from companion.control_loop import (
     init_firebase,
     ensure_control_doc,
+    ensure_running_wrapper,
     run_control_loop,
-    update_control,
 )
 from companion.dedupe import WakeDeduper
 from companion.listener import start_job_listener
 from companion.wake_server import start_wake_server
-from companion.stacks import ensure_running
 
 # Load .env file if present
 try:
@@ -68,7 +67,7 @@ def main() -> None:
     deduper = WakeDeduper(WAKE_DEDUP_WINDOW_SEC)
 
     def _ensure_running(force: bool):
-        ensure_running(db, lambda data: update_control(db, data), force)
+        ensure_running_wrapper(db, force)
 
     listener = None
     if ENABLE_JOB_LISTENER:
@@ -101,4 +100,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
