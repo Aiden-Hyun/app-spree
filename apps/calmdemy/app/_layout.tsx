@@ -5,6 +5,7 @@ import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useFonts } from '@shared/hooks/useFonts';
 import { lightColors } from '@/theme';
 import { AppProviders } from '@core/providers/AppProviders';
+import { initReactGrab } from '@/dev/reactGrab';
 
 function LoadingScreen() {
   return (
@@ -153,6 +154,10 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const { fontsLoaded, fontError } = useFonts();
+
+  useEffect(() => {
+    initReactGrab();
+  }, []);
 
   // Log font errors for debugging
   useEffect(() => {

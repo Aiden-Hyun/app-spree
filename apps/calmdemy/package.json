@@ -52,6 +52,7 @@
     "firebase-admin": "^13.6.0",
     "jsdom": "^28.0.0",
     "music-metadata": "^11.10.3",
+    "react-grab": "^0.1.28",
     "typescript": "~5.9.2",
     "vitest": "^1.0.0"
   }
