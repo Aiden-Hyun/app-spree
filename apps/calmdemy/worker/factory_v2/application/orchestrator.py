@@ -241,6 +241,68 @@ class Orchestrator:
                     },
                 )
 
+    def _maybe_enqueue_ready_course_audio_session(
+        self,
+        job: dict,
+        job_id: str,
+        run_id: str,
+        session_shard: str,
+    ) -> bool:
+        shard = str(session_shard or "").strip().upper()
+        if shard not in COURSE_AUDIO_SHARDS:
+            return False
+
+        runtime_shards = self._completed_course_audio_shards(job)
+        if shard in runtime_shards:
+            return False
+
+        succeeded_session_shards = self.step_run_repo.succeeded_shard_keys(
+            job_id,
+            run_id,
+            "synthesize_course_audio",
+        )
+        if shard in succeeded_session_shards:
+            return False
+
+        failed_session_shards = self.step_run_repo.failed_shard_keys(
+            job_id,
+            run_id,
+            "synthesize_course_audio",
+        )
+        if shard in failed_session_shards:
+            return False
+
+        try:
+            expected_chunk_shards = set(self._course_audio_chunk_shards(job, shard))
+        except ValueError:
+            return False
+
+        failed_chunk_shards = self.step_run_repo.failed_shard_keys(
+            job_id,
+            run_id,
+            COURSE_AUDIO_CHUNK_STEP,
+        )
+        if expected_chunk_shards & failed_chunk_shards:
+            return False
+
+        succeeded_chunk_shards = self.step_run_repo.succeeded_shard_keys(
+            job_id,
+            run_id,
+            COURSE_AUDIO_CHUNK_STEP,
+        )
+        if not expected_chunk_shards.issubset(succeeded_chunk_shards):
+            return False
+
+        self._ensure_step_enqueued(
+            job,
+            job_id,
+            run_id,
+            "synthesize_course_audio",
+            shard_key=shard,
+            step_input={"session_shard": shard},
+        )
+        return True
+
     def _maybe_fan_in_course_audio(self, job: dict, job_id: str, run_id: str) -> bool:
         runtime_shards = self._completed_course_audio_shards(job)
         succeeded_shards = self.step_run_repo.succeeded_shard_keys(
@@ -260,6 +322,22 @@ class Orchestrator:
             self._ensure_step_enqueued(job, job_id, run_id, "upload_course_audio")
             return True
         return False
+
+    def recover_course_audio_fan_in_if_ready(self, job_id: str, run_id: str) -> int:
+        """
+        Heal course runs where all chunk shards for a session succeeded but the
+        session-level synthesize_course_audio step was never enqueued.
+        """
+        job = self.job_repo.get(job_id)
+        if job.get("job_type") != "course":
+            return 0
+
+        recovered = 0
+        for session_shard in COURSE_AUDIO_SHARDS:
+            if self._maybe_enqueue_ready_course_audio_session(job, job_id, run_id, session_shard):
+                recovered += 1
+
+        return recovered
 
     def recover_course_upload_if_ready(self, job_id: str, run_id: str) -> bool:
         """
@@ -343,28 +421,12 @@ class Orchestrator:
                 session_shard = str((parsed_chunk[0] if parsed_chunk else "") or "").strip().upper()
                 if not session_shard:
                     return
-                expected_chunk_shards = set(self._course_audio_chunk_shards(job, session_shard))
-                succeeded_chunk_shards = self.step_run_repo.succeeded_shard_keys(
+                self._maybe_enqueue_ready_course_audio_session(
+                    job,
                     job_id,
                     run_id,
-                    COURSE_AUDIO_CHUNK_STEP,
+                    session_shard,
                 )
-                failed_chunk_shards = self.step_run_repo.failed_shard_keys(
-                    job_id,
-                    run_id,
-                    COURSE_AUDIO_CHUNK_STEP,
-                )
-                if expected_chunk_shards & failed_chunk_shards:
-                    return
-                if expected_chunk_shards.issubset(succeeded_chunk_shards):
-                    self._ensure_step_enqueued(
-                        job,
-                        job_id,
-                        run_id,
-                        "synthesize_course_audio",
-                        shard_key=session_shard,
-                        step_input={"session_shard": session_shard},
-                    )
                 return
             if step_name == "synthesize_course_audio":
                 self._maybe_fan_in_course_audio(job, job_id, run_id)

@@ -66,6 +66,24 @@ class WorkerMain:
         )
         self._last_recovery_at = 0.0
 
+    def _recover_stuck_course_audio_fan_in_steps(self) -> int:
+        recovered = 0
+        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
+        for doc in query.stream():
+            data = doc.to_dict() or {}
+            if str(data.get("job_type") or "").strip().lower() != "course":
+                continue
+
+            run_id = str(data.get("current_run_id") or "").strip()
+            if not run_id:
+                continue
+            if self.run_repo.run_state(run_id) != "running":
+                continue
+
+            recovered += self.orchestrator.recover_course_audio_fan_in_if_ready(doc.id, run_id)
+
+        return recovered
+
     def _recover_stuck_course_publish_steps(self) -> int:
         recovered = 0
         query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
@@ -221,6 +239,22 @@ class WorkerMain:
                 except Exception as recovery_exc:
                     logger.warning(
                         "V2 queue lease recovery failed",
+                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
+                    )
+
+                try:
+                    fan_in_recovered = self._recover_stuck_course_audio_fan_in_steps()
+                    if fan_in_recovered:
+                        logger.info(
+                            "V2 recovered stuck course audio fan-in steps",
+                            extra={
+                                "worker_id": self.worker_id,
+                                "recovered": fan_in_recovered,
+                            },
+                        )
+                except Exception as recovery_exc:
+                    logger.warning(
+                        "V2 course audio fan-in recovery failed",
                         extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
                     )
 
