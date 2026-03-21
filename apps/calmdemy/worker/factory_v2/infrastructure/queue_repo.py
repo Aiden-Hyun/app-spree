@@ -14,6 +14,16 @@ class FirestoreQueueRepo:
     def make_queue_id(run_id: str, step_name: str, shard_key: str = "root") -> str:
         return f"{run_id}__{step_name}__{shard_key}"
 
+    def state(self, run_id: str, step_name: str, shard_key: str = "root") -> str | None:
+        snap = self.db.collection("factory_step_queue").document(
+            self.make_queue_id(run_id, step_name, shard_key)
+        ).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        state = str(data.get("state") or "").strip()
+        return state or None
+
     def enqueue(
         self,
         job_id: str,

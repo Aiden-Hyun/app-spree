@@ -270,6 +270,16 @@ class FirestoreStepRunRepo:
     def failed_shard_keys(self, job_id: str, run_id: str, step_name: str) -> set[str]:
         return self._shard_keys_by_state(job_id, run_id, step_name, "failed")
 
+    def state(self, run_id: str, step_name: str, shard_key: str = "root") -> str | None:
+        snap = self.db.collection("factory_step_runs").document(
+            self.make_step_run_id(run_id, step_name, shard_key)
+        ).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict() or {}
+        state = str(data.get("state") or "").strip()
+        return state or None
+
     def mark_running(
         self,
         step_run_id: str,

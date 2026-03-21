@@ -241,6 +241,55 @@ class Orchestrator:
                     },
                 )
 
+    def recover_course_audio_fan_out_if_ready(self, job_id: str, run_id: str) -> int:
+        """
+        Heal course runs where format succeeded but some expected chunk queue items
+        were never created before the worker stopped.
+        """
+        job = self.job_repo.get(job_id)
+        if job.get("job_type") != "course":
+            return 0
+        if not self.step_run_repo.has_succeeded(job_id, run_id, "format_course_scripts"):
+            return 0
+        if self.step_run_repo.has_succeeded(job_id, run_id, "upload_course_audio"):
+            return 0
+
+        completed_shards = self._completed_course_audio_shards(job)
+        recovered = 0
+        for shard in COURSE_AUDIO_SHARDS:
+            if shard in completed_shards:
+                continue
+
+            parent_state = self.step_run_repo.state(run_id, "synthesize_course_audio", shard)
+            if parent_state:
+                continue
+
+            try:
+                expected_chunk_shards = self._course_audio_chunk_shards(job, shard)
+            except ValueError:
+                continue
+
+            for chunk_index, chunk_shard in enumerate(expected_chunk_shards):
+                if self.step_run_repo.state(run_id, COURSE_AUDIO_CHUNK_STEP, chunk_shard):
+                    continue
+                if self.queue_repo.state(run_id, COURSE_AUDIO_CHUNK_STEP, chunk_shard):
+                    continue
+
+                self._ensure_step_enqueued(
+                    job,
+                    job_id,
+                    run_id,
+                    COURSE_AUDIO_CHUNK_STEP,
+                    shard_key=chunk_shard,
+                    step_input={
+                        "session_shard": shard,
+                        "chunk_index": chunk_index,
+                    },
+                )
+                recovered += 1
+
+        return recovered
+
     def _maybe_enqueue_ready_course_audio_session(
         self,
         job: dict,

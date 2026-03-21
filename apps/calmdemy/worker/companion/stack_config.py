@@ -55,7 +55,7 @@ _DEFAULT_STACKS = [
         "id": "local-tts-qwen",
         "role": "tts",
         "venv": ".venv-qwen",
-        "replicas": 3,
+        "replicas": 4,
         "enabled": True,
         "dispatch": False,
         "acceptNonTtsSteps": False,

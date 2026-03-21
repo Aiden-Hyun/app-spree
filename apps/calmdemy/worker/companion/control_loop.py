@@ -33,6 +33,9 @@ SYNTH_STEP_NAMES = {
     "synthesize_course_audio_chunk",
 }
 AUTO_STACK_QUEUE_SCAN_LIMIT = int(os.getenv("AUTO_STACK_QUEUE_SCAN_LIMIT", "200"))
+COMPANION_FACTORY_RECOVERY_INTERVAL_SEC = float(
+    os.getenv("COMPANION_FACTORY_RECOVERY_INTERVAL_SEC", "10")
+)
 
 ACTIVE_STATUSES = [
     "llm_generating",
@@ -324,6 +327,51 @@ def _normalize_desired_state(db, control: dict) -> str:
     return desired_state
 
 
+def _recover_running_course_pipeline_gaps(db) -> dict[str, int]:
+    from factory_v2.application.orchestrator import Orchestrator
+    from factory_v2.infrastructure.firestore_repos import (
+        FirestoreJobRepo,
+        FirestoreRunRepo,
+        FirestoreStepRunRepo,
+    )
+    from factory_v2.infrastructure.queue_repo import FirestoreQueueRepo
+
+    run_repo = FirestoreRunRepo(db)
+    orchestrator = Orchestrator(
+        FirestoreJobRepo(db),
+        run_repo,
+        FirestoreStepRunRepo(db),
+        FirestoreQueueRepo(db),
+    )
+
+    recovered = {
+        "fan_out": 0,
+        "fan_in": 0,
+        "upload": 0,
+        "publish": 0,
+    }
+    query = db.collection("factory_jobs").where("current_state", "==", "running").limit(50)
+    for doc in query.stream():
+        data = doc.to_dict() or {}
+        if str(data.get("job_type") or "").strip().lower() != "course":
+            continue
+
+        run_id = str(data.get("current_run_id") or "").strip()
+        if not run_id:
+            continue
+        if run_repo.run_state(run_id) != "running":
+            continue
+
+        recovered["fan_out"] += orchestrator.recover_course_audio_fan_out_if_ready(doc.id, run_id)
+        recovered["fan_in"] += orchestrator.recover_course_audio_fan_in_if_ready(doc.id, run_id)
+        if orchestrator.recover_course_upload_if_ready(doc.id, run_id):
+            recovered["upload"] += 1
+        if orchestrator.recover_course_publish_if_ready(doc.id, run_id):
+            recovered["publish"] += 1
+
+    return recovered
+
+
 def ensure_running_wrapper(db, force_immediate_start: bool):
     control = get_control(db)
     current_desired = _normalize_desired_state(db, control)
@@ -377,6 +425,7 @@ def ensure_running_wrapper(db, force_immediate_start: bool):
 
 def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
     last_activity_ts = time.time()
+    last_factory_recovery_ts = 0.0
     log_tail_enabled = os.getenv("ENABLE_ADMIN_LOG_TAIL", "true").lower() == "true"
     log_tailer = None
     if log_tail_enabled:
@@ -393,6 +442,19 @@ def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
             control = get_control(db)
             desired_state = _normalize_desired_state(db, control)
             idle_timeout_min = int(control.get("idleTimeoutMin", 10))
+
+            now_ts = time.time()
+            if (
+                desired_state != "stopped"
+                and now_ts - last_factory_recovery_ts >= COMPANION_FACTORY_RECOVERY_INTERVAL_SEC
+            ):
+                last_factory_recovery_ts = now_ts
+                recovered = _recover_running_course_pipeline_gaps(db)
+                if any(recovered.values()):
+                    logger.info(
+                        "Companion recovered factory pipeline gaps",
+                        extra=recovered,
+                    )
 
             stack_defs = stacks.load_worker_stacks()
             enabled_stacks = [s for s in stack_defs if s.get("enabled", True)]

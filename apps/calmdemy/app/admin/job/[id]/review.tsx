@@ -44,6 +44,20 @@ function getPreviewStyle(contentType: string, themeKey?: string): { gradient: [s
   }
 }
 
+function formatAudioLength(seconds?: number) {
+  if (!seconds || seconds < 0) return "";
+  const wholeSeconds = Math.floor(seconds);
+  const hours = Math.floor(wholeSeconds / 3600);
+  const minutes = Math.floor((wholeSeconds % 3600) / 60);
+  const remainingSeconds = wholeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 export default function AdminJobReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -117,24 +131,36 @@ export default function AdminJobReviewScreen() {
             <Text style={styles.emptyText}>No preview sessions available.</Text>
           </View>
         ) : (
-          sessions.map((session) => (
-            <Pressable
-              key={session.code}
-              style={({ pressed }) => [styles.sessionRow, pressed && { opacity: 0.85 }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/admin/job/[id]/review/[sessionCode]",
-                  params: { id: job.id, sessionCode: session.code },
-                })
-              }
-            >
-              <View style={styles.sessionInfo}>
-                <Text style={styles.sessionTitle}>{session.title}</Text>
-                <Text style={styles.sessionMeta}>{session.label}</Text>
-              </View>
-              <Ionicons name="play-circle-outline" size={24} color={theme.colors.text} />
-            </Pressable>
-          ))
+          sessions.map((session) => {
+            const sessionDuration = formatAudioLength(session.durationSec);
+
+            return (
+              <Pressable
+                key={session.code}
+                style={({ pressed }) => [styles.sessionRow, pressed && { opacity: 0.85 }]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/admin/job/[id]/review/[sessionCode]",
+                    params: { id: job.id, sessionCode: session.code },
+                  })
+                }
+              >
+                <View style={styles.sessionInfo}>
+                  <Text style={styles.sessionTitle}>{session.title}</Text>
+                  <View style={styles.sessionMetaRow}>
+                    <Text style={styles.sessionMeta}>{session.label}</Text>
+                    {sessionDuration ? (
+                      <View style={styles.sessionDuration}>
+                        <Ionicons name="time-outline" size={12} color={theme.colors.textMuted} />
+                        <Text style={styles.sessionDurationText}>{sessionDuration}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+                <Ionicons name="play-circle-outline" size={24} color={theme.colors.text} />
+              </Pressable>
+            );
+          })
         )}
       </ScrollView>
     );
@@ -239,6 +265,12 @@ const createStyles = (theme: Theme) =>
       flex: 1,
       marginRight: 12,
     },
+    sessionMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
     sessionTitle: {
       fontFamily: "DMSans-SemiBold",
       fontSize: 16,
@@ -246,8 +278,25 @@ const createStyles = (theme: Theme) =>
       marginBottom: 4,
     },
     sessionMeta: {
+      flex: 1,
       fontFamily: "DMSans-Regular",
       fontSize: 13,
+      color: theme.colors.textMuted,
+    },
+    sessionDuration: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceElevated,
+    },
+    sessionDurationText: {
+      fontFamily: "DMSans-SemiBold",
+      fontSize: 12,
       color: theme.colors.textMuted,
     },
   });

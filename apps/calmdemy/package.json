@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "postinstall": "patch-package",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "check:legacy-freeze": "node scripts/checkLegacyFreeze.js",
@@ -44,7 +45,8 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
-    "react-native-track-player": "^4.1.2"
+    "react-native-track-player": "^4.1.2",
+    "react-native-web": "^0.21.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
@@ -52,6 +54,7 @@
     "firebase-admin": "^13.6.0",
     "jsdom": "^28.0.0",
     "music-metadata": "^11.10.3",
+    "patch-package": "^8.0.1",
     "react-grab": "^0.1.28",
     "typescript": "~5.9.2",
     "vitest": "^1.0.0"

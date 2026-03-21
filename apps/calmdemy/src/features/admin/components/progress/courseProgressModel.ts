@@ -196,6 +196,18 @@ function mergeState(states: ProgressState[]): ProgressState {
   return 'waiting';
 }
 
+function mergeChunkState(states: ProgressState[]): ProgressState {
+  if (states.length === 0) return 'waiting';
+  if (states.includes('failed')) return 'failed';
+  if (states.includes('running')) return 'running';
+  if (states.includes('retrying')) return 'retrying';
+  if (states.every((state) => state === 'succeeded')) return 'succeeded';
+  if (states.every((state) => state === 'cancelled')) return 'cancelled';
+  if (states.includes('succeeded')) return 'running';
+  if (states.includes('queued')) return 'queued';
+  return 'waiting';
+}
+
 export function progressStateFromEntry(entry: JobStepTimelineEntry): ProgressState {
   const state = String(entry.state || '').trim().toLowerCase();
   if (state === 'ready' || state === 'leased') return 'queued';
@@ -235,6 +247,36 @@ function selectRepresentative(entries: JobStepTimelineEntry[]): JobStepTimelineE
   if (entries.length === 0) return undefined;
   return [...entries].sort((a, b) => {
     const stateDelta = statePriority(progressStateFromEntry(b)) - statePriority(progressStateFromEntry(a));
+    if (stateDelta !== 0) return stateDelta;
+    return timestampMs(b) - timestampMs(a);
+  })[0];
+}
+
+function chunkRepresentativePriority(state: ProgressState): number {
+  switch (state) {
+    case 'failed':
+      return 700;
+    case 'running':
+      return 600;
+    case 'retrying':
+      return 500;
+    case 'succeeded':
+      return 400;
+    case 'queued':
+      return 300;
+    case 'cancelled':
+      return 200;
+    default:
+      return 100;
+  }
+}
+
+function selectChunkRepresentative(entries: JobStepTimelineEntry[]): JobStepTimelineEntry | undefined {
+  if (entries.length === 0) return undefined;
+  return [...entries].sort((a, b) => {
+    const stateDelta =
+      chunkRepresentativePriority(progressStateFromEntry(b)) -
+      chunkRepresentativePriority(progressStateFromEntry(a));
     if (stateDelta !== 0) return stateDelta;
     return timestampMs(b) - timestampMs(a);
   })[0];
@@ -356,15 +398,16 @@ export function deriveCourseProgressModel(
   shardSynthEntries.forEach((entries, shardKey) => {
     const sessionEntries = entries.filter((entry) => entry.stepName === 'synthesize_course_audio');
     const chunkEntries = entries.filter((entry) => entry.stepName === CHUNK_SYNTH_STEP);
-    const representative = pickNewestEntry(
-      (sessionEntries.length > 0 ? sessionEntries : chunkEntries).sort((a, b) => timestampMs(b) - timestampMs(a))
-    );
+    const representative =
+      sessionEntries.length > 0
+        ? pickNewestEntry(sessionEntries.sort((a, b) => timestampMs(b) - timestampMs(a)))
+        : selectChunkRepresentative(chunkEntries);
     let state: ProgressState;
     if (sessionEntries.length > 0) {
       state = mergeState(sessionEntries.map(progressStateFromEntry));
     } else {
       const chunkStates = chunkEntries.map(progressStateFromEntry);
-      state = mergeState(chunkStates);
+      state = mergeChunkState(chunkStates);
       if (state === 'succeeded') {
         state = 'running';
       }

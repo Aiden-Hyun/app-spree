@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { ContentJob, JOB_STATUS_LABELS, CONTENT_TYPE_LABELS } from '../types';
+import { formatCourseCode } from '@shared/utils/courseCodeParser';
 import { Theme } from '@/theme';
 
 interface JobCardProps {
@@ -40,6 +41,7 @@ export function JobCard({ job, onPress }: JobCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const statusColor = getStatusColor(job.status, theme);
+  const headline = useMemo(() => getJobHeadline(job), [job]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -69,7 +71,7 @@ export function JobCard({ job, onPress }: JobCardProps) {
       </View>
 
       <Text style={styles.topic} numberOfLines={2}>
-        {job.params.topic}
+        {headline}
       </Text>
 
       <View style={styles.meta}>
@@ -91,6 +93,27 @@ export function JobCard({ job, onPress }: JobCardProps) {
       )}
     </Pressable>
   );
+}
+
+function getJobHeadline(job: ContentJob): string {
+  if (job.contentType === 'course') {
+    const courseCode = formatCourseCode(String(job.params.courseCode || '').trim());
+    const courseTitle = String(job.params.courseTitle || '').trim();
+
+    if (courseCode && courseTitle) {
+      return `${courseCode} — ${courseTitle}`;
+    }
+
+    if (courseTitle) {
+      return courseTitle;
+    }
+
+    if (courseCode) {
+      return courseCode;
+    }
+  }
+
+  return String(job.params.topic || '').trim();
 }
 
 const createStyles = (theme: Theme) =>

@@ -36,7 +36,7 @@ Because of this, a single venv runtime is not a safe default.
 
 ## Default Production Shape
 
-Five-entry manifest / seven-stack runtime default:
+Five-entry manifest / eight-stack runtime default:
 
 1. `local-primary`
    - `venv: .venv`
@@ -60,13 +60,13 @@ Five-entry manifest / seven-stack runtime default:
    - `ttsModels: [dms]`
 5. `local-tts-qwen`
    - `venv: .venv-qwen`
-   - `replicas: 3`
+   - `replicas: 4`
    - `dispatch: false`
    - `acceptNonTtsSteps: false`
    - `ttsModels: [qwen3-base]`
 
-This profile expands to `local-tts-qwen`, `local-tts-qwen-2`, and `local-tts-qwen-3`,
-supporting up to 3 concurrent DMS synth queue items plus 3 concurrent Qwen synth queue items,
+This profile expands to `local-tts-qwen`, `local-tts-qwen-2`, `local-tts-qwen-3`, and `local-tts-qwen-4`,
+supporting up to 3 concurrent DMS synth queue items plus 4 concurrent Qwen synth queue items,
 while preserving one dispatcher/non-TTS executor.
 
 ## When to Add a New Venv
