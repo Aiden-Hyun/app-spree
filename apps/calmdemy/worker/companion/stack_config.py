@@ -5,6 +5,7 @@ import os
 from typing import Any
 
 from observability import get_logger
+from factory_v2.shared.queue_capabilities import worker_capability_keys
 
 logger = get_logger(__name__)
 
@@ -242,6 +243,19 @@ def stack_supports_tts_model(stack: dict, tts_model: str) -> bool:
     if "*" in models:
         return True
     return model in models
+
+
+def stack_capability_keys(stack: dict) -> list[str]:
+    models = [
+        str(value).strip().lower()
+        for value in (stack.get("ttsModels") or [])
+        if str(value).strip()
+    ]
+    supported_tts_models = None if "*" in models else set(models)
+    return worker_capability_keys(
+        accept_non_tts_steps=bool(stack.get("acceptNonTtsSteps", True)),
+        supported_tts_models=supported_tts_models,
+    )
 
 
 def any_enabled_stack_supports_tts_model(stacks: list[dict], tts_model: str) -> bool:

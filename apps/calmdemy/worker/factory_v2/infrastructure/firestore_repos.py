@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from google.api_core.exceptions import AlreadyExists
 from firebase_admin import firestore as fs
@@ -286,6 +287,9 @@ class FirestoreStepRunRepo:
         queue_id: str,
         worker_id: str,
         attempt: int = 1,
+        *,
+        started_at: datetime | None = None,
+        deadline_at: datetime | None = None,
     ) -> None:
         self.db.collection("factory_step_runs").document(step_run_id).set(
             {
@@ -298,17 +302,41 @@ class FirestoreStepRunRepo:
                 "next_attempt": None,
                 "retry_delay_seconds": None,
                 "ended_at": None,
-                "started_at": fs.SERVER_TIMESTAMP,
+                "started_at": started_at or fs.SERVER_TIMESTAMP,
+                "last_heartbeat_at": started_at or fs.SERVER_TIMESTAMP,
+                "deadline_at": deadline_at,
+                "watchdog_state": "running",
+                "progress_detail": None,
                 "updated_at": fs.SERVER_TIMESTAMP,
             },
             merge=True,
         )
+
+    def heartbeat(
+        self,
+        step_run_id: str,
+        worker_id: str,
+        *,
+        deadline_at: datetime,
+        progress_detail: str | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "worker_id": worker_id,
+            "last_heartbeat_at": fs.SERVER_TIMESTAMP,
+            "deadline_at": deadline_at,
+            "watchdog_state": "running",
+            "updated_at": fs.SERVER_TIMESTAMP,
+        }
+        if progress_detail:
+            payload["progress_detail"] = progress_detail
+        self.db.collection("factory_step_runs").document(step_run_id).set(payload, merge=True)
 
     def mark_succeeded(self, step_run_id: str, output: dict) -> None:
         self.db.collection("factory_step_runs").document(step_run_id).set(
             {
                 "state": "succeeded",
                 "output": output,
+                "watchdog_state": "succeeded",
                 "ended_at": fs.SERVER_TIMESTAMP,
                 "updated_at": fs.SERVER_TIMESTAMP,
             },
@@ -332,6 +360,8 @@ class FirestoreStepRunRepo:
                 "worker_id": "checkpoint",
                 "attempt": 1,
                 "started_at": fs.SERVER_TIMESTAMP,
+                "last_heartbeat_at": fs.SERVER_TIMESTAMP,
+                "watchdog_state": "succeeded",
                 "ended_at": fs.SERVER_TIMESTAMP,
                 "updated_at": fs.SERVER_TIMESTAMP,
             },
@@ -344,6 +374,7 @@ class FirestoreStepRunRepo:
                 "state": "failed",
                 "error_code": error_code,
                 "error_message": error_message,
+                "watchdog_state": "failed",
                 "ended_at": fs.SERVER_TIMESTAMP,
                 "updated_at": fs.SERVER_TIMESTAMP,
             },
@@ -365,6 +396,7 @@ class FirestoreStepRunRepo:
                 "error_message": error_message,
                 "next_attempt": next_attempt,
                 "retry_delay_seconds": delay_seconds,
+                "watchdog_state": "retry_scheduled",
                 "updated_at": fs.SERVER_TIMESTAMP,
             },
             merge=True,

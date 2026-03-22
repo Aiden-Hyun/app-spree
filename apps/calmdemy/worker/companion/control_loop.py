@@ -19,7 +19,9 @@ import config
 from observability import get_logger
 from . import stacks
 from .log_tailer import LogTailPublisher
-from .stack_config import stack_supports_tts_model
+from .stack_config import stack_capability_keys, stack_supports_tts_model
+from factory_v2.interfaces.step_watchdog import heartbeat_stale_seconds
+from factory_v2.shared.queue_capabilities import capability_key_for_payload
 
 logger = get_logger(__name__)
 
@@ -36,6 +38,9 @@ AUTO_STACK_QUEUE_SCAN_LIMIT = int(os.getenv("AUTO_STACK_QUEUE_SCAN_LIMIT", "200"
 COMPANION_FACTORY_RECOVERY_INTERVAL_SEC = float(
     os.getenv("COMPANION_FACTORY_RECOVERY_INTERVAL_SEC", "10")
 )
+COMPANION_QUEUE_METRICS_INTERVAL_SEC = float(
+    os.getenv("COMPANION_QUEUE_METRICS_INTERVAL_SEC", "5")
+)
 
 ACTIVE_STATUSES = [
     "llm_generating",
@@ -46,6 +51,136 @@ ACTIVE_STATUSES = [
     "uploading",
     "publishing",
 ]
+
+
+def _queue_metrics_bucket() -> dict:
+    return {
+        "readyCount": 0,
+        "leasedCount": 0,
+        "runningCount": 0,
+        "oldestReadyAgeSec": None,
+        "oldestReadyAt": None,
+        "oldestReadyJobId": None,
+        "oldestReadyRunId": None,
+        "oldestReadyQueueId": None,
+    }
+
+
+def _coerce_datetime(value) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+    if hasattr(value, "timestamp"):
+        return datetime.fromtimestamp(value.timestamp(), tz=timezone.utc)
+    return None
+
+
+def _update_oldest_ready(bucket: dict, payload: dict, now: datetime, queue_id: str) -> None:
+    available_at = _coerce_datetime(payload.get("available_at"))
+    if available_at is None:
+        return
+    current_oldest = _coerce_datetime(bucket.get("oldestReadyAt"))
+    if current_oldest is not None and current_oldest <= available_at:
+        return
+    bucket["oldestReadyAt"] = available_at
+    bucket["oldestReadyAgeSec"] = max(0, int((now - available_at).total_seconds()))
+    bucket["oldestReadyJobId"] = str(payload.get("job_id") or "").strip() or None
+    bucket["oldestReadyRunId"] = str(payload.get("run_id") or "").strip() or None
+    bucket["oldestReadyQueueId"] = queue_id or None
+
+
+def _queue_metrics_bucket_for(snapshot: dict, payload: dict) -> dict:
+    step_name = str(payload.get("step_name") or "").strip()
+    if step_name not in SYNTH_STEP_NAMES:
+        return snapshot["nonTts"]
+
+    model = str(payload.get("required_tts_model") or "").strip().lower()
+    model_key = model or "unassigned"
+    bucket = snapshot["byModel"].get(model_key)
+    if bucket is None:
+        bucket = _queue_metrics_bucket()
+        snapshot["byModel"][model_key] = bucket
+    return bucket
+
+
+def _queue_metrics_capability_bucket(snapshot: dict, payload: dict) -> dict:
+    capability_key = capability_key_for_payload(payload)
+    bucket = snapshot["byCapability"].get(capability_key)
+    if bucket is None:
+        bucket = _queue_metrics_bucket()
+        snapshot["byCapability"][capability_key] = bucket
+    return bucket
+
+
+def _collect_queue_metrics_snapshot(db) -> dict:
+    now = datetime.now(timezone.utc)
+    snapshot = {
+        "capturedAt": now,
+        "totals": _queue_metrics_bucket(),
+        "nonTts": _queue_metrics_bucket(),
+        "byModel": {},
+        "byCapability": {},
+        "runningStepAgeSec": {"byCapability": {}},
+    }
+
+    ready_query = (
+        db.collection(QUEUE_COLLECTION)
+        .where("state", "==", "ready")
+        .where("available_at", "<=", now)
+        .order_by("available_at")
+    )
+    leased_query = db.collection(QUEUE_COLLECTION).where("state", "==", "leased")
+    running_query = db.collection(QUEUE_COLLECTION).where("state", "==", "running")
+
+    for state, query in (
+        ("ready", ready_query),
+        ("leased", leased_query),
+        ("running", running_query),
+    ):
+        count_key = f"{state}Count"
+        for doc in query.stream():
+            payload = doc.to_dict() or {}
+            bucket = _queue_metrics_bucket_for(snapshot, payload)
+            capability_bucket = _queue_metrics_capability_bucket(snapshot, payload)
+            bucket[count_key] += 1
+            capability_bucket[count_key] += 1
+            snapshot["totals"][count_key] += 1
+            if state == "ready":
+                _update_oldest_ready(bucket, payload, now, doc.id)
+                _update_oldest_ready(capability_bucket, payload, now, doc.id)
+                _update_oldest_ready(snapshot["totals"], payload, now, doc.id)
+
+    worker_status_docs = list(db.collection("worker_status").stream())
+    ages_by_capability: dict[str, list[int]] = defaultdict(list)
+    for doc in worker_status_docs:
+        payload = doc.to_dict() or {}
+        current_queue_id = str(payload.get("currentQueueId") or "").strip()
+        started_at = _coerce_datetime(payload.get("currentStepStartedAt"))
+        last_heartbeat = _coerce_datetime(payload.get("lastHeartbeat"))
+        if not current_queue_id or started_at is None or last_heartbeat is None:
+            continue
+        if (now - last_heartbeat).total_seconds() > heartbeat_stale_seconds():
+            continue
+        capability_key = str(payload.get("currentCapabilityKey") or "default").strip() or "default"
+        ages_by_capability[capability_key].append(max(0, int((now - started_at).total_seconds())))
+
+    for capability_key, ages in ages_by_capability.items():
+        ordered = sorted(ages)
+        if not ordered:
+            continue
+        p50_index = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * 0.50))))
+        p95_index = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * 0.95))))
+        snapshot["runningStepAgeSec"]["byCapability"][capability_key] = {
+            "count": len(ordered),
+            "p50": ordered[p50_index],
+            "p95": ordered[p95_index],
+            "max": ordered[-1],
+        }
+
+    return snapshot
 
 
 def init_firebase():
@@ -111,7 +246,12 @@ def get_control(db) -> dict:
     return snapshot.to_dict() or {}
 
 
-def update_stacks_status(db, stack_defs: list[dict], running: dict[str, int]) -> None:
+def update_stacks_status(
+    db,
+    stack_defs: list[dict],
+    running: dict[str, int],
+    queue_metrics: dict | None = None,
+) -> None:
     """Write aggregate status for all stacks (for admin UI)."""
     doc_ref = db.collection("worker_stacks_status").document("local")
     stack_entries = []
@@ -126,6 +266,7 @@ def update_stacks_status(db, stack_defs: list[dict], running: dict[str, int]) ->
             "dispatch": bool(stack_def.get("dispatch", False)),
             "acceptNonTtsSteps": bool(stack_def.get("acceptNonTtsSteps", True)),
             "ttsModels": list(stack_def.get("ttsModels") or []),
+            "capabilityKeys": stack_capability_keys(stack_def),
             "pid": running.get(stack_id),
             "logPath": stacks.log_path(stack_id),
             "lastUpdatedAt": now,
@@ -133,6 +274,7 @@ def update_stacks_status(db, stack_defs: list[dict], running: dict[str, int]) ->
     doc_ref.set(
         {
             "stacks": stack_entries,
+            "queueMetrics": queue_metrics or {},
             "updatedAt": firestore.SERVER_TIMESTAMP,
         },
         merge=True,
@@ -330,46 +472,64 @@ def _normalize_desired_state(db, control: dict) -> str:
 def _recover_running_course_pipeline_gaps(db) -> dict[str, int]:
     from factory_v2.application.orchestrator import Orchestrator
     from factory_v2.infrastructure.firestore_repos import (
+        FirestoreEventRepo,
         FirestoreJobRepo,
         FirestoreRunRepo,
         FirestoreStepRunRepo,
     )
     from factory_v2.infrastructure.queue_repo import FirestoreQueueRepo
+    from factory_v2.interfaces.recovery_manager import RecoveryManager
 
+    stack_defs = stacks.load_worker_stacks()
+    stack_by_id = {str(stack.get("id")): stack for stack in stack_defs}
+
+    def _recycle_worker_stack(worker_id: str, payload: dict) -> dict[str, bool]:
+        stack_id = str(worker_id or "").strip()
+        stack_def = stack_by_id.get(stack_id)
+        running = stacks.running_stack_pids(stack_defs)
+        recycled = False
+        terminated = stack_id not in running
+        if stack_id in running:
+            stacks.stop_worker(stack_id)
+            terminated = not stacks.is_worker_running(stack_id)
+            recycled = terminated
+        if terminated and stack_def and bool(stack_def.get("enabled", True)):
+            running_after = stacks.running_stack_pids(stack_defs)
+            if stack_id not in running_after:
+                stacks.start_worker(stack_def)
+                recycled = True
+        logger.warning(
+            "Companion recycled worker for stuck step",
+            extra={
+                "worker_id": stack_id or None,
+                "run_id": str(payload.get("run_id") or "") or None,
+                "step_name": str(payload.get("step_name") or "") or None,
+                "terminated": terminated,
+                "recycled": recycled,
+            },
+        )
+        return {"terminated": terminated, "recycled": recycled}
+
+    job_repo = FirestoreJobRepo(db)
     run_repo = FirestoreRunRepo(db)
-    orchestrator = Orchestrator(
-        FirestoreJobRepo(db),
-        run_repo,
-        FirestoreStepRunRepo(db),
-        FirestoreQueueRepo(db),
+    step_run_repo = FirestoreStepRunRepo(db)
+    queue_repo = FirestoreQueueRepo(db)
+    recovery_manager = RecoveryManager(
+        db=db,
+        job_repo=job_repo,
+        step_run_repo=step_run_repo,
+        queue_repo=queue_repo,
+        run_repo=run_repo,
+        event_repo=FirestoreEventRepo(db),
+        orchestrator=Orchestrator(
+            job_repo,
+            run_repo,
+            step_run_repo,
+            queue_repo,
+        ),
+        worker_recycler=_recycle_worker_stack,
     )
-
-    recovered = {
-        "fan_out": 0,
-        "fan_in": 0,
-        "upload": 0,
-        "publish": 0,
-    }
-    query = db.collection("factory_jobs").where("current_state", "==", "running").limit(50)
-    for doc in query.stream():
-        data = doc.to_dict() or {}
-        if str(data.get("job_type") or "").strip().lower() != "course":
-            continue
-
-        run_id = str(data.get("current_run_id") or "").strip()
-        if not run_id:
-            continue
-        if run_repo.run_state(run_id) != "running":
-            continue
-
-        recovered["fan_out"] += orchestrator.recover_course_audio_fan_out_if_ready(doc.id, run_id)
-        recovered["fan_in"] += orchestrator.recover_course_audio_fan_in_if_ready(doc.id, run_id)
-        if orchestrator.recover_course_upload_if_ready(doc.id, run_id):
-            recovered["upload"] += 1
-        if orchestrator.recover_course_publish_if_ready(doc.id, run_id):
-            recovered["publish"] += 1
-
-    return recovered
+    return recovery_manager.recover_companion_tick()
 
 
 def ensure_running_wrapper(db, force_immediate_start: bool):
@@ -426,6 +586,8 @@ def ensure_running_wrapper(db, force_immediate_start: bool):
 def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
     last_activity_ts = time.time()
     last_factory_recovery_ts = 0.0
+    last_queue_metrics_ts = 0.0
+    queue_metrics_snapshot: dict | None = None
     log_tail_enabled = os.getenv("ENABLE_ADMIN_LOG_TAIL", "true").lower() == "true"
     log_tailer = None
     if log_tail_enabled:
@@ -460,7 +622,18 @@ def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
             enabled_stacks = [s for s in stack_defs if s.get("enabled", True)]
             running = stacks.running_stack_pids(stack_defs)
             try:
-                update_stacks_status(db, stack_defs, running)
+                if (
+                    queue_metrics_snapshot is None
+                    or now_ts - last_queue_metrics_ts >= COMPANION_QUEUE_METRICS_INTERVAL_SEC
+                ):
+                    queue_metrics_snapshot = _collect_queue_metrics_snapshot(db)
+                    last_queue_metrics_ts = now_ts
+                update_stacks_status(
+                    db,
+                    stack_defs,
+                    running,
+                    queue_metrics=queue_metrics_snapshot,
+                )
             except Exception as e:
                 logger.warning("Failed to update stacks status", extra={"error": str(e)})
             if log_tailer:

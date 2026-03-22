@@ -5,6 +5,7 @@ Each content type maps to its own Firestore collection with the appropriate sche
 """
 
 import math
+import re
 
 from firebase_admin import firestore as fs
 from .voice_utils import get_voice_display_name
@@ -38,6 +39,12 @@ def _generate_title(job_data: dict) -> str:
     if len(title) > 60:
         title = title[:57] + "..."
     return title
+
+
+def _stable_doc_id(value: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]+", "-", str(value or "").strip())
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
+    return cleaned[:120] or "generated-content"
 
 
 def publish_content(
@@ -158,9 +165,19 @@ def publish_content(
     else:
         raise ValueError(f"Unknown content type: {content_type}")
 
-    # Create the document
-    doc_ref = db.collection(collection_name).add(doc_data)
-    content_id = doc_ref[1].id
+    publish_token = str(
+        job_data.get("publishToken")
+        or job_data.get("_factoryContentJobId")
+        or job_data.get("id")
+        or title
+    ).strip()
+    doc_ref = db.collection(collection_name).document(_stable_doc_id(publish_token))
+    existing = doc_ref.get()
+    if existing.exists:
+        doc_data.pop("createdAt", None)
+        doc_data["updatedAt"] = fs.SERVER_TIMESTAMP
+    doc_ref.set(doc_data, merge=True)
+    content_id = doc_ref.id
 
     logger.info(
         "Content document created",

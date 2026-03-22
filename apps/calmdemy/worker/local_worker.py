@@ -14,6 +14,7 @@ from firebase_admin import credentials, firestore
 import config
 from observability import configure_logging, get_logger
 from factory_v2.interfaces.worker_main import WorkerMain
+from factory_v2.shared.queue_capabilities import worker_capability_keys
 
 logger = get_logger(__name__)
 
@@ -57,6 +58,7 @@ def init_firebase():
 def main() -> None:
     configure_logging()
     worker_id = os.getenv("WORKER_ID", "local-v2")
+    process_id = os.getpid()
     poll_seconds = float(os.getenv("V2_POLL_INTERVAL_SECONDS", "1.0"))
     worker_dispatch_raw = os.getenv("WORKER_DISPATCH")
     if worker_dispatch_raw is None:
@@ -70,6 +72,12 @@ def main() -> None:
         parsed = {item.strip().lower() for item in tts_models_raw.split(",") if item.strip()}
         supported_tts_models = None if "*" in parsed else parsed
     max_step_retries = int(os.getenv("V2_MAX_STEP_RETRIES", "2"))
+    claim_candidate_limit = int(os.getenv("V2_QUEUE_CLAIM_CANDIDATE_LIMIT", "200"))
+    tts_per_job_soft_limit = int(os.getenv("V2_TTS_PER_JOB_SOFT_LIMIT", "2"))
+    capability_keys = worker_capability_keys(
+        accept_non_tts_steps=accept_non_tts_steps,
+        supported_tts_models=supported_tts_models,
+    )
 
     db = init_firebase()
     logger.info(
@@ -80,7 +88,12 @@ def main() -> None:
             "enable_dispatch": enable_dispatch,
             "accept_non_tts_steps": accept_non_tts_steps,
             "supported_tts_models": sorted(supported_tts_models) if supported_tts_models else ["*"],
+            "capability_keys": capability_keys,
             "max_step_retries": max_step_retries,
+            "claim_candidate_limit": claim_candidate_limit,
+            "tts_per_job_soft_limit": tts_per_job_soft_limit,
+            "step_watchdog_enabled": os.getenv("V2_STEP_WATCHDOG_ENABLED", "false").lower() == "true",
+            "process_id": process_id,
         },
     )
 
@@ -93,6 +106,12 @@ def main() -> None:
         accept_non_tts_steps=accept_non_tts_steps,
         supported_tts_models=supported_tts_models,
         max_step_retries=max_step_retries,
+        claim_candidate_limit=claim_candidate_limit,
+        tts_per_job_soft_limit=tts_per_job_soft_limit,
+        worker_type="local",
+        stack_id=worker_id,
+        process_id=process_id,
+        capability_keys=capability_keys,
     )
     runner.run_forever()
 

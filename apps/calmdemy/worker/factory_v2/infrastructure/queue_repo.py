@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import datetime, timezone
+from typing import Any
 
 from google.api_core.exceptions import AlreadyExists
 from firebase_admin import firestore as fs
+
+from ..shared.queue_capabilities import capability_key_for_step
 
 
 class FirestoreQueueRepo:
@@ -37,6 +41,7 @@ class FirestoreQueueRepo:
     ) -> str:
         queue_id = self.make_queue_id(run_id, step_name, shard_key)
         doc_ref = self.db.collection("factory_step_queue").document(queue_id)
+        normalized_tts_model = str(required_tts_model or "").strip().lower()
         payload = {
             "job_id": job_id,
             "run_id": run_id,
@@ -47,11 +52,13 @@ class FirestoreQueueRepo:
             "state": "ready",
             "available_at": available_at or datetime.now(timezone.utc),
             "retry_count": 0,
+            "stuck_retry_count": 0,
+            "capability_key": capability_key_for_step(step_name, normalized_tts_model),
             "created_at": fs.SERVER_TIMESTAMP,
             "updated_at": fs.SERVER_TIMESTAMP,
         }
-        if required_tts_model:
-            payload["required_tts_model"] = str(required_tts_model).strip().lower()
+        if normalized_tts_model:
+            payload["required_tts_model"] = normalized_tts_model
         try:
             doc_ref.create(payload)
         except AlreadyExists:
@@ -59,88 +66,96 @@ class FirestoreQueueRepo:
             pass
         return queue_id
 
-    @staticmethod
-    def _supports_payload(
-        payload: dict,
-        accept_non_tts_steps: bool,
-        supported_tts_models: set[str] | None,
-    ) -> bool:
-        step_name = str(payload.get("step_name") or "")
-        is_tts_step = step_name in {
-            "synthesize_audio",
-            "synthesize_course_audio",
-            "synthesize_course_audio_chunk",
-        }
-        if not is_tts_step:
-            return accept_non_tts_steps
-
-        required_tts_model = str(payload.get("required_tts_model") or "").strip().lower()
-        if not required_tts_model:
-            return True
-        if supported_tts_models is None:
-            return True
-        return required_tts_model in supported_tts_models
-
-    def claim_next(
+    def fetch_ready(
         self,
-        worker_id: str,
-        lease_seconds: int = 300,
-        accept_non_tts_steps: bool = True,
-        supported_tts_models: set[str] | None = None,
-    ) -> tuple[str, dict] | None:
-        now = datetime.now(timezone.utc)
+        available_before: datetime,
+        limit: int,
+    ) -> list[Any]:
         query = (
             self.db.collection("factory_step_queue")
             .where("state", "==", "ready")
-            .where("available_at", "<=", now)
+            .where("available_at", "<=", available_before)
             .order_by("available_at")
-            .limit(20)
+            .limit(limit)
         )
+        return list(query.stream())
 
-        docs = list(query.stream())
-        for doc in docs:
-            doc_payload = doc.to_dict() or {}
-            if not self._supports_payload(
-                doc_payload,
-                accept_non_tts_steps=accept_non_tts_steps,
-                supported_tts_models=supported_tts_models,
-            ):
-                continue
-            tx = self.db.transaction()
+    def fetch_ready_by_capability(
+        self,
+        capability_key: str,
+        available_before: datetime,
+        limit: int,
+    ) -> list[Any]:
+        query = (
+            self.db.collection("factory_step_queue")
+            .where("state", "==", "ready")
+            .where("capability_key", "==", capability_key)
+            .where("available_at", "<=", available_before)
+            .order_by("available_at")
+            .limit(limit)
+        )
+        return list(query.stream())
 
-            @fs.transactional
-            def _claim(transaction):
-                snap = doc.reference.get(transaction=transaction)
-                if not snap.exists:
-                    return None
-                data = snap.to_dict() or {}
-                if data.get("state") != "ready":
-                    return None
-                if not self._supports_payload(
-                    data,
-                    accept_non_tts_steps=accept_non_tts_steps,
-                    supported_tts_models=supported_tts_models,
-                ):
-                    return None
-                transaction.update(
-                    doc.reference,
-                    {
-                        "state": "leased",
-                        "lease_owner": worker_id,
-                        "lease_expires_at": datetime.fromtimestamp(
-                            now.timestamp() + lease_seconds,
-                            tz=timezone.utc,
-                        ),
-                        "updated_at": fs.SERVER_TIMESTAMP,
-                    },
-                )
-                return data
+    def fetch_payloads_by_states(
+        self,
+        states: Iterable[str],
+        limit: int,
+    ) -> list[dict]:
+        payloads: list[dict] = []
+        for state in states:
+            query = self.db.collection("factory_step_queue").where("state", "==", state).limit(limit)
+            for doc in query.stream():
+                payload = doc.to_dict() or {}
+                if payload:
+                    payloads.append(payload)
+        return payloads
 
-            claimed = _claim(tx)
-            if claimed is not None:
-                return doc.id, claimed
+    def fetch_docs_by_states(
+        self,
+        states: Iterable[str],
+        limit: int,
+    ) -> list[Any]:
+        docs: list[Any] = []
+        for state in states:
+            query = self.db.collection("factory_step_queue").where("state", "==", state).limit(limit)
+            docs.extend(list(query.stream()))
+        return docs
 
-        return None
+    def claim_ready_doc(
+        self,
+        doc_ref,
+        worker_id: str,
+        lease_seconds: int = 300,
+        payload_validator: Callable[[dict], bool] | None = None,
+    ) -> dict | None:
+        now = datetime.now(timezone.utc)
+        tx = self.db.transaction()
+
+        @fs.transactional
+        def _claim(transaction):
+            snap = doc_ref.get(transaction=transaction)
+            if not snap.exists:
+                return None
+            data = snap.to_dict() or {}
+            if data.get("state") != "ready":
+                return None
+            if payload_validator and not payload_validator(data):
+                return None
+            transaction.update(
+                doc_ref,
+                {
+                    "state": "leased",
+                    "lease_owner": worker_id,
+                    "lease_expires_at": datetime.fromtimestamp(
+                        now.timestamp() + lease_seconds,
+                        tz=timezone.utc,
+                    ),
+                    "updated_at": fs.SERVER_TIMESTAMP,
+                },
+            )
+            return data
+
+        return _claim(tx)
 
     def recover_stale_leases(self, max_docs: int = 50) -> int:
         """Reset expired leased/running queue items back to ready."""
@@ -188,6 +203,11 @@ class FirestoreQueueRepo:
                             "lease_owner": None,
                             "lease_expires_at": None,
                             "available_at": now,
+                            "last_step_heartbeat_at": None,
+                            "step_started_at": None,
+                            "step_deadline_at": None,
+                            "heartbeat_interval_sec": None,
+                            "progress_detail": None,
                             "updated_at": fs.SERVER_TIMESTAMP,
                         },
                     )
@@ -198,16 +218,63 @@ class FirestoreQueueRepo:
 
         return recovered
 
-    def mark_running(self, queue_id: str, worker_id: str) -> None:
+    def mark_running(
+        self,
+        queue_id: str,
+        worker_id: str,
+        *,
+        lease_seconds: int = 300,
+        started_at: datetime | None = None,
+        deadline_at: datetime | None = None,
+        heartbeat_interval_sec: int | None = None,
+    ) -> None:
+        now = datetime.now(timezone.utc)
         self.db.collection("factory_step_queue").document(queue_id).update(
             {
                 "state": "running",
                 "lease_owner": worker_id,
+                "lease_expires_at": datetime.fromtimestamp(
+                    now.timestamp() + max(1, int(lease_seconds)),
+                    tz=timezone.utc,
+                ),
                 "error_code": None,
                 "error_message": None,
+                "step_started_at": started_at or now,
+                "last_step_heartbeat_at": started_at or now,
+                "step_deadline_at": deadline_at,
+                "heartbeat_interval_sec": heartbeat_interval_sec,
+                "progress_detail": None,
                 "updated_at": fs.SERVER_TIMESTAMP,
             }
         )
+
+    def heartbeat_running(
+        self,
+        queue_id: str,
+        worker_id: str,
+        *,
+        lease_seconds: int,
+        deadline_at: datetime,
+        heartbeat_interval_sec: int | None = None,
+        progress_detail: str | None = None,
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        payload: dict[str, Any] = {
+            "state": "running",
+            "lease_owner": worker_id,
+            "lease_expires_at": datetime.fromtimestamp(
+                now.timestamp() + max(1, int(lease_seconds)),
+                tz=timezone.utc,
+            ),
+            "last_step_heartbeat_at": now,
+            "step_deadline_at": deadline_at,
+            "updated_at": fs.SERVER_TIMESTAMP,
+        }
+        if heartbeat_interval_sec is not None:
+            payload["heartbeat_interval_sec"] = heartbeat_interval_sec
+        if progress_detail:
+            payload["progress_detail"] = progress_detail
+        self.db.collection("factory_step_queue").document(queue_id).update(payload)
 
     def mark_done(self, queue_id: str) -> None:
         self.db.collection("factory_step_queue").document(queue_id).update(
@@ -215,6 +282,11 @@ class FirestoreQueueRepo:
                 "state": "succeeded",
                 "lease_owner": None,
                 "lease_expires_at": None,
+                "last_step_heartbeat_at": None,
+                "step_started_at": None,
+                "step_deadline_at": None,
+                "heartbeat_interval_sec": None,
+                "progress_detail": None,
                 "updated_at": fs.SERVER_TIMESTAMP,
             }
         )
@@ -227,6 +299,11 @@ class FirestoreQueueRepo:
                 "error_message": error_message,
                 "lease_owner": None,
                 "lease_expires_at": None,
+                "last_step_heartbeat_at": None,
+                "step_started_at": None,
+                "step_deadline_at": None,
+                "heartbeat_interval_sec": None,
+                "progress_detail": None,
                 "updated_at": fs.SERVER_TIMESTAMP,
             }
         )
@@ -251,6 +328,11 @@ class FirestoreQueueRepo:
                 "available_at": available_at,
                 "lease_owner": None,
                 "lease_expires_at": None,
+                "last_step_heartbeat_at": None,
+                "step_started_at": None,
+                "step_deadline_at": None,
+                "heartbeat_interval_sec": None,
+                "progress_detail": None,
                 "updated_at": fs.SERVER_TIMESTAMP,
             }
         )

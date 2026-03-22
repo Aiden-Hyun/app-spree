@@ -55,6 +55,50 @@ def _slugify(text: str) -> str:
     return slug[:60]
 
 
+def _stable_identifier(text: str, fallback: str) -> str:
+    slug = _slugify(text)
+    if slug:
+        return slug
+    fallback_slug = _slugify(fallback)
+    return fallback_slug or "generated"
+
+
+def _asset_stem(job_data: dict, *, default_label: str) -> str:
+    explicit = str(job_data.get("_factoryAssetKey") or "").strip()
+    if explicit:
+        return _stable_identifier(explicit, default_label)
+
+    content_job_id = str(job_data.get("_factoryContentJobId") or job_data.get("id") or "").strip()
+    step_name = str(job_data.get("_factoryStepName") or default_label).strip() or default_label
+    if content_job_id:
+        return _stable_identifier(f"{content_job_id}-{step_name}", default_label)
+
+    topic = str(job_data.get("params", {}).get("topic", "untitled") or "untitled")
+    unique_id = uuid.uuid4().hex[:8]
+    return f"{_slugify(topic)}-{unique_id}"
+
+
+def _build_download_url(storage_path: str, token: str) -> str:
+    encoded_path = urllib.parse.quote(storage_path, safe="")
+    return (
+        f"https://firebasestorage.googleapis.com/v0/b/{config.STORAGE_BUCKET}"
+        f"/o/{encoded_path}?alt=media&token={token}"
+    )
+
+
+def _ensure_download_token(blob) -> str:
+    blob.reload()
+    metadata = dict(blob.metadata or {})
+    token = str(metadata.get("firebaseStorageDownloadTokens") or "").split(",")[0].strip()
+    if token:
+        return token
+    token = uuid.uuid4().hex
+    metadata["firebaseStorageDownloadTokens"] = token
+    blob.metadata = metadata
+    blob.patch()
+    return token
+
+
 def upload_audio(mp3_path: str, job_data: dict) -> tuple[str, float]:
     """
     Upload MP3 to Firebase Storage.
@@ -62,33 +106,47 @@ def upload_audio(mp3_path: str, job_data: dict) -> tuple[str, float]:
     Returns (storage_path, duration_seconds).
     """
     content_type = job_data.get("contentType", "guided_meditation")
-    topic = job_data.get("params", {}).get("topic", "untitled")
 
     # Build storage path
     base_path = STORAGE_PATHS.get(content_type, "audio/generated")
-    slug = _slugify(topic)
-    unique_id = uuid.uuid4().hex[:8]
-    filename = f"{slug}-{unique_id}.mp3"
+    filename = f"{_asset_stem(job_data, default_label='audio')}.mp3"
     storage_path = f"{base_path}/{filename}"
 
     logger.info("Uploading audio", extra={"storage_path": storage_path})
 
     # Get duration before upload
-    duration_sec = _get_audio_duration(mp3_path)
+    duration_sec = _get_audio_duration(mp3_path) if os.path.isfile(mp3_path) else 0.0
 
     # Upload to Firebase Storage
     bucket = storage.bucket(config.STORAGE_BUCKET)
     blob = bucket.blob(storage_path)
-    blob.upload_from_filename(
-        mp3_path,
-        content_type="audio/mpeg",
-        retry=None,
-        timeout=60,
-    )
-    blob.cache_control = "public, max-age=31536000"
-    blob.patch()
+    if blob.exists():
+        blob.reload()
+        metadata = dict(blob.metadata or {})
+        try:
+            duration_sec = float(metadata.get("factoryDurationSec") or duration_sec)
+        except (TypeError, ValueError):
+            pass
+        logger.info("Audio upload reused existing blob", extra={"storage_path": storage_path})
+    else:
+        if not os.path.isfile(mp3_path):
+            raise FileNotFoundError(f"Missing audio file for upload: {mp3_path}")
+        blob.metadata = {
+            **dict(blob.metadata or {}),
+            "factoryContentJobId": str(job_data.get("_factoryContentJobId") or ""),
+            "factoryStepName": str(job_data.get("_factoryStepName") or "upload_audio"),
+            "factoryDurationSec": f"{duration_sec:.3f}",
+        }
+        blob.upload_from_filename(
+            mp3_path,
+            content_type="audio/mpeg",
+            retry=None,
+            timeout=60,
+        )
+        blob.cache_control = "public, max-age=31536000"
+        blob.patch()
 
-    size_mb = os.path.getsize(mp3_path) / (1024 * 1024)
+    size_mb = (os.path.getsize(mp3_path) / (1024 * 1024)) if os.path.isfile(mp3_path) else 0.0
     logger.info(
         "Audio uploaded",
         extra={"size_mb": round(size_mb, 1), "duration_sec": round(duration_sec, 1)},
@@ -110,35 +168,37 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
     Returns (storage_path, download_url).
     """
     content_type = job_data.get("contentType", "guided_meditation")
-    topic = job_data.get("params", {}).get("topic", "untitled")
 
     base_path = IMAGE_STORAGE_PATHS.get(content_type, "images/generated")
-    slug = _slugify(topic)
-    unique_id = uuid.uuid4().hex[:8]
-    filename = f"{slug}-{unique_id}.png"
+    filename = f"{_asset_stem(job_data, default_label='image')}.png"
     storage_path = f"{base_path}/{filename}"
 
     logger.info("Uploading image", extra={"storage_path": storage_path})
 
     bucket = storage.bucket(config.STORAGE_BUCKET)
     blob = bucket.blob(storage_path)
+    if blob.exists():
+        download_token = _ensure_download_token(blob)
+        logger.info("Image upload reused existing blob", extra={"storage_path": storage_path})
+    else:
+        if not os.path.isfile(image_path):
+            raise FileNotFoundError(f"Missing image file for upload: {image_path}")
+        download_token = uuid.uuid4().hex
+        blob.metadata = {
+            "firebaseStorageDownloadTokens": download_token,
+            "factoryContentJobId": str(job_data.get("_factoryContentJobId") or ""),
+            "factoryStepName": str(job_data.get("_factoryStepName") or "generate_image"),
+        }
+        blob.upload_from_filename(
+            image_path,
+            content_type="image/png",
+        )
+        blob.cache_control = "public, max-age=31536000"
+        blob.patch()
 
-    download_token = uuid.uuid4().hex
-    blob.metadata = {"firebaseStorageDownloadTokens": download_token}
-    blob.upload_from_filename(
-        image_path,
-        content_type="image/png",
-    )
-    blob.cache_control = "public, max-age=31536000"
-    blob.patch()
+    download_url = _build_download_url(storage_path, download_token)
 
-    encoded_path = urllib.parse.quote(storage_path, safe="")
-    download_url = (
-        f"https://firebasestorage.googleapis.com/v0/b/{config.STORAGE_BUCKET}"
-        f"/o/{encoded_path}?alt=media&token={download_token}"
-    )
-
-    size_kb = os.path.getsize(image_path) / 1024
+    size_kb = (os.path.getsize(image_path) / 1024) if os.path.isfile(image_path) else 0.0
     logger.info("Image uploaded", extra={"size_kb": round(size_kb, 1)})
 
     try:

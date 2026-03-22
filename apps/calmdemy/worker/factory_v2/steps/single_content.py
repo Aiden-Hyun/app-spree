@@ -19,6 +19,12 @@ def _runtime(job: dict) -> dict[str, Any]:
     return dict(job.get("runtime") or {})
 
 
+def _content_job_id(job: dict) -> str:
+    request = job.get("request") or {}
+    compat = request.get("compat") or {}
+    return str(compat.get("content_job_id") or "").strip()
+
+
 def execute_generate_script(ctx: StepContext) -> StepResult:
     from factory_v2.shared.llm_generator import generate_script
 
@@ -87,13 +93,21 @@ def execute_generate_image(ctx: StepContext) -> StepResult:
     title = runtime.get("generated_title") or job_data.get("title") or "Untitled"
     topic = job_data.get("params", {}).get("topic", "")
     content_type = job_data.get("contentType", "guided_meditation")
+    content_job_id = _content_job_id(ctx.job)
 
     image_prompt = runtime.get("image_prompt") or job_data.get("imagePrompt")
     if not image_prompt:
         image_prompt = build_image_prompt(job_data, title, topic, content_type)
 
     local_image_path = generate_image(image_prompt)
-    image_path, thumbnail_url = upload_image(local_image_path, job_data)
+    image_path, thumbnail_url = upload_image(
+        local_image_path,
+        {
+            **job_data,
+            "_factoryContentJobId": content_job_id,
+            "_factoryStepName": ctx.step_name,
+        },
+    )
 
     return StepResult(
         output={"thumbnail_url": thumbnail_url},
@@ -157,11 +171,19 @@ def execute_upload_audio(ctx: StepContext) -> StepResult:
 
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
+    content_job_id = _content_job_id(ctx.job)
     mp3_path = runtime.get("mp3_path")
     if not mp3_path:
         raise ValueError("Missing runtime.mp3_path")
 
-    storage_path, duration_sec = upload_audio(mp3_path, job_data)
+    storage_path, duration_sec = upload_audio(
+        mp3_path,
+        {
+            **job_data,
+            "_factoryContentJobId": content_job_id,
+            "_factoryStepName": ctx.step_name,
+        },
+    )
 
     return StepResult(
         output={"storage_path": storage_path, "duration_sec": duration_sec},
@@ -181,6 +203,7 @@ def execute_publish_content(ctx: StepContext) -> StepResult:
 
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
+    content_job_id = _content_job_id(ctx.job)
     request_status = (job_data.get("status") or "").strip().lower()
     auto_publish = bool(job_data.get("autoPublish", True))
 
@@ -223,7 +246,10 @@ def execute_publish_content(ctx: StepContext) -> StepResult:
         storage_path,
         float(duration_sec),
         formatted_script,
-        publish_job_data,
+        {
+            **publish_job_data,
+            "_factoryContentJobId": content_job_id,
+        },
     )
 
     return StepResult(

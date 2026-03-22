@@ -8,10 +8,12 @@ from firebase_admin import firestore as fs
 import config
 from observability import get_logger
 from factory_v2.shared.delete_job import mark_delete_failed, process_delete_job
-from factory_v2.shared.error_codes import classify_error
 from factory_v2.shared.worker_status import update_worker_status
 
+from .claim_loop import ClaimLoop
 from .dispatcher import dispatch_next_content_job
+from .recovery_manager import RecoveryManager
+from ..application.orchestrator import Orchestrator
 from ..infrastructure.firestore_repos import (
     FirestoreEventRepo,
     FirestoreJobRepo,
@@ -19,15 +21,12 @@ from ..infrastructure.firestore_repos import (
     FirestoreStepRunRepo,
 )
 from ..infrastructure.queue_repo import FirestoreQueueRepo
-from ..application.orchestrator import Orchestrator
-from ..steps.base import StepContext
-from ..steps.registry import get_executor
 
 logger = get_logger(__name__)
 
 
 class WorkerMain:
-    """V2 worker loop with queue lease + step executor dispatch."""
+    """V2 worker loop coordinator."""
 
     def __init__(
         self,
@@ -39,19 +38,22 @@ class WorkerMain:
         accept_non_tts_steps: bool = True,
         supported_tts_models: set[str] | None = None,
         max_step_retries: int = 2,
+        claim_candidate_limit: int = 200,
+        tts_per_job_soft_limit: int = 2,
+        worker_type: str = "local",
+        stack_id: str | None = None,
+        process_id: int | None = None,
+        capability_keys: list[str] | None = None,
     ):
         self.db = db
         self.worker_id = worker_id
         self.poll_seconds = poll_seconds
         self.enable_dispatch = enable_dispatch
         self.can_dispatch = bool(enable_dispatch if can_dispatch is None else can_dispatch)
-        self.accept_non_tts_steps = bool(accept_non_tts_steps)
-        self.supported_tts_models = (
-            {model.strip().lower() for model in supported_tts_models if model.strip()}
-            if supported_tts_models
-            else None
-        )
-        self.max_step_retries = max(0, int(max_step_retries))
+        self.worker_type = worker_type
+        self.stack_id = stack_id or worker_id
+        self.process_id = process_id
+        self.capability_keys = list(capability_keys or [])
 
         self.job_repo = FirestoreJobRepo(db)
         self.run_repo = FirestoreRunRepo(db)
@@ -64,99 +66,36 @@ class WorkerMain:
             self.step_run_repo,
             self.queue_repo,
         )
+        self.claim_loop = ClaimLoop(
+            db=db,
+            worker_id=worker_id,
+            job_repo=self.job_repo,
+            run_repo=self.run_repo,
+            step_run_repo=self.step_run_repo,
+            queue_repo=self.queue_repo,
+            event_repo=self.event_repo,
+            orchestrator=self.orchestrator,
+            accept_non_tts_steps=accept_non_tts_steps,
+            supported_tts_models=supported_tts_models,
+            max_step_retries=max_step_retries,
+            claim_candidate_limit=claim_candidate_limit,
+            tts_per_job_soft_limit=tts_per_job_soft_limit,
+            worker_type=self.worker_type,
+            poll_interval_sec=self.poll_seconds,
+            stack_id=self.stack_id,
+            process_id=self.process_id,
+            capability_keys=self.capability_keys,
+        )
+        self.recovery_manager = RecoveryManager(
+            db=db,
+            job_repo=self.job_repo,
+            step_run_repo=self.step_run_repo,
+            queue_repo=self.queue_repo,
+            run_repo=self.run_repo,
+            event_repo=self.event_repo,
+            orchestrator=self.orchestrator,
+        )
         self._last_recovery_at = 0.0
-
-    def _recover_stuck_course_audio_fan_in_steps(self) -> int:
-        recovered = 0
-        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
-        for doc in query.stream():
-            data = doc.to_dict() or {}
-            if str(data.get("job_type") or "").strip().lower() != "course":
-                continue
-
-            run_id = str(data.get("current_run_id") or "").strip()
-            if not run_id:
-                continue
-            if self.run_repo.run_state(run_id) != "running":
-                continue
-
-            recovered += self.orchestrator.recover_course_audio_fan_in_if_ready(doc.id, run_id)
-
-        return recovered
-
-    def _recover_stuck_course_publish_steps(self) -> int:
-        recovered = 0
-        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
-        for doc in query.stream():
-            data = doc.to_dict() or {}
-            if str(data.get("job_type") or "").strip().lower() != "course":
-                continue
-
-            run_id = str(data.get("current_run_id") or "").strip()
-            if not run_id:
-                continue
-            if self.run_repo.run_state(run_id) != "running":
-                continue
-
-            if self.orchestrator.recover_course_publish_if_ready(doc.id, run_id):
-                recovered += 1
-
-        return recovered
-
-    def _recover_stuck_course_upload_steps(self) -> int:
-        recovered = 0
-        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(25)
-        for doc in query.stream():
-            data = doc.to_dict() or {}
-            if str(data.get("job_type") or "").strip().lower() != "course":
-                continue
-
-            run_id = str(data.get("current_run_id") or "").strip()
-            if not run_id:
-                continue
-            if self.run_repo.run_state(run_id) != "running":
-                continue
-
-            if self.orchestrator.recover_course_upload_if_ready(doc.id, run_id):
-                recovered += 1
-
-        return recovered
-
-    @staticmethod
-    def _is_retryable(error_code: str) -> bool:
-        return error_code in {
-            "timeout",
-            "firestore_error",
-            "llm_error",
-            "tts_error",
-            "image_error",
-        }
-
-    @staticmethod
-    def _retry_delay_seconds(retry_count: int) -> int:
-        # 5s, 10s, 20s, 40s...
-        return min(300, 5 * (2 ** max(0, retry_count)))
-
-    @staticmethod
-    def _compat_failed_stage(step_name: str) -> str:
-        mapping = {
-            "generate_script": "llm_generating",
-            "format_script": "qa_formatting",
-            "generate_image": "image_generating",
-            "synthesize_audio": "tts_converting",
-            "post_process_audio": "post_processing",
-            "upload_audio": "uploading",
-            "publish_content": "publishing",
-            "generate_course_plan": "llm_generating",
-            "generate_course_scripts": "llm_generating",
-            "format_course_scripts": "qa_formatting",
-            "generate_course_thumbnail": "image_generating",
-            "synthesize_course_audio_chunk": "tts_converting",
-            "synthesize_course_audio": "tts_converting",
-            "upload_course_audio": "uploading",
-            "publish_course": "publishing",
-        }
-        return mapping.get(step_name, "pending")
 
     def _claim_delete_job(self, doc_ref) -> dict | None:
         transaction = self.db.transaction()
@@ -193,7 +132,6 @@ class WorkerMain:
 
     def _cleanup_factory_records(self, job_id: str) -> None:
         self.db.collection("factory_jobs").document(job_id).delete()
-
         for collection_name in ("factory_job_runs", "factory_step_runs", "factory_step_queue", "factory_events"):
             query = self.db.collection(collection_name).where("job_id", "==", job_id).limit(500)
             for snapshot in query.stream():
@@ -213,10 +151,62 @@ class WorkerMain:
             mark_delete_failed(self.db, job_id, f"{type(exc).__name__}: {exc}")
         return True
 
+    def _run_recovery_tick(self) -> None:
+        recovered = self.recovery_manager.recover_worker_tick()
+        if recovered.get("stale_leases"):
+            logger.info(
+                "V2 queue stale leases recovered",
+                extra={"worker_id": self.worker_id, "recovered": recovered["stale_leases"]},
+            )
+        if recovered.get("stuck_detected"):
+            logger.info(
+                "V2 detected stuck steps",
+                extra={"worker_id": self.worker_id, "recovered": recovered["stuck_detected"]},
+            )
+        if recovered.get("watchdog_retries"):
+            logger.info(
+                "V2 scheduled watchdog retries",
+                extra={"worker_id": self.worker_id, "recovered": recovered["watchdog_retries"]},
+            )
+        if recovered.get("watchdog_failures"):
+            logger.info(
+                "V2 failed stuck steps after retry budget",
+                extra={"worker_id": self.worker_id, "recovered": recovered["watchdog_failures"]},
+            )
+        if recovered.get("worker_recycles"):
+            logger.info(
+                "V2 recycled stuck workers",
+                extra={"worker_id": self.worker_id, "recovered": recovered["worker_recycles"]},
+            )
+        if recovered.get("fan_in"):
+            logger.info(
+                "V2 recovered stuck course audio fan-in steps",
+                extra={"worker_id": self.worker_id, "recovered": recovered["fan_in"]},
+            )
+        if recovered.get("upload"):
+            logger.info(
+                "V2 recovered stuck course upload steps",
+                extra={"worker_id": self.worker_id, "recovered": recovered["upload"]},
+            )
+        if recovered.get("publish"):
+            logger.info(
+                "V2 recovered stuck course publish steps",
+                extra={"worker_id": self.worker_id, "recovered": recovered["publish"]},
+            )
+
     def run_forever(self) -> None:
         while True:
             try:
-                update_worker_status(self.db, self.worker_id, "local")
+                update_worker_status(
+                    self.db,
+                    self.worker_id,
+                    self.worker_type,
+                    poll_interval_sec=self.poll_seconds,
+                    stack_id=self.stack_id,
+                    pid=self.process_id,
+                    capability_keys=self.capability_keys,
+                    clear_current_step=True,
+                )
             except Exception as heartbeat_exc:
                 logger.warning(
                     "V2 heartbeat failed",
@@ -230,63 +220,10 @@ class WorkerMain:
             if now - self._last_recovery_at >= 15:
                 self._last_recovery_at = now
                 try:
-                    recovered = self.queue_repo.recover_stale_leases()
-                    if recovered:
-                        logger.info(
-                            "V2 queue stale leases recovered",
-                            extra={"worker_id": self.worker_id, "recovered": recovered},
-                        )
+                    self._run_recovery_tick()
                 except Exception as recovery_exc:
                     logger.warning(
-                        "V2 queue lease recovery failed",
-                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
-                    )
-
-                try:
-                    fan_in_recovered = self._recover_stuck_course_audio_fan_in_steps()
-                    if fan_in_recovered:
-                        logger.info(
-                            "V2 recovered stuck course audio fan-in steps",
-                            extra={
-                                "worker_id": self.worker_id,
-                                "recovered": fan_in_recovered,
-                            },
-                        )
-                except Exception as recovery_exc:
-                    logger.warning(
-                        "V2 course audio fan-in recovery failed",
-                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
-                    )
-
-                try:
-                    upload_recovered = self._recover_stuck_course_upload_steps()
-                    if upload_recovered:
-                        logger.info(
-                            "V2 recovered stuck course upload steps",
-                            extra={
-                                "worker_id": self.worker_id,
-                                "recovered": upload_recovered,
-                            },
-                        )
-                except Exception as recovery_exc:
-                    logger.warning(
-                        "V2 course upload recovery failed",
-                        extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
-                    )
-
-                try:
-                    publish_recovered = self._recover_stuck_course_publish_steps()
-                    if publish_recovered:
-                        logger.info(
-                            "V2 recovered stuck course publish steps",
-                            extra={
-                                "worker_id": self.worker_id,
-                                "recovered": publish_recovered,
-                            },
-                        )
-                except Exception as recovery_exc:
-                    logger.warning(
-                        "V2 course publish recovery failed",
+                        "V2 recovery tick failed",
                         extra={"worker_id": self.worker_id, "error": str(recovery_exc)},
                     )
 
@@ -309,351 +246,6 @@ class WorkerMain:
                         extra={"worker_id": self.worker_id, "error": str(dispatch_exc)},
                     )
 
-            claimed = self.queue_repo.claim_next(
-                self.worker_id,
-                accept_non_tts_steps=self.accept_non_tts_steps,
-                supported_tts_models=self.supported_tts_models,
-            )
-            if not claimed:
+            processed = self.claim_loop.run_once()
+            if not processed:
                 time.sleep(self.poll_seconds)
-                continue
-
-            queue_id, payload = claimed
-            job_id = str(payload.get("job_id"))
-            run_id = str(payload.get("run_id"))
-            step_name = str(payload.get("step_name"))
-            shard_key = str(payload.get("shard_key") or "root")
-            raw_step_input = payload.get("step_input")
-            step_input = dict(raw_step_input) if isinstance(raw_step_input, dict) else {}
-            retry_count = int(payload.get("retry_count") or 0)
-            attempt = retry_count + 1
-            step_run_id = payload.get("step_run_id") or self.step_run_repo.make_step_run_id(
-                run_id,
-                step_name,
-                shard_key,
-            )
-
-            try:
-                claimed_job = self.job_repo.get(job_id)
-            except Exception as lookup_exc:
-                lookup_error = f"{type(lookup_exc).__name__}: {lookup_exc}"
-                self.step_run_repo.mark_failed(
-                    step_run_id,
-                    "job_lookup_failed",
-                    lookup_error,
-                )
-                self.queue_repo.mark_failed(
-                    queue_id,
-                    "job_lookup_failed",
-                    lookup_error,
-                )
-                self.event_repo.emit(
-                    "step_failed",
-                    job_id,
-                    run_id,
-                    {
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "step_name": step_name,
-                        "error_code": "job_lookup_failed",
-                        "attempt": attempt,
-                    },
-                )
-                logger.exception(
-                    "V2 failed to load job for claimed queue item",
-                    extra={
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "job_id": job_id,
-                        "run_id": run_id,
-                        "step_name": step_name,
-                        "worker_id": self.worker_id,
-                        "error": lookup_error,
-                    },
-                )
-                continue
-            active_run_id = str(claimed_job.get("current_run_id") or "").strip()
-            if active_run_id and active_run_id != run_id:
-                superseded_error = (
-                    f"Run '{run_id}' superseded by active run '{active_run_id}'"
-                )
-                self.step_run_repo.mark_failed(
-                    step_run_id,
-                    "superseded_run",
-                    superseded_error,
-                )
-                self.queue_repo.mark_failed(
-                    queue_id,
-                    "superseded_run",
-                    superseded_error,
-                )
-                self.event_repo.emit(
-                    "step_superseded",
-                    job_id,
-                    run_id,
-                    {
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "step_name": step_name,
-                        "active_run_id": active_run_id,
-                        "worker_id": self.worker_id,
-                    },
-                )
-                logger.info(
-                    "V2 skipped superseded step",
-                    extra={
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "job_id": job_id,
-                        "run_id": run_id,
-                        "active_run_id": active_run_id,
-                        "step_name": step_name,
-                        "worker_id": self.worker_id,
-                    },
-                )
-                continue
-            run_state_before_step = self.run_repo.run_state(run_id)
-            if run_state_before_step != "running":
-                superseded_error = (
-                    f"Run '{run_id}' is not running (state={run_state_before_step or 'missing'})"
-                )
-                self.step_run_repo.mark_failed(
-                    step_run_id,
-                    "superseded_run",
-                    superseded_error,
-                )
-                self.queue_repo.mark_failed(
-                    queue_id,
-                    "superseded_run",
-                    superseded_error,
-                )
-                self.event_repo.emit(
-                    "step_superseded",
-                    job_id,
-                    run_id,
-                    {
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "step_name": step_name,
-                        "run_state": run_state_before_step,
-                        "worker_id": self.worker_id,
-                    },
-                )
-                logger.info(
-                    "V2 skipped step for non-running run",
-                    extra={
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "job_id": job_id,
-                        "run_id": run_id,
-                        "step_name": step_name,
-                        "run_state": run_state_before_step,
-                        "worker_id": self.worker_id,
-                    },
-                )
-                continue
-
-            request = claimed_job.get("request") or {}
-            compat = request.get("compat") or {}
-            content_job_id = compat.get("content_job_id")
-            running_status = self._compat_failed_stage(step_name)
-            self.job_repo.patch_compat_content_job_for_run(
-                content_job_id,
-                run_id,
-                {
-                    "status": running_status,
-                    "jobRunId": run_id,
-                    "lastRunStatus": "running",
-                    "runEndedAt": None,
-                },
-            )
-
-            self.queue_repo.mark_running(queue_id, self.worker_id)
-            self.step_run_repo.mark_running(step_run_id, queue_id, self.worker_id, attempt=attempt)
-            self.event_repo.emit(
-                "step_started",
-                job_id,
-                run_id,
-                {
-                    "queue_id": queue_id,
-                    "step_run_id": step_run_id,
-                    "step_name": step_name,
-                    "worker_id": self.worker_id,
-                    "attempt": attempt,
-                },
-            )
-
-            logger.info(
-                "V2 step running",
-                extra={
-                    "queue_id": queue_id,
-                    "step_run_id": step_run_id,
-                    "job_id": job_id,
-                    "run_id": run_id,
-                    "step_name": step_name,
-                    "worker_id": self.worker_id,
-                    "attempt": attempt,
-                },
-            )
-
-            job: dict | None = None
-            try:
-                job = claimed_job
-                executor = get_executor(step_name)
-                ctx = StepContext(
-                    db=self.db,
-                    job=job,
-                    run_id=run_id,
-                    step_name=step_name,
-                    worker_id=self.worker_id,
-                    shard_key=shard_key,
-                    step_input=step_input,
-                )
-                result = executor(ctx)
-
-                run_state_after_step = self.run_repo.run_state(run_id)
-                if run_state_after_step != "running":
-                    superseded_error = (
-                        f"Run '{run_id}' changed state to '{run_state_after_step or 'missing'}' "
-                        "before success projection."
-                    )
-                    self.step_run_repo.mark_failed(
-                        step_run_id,
-                        "superseded_run",
-                        superseded_error,
-                    )
-                    self.queue_repo.mark_failed(
-                        queue_id,
-                        "superseded_run",
-                        superseded_error,
-                    )
-                    self.event_repo.emit(
-                        "step_superseded",
-                        job_id,
-                        run_id,
-                        {
-                            "queue_id": queue_id,
-                            "step_run_id": step_run_id,
-                            "step_name": step_name,
-                            "run_state": run_state_after_step,
-                            "worker_id": self.worker_id,
-                        },
-                    )
-                    logger.info(
-                        "V2 skipped success projection for non-running run",
-                        extra={
-                            "queue_id": queue_id,
-                            "step_run_id": step_run_id,
-                            "job_id": job_id,
-                            "run_id": run_id,
-                            "step_name": step_name,
-                            "run_state": run_state_after_step,
-                            "worker_id": self.worker_id,
-                        },
-                    )
-                    continue
-
-                self.step_run_repo.mark_succeeded(step_run_id, result.output)
-                self.queue_repo.mark_done(queue_id)
-                self.event_repo.emit(
-                    "step_succeeded",
-                    job_id,
-                    run_id,
-                    {
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "step_name": step_name,
-                    },
-                )
-
-                self.job_repo.patch_runtime(job_id, result.runtime_patch)
-                self.job_repo.patch_summary(job_id, result.summary_patch)
-
-                self.job_repo.patch_compat_content_job_for_run(
-                    content_job_id,
-                    run_id,
-                    result.compat_content_job_patch,
-                )
-
-                self.orchestrator.on_step_success(job_id, run_id, step_name, shard_key=shard_key)
-
-            except Exception as exc:
-                error_msg = f"{type(exc).__name__}: {exc}"
-                error_code = classify_error(exc)
-                retryable = self._is_retryable(error_code)
-                logger.exception(
-                    "V2 step failed",
-                    extra={
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "job_id": job_id,
-                        "run_id": run_id,
-                        "step_name": step_name,
-                        "worker_id": self.worker_id,
-                        "error_code": error_code,
-                        "retryable": retryable,
-                        "attempt": attempt,
-                    },
-                )
-
-                if retryable and retry_count < self.max_step_retries:
-                    delay_seconds = self._retry_delay_seconds(retry_count)
-                    next_attempt = retry_count + 2
-                    self.step_run_repo.mark_retry_scheduled(
-                        step_run_id,
-                        error_code,
-                        error_msg,
-                        next_attempt=next_attempt,
-                        delay_seconds=delay_seconds,
-                    )
-                    self.queue_repo.schedule_retry(
-                        queue_id,
-                        error_code,
-                        error_msg,
-                        delay_seconds=delay_seconds,
-                    )
-                    self.event_repo.emit(
-                        "step_retry_scheduled",
-                        job_id,
-                        run_id,
-                        {
-                            "queue_id": queue_id,
-                            "step_run_id": step_run_id,
-                            "step_name": step_name,
-                            "error_code": error_code,
-                            "attempt": attempt,
-                            "next_attempt": next_attempt,
-                            "delay_seconds": delay_seconds,
-                        },
-                    )
-                    continue
-
-                self.step_run_repo.mark_failed(step_run_id, error_code, error_msg)
-                self.queue_repo.mark_failed(queue_id, error_code, error_msg)
-                self.event_repo.emit(
-                    "step_failed",
-                    job_id,
-                    run_id,
-                    {
-                        "queue_id": queue_id,
-                        "step_run_id": step_run_id,
-                        "step_name": step_name,
-                        "error_code": error_code,
-                        "attempt": attempt,
-                    },
-                )
-
-                self.job_repo.patch_compat_content_job_for_run(
-                    content_job_id,
-                    run_id,
-                    {
-                        "status": "failed",
-                        "error": error_msg,
-                        "errorCode": error_code,
-                        "failedStage": self._compat_failed_stage(step_name),
-                        "jobRunId": run_id,
-                        "lastRunStatus": "failed",
-                        "runEndedAt": fs.SERVER_TIMESTAMP,
-                    },
-                )
-                self.orchestrator.on_step_failed(job_id, run_id, step_name, error_code)
