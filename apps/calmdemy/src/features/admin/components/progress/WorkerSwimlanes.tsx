@@ -38,6 +38,12 @@ export function WorkerSwimlanes({ model }: Props) {
     });
   }, [model.workerLanes]);
 
+  const allExpanded =
+    model.workerLanes.length > 0 &&
+    model.workerLanes.every(
+      (lane) => (expandedByWorker[lane.workerId] ?? hasActiveLaneItem(lane)) === true
+    );
+
   if (model.workerLanes.length === 0) {
     return (
       <View style={styles.emptyState}>
@@ -48,14 +54,36 @@ export function WorkerSwimlanes({ model }: Props) {
 
   return (
     <View style={styles.container}>
-      {model.selectedRunId ? (
-        <View style={styles.runBadge}>
-          <Ionicons name="git-branch-outline" size={12} color={theme.colors.textMuted} />
-          <Text style={styles.runLabel} numberOfLines={1}>
-            Run {model.selectedRunId}
-          </Text>
-        </View>
-      ) : null}
+      <View style={styles.topRow}>
+        {model.selectedRunId ? (
+          <View style={styles.runBadge}>
+            <Ionicons name="git-branch-outline" size={12} color={theme.colors.textMuted} />
+            <Text style={styles.runLabel} numberOfLines={1}>
+              Run {model.selectedRunId}
+            </Text>
+          </View>
+        ) : (
+          <View />
+        )}
+
+        <Pressable
+          onPress={() =>
+            setExpandedByWorker(() =>
+              Object.fromEntries(
+                model.workerLanes.map((lane) => [lane.workerId, !allExpanded])
+              )
+            )
+          }
+          style={({ pressed }) => [styles.bulkToggleButton, pressed && styles.bulkToggleButtonPressed]}
+        >
+          <Ionicons
+            name={allExpanded ? 'contract-outline' : 'expand-outline'}
+            size={14}
+            color={theme.colors.text}
+          />
+          <Text style={styles.bulkToggleText}>{allExpanded ? 'Collapse All' : 'Expand All'}</Text>
+        </Pressable>
+      </View>
 
       {model.workerLanes.map((lane) => (
         <WorkerLaneCard
@@ -255,6 +283,12 @@ const createStyles = (theme: Theme) =>
     container: {
       gap: 12,
     },
+    topRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     runBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -272,6 +306,26 @@ const createStyles = (theme: Theme) =>
       fontFamily: 'DMSans-SemiBold',
       fontSize: 12,
       color: theme.colors.textMuted,
+    },
+    bulkToggleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      backgroundColor: theme.colors.surface,
+    },
+    bulkToggleButtonPressed: {
+      opacity: 0.82,
+    },
+    bulkToggleText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.text,
     },
     emptyState: {
       borderWidth: 1,

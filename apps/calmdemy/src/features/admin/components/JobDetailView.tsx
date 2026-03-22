@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -97,7 +97,9 @@ export function JobDetailView({
   const { theme } = useTheme();
   const { width: viewportWidth } = useWindowDimensions();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() =>
+    buildInitialExpandedSections(job)
+  );
   const [errorManuallyCollapsed, setErrorManuallyCollapsed] = useState(false);
   const [selectedCourseScript, setSelectedCourseScript] = useState<string>('');
   const [pipelineTab, setPipelineTab] = useState<'pipeline' | 'workers'>('pipeline');
@@ -109,6 +111,7 @@ export function JobDetailView({
   const [approvalScriptEdits, setApprovalScriptEdits] = useState<Record<string, string>>({});
   const [singleApprovalScriptEdit, setSingleApprovalScriptEdit] = useState('');
   const [showScriptApprovalModal, setShowScriptApprovalModal] = useState(false);
+  const previousJobIdRef = useRef(job.id);
 
   const courseScripts = useMemo(
     () => mergeCourseScripts(job.courseRawScripts, job.courseFormattedScripts),
@@ -155,6 +158,9 @@ export function JobDetailView({
         ? getCanonicalCourseSessionCodes(job)
         : [];
   const approvalSessionCodesKey = approvalSessionCodes.join('|');
+  const regenerationTargetSessionCodesKey = Array.isArray(job.courseRegeneration?.targetSessionCodes)
+    ? job.courseRegeneration.targetSessionCodes.join('|')
+    : '';
   const scriptApprovalTitle = isAwaitingSingleScriptApproval
     ? 'Approve Script'
     : isAwaitingRegeneratedScriptApproval
@@ -186,49 +192,53 @@ export function JobDetailView({
       : 'Regenerate Scripts';
 
   useEffect(() => {
-    const initial: Record<string, boolean> = {};
-    SECTION_IDS.forEach((sectionId) => {
-      initial[sectionId] = false;
-    });
-    if (job.error) {
-      initial.error = true;
+    if (previousJobIdRef.current === job.id) {
+      return;
     }
-    if (isAwaitingAnyScriptApproval) {
-      if (isAwaitingRegeneratedScriptApproval) {
-        initial.courseRegeneration = true;
-      }
-      if (job.contentType === 'course') {
-        initial.courseScripts = true;
-      } else {
-        initial.generatedScript = true;
-      }
-    }
-    setExpandedSections(initial);
+    previousJobIdRef.current = job.id;
+    setExpandedSections(buildInitialExpandedSections(job));
     setErrorManuallyCollapsed(false);
+    setRegenerationMode('audio_only');
+    setRegenerationScriptEdits({});
+    setSelectedRegenerationSessions([]);
     if (job.contentType === 'course') {
-      const scripts = mergeCourseScripts(job.courseRawScripts, job.courseFormattedScripts);
-      const sorted = Object.keys(scripts).sort(
-        (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
-      );
       const firstTargetScript =
         isAwaitingRegeneratedScriptApproval &&
         Array.isArray(job.courseRegeneration?.targetSessionCodes)
-          ? job.courseRegeneration?.targetSessionCodes.find((code) => sorted.includes(code))
+          ? job.courseRegeneration.targetSessionCodes.find((code) => courseScriptKeys.includes(code))
           : '';
-      const firstScript = firstTargetScript || sorted[0] || '';
-      setSelectedCourseScript(firstScript);
-      setRegenerationMode('audio_only');
-      setRegenerationScriptEdits({});
-      setSelectedRegenerationSessions([]);
+      setSelectedCourseScript(firstTargetScript || courseScriptKeys[0] || '');
+      return;
     }
+    setSelectedCourseScript('');
   }, [
-    job.id,
-    job.error,
-    job.courseFormattedScripts,
-    job.courseRawScripts,
+    job,
+    courseScriptKeys,
     job.contentType,
-    isAwaitingAnyScriptApproval,
     isAwaitingRegeneratedScriptApproval,
+  ]);
+
+  useEffect(() => {
+    if (job.contentType !== 'course') {
+      return;
+    }
+
+    setSelectedCourseScript((current) => {
+      if (current && courseScriptKeys.includes(current)) {
+        return current;
+      }
+      const firstTargetScript =
+        isAwaitingRegeneratedScriptApproval &&
+        Array.isArray(job.courseRegeneration?.targetSessionCodes)
+          ? job.courseRegeneration.targetSessionCodes.find((code) => courseScriptKeys.includes(code))
+          : '';
+      return firstTargetScript || courseScriptKeys[0] || '';
+    });
+  }, [
+    job.contentType,
+    courseScriptKeys,
+    isAwaitingRegeneratedScriptApproval,
+    regenerationTargetSessionCodesKey,
   ]);
 
   useEffect(() => {
@@ -1857,6 +1867,62 @@ function getCanonicalCourseSessionCodes(job: ContentJob): string[] {
     if (existing) return existing;
     return courseCode ? `${courseCode}${suffix}` : suffix;
   });
+}
+
+function isAwaitingRegeneratedScriptApprovalJob(job: ContentJob): boolean {
+  return Boolean(
+    job.contentType === 'course' &&
+      job.status === 'completed' &&
+      job.courseRegeneration?.active &&
+      job.courseRegeneration.mode === 'script_and_audio' &&
+      job.courseRegeneration.awaitingScriptApproval
+  );
+}
+
+function isAwaitingInitialScriptApprovalJob(job: ContentJob): boolean {
+  return Boolean(
+    job.contentType === 'course' &&
+      job.status === 'completed' &&
+      job.courseScriptApproval?.enabled &&
+      job.courseScriptApproval.awaitingApproval
+  );
+}
+
+function isAwaitingSingleScriptApprovalJob(job: ContentJob): boolean {
+  return Boolean(
+    job.contentType !== 'course' &&
+      job.status === 'completed' &&
+      job.scriptApproval?.enabled &&
+      job.scriptApproval.awaitingApproval
+  );
+}
+
+function buildInitialExpandedSections(job: ContentJob): Record<string, boolean> {
+  const initial = SECTION_IDS.reduce<Record<string, boolean>>((acc, sectionId) => {
+    acc[sectionId] = false;
+    return acc;
+  }, {});
+
+  if (job.error) {
+    initial.error = true;
+  }
+
+  if (
+    isAwaitingRegeneratedScriptApprovalJob(job) ||
+    isAwaitingInitialScriptApprovalJob(job) ||
+    isAwaitingSingleScriptApprovalJob(job)
+  ) {
+    if (isAwaitingRegeneratedScriptApprovalJob(job)) {
+      initial.courseRegeneration = true;
+    }
+    if (job.contentType === 'course') {
+      initial.courseScripts = true;
+    } else {
+      initial.generatedScript = true;
+    }
+  }
+
+  return initial;
 }
 
 function getCourseScriptOrder(code: string) {
