@@ -35,6 +35,9 @@ SYNTH_STEP_NAMES = {
     "synthesize_course_audio_chunk",
 }
 AUTO_STACK_QUEUE_SCAN_LIMIT = int(os.getenv("AUTO_STACK_QUEUE_SCAN_LIMIT", "200"))
+AUTO_STACK_OWNERSHIP_GRACE_SEC = float(
+    os.getenv("AUTO_STACK_OWNERSHIP_GRACE_SEC", "60")
+)
 COMPANION_FACTORY_RECOVERY_INTERVAL_SEC = float(
     os.getenv("COMPANION_FACTORY_RECOVERY_INTERVAL_SEC", "10")
 )
@@ -97,8 +100,11 @@ def _queue_metrics_bucket_for(snapshot: dict, payload: dict) -> dict:
     if step_name not in SYNTH_STEP_NAMES:
         return snapshot["nonTts"]
 
-    model = str(payload.get("required_tts_model") or "").strip().lower()
-    model_key = model or "unassigned"
+    capability_key = capability_key_for_payload(payload)
+    if capability_key.startswith("tts:") and capability_key != "tts:any":
+        model_key = capability_key.split(":", 1)[1].strip().lower() or "unassigned"
+    else:
+        model_key = "unassigned"
     bucket = snapshot["byModel"].get(model_key)
     if bucket is None:
         bucket = _queue_metrics_bucket()
@@ -311,13 +317,70 @@ def _load_queue_payloads(db, limit: int = AUTO_STACK_QUEUE_SCAN_LIMIT) -> list[d
         for doc in query.stream():
             payload = doc.to_dict() or {}
             if payload:
+                payload["_queue_id"] = doc.id
                 payloads.append(payload)
 
     return payloads
 
 
-def _collect_auto_workload(db) -> dict:
-    queue_payloads = _load_queue_payloads(db)
+def _worker_status_heartbeat_is_fresh(status: dict | None, now: datetime) -> bool:
+    if not status:
+        return False
+    last_heartbeat = _coerce_datetime(status.get("lastHeartbeat"))
+    if last_heartbeat is None:
+        return False
+    return (now - last_heartbeat).total_seconds() <= heartbeat_stale_seconds()
+
+
+def _queue_payload_is_recent(payload: dict, now: datetime) -> bool:
+    lease_expires_at = _coerce_datetime(payload.get("lease_expires_at"))
+    if lease_expires_at is not None and lease_expires_at > now:
+        return True
+
+    for field_name in ("step_started_at", "updated_at"):
+        field_value = _coerce_datetime(payload.get(field_name))
+        if field_value is None:
+            continue
+        if (now - field_value).total_seconds() <= AUTO_STACK_OWNERSHIP_GRACE_SEC:
+            return True
+    return False
+
+
+def _queue_payload_counts_as_live_work(
+    payload: dict,
+    *,
+    worker_status_by_id: dict[str, dict],
+    now: datetime,
+) -> bool:
+    state = str(payload.get("state") or "").strip().lower()
+    if state == "ready":
+        return True
+    if state not in {"leased", "running"}:
+        return False
+
+    owner = str(payload.get("lease_owner") or "").strip()
+    if not owner:
+        return False
+
+    status = worker_status_by_id.get(owner)
+    if not _worker_status_heartbeat_is_fresh(status, now):
+        return False
+
+    queue_id = str(payload.get("_queue_id") or "").strip()
+    current_queue_id = str((status or {}).get("currentQueueId") or "").strip()
+    if queue_id and current_queue_id == queue_id:
+        return True
+    if current_queue_id:
+        return False
+    return _queue_payload_is_recent(payload, now)
+
+
+def _collect_auto_workload_from_payloads(
+    queue_payloads: list[dict],
+    *,
+    worker_status_by_id: dict[str, dict],
+    now: datetime,
+) -> dict:
     tts_outstanding: dict[str, int] = defaultdict(int)
     wildcard_tts_outstanding = 0
     non_tts_outstanding = 0
@@ -325,39 +388,72 @@ def _collect_auto_workload(db) -> dict:
 
     for payload in queue_payloads:
         state = str(payload.get("state") or "").strip().lower()
+        if not _queue_payload_counts_as_live_work(
+            payload,
+            worker_status_by_id=worker_status_by_id,
+            now=now,
+        ):
+            continue
+
         lease_owner = str(payload.get("lease_owner") or "").strip()
         if state in {"leased", "running"} and lease_owner:
             active_owners.add(lease_owner)
 
-        step_name = str(payload.get("step_name") or "").strip()
-        if step_name not in SYNTH_STEP_NAMES:
+        capability_key = capability_key_for_payload(payload)
+        if not capability_key.startswith("tts:"):
             non_tts_outstanding += 1
             continue
 
-        model = str(payload.get("required_tts_model") or "").strip().lower()
+        if capability_key == "tts:any":
+            wildcard_tts_outstanding += 1
+            continue
+
+        model = capability_key.split(":", 1)[1].strip().lower()
         if model:
             tts_outstanding[model] += 1
         else:
             wildcard_tts_outstanding += 1
 
-    pending_jobs = has_pending_jobs(db)
-    delete_jobs = has_delete_requested_jobs(db)
-
     return {
-        "pending_jobs": pending_jobs,
-        "delete_jobs": delete_jobs,
+        "pending_jobs": False,
+        "delete_jobs": False,
         "non_tts_outstanding": non_tts_outstanding,
         "tts_outstanding": dict(tts_outstanding),
         "wildcard_tts_outstanding": wildcard_tts_outstanding,
         "active_owners": active_owners,
         "has_any_work": (
-            pending_jobs
-            or delete_jobs
-            or non_tts_outstanding > 0
+            non_tts_outstanding > 0
             or wildcard_tts_outstanding > 0
             or any(tts_outstanding.values())
         ),
     }
+
+
+def _collect_auto_workload(db) -> dict:
+    now = datetime.now(timezone.utc)
+    queue_payloads = _load_queue_payloads(db)
+    worker_status_by_id = {
+        doc.id: (doc.to_dict() or {})
+        for doc in db.collection("worker_status").stream()
+    }
+    workload = _collect_auto_workload_from_payloads(
+        queue_payloads,
+        worker_status_by_id=worker_status_by_id,
+        now=now,
+    )
+    pending_jobs = has_pending_jobs(db)
+    delete_jobs = has_delete_requested_jobs(db)
+    workload["pending_jobs"] = pending_jobs
+    workload["delete_jobs"] = delete_jobs
+    workload["has_any_work"] = (
+        pending_jobs
+        or delete_jobs
+        or workload["non_tts_outstanding"] > 0
+        or workload["wildcard_tts_outstanding"] > 0
+        or any(workload["tts_outstanding"].values())
+    )
+
+    return workload
 
 
 def _ordered_candidate_ids(
