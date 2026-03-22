@@ -78,6 +78,7 @@ type DraftPayload = {
   subjectId: string;
   targetAudience: string;
   tone: string;
+  requireScriptApprovalBeforeTts: boolean;
   llmBackend: JobBackend;
   ttsBackend: JobBackend;
   llmModel: string;
@@ -115,6 +116,7 @@ export default function CreateContentScreen() {
   const [subjectId, setSubjectId] = useState('');
   const [targetAudience, setTargetAudience] = useState<string>('beginner');
   const [tone, setTone] = useState<string>('gentle');
+  const [requireScriptApprovalBeforeTts, setRequireScriptApprovalBeforeTts] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [courseCodeError, setCourseCodeError] = useState<string | null>(null);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
@@ -181,6 +183,7 @@ export default function CreateContentScreen() {
         setSubjectId(draft.subjectId);
         setTargetAudience(draft.targetAudience || 'beginner');
         setTone(draft.tone || 'gentle');
+        setRequireScriptApprovalBeforeTts(Boolean(draft.requireScriptApprovalBeforeTts));
 
         setLlmBackend(draft.llmBackend);
         setTtsBackend(draft.ttsBackend);
@@ -205,6 +208,7 @@ export default function CreateContentScreen() {
           subjectId: draft.subjectId,
           targetAudience: draft.targetAudience,
           tone: draft.tone,
+          requireScriptApprovalBeforeTts: Boolean(draft.requireScriptApprovalBeforeTts),
           llmBackend: draft.llmBackend,
           ttsBackend: draft.ttsBackend,
           llmModel: normalizedLLMModel,
@@ -301,6 +305,7 @@ export default function CreateContentScreen() {
     subjectId,
     targetAudience,
     tone,
+    requireScriptApprovalBeforeTts,
     llmBackend,
     ttsBackend,
     llmModel,
@@ -322,6 +327,7 @@ export default function CreateContentScreen() {
     subjectId,
     targetAudience,
     tone,
+    requireScriptApprovalBeforeTts,
     llmBackend,
     ttsBackend,
     llmModel,
@@ -476,6 +482,7 @@ export default function CreateContentScreen() {
         title: isCourse ? courseTitle.trim() : (title.trim() || undefined),
         imagePrompt: imagePrompt.trim() || undefined,
         autoPublish,
+        requireScriptApprovalBeforeTts: isCourse ? requireScriptApprovalBeforeTts : false,
       };
 
       await createJob(input);
@@ -528,6 +535,8 @@ export default function CreateContentScreen() {
         onTargetAudienceChange={setTargetAudience}
         tone={tone}
         onToneChange={setTone}
+        requireScriptApprovalBeforeTts={requireScriptApprovalBeforeTts}
+        onRequireScriptApprovalBeforeTtsChange={setRequireScriptApprovalBeforeTts}
         llmBackend={llmBackend}
         onLLMBackendChange={handleLLMBackendChange}
         ttsBackend={ttsBackend}

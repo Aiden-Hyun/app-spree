@@ -54,6 +54,8 @@ type Props = {
   onTargetAudienceChange: (v: string) => void;
   tone: string;
   onToneChange: (v: string) => void;
+  requireScriptApprovalBeforeTts: boolean;
+  onRequireScriptApprovalBeforeTtsChange: (v: boolean) => void;
 
   // Backends / models
   llmBackend: string;
@@ -155,6 +157,7 @@ export function CreateContentForm(props: Props) {
             selectedId={props.tone}
             onSelect={(id) => props.onToneChange(String(id))}
           />
+
         </>
       ) : null}
 
@@ -234,6 +237,26 @@ export function CreateContentForm(props: Props) {
         onChangeText={props.onImagePromptChange}
         multiline
       />
+
+      <Text style={styles.sectionTitle}>Script Approval</Text>
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleInfo}>
+          <Text style={styles.toggleLabel}>Pause for script approval</Text>
+          <Text style={styles.toggleDescription}>
+            Optional. Stop after scripts are generated so you can edit, approve, or regenerate them before TTS starts.
+          </Text>
+        </View>
+        <Switch
+          value={props.requireScriptApprovalBeforeTts}
+          onValueChange={props.onRequireScriptApprovalBeforeTtsChange}
+          trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+          thumbColor={
+            props.requireScriptApprovalBeforeTts
+              ? theme.colors.primary
+              : theme.colors.gray[400]
+          }
+        />
+      </View>
 
       {/* Model selection */}
       <View style={styles.divider} />
@@ -457,4 +480,3 @@ const createStyles = (theme: Theme) =>
       color: '#fff',
     },
   });
-

@@ -20,7 +20,8 @@ export default function JobDetailScreen() {
     cancel,
     requestDelete,
     regenerateCourse,
-    approveRegeneratedScripts,
+    approvePendingScripts,
+    regeneratePendingScripts,
   } = useJobDetail(id);
   const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
     id || '',
@@ -82,17 +83,40 @@ export default function JobDetailScreen() {
     );
   };
   const handleDelete = () => requestDelete();
-  const startApproveRegeneratedScripts = async (rawScriptEdits?: Record<string, string>) => {
-    await approveRegeneratedScripts(rawScriptEdits);
+  const startApprovePendingScripts = async (input?: {
+    rawScriptEdits?: Record<string, string>;
+    script?: string;
+  }) => {
+    await approvePendingScripts(input);
   };
 
-  const handleApproveRegeneratedScripts = async (rawScriptEdits?: Record<string, string>) => {
+  const startRegeneratePendingScripts = async () => {
+    await regeneratePendingScripts();
+  };
+
+  const handleApprovePendingScripts = async (input?: {
+    rawScriptEdits?: Record<string, string>;
+    script?: string;
+  }) => {
     if (!job) {
       return;
     }
 
-    const message =
-      'This will confirm the regenerated scripts and continue with formatting and audio generation.';
+    const isRegenerationApproval = Boolean(
+      job.courseRegeneration?.active &&
+        job.courseRegeneration.mode === 'script_and_audio' &&
+        job.courseRegeneration.awaitingScriptApproval
+    );
+    const isSingleScriptApproval = Boolean(
+      job.contentType !== 'course' &&
+        job.scriptApproval?.enabled &&
+        job.scriptApproval.awaitingApproval
+    );
+    const message = isRegenerationApproval
+      ? 'This will confirm the regenerated scripts and continue with formatting and audio generation.'
+      : isSingleScriptApproval
+        ? 'This will confirm the script and continue with formatting, image generation, and audio generation.'
+        : 'This will confirm the course scripts and continue with formatting and audio generation.';
 
     if (Platform.OS === 'web') {
       const confirmed = await confirmAction(message);
@@ -100,12 +124,16 @@ export default function JobDetailScreen() {
         return;
       }
 
-      await startApproveRegeneratedScripts(rawScriptEdits);
+      await startApprovePendingScripts(input);
       return;
     }
 
     Alert.alert(
-      'Approve Regenerated Scripts',
+      isRegenerationApproval
+        ? 'Approve Regenerated Scripts'
+        : isSingleScriptApproval
+          ? 'Approve Script'
+          : 'Approve Course Scripts',
       message,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -113,11 +141,11 @@ export default function JobDetailScreen() {
           text: 'Approve',
           onPress: async () => {
             try {
-              await startApproveRegeneratedScripts(rawScriptEdits);
+              await startApprovePendingScripts(input);
             } catch (error) {
               Alert.alert(
                 'Approval Failed',
-                error instanceof Error ? error.message : 'Unable to approve regenerated scripts.'
+                error instanceof Error ? error.message : 'Unable to approve pending script.'
               );
             }
           },
@@ -125,6 +153,7 @@ export default function JobDetailScreen() {
       ]
     );
   };
+
   const handleReview = () => {
     if (!job) return;
     router.push({ pathname: '/admin/job/[id]/review', params: { id: job.id } });
@@ -163,13 +192,25 @@ export default function JobDetailScreen() {
         job.courseRegeneration.mode === 'script_and_audio' &&
         job.courseRegeneration.awaitingScriptApproval
     );
+  const isCourseInitialAwaitingScriptApproval =
+    job.contentType === 'course' &&
+    job.status === 'completed' &&
+    Boolean(job.courseScriptApproval?.enabled && job.courseScriptApproval.awaitingApproval);
+  const isSingleAwaitingScriptApproval =
+    job.contentType !== 'course' &&
+    job.status === 'completed' &&
+    Boolean(job.scriptApproval?.enabled && job.scriptApproval.awaitingApproval);
+  const isAwaitingAnyScriptApproval =
+    isCourseRegenAwaitingScriptApproval ||
+    isCourseInitialAwaitingScriptApproval ||
+    isSingleAwaitingScriptApproval;
   const isAwaitingApproval =
-    !isCourseRegenAwaitingScriptApproval &&
+    !isAwaitingAnyScriptApproval &&
     (isCourseRegenAwaitingPublish ||
       (job.status === 'completed' && !job.autoPublish && !job.publishedContentId));
   const isReviewable =
     job.status === 'completed' &&
-    !isCourseRegenAwaitingScriptApproval &&
+    !isAwaitingAnyScriptApproval &&
     (!job.autoPublish || isCourseRegenAwaitingPublish);
   const isDeletable =
     job.status === 'failed' || (job.status === 'completed' && !job.autoPublish);
@@ -196,7 +237,8 @@ export default function JobDetailScreen() {
         onPublish={handlePublish}
         publishButtonLabel={publishButtonLabel}
         onRegenerateCourse={regenerateCourse}
-        onApproveRegeneratedScripts={handleApproveRegeneratedScripts}
+        onApprovePendingScripts={handleApprovePendingScripts}
+        onRegeneratePendingScripts={startRegeneratePendingScripts}
         onDelete={handleDelete}
         onReview={handleReview}
       />

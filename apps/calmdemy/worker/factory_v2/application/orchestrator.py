@@ -63,6 +63,42 @@ class Orchestrator:
             and bool(regeneration.get("awaitingScriptApproval"))
         )
 
+    @staticmethod
+    def _course_script_approval(job: dict) -> dict:
+        runtime = dict(job.get("runtime") or {})
+        script_approval = runtime.get("course_script_approval")
+        if isinstance(script_approval, dict):
+            return dict(script_approval)
+
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        script_approval = payload.get("courseScriptApproval")
+        if isinstance(script_approval, dict):
+            return dict(script_approval)
+        return {}
+
+    def _course_initial_script_approval_awaiting(self, job: dict) -> bool:
+        script_approval = self._course_script_approval(job)
+        return bool(script_approval.get("enabled") and script_approval.get("awaitingApproval"))
+
+    @staticmethod
+    def _single_script_approval(job: dict) -> dict:
+        runtime = dict(job.get("runtime") or {})
+        script_approval = runtime.get("script_approval")
+        if isinstance(script_approval, dict):
+            return dict(script_approval)
+
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        script_approval = payload.get("scriptApproval")
+        if isinstance(script_approval, dict):
+            return dict(script_approval)
+        return {}
+
+    def _single_script_approval_awaiting(self, job: dict) -> bool:
+        script_approval = self._single_script_approval(job)
+        return bool(script_approval.get("enabled") and script_approval.get("awaitingApproval"))
+
     def _seed_course_checkpoint_steps(
         self,
         job: dict,
@@ -458,10 +494,14 @@ class Orchestrator:
         workflow = workflow_for_job_type(job["job_type"])
 
         if job["job_type"] == "course":
-            if step_name == "generate_course_scripts" and self._course_regeneration_awaiting_script_approval(job):
-                self.job_repo.mark_completed(job_id, run_id)
-                self.run_repo.mark_completed(run_id)
-                return
+            if step_name == "generate_course_scripts":
+                if (
+                    self._course_regeneration_awaiting_script_approval(job)
+                    or self._course_initial_script_approval_awaiting(job)
+                ):
+                    self.job_repo.mark_completed(job_id, run_id)
+                    self.run_repo.mark_completed(run_id)
+                    return
             if step_name == "format_course_scripts":
                 self._fan_out_course_audio(job, job_id, run_id)
                 return
@@ -480,6 +520,10 @@ class Orchestrator:
             if step_name == "synthesize_course_audio":
                 self._maybe_fan_in_course_audio(job, job_id, run_id)
                 return
+        elif step_name == "generate_script" and self._single_script_approval_awaiting(job):
+            self.job_repo.mark_completed(job_id, run_id)
+            self.run_repo.mark_completed(run_id)
+            return
 
         next_steps = workflow.next_steps(step_name)
         is_terminal = step_name == workflow.terminal_step or not next_steps

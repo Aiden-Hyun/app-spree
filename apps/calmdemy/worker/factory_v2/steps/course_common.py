@@ -61,6 +61,16 @@ def _course_regeneration(runtime: dict[str, Any], job_data: dict[str, Any]) -> d
     return {}
 
 
+def _course_script_approval(runtime: dict[str, Any], job_data: dict[str, Any]) -> dict[str, Any]:
+    script_approval = runtime.get("course_script_approval")
+    if isinstance(script_approval, dict):
+        return dict(script_approval)
+    payload = job_data.get("courseScriptApproval")
+    if isinstance(payload, dict):
+        return dict(payload)
+    return {}
+
+
 def _session_def_by_shard(shard_key: str) -> dict[str, Any] | None:
     shard = str(shard_key or "").strip().upper()
     for session_def in SESSION_DEFS:

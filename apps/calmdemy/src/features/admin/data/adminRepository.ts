@@ -61,6 +61,17 @@ function freshDispatchResetFields(): Record<string, null | false> {
   };
 }
 
+function makePendingScriptApprovalPayload(userId: string | null) {
+  return {
+    enabled: true,
+    awaitingApproval: false,
+    scriptApprovedBy: null,
+    scriptApprovedAt: null,
+    requestedBy: userId,
+    requestedAt: serverTimestamp(),
+  };
+}
+
 function parseNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
@@ -152,6 +163,11 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   // Course jobs get extra tracking fields
   if (input.contentType === 'course') {
     jobData.courseProgress = 'Pending';
+    if (input.requireScriptApprovalBeforeTts) {
+      jobData.courseScriptApproval = makePendingScriptApprovalPayload(userId);
+    }
+  } else if (input.requireScriptApprovalBeforeTts) {
+    jobData.scriptApproval = makePendingScriptApprovalPayload(userId);
   }
 
   const docRef = await addDoc(jobsCollection, jobData);
@@ -494,6 +510,18 @@ function validateCourseSessionCodes(codes: string[]): string[] {
   return result;
 }
 
+function getInitialCourseSessionCodes(job: ContentJob): string[] {
+  const courseCode = String(job.params.courseCode || '').trim();
+  if (courseCode) {
+    return COURSE_SHARD_SUFFIXES.map((suffix) => `${courseCode}${suffix}`);
+  }
+
+  return validateCourseSessionCodes([
+    ...Object.keys(job.courseRawScripts || {}),
+    ...Object.keys(job.courseFormattedScripts || {}),
+  ]);
+}
+
 export async function regenerateCourseSessions(
   job: ContentJob,
   input: RegenerateCourseSessionsInput
@@ -584,30 +612,84 @@ export async function regenerateCourseSessions(
   await updateDoc(doc(jobsCollection, job.id), payload);
 }
 
-export async function approveRegeneratedCourseScripts(
+export async function approvePendingScripts(
   job: ContentJob,
-  rawScriptEdits?: Record<string, string>
+  input?: {
+    rawScriptEdits?: Record<string, string>;
+    script?: string;
+  }
 ): Promise<void> {
   if (job.contentType !== 'course') {
-    throw new Error('Script approval is only supported for course jobs.');
+    const scriptApproval = job.scriptApproval;
+    if (
+      job.status !== 'completed' ||
+      !scriptApproval?.enabled ||
+      !scriptApproval.awaitingApproval
+    ) {
+      throw new Error('There is no script awaiting approval for this job.');
+    }
+
+    const nextScript = String(input?.script ?? job.generatedScript ?? '').trim();
+    if (!nextScript) {
+      throw new Error('Script cannot be empty.');
+    }
+
+    const userId = getCurrentUserId();
+    await updateDoc(doc(jobsCollection, job.id), {
+      status: 'pending',
+      error: null,
+      errorCode: null,
+      failedStage: null,
+      startedAt: null,
+      completedAt: null,
+      runEndedAt: null,
+      lastRunStatus: null,
+      publishInProgress: false,
+      publishLeaseOwner: null,
+      publishLeaseExpiresAt: null,
+      generatedScript: nextScript,
+      formattedScript: null,
+      ...freshDispatchResetFields(),
+      scriptApproval: {
+        ...scriptApproval,
+        awaitingApproval: false,
+        scriptApprovedBy: userId || null,
+        scriptApprovedAt: serverTimestamp(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+    return;
   }
 
   const regeneration = job.courseRegeneration;
-  if (!regeneration?.active || regeneration.mode !== 'script_and_audio') {
-    throw new Error('There are no regenerated scripts awaiting approval.');
-  }
-  if (!regeneration.awaitingScriptApproval) {
-    throw new Error('This regeneration is not waiting for script approval.');
+  const initialScriptApproval = job.courseScriptApproval;
+  const isRegenerationApproval = Boolean(
+    regeneration?.active &&
+      regeneration.mode === 'script_and_audio' &&
+      regeneration.awaitingScriptApproval
+  );
+  const isInitialApproval = Boolean(
+    initialScriptApproval?.enabled && initialScriptApproval.awaitingApproval
+  );
+
+  if (!isRegenerationApproval && !isInitialApproval) {
+    throw new Error('There are no course scripts awaiting approval.');
   }
 
-  const targetSessionCodes = validateCourseSessionCodes(regeneration.targetSessionCodes || []);
+  const targetSessionCodes = isRegenerationApproval
+    ? validateCourseSessionCodes(regeneration?.targetSessionCodes || [])
+    : getInitialCourseSessionCodes(job);
   if (targetSessionCodes.length === 0) {
-    throw new Error('There are no regenerated sessions awaiting approval.');
+    throw new Error(
+      isRegenerationApproval
+        ? 'There are no regenerated sessions awaiting approval.'
+        : 'There are no course scripts awaiting approval.'
+    );
   }
 
   const nextRawScripts: Record<string, string> = { ...(job.courseRawScripts || {}) };
   const nextFormattedScripts: Record<string, string> = { ...(job.courseFormattedScripts || {}) };
-  const edits = rawScriptEdits || {};
+  const edits = input?.rawScriptEdits || {};
 
   for (const sessionCode of targetSessionCodes) {
     const nextRawScript = Object.prototype.hasOwnProperty.call(edits, sessionCode)
@@ -623,6 +705,108 @@ export async function approveRegeneratedCourseScripts(
   }
 
   const userId = getCurrentUserId();
+  const approvalTimestamp = serverTimestamp();
+  const payload: Record<string, any> = {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
+    courseRawScripts: nextRawScripts,
+    courseFormattedScripts: nextFormattedScripts,
+    ...freshDispatchResetFields(),
+    updatedAt: serverTimestamp(),
+  };
+
+  if (isRegenerationApproval) {
+    payload.courseProgress = 'Approved regenerated scripts. Preparing audio generation';
+    payload.courseRegeneration = {
+      ...regeneration,
+      awaitingScriptApproval: false,
+      scriptApprovedBy: userId || null,
+      scriptApprovedAt: approvalTimestamp,
+    };
+  } else {
+    payload.courseProgress = 'Approved scripts. Preparing audio generation';
+    payload.courseScriptApproval = {
+      ...(initialScriptApproval || { enabled: true }),
+      awaitingApproval: false,
+      scriptApprovedBy: userId || null,
+      scriptApprovedAt: approvalTimestamp,
+    };
+  }
+
+  await updateDoc(doc(jobsCollection, job.id), payload);
+}
+
+export async function regeneratePendingScripts(job: ContentJob): Promise<void> {
+  if (job.contentType !== 'course') {
+    const scriptApproval = job.scriptApproval;
+    if (
+      job.status !== 'completed' ||
+      !scriptApproval?.enabled ||
+      !scriptApproval.awaitingApproval
+    ) {
+      throw new Error('This job is not currently waiting for script approval.');
+    }
+
+    const userId = getCurrentUserId();
+    await updateDoc(doc(jobsCollection, job.id), {
+      status: 'pending',
+      error: null,
+      errorCode: null,
+      failedStage: null,
+      startedAt: null,
+      completedAt: null,
+      runEndedAt: null,
+      lastRunStatus: null,
+      publishInProgress: false,
+      publishLeaseOwner: null,
+      publishLeaseExpiresAt: null,
+      generatedScript: null,
+      formattedScript: null,
+      ...freshDispatchResetFields(),
+      scriptApproval: {
+        ...scriptApproval,
+        awaitingApproval: false,
+        scriptApprovedBy: null,
+        scriptApprovedAt: null,
+        requestedBy: userId || null,
+        requestedAt: serverTimestamp(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+    return;
+  }
+
+  const initialScriptApproval = job.courseScriptApproval;
+  if (
+    job.status !== 'completed' ||
+    !initialScriptApproval?.enabled ||
+    !initialScriptApproval.awaitingApproval
+  ) {
+    throw new Error('This course is not currently waiting for initial script approval.');
+  }
+
+  const targetSessionCodes = getInitialCourseSessionCodes(job);
+  if (targetSessionCodes.length === 0) {
+    throw new Error('There are no course scripts available to regenerate.');
+  }
+
+  const nextRawScripts: Record<string, string> = { ...(job.courseRawScripts || {}) };
+  const nextFormattedScripts: Record<string, string> = { ...(job.courseFormattedScripts || {}) };
+  targetSessionCodes.forEach((sessionCode) => {
+    delete nextRawScripts[sessionCode];
+    delete nextFormattedScripts[sessionCode];
+  });
+
+  const userId = getCurrentUserId();
   await updateDoc(doc(jobsCollection, job.id), {
     status: 'pending',
     error: null,
@@ -635,15 +819,17 @@ export async function approveRegeneratedCourseScripts(
     publishInProgress: false,
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
-    courseProgress: 'Approved regenerated scripts. Preparing audio generation',
+    courseProgress: `Regenerating scripts for ${targetSessionCodes.length} session${targetSessionCodes.length === 1 ? '' : 's'}`,
     courseRawScripts: nextRawScripts,
     courseFormattedScripts: nextFormattedScripts,
     ...freshDispatchResetFields(),
-    courseRegeneration: {
-      ...regeneration,
-      awaitingScriptApproval: false,
-      scriptApprovedBy: userId || null,
-      scriptApprovedAt: serverTimestamp(),
+    courseScriptApproval: {
+      ...initialScriptApproval,
+      awaitingApproval: false,
+      scriptApprovedBy: null,
+      scriptApprovedAt: null,
+      requestedBy: userId || null,
+      requestedAt: serverTimestamp(),
     },
     updatedAt: serverTimestamp(),
   });

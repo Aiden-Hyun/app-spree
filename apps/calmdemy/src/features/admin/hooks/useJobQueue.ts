@@ -10,7 +10,8 @@ import {
   cancelJob,
   requestDeleteJob,
   regenerateCourseSessions,
-  approveRegeneratedCourseScripts,
+  approvePendingScripts,
+  regeneratePendingScripts,
   subscribeToJobStepTimeline,
   setWorkerDesiredState,
   setWorkerIdleTimeout,
@@ -104,9 +105,17 @@ export function useJobDetail(jobId: string) {
     [job, jobId]
   );
 
-  const approveRegeneratedScripts = useCallback(async (rawScriptEdits?: Record<string, string>) => {
+  const approvePendingScriptsAction = useCallback(async (input?: {
+    rawScriptEdits?: Record<string, string>;
+    script?: string;
+  }) => {
     if (!jobId || !job) return;
-    await approveRegeneratedCourseScripts(job, rawScriptEdits);
+    await approvePendingScripts(job, input);
+  }, [job, jobId]);
+
+  const regeneratePendingScriptsAction = useCallback(async () => {
+    if (!jobId || !job) return;
+    await regeneratePendingScripts(job);
   }, [job, jobId]);
 
   return {
@@ -116,7 +125,8 @@ export function useJobDetail(jobId: string) {
     cancel,
     requestDelete,
     regenerateCourse,
-    approveRegeneratedScripts,
+    approvePendingScripts: approvePendingScriptsAction,
+    regeneratePendingScripts: regeneratePendingScriptsAction,
   };
 }
 

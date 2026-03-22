@@ -16,6 +16,7 @@ def _extract_runtime(content_job: dict) -> dict:
         "generated_script": content_job.get("generatedScript"),
         "formatted_script": content_job.get("formattedScript"),
         "generated_title": content_job.get("generatedTitle") or content_job.get("title"),
+        "script_approval": content_job.get("scriptApproval"),
         "image_prompt": content_job.get("imagePrompt"),
         "image_path": content_job.get("imagePath"),
         "thumbnail_url": content_job.get("thumbnailUrl"),
@@ -28,6 +29,7 @@ def _extract_runtime(content_job: dict) -> dict:
         "course_formatted_scripts": content_job.get("courseFormattedScripts"),
         "course_audio_results": content_job.get("courseAudioResults"),
         "course_preview_sessions": content_job.get("coursePreviewSessions"),
+        "course_script_approval": content_job.get("courseScriptApproval"),
         "course_regeneration": content_job.get("courseRegeneration"),
         "course_id": content_job.get("courseId"),
         "course_session_ids": content_job.get("courseSessionIds"),
@@ -70,6 +72,30 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
                 )
             else:
                 first_step = "format_course_scripts"
+        else:
+            script_approval = content_job.get("courseScriptApproval") or {}
+            if (
+                isinstance(script_approval, dict)
+                and script_approval.get("enabled")
+            ):
+                has_existing_plan = bool(content_job.get("coursePlan"))
+                script_approved = bool(
+                    script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy")
+                )
+                awaiting_script_approval = bool(script_approval.get("awaitingApproval"))
+                if script_approved and not awaiting_script_approval:
+                    first_step = "format_course_scripts"
+                elif has_existing_plan:
+                    first_step = "generate_course_scripts"
+    elif status == "pending":
+        script_approval = content_job.get("scriptApproval") or {}
+        if (
+            isinstance(script_approval, dict)
+            and script_approval.get("enabled")
+            and bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
+            and not bool(script_approval.get("awaitingApproval"))
+        ):
+            first_step = "format_script"
     if status == "publishing":
         trigger = "manual_publish"
         first_step = "publish_course" if is_course else "publish_content"
@@ -110,6 +136,18 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
         trigger=trigger,
         first_step=first_step,
     )
+
+    if (
+        is_course
+        and first_step in {"generate_course_scripts", "format_course_scripts"}
+        and not str(content_job.get("thumbnailUrl") or "").strip()
+    ):
+        orchestrator._ensure_step_enqueued(
+            job_repo.get(v2_job_id),
+            v2_job_id,
+            run_id,
+            "generate_course_thumbnail",
+        )
 
     source_ref.set(
         {

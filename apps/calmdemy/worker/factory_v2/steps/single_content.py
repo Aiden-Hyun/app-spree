@@ -25,6 +25,16 @@ def _content_job_id(job: dict) -> str:
     return str(compat.get("content_job_id") or "").strip()
 
 
+def _script_approval(runtime: dict[str, Any], job_data: dict[str, Any]) -> dict[str, Any]:
+    payload = runtime.get("script_approval")
+    if isinstance(payload, dict):
+        return dict(payload)
+    payload = job_data.get("scriptApproval")
+    if isinstance(payload, dict):
+        return dict(payload)
+    return {}
+
+
 def execute_generate_script(ctx: StepContext) -> StepResult:
     from factory_v2.shared.llm_generator import generate_script
 
@@ -37,6 +47,34 @@ def execute_generate_script(ctx: StepContext) -> StepResult:
         or (job_data.get("title") or "").strip()
         or job_data.get("params", {}).get("topic", "Untitled").strip().title()
     )
+    script_approval = _script_approval(runtime, job_data)
+    await_script_approval = (
+        bool(script_approval.get("enabled"))
+        and not bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
+    )
+
+    if await_script_approval:
+        script_approval["awaitingApproval"] = True
+        return StepResult(
+            output={"word_count": len(script.split()), "awaiting_script_approval": True},
+            runtime_patch={
+                "generated_script": script,
+                "generated_title": generated_title,
+                "script_approval": script_approval,
+            },
+            summary_patch={
+                "currentStep": "generate_script",
+                "scriptWordCount": len(script.split()),
+                "awaitingScriptApproval": True,
+            },
+            compat_content_job_patch={
+                "status": "completed",
+                "generatedScript": script,
+                "generatedTitle": generated_title,
+                "jobRunId": ctx.run_id,
+                "scriptApproval": script_approval,
+            },
+        )
 
     return StepResult(
         output={"word_count": len(script.split())},

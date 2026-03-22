@@ -50,7 +50,11 @@ type Props = {
     targetSessionCodes: string[];
     formattedScriptEdits?: Record<string, string>;
   }) => Promise<void>;
-  onApproveRegeneratedScripts: (rawScriptEdits?: Record<string, string>) => Promise<void>;
+  onApprovePendingScripts: (input?: {
+    rawScriptEdits?: Record<string, string>;
+    script?: string;
+  }) => Promise<void>;
+  onRegeneratePendingScripts: () => Promise<void>;
   onDelete: () => void;
   onReview: () => void;
 };
@@ -85,7 +89,8 @@ export function JobDetailView({
   onPublish,
   publishButtonLabel = 'Publish Now',
   onRegenerateCourse,
-  onApproveRegeneratedScripts,
+  onApprovePendingScripts,
+  onRegeneratePendingScripts,
   onDelete,
   onReview,
 }: Props) {
@@ -102,6 +107,7 @@ export function JobDetailView({
   const [regenerating, setRegenerating] = useState(false);
   const [approvingScripts, setApprovingScripts] = useState(false);
   const [approvalScriptEdits, setApprovalScriptEdits] = useState<Record<string, string>>({});
+  const [singleApprovalScriptEdit, setSingleApprovalScriptEdit] = useState('');
   const [showScriptApprovalModal, setShowScriptApprovalModal] = useState(false);
 
   const courseScripts = useMemo(
@@ -126,12 +132,58 @@ export function JobDetailView({
       job.courseRegeneration.mode === 'script_and_audio' &&
       job.courseRegeneration.awaitingScriptApproval
   );
-  const approvalSessionCodes =
-    isAwaitingRegeneratedScriptApproval &&
+  const isAwaitingSingleScriptApproval = Boolean(
+    job.contentType !== 'course' &&
+      job.status === 'completed' &&
+      job.scriptApproval?.enabled &&
+      job.scriptApproval.awaitingApproval
+  );
+  const isAwaitingInitialScriptApproval = Boolean(
+    job.contentType === 'course' &&
+      job.status === 'completed' &&
+      job.courseScriptApproval?.enabled &&
+      job.courseScriptApproval.awaitingApproval
+  );
+  const isAwaitingAnyScriptApproval =
+    isAwaitingRegeneratedScriptApproval ||
+    isAwaitingInitialScriptApproval ||
+    isAwaitingSingleScriptApproval;
+  const approvalSessionCodes = isAwaitingRegeneratedScriptApproval &&
     Array.isArray(job.courseRegeneration?.targetSessionCodes)
       ? job.courseRegeneration.targetSessionCodes
-      : [];
+      : isAwaitingInitialScriptApproval
+        ? getCanonicalCourseSessionCodes(job)
+        : [];
   const approvalSessionCodesKey = approvalSessionCodes.join('|');
+  const scriptApprovalTitle = isAwaitingSingleScriptApproval
+    ? 'Approve Script'
+    : isAwaitingRegeneratedScriptApproval
+    ? 'Approve Regenerated Scripts'
+    : 'Approve Course Scripts';
+  const scriptApprovalSubtitle = isAwaitingSingleScriptApproval
+    ? 'Review the script before audio generation begins.'
+    : isAwaitingRegeneratedScriptApproval
+    ? `Review ${approvalSessionCodes.length} regenerated session${approvalSessionCodes.length === 1 ? '' : 's'} before audio generation begins.`
+    : `Review ${approvalSessionCodes.length} course session${approvalSessionCodes.length === 1 ? '' : 's'} before audio generation begins.`;
+  const scriptApprovalBody = isAwaitingSingleScriptApproval
+    ? 'This script is waiting on your approval. Audio generation will stay paused until you confirm it.'
+    : isAwaitingRegeneratedScriptApproval
+    ? 'These regenerated scripts are waiting on your approval. Audio generation will stay paused until you confirm them.'
+    : 'These course scripts are waiting on your approval. TTS will stay paused until you confirm them.';
+  const scriptApprovalPrimaryLabel = approvingScripts
+    ? 'Starting Audio...'
+    : isAwaitingSingleScriptApproval
+      ? 'Approve Script & Start Audio'
+      : isAwaitingRegeneratedScriptApproval
+      ? 'Approve Scripts & Generate Audio'
+      : 'Approve Scripts & Start TTS';
+  const scriptRegenerateLabel = regenerating
+    ? 'Starting...'
+    : isAwaitingSingleScriptApproval
+      ? 'Regenerate Script'
+      : isAwaitingRegeneratedScriptApproval
+      ? 'Regenerate Again'
+      : 'Regenerate Scripts';
 
   useEffect(() => {
     const initial: Record<string, boolean> = {};
@@ -141,9 +193,15 @@ export function JobDetailView({
     if (job.error) {
       initial.error = true;
     }
-    if (isAwaitingRegeneratedScriptApproval) {
-      initial.courseRegeneration = true;
-      initial.courseScripts = true;
+    if (isAwaitingAnyScriptApproval) {
+      if (isAwaitingRegeneratedScriptApproval) {
+        initial.courseRegeneration = true;
+      }
+      if (job.contentType === 'course') {
+        initial.courseScripts = true;
+      } else {
+        initial.generatedScript = true;
+      }
     }
     setExpandedSections(initial);
     setErrorManuallyCollapsed(false);
@@ -152,13 +210,8 @@ export function JobDetailView({
       const sorted = Object.keys(scripts).sort(
         (a, b) => getCourseScriptOrder(a) - getCourseScriptOrder(b)
       );
-      const awaitingScriptApproval = Boolean(
-        job.courseRegeneration?.active &&
-          job.courseRegeneration.mode === 'script_and_audio' &&
-          job.courseRegeneration.awaitingScriptApproval
-      );
       const firstTargetScript =
-        awaitingScriptApproval &&
+        isAwaitingRegeneratedScriptApproval &&
         Array.isArray(job.courseRegeneration?.targetSessionCodes)
           ? job.courseRegeneration?.targetSessionCodes.find((code) => sorted.includes(code))
           : '';
@@ -174,6 +227,7 @@ export function JobDetailView({
     job.courseFormattedScripts,
     job.courseRawScripts,
     job.contentType,
+    isAwaitingAnyScriptApproval,
     isAwaitingRegeneratedScriptApproval,
   ]);
 
@@ -182,15 +236,15 @@ export function JobDetailView({
   }, [job.id]);
 
   useEffect(() => {
-    if (isAwaitingRegeneratedScriptApproval) {
+    if (isAwaitingAnyScriptApproval) {
       setShowScriptApprovalModal(true);
       return;
     }
     setShowScriptApprovalModal(false);
-  }, [isAwaitingRegeneratedScriptApproval, job.id]);
+  }, [isAwaitingAnyScriptApproval, job.id]);
 
   useEffect(() => {
-    if (!isAwaitingRegeneratedScriptApproval) {
+    if (!isAwaitingAnyScriptApproval || job.contentType !== 'course') {
       setApprovalScriptEdits({});
       return;
     }
@@ -206,14 +260,46 @@ export function JobDetailView({
     setApprovalScriptEdits(nextApprovalEdits);
   }, [
     job.id,
-    isAwaitingRegeneratedScriptApproval,
+    isAwaitingAnyScriptApproval,
     approvalSessionCodesKey,
     job.courseRawScripts,
     courseScripts,
   ]);
 
+  useEffect(() => {
+    if (!isAwaitingSingleScriptApproval) {
+      setSingleApprovalScriptEdit('');
+      return;
+    }
+
+    setSingleApprovalScriptEdit(String(job.generatedScript || ''));
+  }, [isAwaitingSingleScriptApproval, job.generatedScript, job.id]);
+
   const handleApprovePendingScripts = async () => {
     if (approvingScripts) {
+      return;
+    }
+
+    if (isAwaitingSingleScriptApproval) {
+      const nextScript = String(singleApprovalScriptEdit || '').trim();
+      if (!nextScript) {
+        Alert.alert('Script Required', 'Script cannot be empty.');
+        return;
+      }
+
+      try {
+        setApprovingScripts(true);
+        await onApprovePendingScripts({ script: nextScript });
+        setShowScriptApprovalModal(false);
+        Alert.alert('Approval Started', 'Approved the script. Audio generation will begin shortly.');
+      } catch (error) {
+        Alert.alert(
+          'Approval Failed',
+          error instanceof Error ? error.message : 'Unable to approve the script.'
+        );
+      } finally {
+        setApprovingScripts(false);
+      }
       return;
     }
 
@@ -233,7 +319,7 @@ export function JobDetailView({
 
     try {
       setApprovingScripts(true);
-      await onApproveRegeneratedScripts(nextEdits);
+      await onApprovePendingScripts({ rawScriptEdits: nextEdits });
       setShowScriptApprovalModal(false);
       Alert.alert(
         'Approval Started',
@@ -242,7 +328,7 @@ export function JobDetailView({
     } catch (error) {
       Alert.alert(
         'Approval Failed',
-        error instanceof Error ? error.message : 'Unable to approve regenerated scripts.'
+        error instanceof Error ? error.message : 'Unable to approve course scripts.'
       );
     } finally {
       setApprovingScripts(false);
@@ -250,7 +336,29 @@ export function JobDetailView({
   };
 
   const startPendingScriptRegeneration = async () => {
-    if (approvalSessionCodes.length === 0 || regenerating) {
+    if ((!isAwaitingSingleScriptApproval && approvalSessionCodes.length === 0) || regenerating) {
+      return;
+    }
+
+    if (!isAwaitingRegeneratedScriptApproval) {
+      setRegenerating(true);
+      try {
+        await onRegeneratePendingScripts();
+        setShowScriptApprovalModal(false);
+        Alert.alert(
+          'Regeneration Started',
+          isAwaitingSingleScriptApproval
+            ? 'Queued script regeneration. A fresh script will be generated shortly.'
+            : `Queued regeneration for ${approvalSessionCodes.length} session${approvalSessionCodes.length > 1 ? 's' : ''}.`
+        );
+      } catch (error) {
+        Alert.alert(
+          'Regeneration Failed',
+          error instanceof Error ? error.message : 'Unable to regenerate scripts.'
+        );
+      } finally {
+        setRegenerating(false);
+      }
       return;
     }
 
@@ -276,12 +384,15 @@ export function JobDetailView({
   };
 
   const handleRegeneratePendingScripts = () => {
-    if (approvalSessionCodes.length === 0 || regenerating) {
+    if ((!isAwaitingSingleScriptApproval && approvalSessionCodes.length === 0) || regenerating) {
       return;
     }
 
-    const message =
-      'This will discard the current regenerated scripts and generate a new version for the same sessions. Continue?';
+    const message = isAwaitingSingleScriptApproval
+      ? 'This will discard the current script and generate a fresh version before TTS starts. Continue?'
+      : isAwaitingRegeneratedScriptApproval
+      ? 'This will discard the current regenerated scripts and generate a new version for the same sessions. Continue?'
+      : 'This will discard the current course scripts and generate a fresh set before TTS starts. Continue?';
 
     if (Platform.OS === 'web') {
       const webConfirm = (
@@ -297,7 +408,11 @@ export function JobDetailView({
     }
 
     Alert.alert(
-      'Regenerate Again',
+      isAwaitingSingleScriptApproval
+        ? 'Regenerate Script'
+        : isAwaitingRegeneratedScriptApproval
+          ? 'Regenerate Again'
+          : 'Regenerate Course Scripts',
       message,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -486,9 +601,9 @@ export function JobDetailView({
           />
         )}
 
-        {isAwaitingRegeneratedScriptApproval && (
+        {isAwaitingAnyScriptApproval && (
           <PrimaryButton
-            label="Review & Approve Scripts"
+            label={isAwaitingSingleScriptApproval ? 'Review & Approve Script' : 'Review & Approve Scripts'}
             icon="document-text-outline"
             color={theme.colors.success}
             onPress={() => setShowScriptApprovalModal(true)}
@@ -539,7 +654,7 @@ export function JobDetailView({
       </ScrollView>
 
       <Modal
-        visible={isAwaitingRegeneratedScriptApproval && showScriptApprovalModal}
+        visible={isAwaitingAnyScriptApproval && showScriptApprovalModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowScriptApprovalModal(false)}
@@ -548,11 +663,8 @@ export function JobDetailView({
           <View style={styles.approvalModalCard}>
             <View style={styles.approvalModalHeader}>
               <View style={styles.approvalModalTitleBlock}>
-                <Text style={styles.approvalModalTitle}>Approve Regenerated Scripts</Text>
-                <Text style={styles.approvalModalSubtitle}>
-                  Review {approvalSessionCodes.length} regenerated session
-                  {approvalSessionCodes.length === 1 ? '' : 's'} before audio generation begins.
-                </Text>
+                <Text style={styles.approvalModalTitle}>{scriptApprovalTitle}</Text>
+                <Text style={styles.approvalModalSubtitle}>{scriptApprovalSubtitle}</Text>
               </View>
               <Pressable
                 style={({ pressed }) => [
@@ -570,34 +682,51 @@ export function JobDetailView({
               contentContainerStyle={styles.approvalModalScrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.approvalModalBody}>
-                These regenerated scripts are waiting on your approval. Audio generation will stay
-                paused until you confirm them.
-              </Text>
-              <View style={styles.scriptEditorList}>
-                {approvalSessionCodes.map((sessionCode) => {
-                  const script = approvalScriptEdits[sessionCode] ?? '';
-                  return (
-                    <View key={sessionCode} style={styles.scriptEditorCard}>
-                      <Text style={styles.scriptEditorTitle}>
-                        {getCourseScriptTitle(sessionCode, job.coursePlan)}
-                      </Text>
-                      <Text style={styles.scriptEditorMeta}>{sessionCode}</Text>
-                      <TextInput
-                        multiline
-                        editable={!regenerating && !approvingScripts}
-                        style={[styles.scriptEditorInput, styles.approvalScriptEditorInput]}
-                        value={script}
-                        onChangeText={(value) =>
-                          setApprovalScriptEdits((prev) => ({ ...prev, [sessionCode]: value }))
-                        }
-                        placeholder="Edit regenerated script for this session"
-                        placeholderTextColor={theme.colors.textMuted}
-                      />
-                    </View>
-                  );
-                })}
-              </View>
+              <Text style={styles.approvalModalBody}>{scriptApprovalBody}</Text>
+              {isAwaitingSingleScriptApproval ? (
+                <View style={styles.scriptEditorList}>
+                  <View style={styles.scriptEditorCard}>
+                    <Text style={styles.scriptEditorTitle}>
+                      {job.generatedTitle || job.title || CONTENT_TYPE_LABELS[job.contentType]}
+                    </Text>
+                    <Text style={styles.scriptEditorMeta}>{CONTENT_TYPE_LABELS[job.contentType]}</Text>
+                    <TextInput
+                      multiline
+                      editable={!regenerating && !approvingScripts}
+                      style={[styles.scriptEditorInput, styles.approvalScriptEditorInput]}
+                      value={singleApprovalScriptEdit}
+                      onChangeText={setSingleApprovalScriptEdit}
+                      placeholder="Edit the script before audio generation"
+                      placeholderTextColor={theme.colors.textMuted}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.scriptEditorList}>
+                  {approvalSessionCodes.map((sessionCode) => {
+                    const script = approvalScriptEdits[sessionCode] ?? '';
+                    return (
+                      <View key={sessionCode} style={styles.scriptEditorCard}>
+                        <Text style={styles.scriptEditorTitle}>
+                          {getCourseScriptTitle(sessionCode, job.coursePlan)}
+                        </Text>
+                        <Text style={styles.scriptEditorMeta}>{sessionCode}</Text>
+                        <TextInput
+                          multiline
+                          editable={!regenerating && !approvingScripts}
+                          style={[styles.scriptEditorInput, styles.approvalScriptEditorInput]}
+                          value={script}
+                          onChangeText={(value) =>
+                            setApprovalScriptEdits((prev) => ({ ...prev, [sessionCode]: value }))
+                          }
+                          placeholder="Edit script for this session"
+                          placeholderTextColor={theme.colors.textMuted}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </ScrollView>
 
             <View style={styles.approvalModalActions}>
@@ -622,7 +751,7 @@ export function JobDetailView({
                 >
                   <Ionicons name="refresh-outline" size={16} color={theme.colors.warning} />
                   <Text style={styles.approvalModalRegenerateButtonText}>
-                    {regenerating ? 'Starting...' : 'Regenerate Again'}
+                    {scriptRegenerateLabel}
                   </Text>
                 </Pressable>
               </View>
@@ -637,9 +766,7 @@ export function JobDetailView({
                 ]}
               >
                 <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                <Text style={styles.approvalModalPrimaryButtonText}>
-                  {approvingScripts ? 'Starting Audio...' : 'Approve Scripts & Generate Audio'}
-                </Text>
+                <Text style={styles.approvalModalPrimaryButtonText}>{scriptApprovalPrimaryLabel}</Text>
               </Pressable>
             </View>
           </View>
@@ -719,8 +846,13 @@ function buildSections(params: {
     !isTimelineLoading &&
     !showCourseConcurrency;
   const availableSessionCodes = getCanonicalCourseSessionCodes(job);
+  const isInitialCourseScriptApprovalPending = Boolean(
+    job.courseScriptApproval?.enabled && job.courseScriptApproval.awaitingApproval
+  );
   const isCourseRegenerationEligible =
-    job.contentType === 'course' && job.status === 'completed';
+    job.contentType === 'course' &&
+    job.status === 'completed' &&
+    !isInitialCourseScriptApprovalPending;
   const publishedCourseRegeneration = Boolean(job.courseId);
   const requestedRegeneration = job.courseRegeneration;
   const isAwaitingRegeneratedScriptApproval = Boolean(
@@ -996,6 +1128,20 @@ function buildSections(params: {
               )}
             </>
           )}
+          <InfoRow
+            label="Review Before TTS"
+            value={
+              (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)?.enabled
+                ? (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)
+                    ?.awaitingApproval
+                  ? 'Waiting for approval'
+                  : (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)
+                      ?.scriptApprovedAt
+                    ? 'Enabled (approved)'
+                    : 'Enabled'
+                : 'No'
+            }
+          />
           <InfoRow label="Auto-publish" value={job.autoPublish ? 'Yes' : 'No (needs approval)'} />
           <InfoRow label="LLM Model" value={job.llmModel} />
           <InfoRow label="TTS Model" value={job.ttsModel} />

@@ -95,6 +95,15 @@ export interface CourseRegenerationRequest {
   requestedAt?: Timestamp;
 }
 
+export interface ScriptApprovalRequest {
+  enabled: boolean;
+  awaitingApproval?: boolean;
+  scriptApprovedBy?: string;
+  scriptApprovedAt?: Timestamp;
+  requestedBy?: string;
+  requestedAt?: Timestamp;
+}
+
 // ==================== JOB PARAMS ====================
 
 export interface ContentJobParams {
@@ -176,6 +185,7 @@ export interface ContentJob {
   v2DispatchError?: string;
   v2DispatchedBy?: string;
   v2DispatchedAt?: Timestamp;
+  scriptApproval?: ScriptApprovalRequest;
 
   // Course-specific outputs
   courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"
@@ -191,6 +201,7 @@ export interface ContentJob {
     audioPath: string;
     durationSec: number;
   }>;
+  courseScriptApproval?: ScriptApprovalRequest;
   courseRegeneration?: CourseRegenerationRequest;
   courseSessionIds?: string[];     // published session doc IDs
   courseId?: string;               // published course doc ID
@@ -265,6 +276,7 @@ export interface ContentDraft {
   subjectId: string;
   targetAudience: string;
   tone: string;
+  requireScriptApprovalBeforeTts: boolean;
 
   // Model configuration
   llmBackend: JobBackend;
@@ -379,4 +391,5 @@ export interface CreateJobInput {
   title?: string;
   imagePrompt?: string;
   autoPublish: boolean;
+  requireScriptApprovalBeforeTts?: boolean;
 }

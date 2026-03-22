@@ -14,6 +14,7 @@ from .course_common import (
     _content_job_data,
     _course_code,
     _course_regeneration,
+    _course_script_approval,
     _runtime,
 )
 
@@ -130,13 +131,15 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
 
     course_code = _course_code(job_data)
     raw_scripts: dict[str, str] = dict(runtime.get("course_raw_scripts") or job_data.get("courseRawScripts") or {})
-    adapter = _get_llm_adapter(job_data)
+    adapter = None
 
     for index, session_def in enumerate(SESSION_DEFS):
         session_code = f"{course_code}{session_def['suffix']}"
         if raw_scripts.get(session_code, "").strip():
             continue
 
+        if adapter is None:
+            adapter = _get_llm_adapter(job_data)
         prompt = _build_session_script_prompt(session_def, plan, job_data)
         raw_script = adapter.generate(
             prompt,
@@ -158,12 +161,17 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
 
     preview = {key: f"{value[:200]}..." for key, value in raw_scripts.items()}
     regeneration = _course_regeneration(runtime, job_data)
-    await_script_approval = (
+    script_approval = _course_script_approval(runtime, job_data)
+    await_regeneration_script_approval = (
         bool(regeneration.get("active"))
         and str(regeneration.get("mode") or "").strip().lower() == "script_and_audio"
         and not bool(regeneration.get("scriptApprovedAt") or regeneration.get("scriptApprovedBy"))
     )
-    if await_script_approval:
+    await_initial_script_approval = (
+        bool(script_approval.get("enabled"))
+        and not bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
+    )
+    if await_regeneration_script_approval:
         regeneration["awaitingScriptApproval"] = True
         target_session_codes = regeneration.get("targetSessionCodes") or []
         target_count = len(target_session_codes) if isinstance(target_session_codes, list) else 0
@@ -187,6 +195,30 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
                 "courseProgress": progress_label,
                 "jobRunId": ctx.run_id,
                 "courseRegeneration": regeneration,
+            },
+        )
+    if await_initial_script_approval:
+        script_approval["awaitingApproval"] = True
+        progress_label = (
+            f"Scripts ready for approval ({len(SESSION_DEFS)} session{'s' if len(SESSION_DEFS) != 1 else ''})"
+        )
+        return StepResult(
+            output={"script_count": len(raw_scripts), "awaiting_script_approval": True},
+            runtime_patch={
+                "course_raw_scripts": raw_scripts,
+                "course_script_approval": script_approval,
+            },
+            summary_patch={
+                "currentStep": "generate_course_scripts",
+                "awaitingScriptApproval": True,
+            },
+            compat_content_job_patch={
+                "status": "completed",
+                "generatedScript": json.dumps(preview, indent=2),
+                "courseRawScripts": raw_scripts,
+                "courseProgress": progress_label,
+                "jobRunId": ctx.run_id,
+                "courseScriptApproval": script_approval,
             },
         )
 
