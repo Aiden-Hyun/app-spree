@@ -10,6 +10,7 @@ import {
   useWorkerStatus,
   useWorkerStacks,
   useFactoryMetrics,
+  useActiveJobWorkers,
 } from '@features/admin/hooks/useJobQueue';
 import { JobStatus } from '@features/admin/types';
 import { Theme } from '@/theme';
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
   const [overviewOpen, setOverviewOpen] = useState(true);
   const [logsOpen, setLogsOpen] = useState(false);
   const { jobs, isLoading } = useJobQueue(filter);
+  const { workersByJobId } = useActiveJobWorkers(jobs.map((job) => job.id));
   const { drafts, deleteDraft } = useDrafts();
   const { status: localWorker } = useWorkerStatus('local');
   const { stacks } = useWorkerStacks();
@@ -150,6 +152,7 @@ export default function AdminDashboard() {
     <View style={styles.container}>
       <JobList
         jobs={jobs}
+        activeWorkersByJobId={workersByJobId}
         isLoading={isLoading}
         hasDrafts={drafts.length > 0}
         onJobSelect={(jobId) => router.push(`/admin/job/${jobId}`)}

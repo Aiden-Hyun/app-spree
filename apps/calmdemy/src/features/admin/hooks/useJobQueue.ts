@@ -5,6 +5,7 @@ import {
   subscribeToJob,
   subscribeToWorkerControl,
   subscribeToWorkerStatus,
+  subscribeToActiveJobWorkers,
   createContentJob,
   retryJob,
   cancelJob,
@@ -29,6 +30,7 @@ import {
   WorkerControl,
   WorkerDesiredState,
   WorkerStatus,
+  ActiveJobWorker,
   WorkerStackStatus,
   FactoryMetrics,
   WorkerLogTail,
@@ -221,6 +223,36 @@ export function useWorkerStatus(workerId: 'local') {
   }, [workerId]);
 
   return { status };
+}
+
+export function useActiveJobWorkers(jobIds?: string[]) {
+  const [workersByJobId, setWorkersByJobId] = useState<Record<string, ActiveJobWorker[]>>({});
+  const jobIdsKey =
+    jobIds === undefined
+      ? '__all__'
+      : (() => {
+          const normalized = jobIds
+            .map((jobId) => String(jobId || '').trim())
+            .filter(Boolean)
+            .sort();
+          return normalized.length > 0 ? normalized.join('|') : '__none__';
+        })();
+
+  useEffect(() => {
+    if (jobIdsKey === '__none__') {
+      setWorkersByJobId({});
+      return;
+    }
+
+    const normalizedJobIds =
+      jobIdsKey === '__all__' ? undefined : jobIdsKey.split('|');
+    const unsubscribe = subscribeToActiveJobWorkers((next) => {
+      setWorkersByJobId(next);
+    }, normalizedJobIds);
+    return unsubscribe;
+  }, [jobIdsKey]);
+
+  return { workersByJobId };
 }
 
 // ==================== WORKER CONTROL HOOK ====================

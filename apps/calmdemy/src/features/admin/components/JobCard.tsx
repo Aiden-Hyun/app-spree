@@ -2,12 +2,13 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { ContentJob, JOB_STATUS_LABELS, CONTENT_TYPE_LABELS } from '../types';
+import { ActiveJobWorker, ContentJob, JOB_STATUS_LABELS, CONTENT_TYPE_LABELS } from '../types';
 import { formatCourseCode } from '@shared/utils/courseCodeParser';
 import { Theme } from '@/theme';
 
 interface JobCardProps {
   job: ContentJob;
+  activeWorkers?: ActiveJobWorker[];
   onPress: () => void;
 }
 
@@ -41,11 +42,15 @@ function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
   }
 }
 
-export function JobCard({ job, onPress }: JobCardProps) {
+export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const statusColor = getStatusColor(job.status, theme);
   const headline = useMemo(() => getJobHeadline(job), [job]);
+  const visibleWorkerIds = useMemo(
+    () => getVisibleActiveWorkerIds(activeWorkers),
+    [activeWorkers]
+  );
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -102,6 +107,26 @@ export function JobCard({ job, onPress }: JobCardProps) {
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
 
+      {visibleWorkerIds.length > 0 ? (
+        <View style={styles.workerPanel}>
+          <View style={styles.workerHeader}>
+            <Ionicons
+              name="hardware-chip-outline"
+              size={14}
+              color={theme.colors.primary}
+            />
+            <Text style={styles.workerLabel}>Workers</Text>
+          </View>
+          <View style={styles.workerList}>
+            {visibleWorkerIds.map((workerId) => (
+              <View key={workerId} style={styles.workerChip}>
+                <Text style={styles.workerChipText}>{workerId}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {job.error && (
         <Text style={styles.errorText} numberOfLines={1}>
           {job.error}
@@ -141,6 +166,16 @@ function getJobHeadline(job: ContentJob): string {
   }
 
   return String(job.params.topic || '').trim();
+}
+
+function getVisibleActiveWorkerIds(activeWorkers: ActiveJobWorker[]): string[] {
+  return Array.from(
+    new Set(
+      activeWorkers
+        .map((worker) => String(worker.stackId || '').trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 const createStyles = (theme: Theme) =>
@@ -188,10 +223,42 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
       gap: 6,
     },
+    workerPanel: {
+      marginTop: 10,
+    },
+    workerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+    },
     metaText: {
       fontFamily: 'DMSans-Regular',
       fontSize: 13,
       color: theme.colors.textMuted,
+    },
+    workerLabel: {
+      fontFamily: 'DMSans-Medium',
+      fontSize: 12,
+      color: theme.colors.text,
+    },
+    workerList: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    workerChip: {
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      backgroundColor: theme.colors.gray[100],
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    workerChipText: {
+      fontFamily: 'DMSans-Medium',
+      fontSize: 12,
+      color: theme.colors.text,
     },
     metaDot: {
       color: theme.colors.textMuted,

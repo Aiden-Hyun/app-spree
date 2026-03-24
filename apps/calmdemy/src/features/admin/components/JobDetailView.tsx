@@ -19,12 +19,12 @@ import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { PipelineStepper } from './PipelineStepper';
 import { CollapsibleSection, SummaryItem } from './CollapsibleSection';
 import { CoursePipelineMap } from './progress/CoursePipelineMap';
-import { WorkerSwimlanes } from './progress/WorkerSwimlanes';
 import {
   CourseProgressModel,
   deriveCourseProgressModel,
 } from './progress/courseProgressModel';
 import {
+  ActiveJobWorker,
   BACKEND_LABELS,
   CONTENT_TYPE_LABELS,
   CourseRegenerationMode,
@@ -37,6 +37,7 @@ import { Theme } from '@/theme';
 
 type Props = {
   job: ContentJob;
+  activeWorkers?: ActiveJobWorker[];
   childJobs?: ContentJob[];
   isChildJobsLoading?: boolean;
   timeline?: JobStepTimelineEntry[];
@@ -92,6 +93,7 @@ const SECTION_IDS = [
 
 export function JobDetailView({
   job,
+  activeWorkers = [],
   childJobs = [],
   isChildJobsLoading = false,
   timeline = [],
@@ -607,6 +609,7 @@ export function JobDetailView({
 
   const sections = buildSections({
     job,
+    activeWorkers,
     childJobs,
     childJobMap,
     isChildJobsLoading,
@@ -1123,6 +1126,7 @@ export function JobDetailView({
 
 function buildSections(params: {
   job: ContentJob;
+  activeWorkers: ActiveJobWorker[];
   childJobs: ContentJob[];
   childJobMap: Record<string, ContentJob>;
   isChildJobsLoading: boolean;
@@ -1155,6 +1159,7 @@ function buildSections(params: {
 }) {
   const {
     job,
+    activeWorkers,
     childJobs,
     childJobMap,
     isChildJobsLoading,
@@ -1211,6 +1216,21 @@ function buildSections(params: {
   );
   const selectedSessionSet = new Set(selectedRegenerationSessions);
   const subjectPlanCourses = job.subjectPlan?.courses || [];
+  const queuedWorkerEntries = timeline
+    .filter((entry) => ['ready', 'leased', 'retry_scheduled'].includes(String(entry.state || '').trim()))
+    .sort((a, b) => {
+      const aMs =
+        a.timestamp?.toMillis?.() ||
+        a.updatedAt?.toMillis?.() ||
+        a.startedAt?.toMillis?.() ||
+        0;
+      const bMs =
+        b.timestamp?.toMillis?.() ||
+        b.updatedAt?.toMillis?.() ||
+        b.startedAt?.toMillis?.() ||
+        0;
+      return bMs - aMs;
+    });
 
   const toggleSessionSelection = (sessionCode: string) => {
     setSelectedRegenerationSessions((prev) => (
@@ -1301,29 +1321,93 @@ function buildSections(params: {
       title: 'Workers',
       summaryItems: toSummaryItems([
         {
-          label: 'Run',
-          value: showCourseConcurrency
-            ? truncate(courseProgressModel?.selectedRunId || '', 12)
-            : undefined,
+          label: 'Workers',
+          value: activeWorkers.length || undefined,
         },
         {
-          label: 'Workers',
-          value: showCourseConcurrency
-            ? courseProgressModel?.workerLanes.length || 0
-            : undefined,
+          label: 'Queued',
+          value: queuedWorkerEntries.length || undefined,
         },
       ]),
       shouldRender:
-        job.contentType === 'course' &&
-        (isTimelineLoading || showCourseConcurrency),
-      content: isTimelineLoading ? (
-        <View style={styles.timelineLoadingRow}>
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={styles.emptySubtext}>Loading worker activity...</Text>
+        activeWorkers.length > 0 ||
+        queuedWorkerEntries.length > 0 ||
+        (job.contentType === 'course' && isTimelineLoading),
+      content: (
+        <View style={styles.workerSectionPanel}>
+          {activeWorkers.length > 0 ? (
+            <View style={styles.liveWorkerPanel}>
+              <Text style={styles.liveWorkerPanelTitle}>Live Workers</Text>
+              {activeWorkers.map((worker) => (
+                <View key={`${worker.workerId}-${worker.currentQueueId || 'idle'}`} style={styles.liveWorkerRow}>
+                  <View style={styles.liveWorkerIdentity}>
+                    <Ionicons
+                      name="hardware-chip-outline"
+                      size={14}
+                      color={theme.colors.primary}
+                    />
+                    <Text style={styles.liveWorkerName}>{worker.stackId}</Text>
+                  </View>
+                  <Text style={styles.liveWorkerMeta}>
+                    {formatActiveWorkerMeta(worker)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {isTimelineLoading && queuedWorkerEntries.length === 0 ? (
+            <View style={styles.timelineLoadingRow}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={styles.emptySubtext}>Loading queued tasks...</Text>
+            </View>
+          ) : null}
+
+          {queuedWorkerEntries.length > 0 ? (
+            <View style={styles.queuedTaskPanel}>
+              <Text style={styles.liveWorkerPanelTitle}>Queued Tasks</Text>
+              <View style={styles.scrollBox}>
+                <ScrollView nestedScrollEnabled>
+                  {queuedWorkerEntries.map((entry) => (
+                    <View key={entry.id} style={styles.queuedTaskRow}>
+                      <View style={styles.queuedTaskHeader}>
+                        <Text style={styles.queuedTaskTitle}>
+                          {formatQueuedTaskTitle(entry)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.queuedTaskState,
+                            { color: getStepStateColor(entry.state, theme) },
+                          ]}
+                        >
+                          {formatStepState(entry.state)}
+                        </Text>
+                      </View>
+                      <View style={styles.queuedTaskMetaRow}>
+                        {entry.shardKey ? (
+                          <Text style={styles.queuedTaskMetaText}>
+                            Session {entry.shardKey}
+                          </Text>
+                        ) : null}
+                        {typeof entry.attempt === 'number' ? (
+                          <Text style={styles.queuedTaskMetaText}>
+                            Attempt {entry.attempt}
+                          </Text>
+                        ) : null}
+                        {entry.runId ? (
+                          <Text style={styles.queuedTaskMetaText}>
+                            Run {truncate(entry.runId, 10)}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          ) : null}
         </View>
-      ) : showCourseConcurrency && courseProgressModel ? (
-        <WorkerSwimlanes model={courseProgressModel} />
-      ) : null,
+      ),
     },
     {
       id: 'stepTimeline',
@@ -1464,6 +1548,7 @@ function buildSections(params: {
         { label: 'Type', value: CONTENT_TYPE_LABELS[job.contentType] },
         { label: 'Models', value: `${job.llmModel} / ${job.ttsModel}` },
         { label: 'Narrator', value: getVoiceLabelById(job.ttsVoice) },
+        { label: 'Workers', value: activeWorkers.length || undefined },
       ]),
       shouldRender: true,
       content: (
@@ -2240,6 +2325,36 @@ function toSummaryItems(
     .filter((item) => item.value.length > 0);
 }
 
+function formatActiveWorkerMeta(worker: ActiveJobWorker) {
+  const parts = [
+    worker.currentStepName,
+    worker.currentShardKey,
+    worker.currentRequiredTtsModel,
+    worker.currentProgressDetail,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return 'Active now';
+  }
+
+  return parts.join(' · ');
+}
+
+function formatQueuedTaskTitle(entry: JobStepTimelineEntry) {
+  const stepName = String(entry.stepName || '').trim();
+  if (!stepName) {
+    return 'Queued Task';
+  }
+
+  return stepName
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function getErrorType(error?: string) {
   if (!error) return '';
   const parts = error.split(':');
@@ -2625,6 +2740,82 @@ const createStyles = (theme: Theme) =>
     },
     subjectProgressCard: {
       gap: 12,
+    },
+    workerSectionPanel: {
+      gap: 12,
+    },
+    liveWorkerPanel: {
+      gap: 10,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: theme.colors.gray[100],
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    liveWorkerPanelTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      textTransform: 'uppercase',
+    },
+    liveWorkerRow: {
+      gap: 4,
+    },
+    liveWorkerIdentity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    liveWorkerName: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    liveWorkerMeta: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      lineHeight: 18,
+      marginLeft: 22,
+    },
+    queuedTaskPanel: {
+      gap: 10,
+      padding: 12,
+      borderRadius: 14,
+      backgroundColor: theme.colors.gray[100],
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+    },
+    queuedTaskRow: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[200],
+    },
+    queuedTaskHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 4,
+    },
+    queuedTaskTitle: {
+      flex: 1,
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    queuedTaskState: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+    },
+    queuedTaskMetaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    queuedTaskMetaText: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
     },
     subjectProgressText: {
       fontFamily: 'DMSans-SemiBold',

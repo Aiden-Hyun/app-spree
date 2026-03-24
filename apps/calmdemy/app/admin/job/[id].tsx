@@ -3,7 +3,12 @@ import { View, ActivityIndicator, Text, Alert, StyleSheet, Platform } from 'reac
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { useChildJobs, useJobDetail, useJobStepTimeline } from '@features/admin/hooks/useJobQueue';
+import {
+  useActiveJobWorkers,
+  useChildJobs,
+  useJobDetail,
+  useJobStepTimeline,
+} from '@features/admin/hooks/useJobQueue';
 import { publishCompletedJob } from '@features/admin/data/adminRepository';
 import { JobDetailView } from '@features/admin/components/JobDetailView';
 import { Theme } from '@/theme';
@@ -30,6 +35,7 @@ export default function JobDetailScreen() {
   const { jobs: childJobs, isLoading: isChildJobsLoading } = useChildJobs(
     job?.contentType === 'full_subject' ? id : undefined
   );
+  const { workersByJobId } = useActiveJobWorkers(job ? [job.id] : []);
   const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
     id || '',
     job?.v2RunId
@@ -280,6 +286,7 @@ export default function JobDetailScreen() {
       />
       <JobDetailView
         job={job}
+        activeWorkers={workersByJobId[job.id] || []}
         childJobs={childJobs}
         isChildJobsLoading={isChildJobsLoading}
         timeline={timeline}

@@ -8,12 +8,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { ContentJob } from '../types';
+import { ActiveJobWorker, ContentJob } from '../types';
 import { JobCard } from './JobCard';
 import { Theme } from '@/theme';
 
 interface JobListProps {
   jobs: ContentJob[];
+  activeWorkersByJobId?: Record<string, ActiveJobWorker[]>;
   isLoading: boolean;
   hasDrafts: boolean;
   onJobSelect: (jobId: string) => void;
@@ -23,6 +24,7 @@ interface JobListProps {
 
 export function JobList({
   jobs,
+  activeWorkersByJobId = {},
   isLoading,
   hasDrafts,
   onJobSelect,
@@ -79,7 +81,11 @@ export function JobList({
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <View style={styles.jobItem}>
-          <JobCard job={item} onPress={() => onJobSelect(item.id)} />
+          <JobCard
+            job={item}
+            activeWorkers={activeWorkersByJobId[item.id] || []}
+            onPress={() => onJobSelect(item.id)}
+          />
         </View>
       )}
       ListHeaderComponent={headerComponent}

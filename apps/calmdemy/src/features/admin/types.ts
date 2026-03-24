@@ -364,9 +364,38 @@ export interface WorkerStatus {
   id: string;
   workerId?: string;
   workerType?: 'local';
+  stackId?: string;
+  pid?: number | null;
+  capabilityKeys?: string[];
+  jobId?: string | null;
+  currentQueueId?: string | null;
+  currentStepRunId?: string | null;
+  currentRunId?: string | null;
+  currentStepName?: string | null;
+  currentShardKey?: string | null;
+  currentStepAttempt?: number | null;
+  currentStepStartedAt?: Timestamp;
+  currentStepHeartbeatAt?: Timestamp;
+  currentStepDeadlineAt?: Timestamp;
+  currentCapabilityKey?: string | null;
+  currentRequiredTtsModel?: string | null;
+  currentProgressDetail?: string | null;
   lastHeartbeat?: Timestamp;
   updatedAt?: Timestamp;
   pollIntervalSec?: number;
+}
+
+export interface ActiveJobWorker {
+  workerId: string;
+  stackId: string;
+  jobId: string;
+  currentQueueId?: string;
+  currentRunId?: string;
+  currentStepName?: string;
+  currentShardKey?: string;
+  currentProgressDetail?: string;
+  currentRequiredTtsModel?: string;
+  lastHeartbeat?: Timestamp;
 }
 
 // ==================== WORKER CONTROL ====================

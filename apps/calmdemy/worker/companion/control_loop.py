@@ -1,7 +1,9 @@
 import os
+import random
+import re
+import subprocess
 import sys
 import time
-import random
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
@@ -44,6 +46,34 @@ COMPANION_FACTORY_RECOVERY_INTERVAL_SEC = float(
 COMPANION_QUEUE_METRICS_INTERVAL_SEC = float(
     os.getenv("COMPANION_QUEUE_METRICS_INTERVAL_SEC", "5")
 )
+COMPANION_MEMORY_PROBE_TIMEOUT_SEC = float(
+    os.getenv("COMPANION_MEMORY_PROBE_TIMEOUT_SEC", "1.5")
+)
+COMPANION_QWEN_MEMORY_GUARD_ENABLED = (
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_ENABLED", "true").strip().lower()
+    != "false"
+)
+COMPANION_QWEN_MEMORY_GUARD_SOFT_FREE_RATIO = float(
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_SOFT_FREE_RATIO", "0.20")
+)
+COMPANION_QWEN_MEMORY_GUARD_HARD_FREE_RATIO = float(
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_HARD_FREE_RATIO", "0.14")
+)
+COMPANION_QWEN_MEMORY_GUARD_CRITICAL_FREE_RATIO = float(
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_CRITICAL_FREE_RATIO", "0.08")
+)
+COMPANION_QWEN_MEMORY_GUARD_SOFT_MAX_STACKS = max(
+    1,
+    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_SOFT_MAX_STACKS", "3")),
+)
+COMPANION_QWEN_MEMORY_GUARD_HARD_MAX_STACKS = max(
+    1,
+    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_HARD_MAX_STACKS", "2")),
+)
+COMPANION_QWEN_MEMORY_GUARD_CRITICAL_MAX_STACKS = max(
+    1,
+    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_CRITICAL_MAX_STACKS", "1")),
+)
 
 ACTIVE_STATUSES = [
     "llm_generating",
@@ -54,6 +84,107 @@ ACTIVE_STATUSES = [
     "uploading",
     "publishing",
 ]
+
+_MEMORY_PRESSURE_TOTAL_BYTES_RE = re.compile(r"The system has\s+(\d+)")
+_MEMORY_PRESSURE_FREE_PERCENT_RE = re.compile(
+    r"free percentage:\s*(\d+)%",
+    re.IGNORECASE,
+)
+
+
+def _stack_supports_qwen(stack: dict) -> bool:
+    for model in stack.get("ttsModels") or []:
+        normalized = str(model).strip().lower()
+        if normalized.startswith("qwen"):
+            return True
+    return False
+
+
+def _parse_memory_pressure_snapshot(output: str) -> Optional[dict]:
+    total_match = _MEMORY_PRESSURE_TOTAL_BYTES_RE.search(output or "")
+    free_match = _MEMORY_PRESSURE_FREE_PERCENT_RE.search(output or "")
+    if total_match is None or free_match is None:
+        return None
+
+    total_bytes = int(total_match.group(1))
+    free_ratio = max(0.0, min(1.0, int(free_match.group(1)) / 100.0))
+    return {
+        "source": "memory_pressure",
+        "totalBytes": total_bytes,
+        "freeRatio": free_ratio,
+        "freeBytes": int(total_bytes * free_ratio),
+    }
+
+
+def _read_proc_meminfo_snapshot() -> Optional[dict]:
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except OSError:
+        return None
+
+    meminfo: dict[str, int] = {}
+    for line in lines:
+        name, _, value = line.partition(":")
+        if not name or not value:
+            continue
+        parts = value.strip().split()
+        if not parts:
+            continue
+        try:
+            meminfo[name] = int(parts[0]) * 1024
+        except ValueError:
+            continue
+
+    total_bytes = meminfo.get("MemTotal")
+    free_bytes = meminfo.get("MemAvailable")
+    if not total_bytes or free_bytes is None:
+        return None
+
+    free_ratio = max(0.0, min(1.0, free_bytes / total_bytes))
+    return {
+        "source": "proc_meminfo",
+        "totalBytes": total_bytes,
+        "freeRatio": free_ratio,
+        "freeBytes": free_bytes,
+    }
+
+
+def _system_memory_snapshot() -> Optional[dict]:
+    if not COMPANION_QWEN_MEMORY_GUARD_ENABLED:
+        return None
+
+    if sys.platform == "darwin":
+        try:
+            result = subprocess.run(
+                ["memory_pressure", "-Q"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=COMPANION_MEMORY_PROBE_TIMEOUT_SEC,
+            )
+        except Exception:
+            return None
+        return _parse_memory_pressure_snapshot(result.stdout)
+
+    return _read_proc_meminfo_snapshot()
+
+
+def _qwen_stack_cap_for_memory(snapshot: Optional[dict]) -> Optional[int]:
+    if not snapshot:
+        return None
+
+    free_ratio = snapshot.get("freeRatio")
+    if free_ratio is None:
+        return None
+
+    if free_ratio <= COMPANION_QWEN_MEMORY_GUARD_CRITICAL_FREE_RATIO:
+        return COMPANION_QWEN_MEMORY_GUARD_CRITICAL_MAX_STACKS
+    if free_ratio <= COMPANION_QWEN_MEMORY_GUARD_HARD_FREE_RATIO:
+        return COMPANION_QWEN_MEMORY_GUARD_HARD_MAX_STACKS
+    if free_ratio <= COMPANION_QWEN_MEMORY_GUARD_SOFT_FREE_RATIO:
+        return COMPANION_QWEN_MEMORY_GUARD_SOFT_MAX_STACKS
+    return None
 
 
 def _queue_metrics_bucket() -> dict:
@@ -482,9 +613,82 @@ def _pick_stack_ids(
         return []
 
     ordered_ids = _ordered_candidate_ids(candidate_stacks, running_ids, active_owners)
-    fresh = [stack_id for stack_id in ordered_ids if stack_id not in selected_ids]
-    reused = [stack_id for stack_id in ordered_ids if stack_id in selected_ids]
-    return (fresh + reused)[:needed_count]
+    candidate_ids = {stack["id"] for stack in candidate_stacks}
+    active_candidate_ids = [
+        stack_id for stack_id in ordered_ids if stack_id in active_owners
+    ]
+    target_count = max(needed_count, len(active_candidate_ids))
+
+    final_selected = {
+        stack_id for stack_id in selected_ids if stack_id in candidate_ids
+    }
+    additions: list[str] = []
+
+    for stack_id in active_candidate_ids:
+        if stack_id in final_selected:
+            continue
+        additions.append(stack_id)
+        final_selected.add(stack_id)
+
+    for stack_id in ordered_ids:
+        if len(final_selected) >= target_count:
+            break
+        if stack_id in final_selected:
+            continue
+        additions.append(stack_id)
+        final_selected.add(stack_id)
+
+    return additions
+
+
+def _apply_qwen_memory_guard(
+    enabled_stacks: list[dict],
+    desired_ids: set[str],
+    running: dict[str, int],
+    active_owners: set[str],
+) -> tuple[set[str], Optional[dict]]:
+    snapshot = _system_memory_snapshot()
+    qwen_cap = _qwen_stack_cap_for_memory(snapshot)
+    if qwen_cap is None:
+        return desired_ids, snapshot
+
+    qwen_candidate_stacks = [
+        stack
+        for stack in enabled_stacks
+        if _stack_supports_qwen(stack)
+        and (stack["id"] in desired_ids or stack["id"] in active_owners)
+    ]
+    if not qwen_candidate_stacks:
+        return desired_ids, snapshot
+
+    qwen_ids = {stack["id"] for stack in qwen_candidate_stacks}
+    base_desired_ids = {
+        stack_id for stack_id in desired_ids if stack_id not in qwen_ids
+    }
+    kept_qwen_ids = set(
+        _pick_stack_ids(
+            qwen_candidate_stacks,
+            needed_count=qwen_cap,
+            running_ids=set(running.keys()),
+            active_owners=active_owners,
+            selected_ids=base_desired_ids,
+        )
+    )
+    limited_desired_ids = base_desired_ids | kept_qwen_ids
+
+    if limited_desired_ids != desired_ids:
+        logger.info(
+            "Companion reduced Qwen worker pool due to low free memory",
+            extra={
+                "free_ratio": snapshot.get("freeRatio") if snapshot else None,
+                "free_bytes": snapshot.get("freeBytes") if snapshot else None,
+                "qwen_cap": qwen_cap,
+                "desired_before": sorted(desired_ids & qwen_ids),
+                "desired_after": sorted(limited_desired_ids & qwen_ids),
+            },
+        )
+
+    return limited_desired_ids, snapshot
 
 
 def _desired_auto_stack_ids(
@@ -544,6 +748,35 @@ def _desired_auto_stack_ids(
             )
         )
 
+    desired_ids, memory_snapshot = _apply_qwen_memory_guard(
+        enabled_stacks,
+        desired_ids,
+        running,
+        active_owners,
+    )
+    if memory_snapshot:
+        workload["system_memory"] = memory_snapshot
+        workload["qwen_stack_cap"] = _qwen_stack_cap_for_memory(memory_snapshot)
+
+    return desired_ids, workload
+
+
+def _desired_running_stack_ids(
+    db,
+    enabled_stacks: list[dict],
+    running: dict[str, int],
+) -> tuple[set[str], dict]:
+    workload = _collect_auto_workload(db)
+    desired_ids = {stack["id"] for stack in enabled_stacks}
+    desired_ids, memory_snapshot = _apply_qwen_memory_guard(
+        enabled_stacks,
+        desired_ids,
+        running,
+        workload["active_owners"],
+    )
+    if memory_snapshot:
+        workload["system_memory"] = memory_snapshot
+        workload["qwen_stack_cap"] = _qwen_stack_cap_for_memory(memory_snapshot)
     return desired_ids, workload
 
 
@@ -650,7 +883,7 @@ def ensure_running_wrapper(db, force_immediate_start: bool):
     running = stacks.running_stack_pids(stack_defs)
 
     if next_desired == "running":
-        desired_ids = {stack["id"] for stack in enabled_stacks}
+        desired_ids, _ = _desired_running_stack_ids(db, enabled_stacks, running)
     else:
         desired_ids, _ = _desired_auto_stack_ids(db, enabled_stacks, running)
 
@@ -658,6 +891,12 @@ def ensure_running_wrapper(db, force_immediate_start: bool):
         stack_id = stack["id"]
         if stack_id in desired_ids and stack_id not in running:
             running[stack_id] = stacks.start_worker(stack)
+
+    for stack_id in list(running.keys()):
+        if stack_id in desired_ids:
+            continue
+        stacks.stop_worker(stack_id)
+        running.pop(stack_id, None)
 
     running_after = {stack_id: pid for stack_id, pid in running.items() if stack_id in desired_ids}
     update_control(
@@ -759,25 +998,54 @@ def run_control_loop(db, poll_seconds: float, force_immediate_start: bool):
             any_running = any(stack_def["id"] in running for stack_def in enabled_stacks)
 
             if desired_state == "running":
-                if not any_running:
+                running_desired_ids, _ = _desired_running_stack_ids(
+                    db,
+                    enabled_stacks,
+                    running,
+                )
+                missing_running_stacks = [
+                    stack_def
+                    for stack_def in enabled_stacks
+                    if stack_def["id"] in running_desired_ids and stack_def["id"] not in running
+                ]
+                stopped_running_stacks = False
+
+                for stack_id in list(running.keys()):
+                    if stack_id in running_desired_ids:
+                        continue
+                    stacks.stop_worker(stack_id)
+                    running.pop(stack_id, None)
+                    stopped_running_stacks = True
+
+                if missing_running_stacks:
                     update_control(db, {"currentState": "starting", "lastAction": "start"})
-                    for stack_def in enabled_stacks:
-                        if stack_def["id"] not in running:
-                            running[stack_def["id"]] = stacks.start_worker(stack_def)
-                    pid = stacks.primary_pid(enabled_stacks, running)
+                    for stack_def in missing_running_stacks:
+                        running[stack_def["id"]] = stacks.start_worker(stack_def)
+
+                if (
+                    missing_running_stacks
+                    or stopped_running_stacks
+                    or not any_running
+                ):
+                    last_action = (
+                        "memory-scale-down"
+                        if stopped_running_stacks and not missing_running_stacks
+                        else "start"
+                    )
                     update_control(
                         db,
                         {
-                            "currentState": "running",
-                            "workerPid": pid,
-                            "lastAction": "start",
+                            "currentState": "running" if running else "stopped",
+                            "workerPid": (
+                                stacks.primary_pid(enabled_stacks, running)
+                                if running
+                                else None
+                            ),
+                            "lastAction": last_action,
                             "lastError": None,
                         },
                     )
                 else:
-                    for stack_def in enabled_stacks:
-                        if stack_def["id"] not in running:
-                            running[stack_def["id"]] = stacks.start_worker(stack_def)
                     update_control(
                         db,
                         {

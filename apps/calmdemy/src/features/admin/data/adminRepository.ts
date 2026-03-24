@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../../../firebase';
 import {
+  ActiveJobWorker,
   ContentJob,
   CourseRegenerationMode,
   CreateJobInput,
@@ -109,6 +110,48 @@ function parseNumber(value: unknown): number | undefined {
 function asTimestamp(value: unknown): Timestamp | undefined {
   if (value instanceof Timestamp) return value;
   return undefined;
+}
+
+function isFreshWorkerHeartbeat(status: WorkerStatus, nowMs = Date.now()): boolean {
+  const lastHeartbeatMs = status.lastHeartbeat?.toDate?.().getTime();
+  if (!lastHeartbeatMs) {
+    return false;
+  }
+
+  const pollIntervalSec =
+    typeof status.pollIntervalSec === 'number' && Number.isFinite(status.pollIntervalSec)
+      ? status.pollIntervalSec
+      : 10;
+  const maxAgeMs = Math.max(45_000, pollIntervalSec * 6_000);
+  return nowMs - lastHeartbeatMs <= maxAgeMs;
+}
+
+function toActiveJobWorker(status: WorkerStatus): ActiveJobWorker | null {
+  const jobId = String(status.jobId || '').trim();
+  const workerId = String(status.workerId || status.id || '').trim();
+  const stackId = String(status.stackId || workerId).trim();
+  const currentQueueId = String(status.currentQueueId || '').trim();
+
+  if (!jobId || !workerId || !stackId || !currentQueueId) {
+    return null;
+  }
+
+  if (!isFreshWorkerHeartbeat(status)) {
+    return null;
+  }
+
+  return {
+    workerId,
+    stackId,
+    jobId,
+    currentQueueId,
+    currentRunId: String(status.currentRunId || '').trim() || undefined,
+    currentStepName: String(status.currentStepName || '').trim() || undefined,
+    currentShardKey: String(status.currentShardKey || '').trim() || undefined,
+    currentProgressDetail: String(status.currentProgressDetail || '').trim() || undefined,
+    currentRequiredTtsModel: String(status.currentRequiredTtsModel || '').trim() || undefined,
+    lastHeartbeat: status.lastHeartbeat,
+  };
 }
 
 function toV2TimelineEntry(id: string, data: Record<string, any>): JobStepTimelineEntry {
@@ -410,6 +453,40 @@ export function subscribeToWorkerStatus(
       return;
     }
     callback({ id: docSnapshot.id, ...docSnapshot.data() } as WorkerStatus);
+  });
+}
+
+export function subscribeToActiveJobWorkers(
+  callback: (workersByJobId: Record<string, ActiveJobWorker[]>) => void,
+  jobIds?: string[]
+): Unsubscribe {
+  const normalizedJobIds = new Set(
+    (jobIds || []).map((jobId) => String(jobId || '').trim()).filter(Boolean)
+  );
+
+  return onSnapshot(collection(db, 'worker_status'), (snapshot) => {
+    const nextWorkersByJobId: Record<string, ActiveJobWorker[]> = {};
+
+    snapshot.docs.forEach((docSnapshot) => {
+      const status = { id: docSnapshot.id, ...docSnapshot.data() } as WorkerStatus;
+      const activeWorker = toActiveJobWorker(status);
+      if (!activeWorker) {
+        return;
+      }
+      if (normalizedJobIds.size > 0 && !normalizedJobIds.has(activeWorker.jobId)) {
+        return;
+      }
+
+      const existing = nextWorkersByJobId[activeWorker.jobId] || [];
+      existing.push(activeWorker);
+      nextWorkersByJobId[activeWorker.jobId] = existing;
+    });
+
+    Object.values(nextWorkersByJobId).forEach((workers) => {
+      workers.sort((a, b) => a.stackId.localeCompare(b.stackId));
+    });
+
+    callback(nextWorkersByJobId);
   });
 }
 
