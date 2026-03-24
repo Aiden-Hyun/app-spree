@@ -6,6 +6,12 @@ from firebase_admin import firestore as fs
 
 from observability import get_logger
 from factory_v2.shared.error_codes import classify_error
+from factory_v2.shared.lineage_timing import (
+    build_artifact_updates,
+    compute_live_run_elapsed_ms,
+    copy_artifacts,
+    merge_artifacts,
+)
 from factory_v2.shared.worker_status import update_worker_status
 
 from ..steps.base import StepContext
@@ -367,6 +373,32 @@ class ClaimLoop:
                 run_id,
                 result.compat_content_job_patch,
             )
+            updated_job = self.job_repo.get(job_id)
+            artifact_updates = build_artifact_updates(
+                before_job=claimed_job,
+                after_job=updated_job,
+                run_id=run_id,
+                step_name=step_name,
+                shard_key=shard_key,
+                step_input=step_input,
+                step_output=result.output,
+            )
+            if artifact_updates:
+                self.job_repo.patch_runtime(
+                    job_id,
+                    {
+                        "artifacts": merge_artifacts(
+                            copy_artifacts(updated_job),
+                            artifact_updates,
+                        )
+                    },
+                )
+            active_run_elapsed_ms = compute_live_run_elapsed_ms(self.db, job_id, run_id)
+            self.job_repo.patch_compat_content_job_for_run(
+                content_job_id,
+                run_id,
+                {"activeRunElapsedMs": active_run_elapsed_ms},
+            )
             self.orchestrator.on_step_success(job_id, run_id, step_name, shard_key=shard_key)
             return True
 
@@ -437,6 +469,12 @@ class ClaimLoop:
                 step_name,
                 error_msg=error_msg,
                 error_code=error_code,
+            )
+            active_run_elapsed_ms = compute_live_run_elapsed_ms(self.db, job_id, run_id)
+            self.job_repo.patch_compat_content_job_for_run(
+                content_job_id,
+                run_id,
+                {"activeRunElapsedMs": active_run_elapsed_ms},
             )
             self.orchestrator.on_step_failed(job_id, run_id, step_name, error_code)
             return True

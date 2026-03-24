@@ -154,6 +154,8 @@ export interface SubjectChildCounts {
   failed: number;
 }
 
+export type TimingStatus = 'exact' | 'legacy' | 'unavailable';
+
 // ==================== JOB PARAMS ====================
 
 export interface ContentJobParams {
@@ -271,6 +273,18 @@ export interface ContentJob {
   pausedAt?: Timestamp;
   launchCursor?: number;
   maxActiveChildCourses?: number;
+
+  // Timing
+  timingStatus?: TimingStatus;
+  effectiveElapsedMs?: number;
+  effectiveWorkerMs?: number;
+  reuseCreditMs?: number;
+  wastedWorkerMs?: number;
+  queueLatencyMs?: number;
+  parallelismFactor?: number;
+  timingComputedAt?: Timestamp;
+  timingVersion?: number;
+  activeRunElapsedMs?: number;
 
   // Metadata
   error?: string;
@@ -469,6 +483,12 @@ export interface FactoryMetrics {
   failed_by_stage?: Record<string, number>;
   duration_sec_sum?: number;
   duration_sec_count?: number;
+  effective_elapsed_sec_sum?: number;
+  effective_elapsed_sec_count?: number;
+  effective_worker_sec_sum?: number;
+  effective_worker_sec_count?: number;
+  reuse_credit_sec_sum?: number;
+  wasted_worker_sec_sum?: number;
   queue_latency_sec_sum?: number;
   queue_latency_sec_count?: number;
   last_error?: string;

@@ -51,6 +51,7 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
     () => getVisibleActiveWorkerIds(activeWorkers),
     [activeWorkers]
   );
+  const exactTimingLabel = useMemo(() => getExactTimingLabel(job), [job]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -106,6 +107,17 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
+
+      {exactTimingLabel ? (
+        <View style={styles.timingBadge}>
+          <Ionicons
+            name="stopwatch-outline"
+            size={14}
+            color={theme.colors.primary}
+          />
+          <Text style={styles.timingBadgeText}>{exactTimingLabel}</Text>
+        </View>
+      ) : null}
 
       {visibleWorkerIds.length > 0 ? (
         <View style={styles.workerPanel}>
@@ -178,6 +190,37 @@ function getVisibleActiveWorkerIds(activeWorkers: ActiveJobWorker[]): string[] {
   );
 }
 
+function getExactTimingLabel(job: ContentJob): string | null {
+  if (job.timingStatus !== 'exact') {
+    return null;
+  }
+  const elapsedMs =
+    typeof job.effectiveElapsedMs === 'number' && Number.isFinite(job.effectiveElapsedMs)
+      ? job.effectiveElapsedMs
+      : 0;
+  if (elapsedMs <= 0) {
+    return null;
+  }
+  return `${formatElapsedMsCompact(elapsedMs)} active`;
+}
+
+function formatElapsedMsCompact(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     card: {
@@ -225,6 +268,24 @@ const createStyles = (theme: Theme) =>
     },
     workerPanel: {
       marginTop: 10,
+    },
+    timingBadge: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      backgroundColor: `${theme.colors.primary}12`,
+      borderWidth: 1,
+      borderColor: `${theme.colors.primary}28`,
+    },
+    timingBadgeText: {
+      fontFamily: 'DMSans-Medium',
+      fontSize: 12,
+      color: theme.colors.primary,
     },
     workerHeader: {
       flexDirection: 'row',

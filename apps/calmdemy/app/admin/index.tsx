@@ -230,6 +230,18 @@ function MetricsCard({ metrics }: { metrics: FactoryMetrics | null }) {
   const completed = metrics?.completed_total ?? 0;
   const failed = metrics?.failed_total ?? 0;
   const lastError = metrics?.last_error;
+  const averageExactElapsedSec =
+    typeof metrics?.effective_elapsed_sec_count === 'number' &&
+    metrics.effective_elapsed_sec_count > 0 &&
+    typeof metrics.effective_elapsed_sec_sum === 'number'
+      ? metrics.effective_elapsed_sec_sum / metrics.effective_elapsed_sec_count
+      : null;
+  const averageWorkerEffortSec =
+    typeof metrics?.effective_worker_sec_count === 'number' &&
+    metrics.effective_worker_sec_count > 0 &&
+    typeof metrics.effective_worker_sec_sum === 'number'
+      ? metrics.effective_worker_sec_sum / metrics.effective_worker_sec_count
+      : null;
 
   return (
     <View style={styles.metricsCard}>
@@ -247,6 +259,26 @@ function MetricsCard({ metrics }: { metrics: FactoryMetrics | null }) {
           <Text style={styles.metricLabel}>Failed</Text>
         </View>
       </View>
+      {(averageExactElapsedSec !== null || averageWorkerEffortSec !== null) && (
+        <View style={[styles.metricsRow, { marginTop: 10 }]}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricNumberSecondary}>
+              {averageExactElapsedSec !== null
+                ? formatMetricSeconds(averageExactElapsedSec)
+                : '—'}
+            </Text>
+            <Text style={styles.metricLabel}>Avg Exact Time</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricNumberSecondary}>
+              {averageWorkerEffortSec !== null
+                ? formatMetricSeconds(averageWorkerEffortSec)
+                : '—'}
+            </Text>
+            <Text style={styles.metricLabel}>Avg Worker Effort</Text>
+          </View>
+        </View>
+      )}
       {lastError ? (
         <Text style={styles.metricError}>Last error: {lastError}</Text>
       ) : null}
@@ -307,6 +339,11 @@ const createStyles = (theme: Theme) =>
       fontFamily: 'DMSans-Bold',
       fontSize: 20,
     },
+    metricNumberSecondary: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 16,
+      color: theme.colors.text,
+    },
     metricLabel: {
       fontFamily: 'DMSans-Regular',
       fontSize: 12,
@@ -319,3 +356,24 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.error,
     },
   });
+
+function formatMetricSeconds(seconds: number) {
+  const roundedSeconds = Math.max(0, Math.round(seconds));
+  if (roundedSeconds < 60) {
+    return `${roundedSeconds}s`;
+  }
+  const minutes = Math.floor(roundedSeconds / 60);
+  const remainingSeconds = roundedSeconds % 60;
+  if (minutes < 60) {
+    if (remainingSeconds === 0) {
+      return `${minutes}m`;
+    }
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${remainingMinutes}m`;
+}

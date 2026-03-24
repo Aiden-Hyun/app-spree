@@ -76,6 +76,7 @@ const SECTION_IDS = [
   'stepTimeline',
   'courseProgress',
   'jobDetails',
+  'timing',
   'subjectProgress',
   'subjectPlan',
   'subjectChildren',
@@ -141,6 +142,7 @@ export function JobDetailView({
   const [subjectPlanEdits, setSubjectPlanEdits] = useState<
     Record<string, { title: string; description: string }>
   >({});
+  const [timingNowMs, setTimingNowMs] = useState(() => Date.now());
   const previousJobIdRef = useRef(job.id);
 
   const courseScripts = useMemo(
@@ -158,6 +160,14 @@ export function JobDetailView({
         : null,
     [job, timeline]
   );
+  const liveRunElapsedMs = useMemo(
+    () =>
+      computeLiveRunElapsedMsFromTimeline(timeline, job.v2RunId, timingNowMs) ||
+      (typeof job.activeRunElapsedMs === 'number' ? job.activeRunElapsedMs : 0),
+    [job.activeRunElapsedMs, job.v2RunId, timeline, timingNowMs]
+  );
+  const timingStatus = useMemo(() => resolveTimingStatus(job), [job]);
+  const legacyElapsedMs = useMemo(() => getLegacyElapsedMs(job), [job]);
   const isAwaitingRegeneratedScriptApproval = Boolean(
     job.contentType === 'course' &&
       job.status === 'completed' &&
@@ -185,6 +195,21 @@ export function JobDetailView({
     const entries = childJobs.map((childJob) => [childJob.id, childJob] as const);
     return Object.fromEntries(entries);
   }, [childJobs]);
+
+  useEffect(() => {
+    const hasRunningIntervals = timeline.some(
+      (entry) =>
+        entry.runId === job.v2RunId &&
+        entry.state === 'running' &&
+        String(entry.workerId || '').trim().toLowerCase() !== 'checkpoint'
+    );
+    if (!hasRunningIntervals) {
+      return;
+    }
+
+    const interval = setInterval(() => setTimingNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [job.v2RunId, timeline]);
   const approvalSessionCodes = isAwaitingRegeneratedScriptApproval &&
     Array.isArray(job.courseRegeneration?.targetSessionCodes)
       ? job.courseRegeneration.targetSessionCodes
@@ -623,6 +648,9 @@ export function JobDetailView({
     courseScripts,
     setSelectedCourseScript,
     courseProgressModel,
+    timingStatus,
+    liveRunElapsedMs,
+    legacyElapsedMs,
     regenerationMode,
     setRegenerationMode,
     selectedRegenerationSessions,
@@ -1140,6 +1168,9 @@ function buildSections(params: {
   courseScripts: Record<string, string>;
   setSelectedCourseScript: (code: string) => void;
   courseProgressModel: CourseProgressModel | null;
+  timingStatus: 'exact' | 'legacy' | 'unavailable';
+  liveRunElapsedMs: number;
+  legacyElapsedMs?: number;
   regenerationMode: CourseRegenerationMode;
   setRegenerationMode: (mode: CourseRegenerationMode) => void;
   selectedRegenerationSessions: string[];
@@ -1173,6 +1204,9 @@ function buildSections(params: {
     courseScripts,
     setSelectedCourseScript,
     courseProgressModel,
+    timingStatus,
+    liveRunElapsedMs,
+    legacyElapsedMs,
     regenerationMode,
     setRegenerationMode,
     selectedRegenerationSessions,
@@ -1540,6 +1574,79 @@ function buildSections(params: {
           </View>
         </View>
       ),
+    },
+    {
+      id: 'timing',
+      title: 'Timing',
+      summaryItems: toSummaryItems([
+        {
+          label: timingStatus === 'exact' || timingStatus === 'legacy' ? 'Time Taken' : 'Active This Run',
+          value:
+            timingStatus === 'exact'
+              ? formatElapsedMs(job.effectiveElapsedMs)
+              : timingStatus === 'legacy'
+                ? formatElapsedMs(legacyElapsedMs)
+                : formatElapsedMs(liveRunElapsedMs),
+        },
+        {
+          label: 'Mode',
+          value:
+            timingStatus === 'exact'
+              ? 'Exact'
+              : timingStatus === 'legacy'
+                ? 'Legacy'
+                : liveRunElapsedMs > 0
+                  ? 'Live'
+                  : undefined,
+        },
+      ]),
+      shouldRender:
+        timingStatus !== 'unavailable' ||
+        liveRunElapsedMs > 0 ||
+        job.status === 'completed' ||
+        job.status === 'failed',
+      content:
+        timingStatus === 'exact' ? (
+          <>
+            <InfoRow label="Time Taken" value={formatElapsedMs(job.effectiveElapsedMs) || '0s'} />
+            <InfoRow label="Worker Effort" value={formatElapsedMs(job.effectiveWorkerMs) || '0s'} />
+            <InfoRow label="Reuse Credit" value={formatElapsedMs(job.reuseCreditMs) || '0s'} />
+            <InfoRow label="Wasted Work" value={formatElapsedMs(job.wastedWorkerMs) || '0s'} />
+            <InfoRow label="Queue Time" value={formatElapsedMs(job.queueLatencyMs) || '0s'} />
+            {formatParallelism(job.parallelismFactor) && (
+              <InfoRow
+                label="Parallelism"
+                value={formatParallelism(job.parallelismFactor) || ''}
+              />
+            )}
+            {job.timingComputedAt?.toDate && (
+              <InfoRow
+                label="Computed"
+                value={job.timingComputedAt.toDate().toLocaleString()}
+              />
+            )}
+          </>
+        ) : timingStatus === 'legacy' ? (
+          <>
+            <InfoRow label="Time Taken" value={formatElapsedMs(legacyElapsedMs) || '0s'} />
+            <Text style={styles.emptySubtext}>
+              Legacy timing was derived from older job timestamps and may include queue or pause time.
+            </Text>
+          </>
+        ) : (
+          <>
+            {liveRunElapsedMs > 0 && (
+              <InfoRow label="Active This Run" value={formatElapsedMs(liveRunElapsedMs) || '0s'} />
+            )}
+            <Text style={styles.emptySubtext}>
+              {job.status === 'completed'
+                ? 'Exact lineage timing is unavailable for this historical or approval-paused run.'
+                : job.status === 'failed'
+                  ? 'This run did not finish successfully, so no exact final timing was recorded.'
+                  : 'Exact timing will appear after the job finishes successfully.'}
+            </Text>
+          </>
+        ),
     },
     {
       id: 'jobDetails',
@@ -2288,6 +2395,98 @@ function formatDuration(seconds?: number) {
   return `${minutes}:${String(remaining).padStart(2, '0')}`;
 }
 
+function formatElapsedMs(ms?: number | null) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) return '';
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  if (totalMinutes < 60) {
+    if (remainingSeconds === 0) {
+      return `${totalMinutes}m`;
+    }
+    return `${totalMinutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
+function formatParallelism(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return '';
+  return `${value.toFixed(2)}x`;
+}
+
+function resolveTimingStatus(job: ContentJob): 'exact' | 'legacy' | 'unavailable' {
+  if (job.timingStatus === 'exact') return 'exact';
+  if (job.timingStatus === 'legacy') return 'legacy';
+  return getLegacyElapsedMs(job) !== undefined ? 'legacy' : 'unavailable';
+}
+
+function getLegacyElapsedMs(job: ContentJob): number | undefined {
+  const startedMs = job.startedAt?.toMillis?.();
+  const completedMs = job.completedAt?.toMillis?.();
+  if (typeof startedMs === 'number' && typeof completedMs === 'number' && completedMs >= startedMs) {
+    return completedMs - startedMs;
+  }
+  return undefined;
+}
+
+function computeLiveRunElapsedMsFromTimeline(
+  entries: JobStepTimelineEntry[],
+  runId?: string,
+  nowMs = Date.now()
+): number {
+  const normalizedRunId = String(runId || '').trim();
+  if (!normalizedRunId) {
+    return 0;
+  }
+
+  const intervals = entries
+    .filter((entry) => entry.runId === normalizedRunId)
+    .filter((entry) => String(entry.workerId || '').trim().toLowerCase() !== 'checkpoint')
+    .filter((entry) => entry.state === 'running' || entry.state === 'succeeded' || entry.state === 'failed')
+    .map((entry) => {
+      const startedMs = entry.startedAt?.toMillis?.();
+      if (typeof startedMs !== 'number') {
+        return null;
+      }
+      const endedMs =
+        entry.state === 'running'
+          ? nowMs
+          : entry.endedAt?.toMillis?.() || startedMs;
+      return [startedMs, Math.max(startedMs, endedMs)] as const;
+    })
+    .filter((interval): interval is readonly [number, number] => Boolean(interval))
+    .sort((a, b) => a[0] - b[0]);
+
+  if (intervals.length === 0) {
+    return 0;
+  }
+
+  let total = 0;
+  let currentStart = intervals[0][0];
+  let currentEnd = intervals[0][1];
+
+  for (const [startMs, endMs] of intervals.slice(1)) {
+    if (startMs <= currentEnd) {
+      currentEnd = Math.max(currentEnd, endMs);
+      continue;
+    }
+    total += Math.max(0, currentEnd - currentStart);
+    currentStart = startMs;
+    currentEnd = endMs;
+  }
+
+  total += Math.max(0, currentEnd - currentStart);
+  return total;
+}
+
 function formatTimelineTimestamp(timestamp?: { toDate?: () => Date }) {
   if (!timestamp?.toDate) return 'No timestamp';
   return timestamp.toDate().toLocaleString();
@@ -2405,6 +2604,7 @@ function estimateWebSectionHeight(sectionId: string, expanded: boolean, summaryC
     workers: 7.2,
     stepTimeline: 6.5,
     courseProgress: 2.4,
+    timing: 3.2,
     subjectProgress: 3.2,
     jobDetails: 5.2,
     subjectPlan: 7.4,

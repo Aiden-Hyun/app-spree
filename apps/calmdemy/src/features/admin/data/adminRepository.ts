@@ -47,7 +47,7 @@ const workerControlCollection = collection(db, 'worker_control');
 const stepRunsCollection = collection(db, 'factory_step_runs');
 const COURSE_SHARD_SUFFIXES = ['INT', 'M1L', 'M1P', 'M2L', 'M2P', 'M3L', 'M3P', 'M4L', 'M4P'];
 
-function freshDispatchResetFields(): Record<string, null | false> {
+function freshDispatchResetFields(): Record<string, null | false | string> {
   return {
     jobRunId: null,
     runAttempt: null,
@@ -60,6 +60,16 @@ function freshDispatchResetFields(): Record<string, null | false> {
     v2DispatchError: null,
     v2DispatchedBy: null,
     v2DispatchedAt: null,
+    timingStatus: 'unavailable',
+    effectiveElapsedMs: null,
+    effectiveWorkerMs: null,
+    reuseCreditMs: null,
+    wastedWorkerMs: null,
+    queueLatencyMs: null,
+    parallelismFactor: null,
+    timingComputedAt: null,
+    timingVersion: null,
+    activeRunElapsedMs: null,
   };
 }
 
@@ -218,6 +228,16 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     createdBy: userId,
+    timingStatus: 'unavailable',
+    effectiveElapsedMs: null,
+    effectiveWorkerMs: null,
+    reuseCreditMs: null,
+    wastedWorkerMs: null,
+    queueLatencyMs: null,
+    parallelismFactor: null,
+    timingComputedAt: null,
+    timingVersion: null,
+    activeRunElapsedMs: null,
   };
 
   // Only store title if admin provided one

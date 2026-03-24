@@ -3,6 +3,7 @@ from __future__ import annotations
 from firebase_admin import firestore as fs
 
 from ..application.orchestrator import Orchestrator
+from ..shared.lineage_timing import copy_artifacts
 from ..infrastructure.firestore_repos import (
     FirestoreJobRepo,
     FirestoreRunRepo,
@@ -11,7 +12,8 @@ from ..infrastructure.firestore_repos import (
 from ..infrastructure.queue_repo import FirestoreQueueRepo
 
 
-def _extract_runtime(content_job: dict) -> dict:
+def _extract_runtime(content_job: dict, existing_runtime: dict | None = None) -> dict:
+    existing_runtime = dict(existing_runtime or {})
     return {
         "generated_script": content_job.get("generatedScript"),
         "formatted_script": content_job.get("formattedScript"),
@@ -42,6 +44,7 @@ def _extract_runtime(content_job: dict) -> dict:
         "pause_requested": content_job.get("pauseRequested"),
         "paused_at": content_job.get("pausedAt"),
         "max_active_child_courses": content_job.get("maxActiveChildCourses"),
+        "artifacts": copy_artifacts({"runtime": existing_runtime}),
     }
 
 
@@ -140,6 +143,10 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
 
     v2_job_id = content_job_id
     job_ref = db.collection("factory_jobs").document(v2_job_id)
+    existing_job_snap = job_ref.get()
+    existing_runtime = {}
+    if existing_job_snap.exists:
+        existing_runtime = dict((existing_job_snap.to_dict() or {}).get("runtime") or {})
     job_ref.set(
         {
             "job_type": "course" if is_course else "subject" if is_subject else "single_content",
@@ -159,7 +166,7 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
                     "content_job_id": content_job_id,
                 },
             },
-            "runtime": _extract_runtime(content_job),
+            "runtime": _extract_runtime(content_job, existing_runtime=existing_runtime),
         }
     )
 

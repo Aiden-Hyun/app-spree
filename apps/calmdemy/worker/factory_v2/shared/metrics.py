@@ -50,25 +50,47 @@ def record_job_metric(
             if error:
                 updates["last_error"] = error
 
-        started_at = _coerce_datetime(
-            job_data.get("startedAt")
-            or job_data.get("ttsPendingAt")
-            or job_data.get("createdAt")
-        )
-        completed_at = _coerce_datetime(job_data.get("completedAt"))
-        if completed_at is None:
-            completed_at = datetime.now(timezone.utc)
+        timing_status = str(job_data.get("timingStatus") or "").strip().lower()
+        if timing_status == "exact":
+            effective_elapsed_ms = float(job_data.get("effectiveElapsedMs") or 0)
+            effective_worker_ms = float(job_data.get("effectiveWorkerMs") or 0)
+            reuse_credit_ms = float(job_data.get("reuseCreditMs") or 0)
+            wasted_worker_ms = float(job_data.get("wastedWorkerMs") or 0)
+            queue_latency_ms = float(job_data.get("queueLatencyMs") or 0)
 
-        if started_at and completed_at:
-            duration_sec = max(0.0, (completed_at - started_at).total_seconds())
-            updates["duration_sec_sum"] = fs.Increment(duration_sec)
-            updates["duration_sec_count"] = fs.Increment(1)
+            if effective_elapsed_ms > 0:
+                updates["effective_elapsed_sec_sum"] = fs.Increment(effective_elapsed_ms / 1000.0)
+                updates["effective_elapsed_sec_count"] = fs.Increment(1)
+            if effective_worker_ms > 0:
+                updates["effective_worker_sec_sum"] = fs.Increment(effective_worker_ms / 1000.0)
+                updates["effective_worker_sec_count"] = fs.Increment(1)
+            if reuse_credit_ms > 0:
+                updates["reuse_credit_sec_sum"] = fs.Increment(reuse_credit_ms / 1000.0)
+            if wasted_worker_ms > 0:
+                updates["wasted_worker_sec_sum"] = fs.Increment(wasted_worker_ms / 1000.0)
+            if queue_latency_ms > 0:
+                updates["queue_latency_sec_sum"] = fs.Increment(queue_latency_ms / 1000.0)
+                updates["queue_latency_sec_count"] = fs.Increment(1)
+        elif outcome == "completed":
+            started_at = _coerce_datetime(
+                job_data.get("startedAt")
+                or job_data.get("ttsPendingAt")
+                or job_data.get("createdAt")
+            )
+            completed_at = _coerce_datetime(job_data.get("completedAt"))
+            if completed_at is None:
+                completed_at = datetime.now(timezone.utc)
 
-        created_at = _coerce_datetime(job_data.get("createdAt"))
-        if created_at and started_at:
-            queue_latency_sec = max(0.0, (started_at - created_at).total_seconds())
-            updates["queue_latency_sec_sum"] = fs.Increment(queue_latency_sec)
-            updates["queue_latency_sec_count"] = fs.Increment(1)
+            if started_at and completed_at:
+                duration_sec = max(0.0, (completed_at - started_at).total_seconds())
+                updates["duration_sec_sum"] = fs.Increment(duration_sec)
+                updates["duration_sec_count"] = fs.Increment(1)
+
+            created_at = _coerce_datetime(job_data.get("createdAt"))
+            if created_at and started_at:
+                queue_latency_sec = max(0.0, (started_at - created_at).total_seconds())
+                updates["queue_latency_sec_sum"] = fs.Increment(queue_latency_sec)
+                updates["queue_latency_sec_count"] = fs.Increment(1)
 
         doc_ref.set(updates, merge=True)
 

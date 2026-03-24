@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from .scheduler import workflow_for_job_type
+from ..shared.lineage_timing import finalize_job_timing
+from ..shared.metrics import record_job_metric
 from ..shared.course_tts_chunks import make_chunk_shard_key, parse_chunk_shard_key, split_course_tts_chunks
 
 COURSE_AUDIO_SHARDS = ("INT", "M1L", "M1P", "M2L", "M2P", "M3L", "M3P", "M4L", "M4P")
@@ -237,6 +239,34 @@ class Orchestrator:
             step_input=step_input,
             required_tts_model=self._required_tts_model_for_step(job, step_name),
         )
+
+    @staticmethod
+    def _content_job_id(job: dict) -> str:
+        request = job.get("request") or {}
+        compat = request.get("compat") or {}
+        return str(compat.get("content_job_id") or "").strip()
+
+    def _finalize_completed_job(self, job_id: str, run_id: str) -> None:
+        if not hasattr(self.job_repo, "db"):
+            return
+        job = self.job_repo.get(job_id)
+        content_job_id = self._content_job_id(job)
+        if not content_job_id:
+            return
+        finalized = finalize_job_timing(
+            self.job_repo.db,
+            job_id=job_id,
+            run_id=run_id,
+            content_job_id=content_job_id,
+        )
+        if finalized:
+            content_job = self.job_repo.db.collection("content_jobs").document(content_job_id).get().to_dict() or {}
+            record_job_metric(
+                self.job_repo.db,
+                content_job_id,
+                content_job,
+                outcome="completed",
+            )
 
     def start_new_run(
         self,
@@ -526,6 +556,7 @@ class Orchestrator:
                 if self._subject_plan_approval_awaiting(job):
                     self.job_repo.mark_completed(job_id, run_id)
                     self.run_repo.mark_completed(run_id)
+                    self._finalize_completed_job(job_id, run_id)
                     return
                 self._ensure_step_enqueued(job, job_id, run_id, "launch_subject_children")
                 return
@@ -539,6 +570,7 @@ class Orchestrator:
                 if subject_state in {"completed", "paused"}:
                     self.job_repo.mark_completed(job_id, run_id)
                     self.run_repo.mark_completed(run_id)
+                    self._finalize_completed_job(job_id, run_id)
                     return
                 self._ensure_step_enqueued(job, job_id, run_id, "watch_subject_children")
                 return
@@ -552,6 +584,7 @@ class Orchestrator:
                 if subject_state in {"completed", "paused"}:
                     self.job_repo.mark_completed(job_id, run_id)
                     self.run_repo.mark_completed(run_id)
+                    self._finalize_completed_job(job_id, run_id)
                     return
                 return
 
@@ -563,6 +596,7 @@ class Orchestrator:
                 ):
                     self.job_repo.mark_completed(job_id, run_id)
                     self.run_repo.mark_completed(run_id)
+                    self._finalize_completed_job(job_id, run_id)
                     return
             if step_name == "format_course_scripts":
                 self._fan_out_course_audio(job, job_id, run_id)
@@ -585,6 +619,7 @@ class Orchestrator:
         elif step_name == "generate_script" and self._single_script_approval_awaiting(job):
             self.job_repo.mark_completed(job_id, run_id)
             self.run_repo.mark_completed(run_id)
+            self._finalize_completed_job(job_id, run_id)
             return
 
         next_steps = workflow.next_steps(step_name)
@@ -592,6 +627,7 @@ class Orchestrator:
         if is_terminal:
             self.job_repo.mark_completed(job_id, run_id)
             self.run_repo.mark_completed(run_id)
+            self._finalize_completed_job(job_id, run_id)
             return
 
         for next_step in next_steps:
@@ -606,6 +642,25 @@ class Orchestrator:
     def on_step_failed(self, job_id: str, run_id: str, step_name: str, error_code: str) -> None:
         self.job_repo.mark_failed(job_id, run_id, step_name, error_code)
         self.run_repo.mark_failed(run_id, step_name, error_code)
+        if not hasattr(self.job_repo, "db"):
+            self.queue_repo.cancel_ready_for_run(
+                run_id,
+                error_code="run_failed",
+                error_message=f"Run failed at step '{step_name}' ({error_code}). Pending work cancelled.",
+            )
+            return
+        job = self.job_repo.get(job_id)
+        content_job_id = self._content_job_id(job)
+        if content_job_id:
+            content_job = self.job_repo.db.collection("content_jobs").document(content_job_id).get().to_dict() or {}
+            record_job_metric(
+                self.job_repo.db,
+                content_job_id,
+                content_job,
+                outcome="failed",
+                stage=step_name,
+                error=error_code,
+            )
         self.queue_repo.cancel_ready_for_run(
             run_id,
             error_code="run_failed",
