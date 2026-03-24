@@ -65,8 +65,24 @@ COURSE_WORKFLOW = WorkflowSpec(
     terminal_step="publish_course",
 )
 
+SUBJECT_WORKFLOW = WorkflowSpec(
+    name="subject",
+    steps=[
+        "generate_subject_plan",
+        "launch_subject_children",
+        "watch_subject_children",
+    ],
+    edges={
+        "generate_subject_plan": ["launch_subject_children"],
+        "launch_subject_children": ["watch_subject_children"],
+    },
+    terminal_step="watch_subject_children",
+)
+
 
 def workflow_for_job_type(job_type: str) -> WorkflowSpec:
     if job_type == "course":
         return COURSE_WORKFLOW
+    if job_type == "subject":
+        return SUBJECT_WORKFLOW
     return SINGLE_CONTENT_WORKFLOW

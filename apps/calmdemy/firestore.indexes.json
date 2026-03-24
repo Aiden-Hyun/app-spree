@@ -76,6 +76,15 @@
       ]
     },
     {
+      "collectionGroup": "content_jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "parentJobId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "factory_job_runs",
       "queryScope": "COLLECTION",
       "fields": [

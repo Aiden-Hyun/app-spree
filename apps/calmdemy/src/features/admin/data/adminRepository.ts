@@ -21,6 +21,7 @@ import {
   CourseRegenerationMode,
   CreateJobInput,
   JobStatus,
+  SubjectPlan,
   WorkerControl,
   WorkerDesiredState,
   WorkerStatus,
@@ -69,6 +70,30 @@ function makePendingScriptApprovalPayload(userId: string | null) {
     scriptApprovedAt: null,
     requestedBy: userId,
     requestedAt: serverTimestamp(),
+  };
+}
+
+function makePendingSubjectPlanApprovalPayload(userId: string | null) {
+  return {
+    enabled: true,
+    awaitingApproval: false,
+    approvedBy: null,
+    approvedAt: null,
+    requestedBy: userId,
+    requestedAt: serverTimestamp(),
+  };
+}
+
+function cloneSubjectPlan(plan: SubjectPlan): SubjectPlan {
+  return {
+    ...plan,
+    courses: Array.isArray(plan.courses)
+      ? plan.courses.map((course) => ({
+          ...course,
+          learningGoals: Array.isArray(course.learningGoals) ? [...course.learningGoals] : undefined,
+          prerequisites: Array.isArray(course.prerequisites) ? [...course.prerequisites] : undefined,
+        }))
+      : [],
   };
 }
 
@@ -166,6 +191,22 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
     if (input.requireScriptApprovalBeforeTts) {
       jobData.courseScriptApproval = makePendingScriptApprovalPayload(userId);
     }
+  } else if (input.contentType === 'full_subject') {
+    jobData.autoPublish = true;
+    jobData.subjectProgress = 'Pending subject curriculum generation';
+    jobData.childJobIds = [];
+    jobData.childCounts = {
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+    };
+    jobData.launchCursor = 0;
+    jobData.maxActiveChildCourses = 2;
+    jobData.pauseRequested = false;
+    if (input.requireSubjectPlanApproval) {
+      jobData.subjectPlanApproval = makePendingSubjectPlanApprovalPayload(userId);
+    }
   } else if (input.requireScriptApprovalBeforeTts) {
     jobData.scriptApproval = makePendingScriptApprovalPayload(userId);
   }
@@ -260,6 +301,30 @@ export function subscribeToJob(
     }
     const data = docSnapshot.data() as Record<string, any>;
     callback({ id: docSnapshot.id, ...data } as ContentJob);
+  });
+}
+
+export function subscribeToChildJobs(
+  parentJobId: string,
+  callback: (jobs: ContentJob[]) => void
+): Unsubscribe {
+  if (!parentJobId) {
+    callback([]);
+    return () => {};
+  }
+
+  const q = query(
+    jobsCollection,
+    where('parentJobId', '==', parentJobId),
+    orderBy('createdAt', 'asc')
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const jobs = snapshot.docs.map((docSnapshot) => {
+      const data = docSnapshot.data() as Record<string, any>;
+      return { id: docSnapshot.id, ...data } as ContentJob;
+    });
+    callback(jobs);
   });
 }
 
@@ -831,6 +896,161 @@ export async function regeneratePendingScripts(job: ContentJob): Promise<void> {
       requestedBy: userId || null,
       requestedAt: serverTimestamp(),
     },
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function approveSubjectPlan(
+  job: ContentJob,
+  input?: {
+    courseEdits?: Record<string, { title?: string; description?: string }>;
+  }
+): Promise<void> {
+  if (
+    job.contentType !== 'full_subject' ||
+    job.status !== 'completed' ||
+    !job.subjectPlanApproval?.enabled ||
+    !job.subjectPlanApproval.awaitingApproval ||
+    !job.subjectPlan
+  ) {
+    throw new Error('There is no subject lineup awaiting approval for this job.');
+  }
+
+  const nextPlan = cloneSubjectPlan(job.subjectPlan);
+  const edits = input?.courseEdits || {};
+
+  nextPlan.courses = nextPlan.courses.map((course) => {
+    const edit = edits[course.code];
+    const nextTitle = String(edit?.title ?? course.title ?? '').trim();
+    const nextDescription = String(edit?.description ?? course.description ?? '').trim();
+    if (!nextTitle) {
+      throw new Error(`Title cannot be empty for ${course.code}.`);
+    }
+    if (!nextDescription) {
+      throw new Error(`Description cannot be empty for ${course.code}.`);
+    }
+    return {
+      ...course,
+      title: nextTitle,
+      description: nextDescription,
+    };
+  });
+
+  const userId = getCurrentUserId();
+  await updateDoc(doc(jobsCollection, job.id), {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
+    pauseRequested: false,
+    pausedAt: null,
+    subjectPlan: nextPlan,
+    subjectProgress: 'Approved subject lineup. Launching child courses',
+    ...freshDispatchResetFields(),
+    subjectPlanApproval: {
+      ...job.subjectPlanApproval,
+      awaitingApproval: false,
+      approvedBy: userId || null,
+      approvedAt: serverTimestamp(),
+    },
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function regenerateSubjectPlan(job: ContentJob): Promise<void> {
+  if (
+    job.contentType !== 'full_subject' ||
+    job.status !== 'completed' ||
+    !job.subjectPlanApproval?.enabled ||
+    !job.subjectPlanApproval.awaitingApproval
+  ) {
+    throw new Error('This full subject job is not waiting for lineup approval.');
+  }
+
+  const userId = getCurrentUserId();
+  await updateDoc(doc(jobsCollection, job.id), {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
+    subjectPlan: null,
+    subjectProgress: 'Regenerating subject curriculum',
+    launchCursor: 0,
+    childJobIds: [],
+    childCounts: {
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+    },
+    pauseRequested: false,
+    pausedAt: null,
+    ...freshDispatchResetFields(),
+    subjectPlanApproval: {
+      ...job.subjectPlanApproval,
+      awaitingApproval: false,
+      approvedBy: null,
+      approvedAt: null,
+      requestedBy: userId || null,
+      requestedAt: serverTimestamp(),
+    },
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function pauseFullSubjectJob(job: ContentJob): Promise<void> {
+  if (job.contentType !== 'full_subject') {
+    throw new Error('Pause is only supported for full subject jobs.');
+  }
+  if (job.status === 'completed' || job.status === 'failed') {
+    throw new Error('Only active full subject jobs can be paused.');
+  }
+
+  const patch: Record<string, any> = {
+    pauseRequested: true,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (job.status === 'pending' || job.status === 'paused') {
+    patch.status = 'paused';
+    patch.pausedAt = serverTimestamp();
+    patch.subjectProgress = job.subjectProgress || 'Paused before launching more child courses';
+    patch.v2Locked = false;
+  }
+
+  await updateDoc(doc(jobsCollection, job.id), patch);
+}
+
+export async function resumeFullSubjectJob(job: ContentJob): Promise<void> {
+  if (job.contentType !== 'full_subject') {
+    throw new Error('Resume is only supported for full subject jobs.');
+  }
+  if (job.status !== 'paused') {
+    throw new Error('This full subject job is not paused.');
+  }
+
+  await updateDoc(doc(jobsCollection, job.id), {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    pauseRequested: false,
+    pausedAt: null,
+    subjectProgress: job.subjectProgress || 'Resuming child course launch',
+    ...freshDispatchResetFields(),
     updatedAt: serverTimestamp(),
   });
 }

@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { Dropdown, DropdownOption } from './Dropdown';
-import { FactoryContentType, BACKEND_LABELS } from '../types';
+import { FactoryContentType, BACKEND_LABELS, SubjectLevelCounts } from '../types';
 import { Theme } from '@/theme';
 
 type Props = {
@@ -41,6 +41,7 @@ type Props = {
 
   // Course-specific
   isCourse: boolean;
+  isFullSubject: boolean;
   courseCode: string;
   onCourseCodeChange: (v: string) => void;
   courseCodeError?: string | null;
@@ -56,6 +57,11 @@ type Props = {
   onToneChange: (v: string) => void;
   requireScriptApprovalBeforeTts: boolean;
   onRequireScriptApprovalBeforeTtsChange: (v: boolean) => void;
+  levelCounts: SubjectLevelCounts;
+  onLevelCountChange: (level: keyof SubjectLevelCounts, value: string) => void;
+  derivedCourseCount: number;
+  requireSubjectPlanApproval: boolean;
+  onRequireSubjectPlanApprovalChange: (v: boolean) => void;
 
   // Backends / models
   llmBackend: string;
@@ -90,6 +96,16 @@ type Props = {
 export function CreateContentForm(props: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isSingleContent = !props.isCourse && !props.isFullSubject;
+  const isSubmitDisabled =
+    props.isSubmitting ||
+    (props.isFullSubject && (!props.subjectId || props.derivedCourseCount <= 0));
+  const levelFields: Array<{ key: keyof SubjectLevelCounts; label: string }> = [
+    { key: 'l100', label: '100 Level' },
+    { key: 'l200', label: '200 Level' },
+    { key: 'l300', label: '300 Level' },
+    { key: 'l400', label: '400 Level' },
+  ];
 
   return (
     <ScrollView
@@ -161,8 +177,44 @@ export function CreateContentForm(props: Props) {
         </>
       ) : null}
 
+      {props.isFullSubject ? (
+        <>
+          <Text style={styles.sectionTitle}>Therapy Subject</Text>
+          <Dropdown
+            options={props.subjectOptions}
+            selectedId={props.subjectId}
+            onSelect={(id) => props.onSubjectChange(String(id))}
+          />
+
+          <Text style={styles.sectionTitle}>Course Count By Level</Text>
+          <View style={styles.levelGrid}>
+            {levelFields.map((field) => (
+              <View key={field.key} style={styles.levelCard}>
+                <Text style={styles.levelLabel}>{field.label}</Text>
+                <TextInput
+                  style={[styles.input, styles.levelInput]}
+                  keyboardType="number-pad"
+                  value={String(props.levelCounts[field.key] ?? 0)}
+                  onChangeText={(value) => props.onLevelCountChange(field.key, value)}
+                />
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.subjectSummaryCard}>
+            <Text style={styles.subjectSummaryLabel}>Total Courses</Text>
+            <Text style={styles.subjectSummaryValue}>{props.derivedCourseCount}</Text>
+            {props.derivedCourseCount > 20 ? (
+              <Text style={styles.subjectSummaryHelper}>
+                Large runs can take a long time. Approval before launch is strongly recommended.
+              </Text>
+            ) : null}
+          </View>
+        </>
+      ) : null}
+
       {/* Common Fields */}
-      {!props.isCourse && (
+      {isSingleContent && (
         <>
           <Text style={styles.sectionTitle}>Title (optional)</Text>
           <TextInput
@@ -174,15 +226,19 @@ export function CreateContentForm(props: Props) {
         </>
       )}
 
-      <Text style={styles.sectionTitle}>{props.isCourse ? 'Course Description' : 'Topic'}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder={props.isCourse ? 'Course description' : 'What should we generate?'}
-        value={props.topic}
-        onChangeText={props.onTopicChange}
-      />
+      {!props.isFullSubject && (
+        <>
+          <Text style={styles.sectionTitle}>{props.isCourse ? 'Course Description' : 'Topic'}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={props.isCourse ? 'Course description' : 'What should we generate?'}
+            value={props.topic}
+            onChangeText={props.onTopicChange}
+          />
+        </>
+      )}
 
-      {!props.isCourse && (
+      {isSingleContent && (
         <>
           <Text style={styles.sectionTitle}>Duration</Text>
           <Dropdown
@@ -193,7 +249,7 @@ export function CreateContentForm(props: Props) {
         </>
       )}
 
-      {!props.isCourse && (
+      {isSingleContent && (
         <>
           <Text style={styles.sectionTitle}>Style</Text>
           <TextInput
@@ -229,34 +285,62 @@ export function CreateContentForm(props: Props) {
         multiline
       />
 
-      <Text style={styles.sectionTitle}>Image Prompt (optional)</Text>
-      <TextInput
-        style={[styles.input, styles.multilineInput]}
-        placeholder="Describe the thumbnail image"
-        value={props.imagePrompt}
-        onChangeText={props.onImagePromptChange}
-        multiline
-      />
+      {!props.isFullSubject && (
+        <>
+          <Text style={styles.sectionTitle}>Image Prompt (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Describe the thumbnail image"
+            value={props.imagePrompt}
+            onChangeText={props.onImagePromptChange}
+            multiline
+          />
 
-      <Text style={styles.sectionTitle}>Script Approval</Text>
-      <View style={styles.toggleRow}>
-        <View style={styles.toggleInfo}>
-          <Text style={styles.toggleLabel}>Pause for script approval</Text>
-          <Text style={styles.toggleDescription}>
-            Optional. Stop after scripts are generated so you can edit, approve, or regenerate them before TTS starts.
-          </Text>
-        </View>
-        <Switch
-          value={props.requireScriptApprovalBeforeTts}
-          onValueChange={props.onRequireScriptApprovalBeforeTtsChange}
-          trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
-          thumbColor={
-            props.requireScriptApprovalBeforeTts
-              ? theme.colors.primary
-              : theme.colors.gray[400]
-          }
-        />
-      </View>
+          <Text style={styles.sectionTitle}>Script Approval</Text>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>Pause for script approval</Text>
+              <Text style={styles.toggleDescription}>
+                Optional. Stop after scripts are generated so you can edit, approve, or regenerate them before TTS starts.
+              </Text>
+            </View>
+            <Switch
+              value={props.requireScriptApprovalBeforeTts}
+              onValueChange={props.onRequireScriptApprovalBeforeTtsChange}
+              trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+              thumbColor={
+                props.requireScriptApprovalBeforeTts
+                  ? theme.colors.primary
+                  : theme.colors.gray[400]
+              }
+            />
+          </View>
+        </>
+      )}
+
+      {props.isFullSubject && (
+        <>
+          <Text style={styles.sectionTitle}>Lineup Approval</Text>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>Pause after lineup generation</Text>
+              <Text style={styles.toggleDescription}>
+                Review and edit the generated course titles and descriptions before child course jobs launch.
+              </Text>
+            </View>
+            <Switch
+              value={props.requireSubjectPlanApproval}
+              onValueChange={props.onRequireSubjectPlanApprovalChange}
+              trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+              thumbColor={
+                props.requireSubjectPlanApproval
+                  ? theme.colors.primary
+                  : theme.colors.gray[400]
+              }
+            />
+          </View>
+        </>
+      )}
 
       {/* Model selection */}
       <View style={styles.divider} />
@@ -329,40 +413,46 @@ export function CreateContentForm(props: Props) {
       )}
 
       {/* Auto-Publish Toggle */}
-      <View style={styles.divider} />
-      <View style={styles.toggleRow}>
-        <View style={styles.toggleInfo}>
-          <Text style={styles.toggleLabel}>Auto-publish</Text>
-          <Text style={styles.toggleDescription}>
-            {props.autoPublish
-              ? 'Content will be published automatically when done'
-              : 'Content will need manual approval before publishing'}
-          </Text>
-        </View>
-        <Switch
-          value={props.autoPublish}
-          onValueChange={props.onAutoPublishChange}
-          trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
-          thumbColor={props.autoPublish ? theme.colors.primary : theme.colors.gray[400]}
-        />
-      </View>
+      {!props.isFullSubject && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>Auto-publish</Text>
+              <Text style={styles.toggleDescription}>
+                {props.autoPublish
+                  ? 'Content will be published automatically when done'
+                  : 'Content will need manual approval before publishing'}
+              </Text>
+            </View>
+            <Switch
+              value={props.autoPublish}
+              onValueChange={props.onAutoPublishChange}
+              trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+              thumbColor={props.autoPublish ? theme.colors.primary : theme.colors.gray[400]}
+            />
+          </View>
+        </>
+      )}
 
       {/* Submit */}
       <Pressable
         style={({ pressed }) => [
           styles.submitButton,
           pressed && { opacity: 0.85 },
-          props.isSubmitting && styles.submitButtonDisabled,
+          isSubmitDisabled && styles.submitButtonDisabled,
         ]}
         onPress={props.onSubmit}
-        disabled={props.isSubmitting}
+        disabled={isSubmitDisabled}
       >
         {props.isSubmitting ? (
           <ActivityIndicator color="#fff" />
         ) : (
           <>
             <Ionicons name="sparkles" size={20} color="#fff" />
-            <Text style={styles.submitText}>Generate Content</Text>
+            <Text style={styles.submitText}>
+              {props.isFullSubject ? 'Generate Subject Curriculum' : 'Generate Content'}
+            </Text>
           </>
         )}
       </Pressable>
@@ -429,6 +519,52 @@ const createStyles = (theme: Theme) =>
     multilineInput: {
       minHeight: 80,
       textAlignVertical: 'top',
+    },
+    levelGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    levelCard: {
+      width: '47%',
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      gap: 8,
+    },
+    levelLabel: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    levelInput: {
+      paddingVertical: 10,
+    },
+    subjectSummaryCard: {
+      marginTop: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      padding: 14,
+      backgroundColor: theme.colors.surface,
+    },
+    subjectSummaryLabel: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      marginBottom: 6,
+    },
+    subjectSummaryValue: {
+      fontFamily: 'DMSans-Bold',
+      fontSize: 24,
+      color: theme.colors.text,
+    },
+    subjectSummaryHelper: {
+      marginTop: 8,
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.warning,
+      lineHeight: 18,
     },
     helperText: {
       fontFamily: 'DMSans-Regular',

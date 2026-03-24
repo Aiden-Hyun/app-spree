@@ -27,3 +27,4 @@ class StepResult:
     runtime_patch: dict[str, Any] = field(default_factory=dict)
     summary_patch: dict[str, Any] = field(default_factory=dict)
     compat_content_job_patch: dict[str, Any] = field(default_factory=dict)
+    requeue_after_seconds: int | None = None

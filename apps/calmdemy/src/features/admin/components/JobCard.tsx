@@ -17,6 +17,8 @@ function getStatusColor(status: string, theme: Theme): string {
       return theme.colors.success;
     case 'failed':
       return theme.colors.error;
+    case 'paused':
+      return theme.colors.warning;
     case 'pending':
       return theme.colors.gray[400];
     default:
@@ -30,6 +32,8 @@ function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
       return 'checkmark-circle';
     case 'failed':
       return 'close-circle';
+    case 'paused':
+      return 'pause-circle';
     case 'pending':
       return 'time-outline';
     default:
@@ -78,10 +82,22 @@ export function JobCard({ job, onPress }: JobCardProps) {
         <Text style={styles.metaText}>
           {CONTENT_TYPE_LABELS[job.contentType]}
         </Text>
-        <Text style={styles.metaDot}>·</Text>
-        <Text style={styles.metaText}>
-          {job.params.duration_minutes} min
-        </Text>
+        {job.contentType !== 'full_subject' && (
+          <>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.metaText}>
+              {job.params.duration_minutes} min
+            </Text>
+          </>
+        )}
+        {job.contentType === 'full_subject' && (
+          <>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.metaText}>
+              {job.params.courseCount || 0} courses
+            </Text>
+          </>
+        )}
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
@@ -96,6 +112,17 @@ export function JobCard({ job, onPress }: JobCardProps) {
 }
 
 function getJobHeadline(job: ContentJob): string {
+  if (job.contentType === 'full_subject') {
+    const subjectLabel = String(job.params.subjectLabel || job.params.subjectId || '').trim();
+    const totalCourses = Number(job.params.courseCount || 0);
+    if (subjectLabel && totalCourses > 0) {
+      return `${subjectLabel} Full Subject — ${totalCourses} courses`;
+    }
+    if (subjectLabel) {
+      return `${subjectLabel} Full Subject`;
+    }
+  }
+
   if (job.contentType === 'course') {
     const courseCode = formatCourseCode(String(job.params.courseCode || '').trim());
     const courseTitle = String(job.params.courseTitle || '').trim();

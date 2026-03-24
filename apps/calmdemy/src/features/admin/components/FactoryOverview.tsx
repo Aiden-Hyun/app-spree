@@ -22,6 +22,7 @@ export type WorkerCardState = {
 interface FactoryOverviewProps {
   pendingCount: number;
   activeCount: number;
+  pausedCount: number;
   completedCount: number;
   localState: WorkerCardState;
   autoMode: boolean;
@@ -46,6 +47,7 @@ interface FactoryOverviewProps {
 export function FactoryOverview({
   pendingCount,
   activeCount,
+  pausedCount,
   completedCount,
   localState,
   autoMode,
@@ -120,6 +122,12 @@ export function FactoryOverview({
                 {activeCount}
               </Text>
               <Text style={styles.statLabel}>Processing</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: `${theme.colors.textMuted}15` }]}>
+              <Text style={[styles.statNumber, { color: theme.colors.textMuted }]}>
+                {pausedCount}
+              </Text>
+              <Text style={styles.statLabel}>Paused</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: `${theme.colors.success}15` }]}>
               <Text style={[styles.statNumber, { color: theme.colors.success }]}>

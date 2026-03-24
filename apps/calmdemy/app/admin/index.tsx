@@ -50,11 +50,13 @@ export default function AdminDashboard() {
       j.status !== 'completed' &&
       j.status !== 'failed' &&
       j.status !== 'pending' &&
+      j.status !== 'paused' &&
       j.status !== 'tts_pending'
   ).length;
   const pendingCount = jobs.filter(
     (j) => j.status === 'pending' || j.status === 'tts_pending'
   ).length;
+  const pausedCount = jobs.filter((j) => j.status === 'paused').length;
   const completedCount = jobs.filter((j) => j.status === 'completed').length;
 
   const localState = getLocalWorkerState(localWorker, localControl, theme, optimisticState);
@@ -156,6 +158,7 @@ export default function AdminDashboard() {
             <FactoryOverview
               pendingCount={pendingCount}
               activeCount={activeCount}
+              pausedCount={pausedCount}
               completedCount={completedCount}
               localState={localState}
               autoMode={autoMode}

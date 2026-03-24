@@ -3,7 +3,7 @@ import { View, ActivityIndicator, Text, Alert, StyleSheet, Platform } from 'reac
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { useJobDetail, useJobStepTimeline } from '@features/admin/hooks/useJobQueue';
+import { useChildJobs, useJobDetail, useJobStepTimeline } from '@features/admin/hooks/useJobQueue';
 import { publishCompletedJob } from '@features/admin/data/adminRepository';
 import { JobDetailView } from '@features/admin/components/JobDetailView';
 import { Theme } from '@/theme';
@@ -20,9 +20,16 @@ export default function JobDetailScreen() {
     cancel,
     requestDelete,
     regenerateCourse,
+    approveSubjectPlan,
     approvePendingScripts,
+    pauseSubject,
+    regenerateSubjectPlan,
     regeneratePendingScripts,
+    resumeSubject,
   } = useJobDetail(id);
+  const { jobs: childJobs, isLoading: isChildJobsLoading } = useChildJobs(
+    job?.contentType === 'full_subject' ? id : undefined
+  );
   const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
     id || '',
     job?.v2RunId
@@ -93,6 +100,20 @@ export default function JobDetailScreen() {
   const startRegeneratePendingScripts = async () => {
     await regeneratePendingScripts();
   };
+  const startApproveSubjectPlan = async (input?: {
+    courseEdits?: Record<string, { title?: string; description?: string }>;
+  }) => {
+    await approveSubjectPlan(input);
+  };
+  const startRegenerateSubjectPlan = async () => {
+    await regenerateSubjectPlan();
+  };
+  const startPauseSubject = async () => {
+    await pauseSubject();
+  };
+  const startResumeSubject = async () => {
+    await resumeSubject();
+  };
 
   const handleApprovePendingScripts = async (input?: {
     rawScriptEdits?: Record<string, string>;
@@ -158,6 +179,32 @@ export default function JobDetailScreen() {
     if (!job) return;
     router.push({ pathname: '/admin/job/[id]/review', params: { id: job.id } });
   };
+  const handleApproveSubjectPlan = async (input?: {
+    courseEdits?: Record<string, { title?: string; description?: string }>;
+  }) => {
+    if (!job) return;
+    const message =
+      'This will lock the lineup and start launching child course jobs for the approved full subject.';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+      await startApproveSubjectPlan(input);
+      return;
+    }
+
+    Alert.alert('Approve Subject Lineup', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Approve',
+        onPress: async () => {
+          await startApproveSubjectPlan(input);
+        },
+      },
+    ]);
+  };
 
   if (isLoading) {
     return (
@@ -198,14 +245,20 @@ export default function JobDetailScreen() {
     Boolean(job.courseScriptApproval?.enabled && job.courseScriptApproval.awaitingApproval);
   const isSingleAwaitingScriptApproval =
     job.contentType !== 'course' &&
+    job.contentType !== 'full_subject' &&
     job.status === 'completed' &&
     Boolean(job.scriptApproval?.enabled && job.scriptApproval.awaitingApproval);
+  const isSubjectPlanAwaitingApproval =
+    job.contentType === 'full_subject' &&
+    job.status === 'completed' &&
+    Boolean(job.subjectPlanApproval?.enabled && job.subjectPlanApproval.awaitingApproval);
   const isAwaitingAnyScriptApproval =
     isCourseRegenAwaitingScriptApproval ||
     isCourseInitialAwaitingScriptApproval ||
     isSingleAwaitingScriptApproval;
   const isAwaitingApproval =
     !isAwaitingAnyScriptApproval &&
+    !isSubjectPlanAwaitingApproval &&
     (isCourseRegenAwaitingPublish ||
       (job.status === 'completed' && !job.autoPublish && !job.publishedContentId));
   const isReviewable =
@@ -227,18 +280,25 @@ export default function JobDetailScreen() {
       />
       <JobDetailView
         job={job}
+        childJobs={childJobs}
+        isChildJobsLoading={isChildJobsLoading}
         timeline={timeline}
         isTimelineLoading={isTimelineLoading}
         isAwaitingApproval={isAwaitingApproval}
+        isAwaitingSubjectPlanApproval={isSubjectPlanAwaitingApproval}
         isReviewable={isReviewable}
         isDeletable={isDeletable}
+        onApproveSubjectPlan={handleApproveSubjectPlan}
         onRetry={handleRetry}
         onCancel={handleCancel}
         onPublish={handlePublish}
         publishButtonLabel={publishButtonLabel}
+        onPauseSubject={startPauseSubject}
         onRegenerateCourse={regenerateCourse}
+        onRegenerateSubjectPlan={startRegenerateSubjectPlan}
         onApprovePendingScripts={handleApprovePendingScripts}
         onRegeneratePendingScripts={startRegeneratePendingScripts}
+        onResumeSubject={startResumeSubject}
         onDelete={handleDelete}
         onReview={handleReview}
       />

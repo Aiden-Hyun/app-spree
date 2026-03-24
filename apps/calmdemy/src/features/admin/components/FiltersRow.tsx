@@ -9,6 +9,7 @@ const FILTER_OPTIONS: { label: string; value: JobStatus | undefined }[] = [
   { label: 'Pending', value: 'pending' },
   { label: 'TTS Pending', value: 'tts_pending' },
   { label: 'Active', value: 'llm_generating' },
+  { label: 'Paused', value: 'paused' },
   { label: 'Completed', value: 'completed' },
   { label: 'Failed', value: 'failed' },
 ];

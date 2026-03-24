@@ -33,6 +33,15 @@ def _extract_runtime(content_job: dict) -> dict:
         "course_regeneration": content_job.get("courseRegeneration"),
         "course_id": content_job.get("courseId"),
         "course_session_ids": content_job.get("courseSessionIds"),
+        "subject_plan": content_job.get("subjectPlan"),
+        "subject_plan_approval": content_job.get("subjectPlanApproval"),
+        "subject_progress": content_job.get("subjectProgress"),
+        "child_job_ids": content_job.get("childJobIds"),
+        "child_counts": content_job.get("childCounts"),
+        "launch_cursor": content_job.get("launchCursor"),
+        "pause_requested": content_job.get("pauseRequested"),
+        "paused_at": content_job.get("pausedAt"),
+        "max_active_child_courses": content_job.get("maxActiveChildCourses"),
     }
 
 
@@ -53,9 +62,10 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     content_type = content_job.get("contentType", "guided_meditation")
     status = content_job.get("status", "pending")
     is_course = content_type == "course"
+    is_subject = content_type == "full_subject"
 
     trigger = "bootstrap"
-    first_step = "generate_course_plan" if is_course else None
+    first_step = "generate_course_plan" if is_course else "generate_subject_plan" if is_subject else None
     if status == "pending" and is_course:
         regeneration = content_job.get("courseRegeneration") or {}
         if isinstance(regeneration, dict) and regeneration.get("active"):
@@ -88,14 +98,42 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
                 elif has_existing_plan:
                     first_step = "generate_course_scripts"
     elif status == "pending":
-        script_approval = content_job.get("scriptApproval") or {}
-        if (
-            isinstance(script_approval, dict)
-            and script_approval.get("enabled")
-            and bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
-            and not bool(script_approval.get("awaitingApproval"))
-        ):
-            first_step = "format_script"
+        if is_subject:
+            subject_plan = content_job.get("subjectPlan") or {}
+            subject_plan_approval = content_job.get("subjectPlanApproval") or {}
+            approval_enabled = bool(
+                isinstance(subject_plan_approval, dict)
+                and subject_plan_approval.get("enabled")
+            )
+            approval_awaiting = bool(
+                isinstance(subject_plan_approval, dict)
+                and subject_plan_approval.get("awaitingApproval")
+            )
+            approval_complete = bool(
+                isinstance(subject_plan_approval, dict)
+                and (
+                    subject_plan_approval.get("approvedAt")
+                    or subject_plan_approval.get("approvedBy")
+                )
+            )
+            launch_cursor = int(content_job.get("launchCursor") or 0)
+            child_job_ids = list(content_job.get("childJobIds") or [])
+            has_plan = bool(isinstance(subject_plan, dict) and subject_plan.get("courses"))
+            if has_plan and ((approval_enabled and approval_complete and not approval_awaiting) or not approval_enabled):
+                first_step = (
+                    "watch_subject_children"
+                    if launch_cursor > 0 or len(child_job_ids) > 0
+                    else "launch_subject_children"
+                )
+        else:
+            script_approval = content_job.get("scriptApproval") or {}
+            if (
+                isinstance(script_approval, dict)
+                and script_approval.get("enabled")
+                and bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
+                and not bool(script_approval.get("awaitingApproval"))
+            ):
+                first_step = "format_script"
     if status == "publishing":
         trigger = "manual_publish"
         first_step = "publish_course" if is_course else "publish_content"
@@ -104,7 +142,7 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     job_ref = db.collection("factory_jobs").document(v2_job_id)
     job_ref.set(
         {
-            "job_type": "course" if is_course else "single_content",
+            "job_type": "course" if is_course else "subject" if is_subject else "single_content",
             "current_state": "queued",
             "updated_at": fs.SERVER_TIMESTAMP,
             "created_at": fs.SERVER_TIMESTAMP,

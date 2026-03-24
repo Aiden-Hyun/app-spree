@@ -8,6 +8,7 @@ import {
   FactoryContentType,
   CreateJobInput,
   JobBackend,
+  SubjectLevelCounts,
 } from '@features/admin/types';
 import {
   getLLMModelsForBackend,
@@ -38,6 +39,7 @@ const CONTENT_TYPE_OPTIONS: DropdownOption[] = [
   { id: 'emergency_meditation', label: 'Emergency Meditation' },
   { id: 'course_session', label: 'Course Session' },
   { id: 'course', label: 'Full Course (9 audio)' },
+  { id: 'full_subject', label: 'Full Subject' },
 ];
 
 const DURATION_OPTIONS: DropdownOption[] = [5, 10, 15, 20, 30].map((d) => ({
@@ -79,6 +81,8 @@ type DraftPayload = {
   targetAudience: string;
   tone: string;
   requireScriptApprovalBeforeTts: boolean;
+  levelCounts: SubjectLevelCounts;
+  requireSubjectPlanApproval: boolean;
   llmBackend: JobBackend;
   ttsBackend: JobBackend;
   llmModel: string;
@@ -117,12 +121,22 @@ export default function CreateContentScreen() {
   const [targetAudience, setTargetAudience] = useState<string>('beginner');
   const [tone, setTone] = useState<string>('gentle');
   const [requireScriptApprovalBeforeTts, setRequireScriptApprovalBeforeTts] = useState(false);
+  const [levelCounts, setLevelCounts] = useState<SubjectLevelCounts>({
+    l100: 0,
+    l200: 0,
+    l300: 0,
+    l400: 0,
+  });
+  const [requireSubjectPlanApproval, setRequireSubjectPlanApproval] = useState(true);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [courseCodeError, setCourseCodeError] = useState<string | null>(null);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const codeCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isCourse = contentType === 'course';
+  const isFullSubject = contentType === 'full_subject';
+  const derivedCourseCount =
+    levelCounts.l100 + levelCounts.l200 + levelCounts.l300 + levelCounts.l400;
 
   // Independent backend + model state
   const [llmBackend, setLlmBackend] = useState<JobBackend>('local');
@@ -184,6 +198,17 @@ export default function CreateContentScreen() {
         setTargetAudience(draft.targetAudience || 'beginner');
         setTone(draft.tone || 'gentle');
         setRequireScriptApprovalBeforeTts(Boolean(draft.requireScriptApprovalBeforeTts));
+        setLevelCounts(
+          draft.levelCounts || {
+            l100: 0,
+            l200: 0,
+            l300: 0,
+            l400: 0,
+          }
+        );
+        setRequireSubjectPlanApproval(
+          draft.requireSubjectPlanApproval !== false
+        );
 
         setLlmBackend(draft.llmBackend);
         setTtsBackend(draft.ttsBackend);
@@ -209,6 +234,13 @@ export default function CreateContentScreen() {
           targetAudience: draft.targetAudience,
           tone: draft.tone,
           requireScriptApprovalBeforeTts: Boolean(draft.requireScriptApprovalBeforeTts),
+          levelCounts: draft.levelCounts || {
+            l100: 0,
+            l200: 0,
+            l300: 0,
+            l400: 0,
+          },
+          requireSubjectPlanApproval: draft.requireSubjectPlanApproval !== false,
           llmBackend: draft.llmBackend,
           ttsBackend: draft.ttsBackend,
           llmModel: normalizedLLMModel,
@@ -229,6 +261,15 @@ export default function CreateContentScreen() {
   const subjectOptions: DropdownOption[] = useMemo(
     () => subjects.map((s) => ({ id: s.id, label: `${s.label} — ${s.fullName}` })),
     [subjects]
+  );
+
+  const handleLevelCountChange = useCallback(
+    (level: keyof SubjectLevelCounts, rawValue: string) => {
+      const digitsOnly = rawValue.replace(/[^0-9]/g, '');
+      const nextValue = digitsOnly ? Number(digitsOnly) : 0;
+      setLevelCounts((prev) => ({ ...prev, [level]: nextValue }));
+    },
+    []
   );
 
   // Course code uniqueness validation (debounced)
@@ -306,6 +347,8 @@ export default function CreateContentScreen() {
     targetAudience,
     tone,
     requireScriptApprovalBeforeTts,
+    levelCounts,
+    requireSubjectPlanApproval,
     llmBackend,
     ttsBackend,
     llmModel,
@@ -328,6 +371,8 @@ export default function CreateContentScreen() {
     targetAudience,
     tone,
     requireScriptApprovalBeforeTts,
+    levelCounts,
+    requireSubjectPlanApproval,
     llmBackend,
     ttsBackend,
     llmModel,
@@ -444,6 +489,15 @@ export default function CreateContentScreen() {
         Alert.alert('Required', 'Please enter a course description / topic.');
         return;
       }
+    } else if (isFullSubject) {
+      if (!subjectId) {
+        Alert.alert('Required', 'Please select a therapy subject.');
+        return;
+      }
+      if (derivedCourseCount <= 0) {
+        Alert.alert('Required', 'Please enter at least one course across the 100/200/300/400 levels.');
+        return;
+      }
     } else if (!topic.trim()) {
       Alert.alert('Required', 'Please enter a topic.');
       return;
@@ -458,31 +512,44 @@ export default function CreateContentScreen() {
         ttsBackend,
         contentType,
         params: {
-          topic: topic.trim(),
-          duration_minutes: isCourse ? 0 : duration,
-          style: isCourse ? undefined : (style.trim() || undefined),
-          technique: isCourse ? undefined : (technique.trim() || undefined),
-          difficulty: isCourse ? undefined : difficulty as any,
+          topic: isFullSubject
+            ? (selectedSubject?.description || `${selectedSubject?.fullName || selectedSubject?.label || subjectId} subject curriculum`)
+            : topic.trim(),
+          duration_minutes: isCourse || isFullSubject ? 0 : duration,
+          style: isCourse || isFullSubject ? undefined : (style.trim() || undefined),
+          technique: isCourse || isFullSubject ? undefined : (technique.trim() || undefined),
+          difficulty: isCourse || isFullSubject ? undefined : difficulty as any,
           customInstructions: customInstructions.trim() || undefined,
-          // Course-specific params
-          ...(isCourse && {
-            courseCode,
-            courseTitle: courseTitle.trim(),
+          ...((isCourse || isFullSubject) && {
             subjectId,
             subjectLabel: selectedSubject?.label || subjectId,
             subjectColor: selectedSubject?.color || '#6B7280',
             subjectIcon: selectedSubject?.icon || 'school-outline',
+          }),
+          // Course-specific params
+          ...(isCourse && {
+            courseCode,
+            courseTitle: courseTitle.trim(),
             targetAudience: targetAudience as any,
             tone: tone as any,
+          }),
+          ...(isFullSubject && {
+            levelCounts,
+            courseCount: derivedCourseCount,
           }),
         },
         llmModel,
         ttsModel,
         ttsVoice,
-        title: isCourse ? courseTitle.trim() : (title.trim() || undefined),
-        imagePrompt: imagePrompt.trim() || undefined,
-        autoPublish,
+        title: isCourse
+          ? courseTitle.trim()
+          : isFullSubject
+            ? `${selectedSubject?.label || 'Subject'} Full Subject`
+            : (title.trim() || undefined),
+        imagePrompt: isFullSubject ? undefined : (imagePrompt.trim() || undefined),
+        autoPublish: isFullSubject ? true : autoPublish,
         requireScriptApprovalBeforeTts: isCourse ? requireScriptApprovalBeforeTts : false,
+        requireSubjectPlanApproval: isFullSubject ? requireSubjectPlanApproval : false,
       };
 
       await createJob(input);
@@ -522,6 +589,7 @@ export default function CreateContentScreen() {
         imagePrompt={imagePrompt}
         onImagePromptChange={setImagePrompt}
         isCourse={isCourse}
+        isFullSubject={isFullSubject}
         courseCode={courseCode}
         onCourseCodeChange={handleCourseCodeChange}
         courseCodeError={courseCodeError}
@@ -537,6 +605,11 @@ export default function CreateContentScreen() {
         onToneChange={setTone}
         requireScriptApprovalBeforeTts={requireScriptApprovalBeforeTts}
         onRequireScriptApprovalBeforeTtsChange={setRequireScriptApprovalBeforeTts}
+        levelCounts={levelCounts}
+        onLevelCountChange={handleLevelCountChange}
+        derivedCourseCount={derivedCourseCount}
+        requireSubjectPlanApproval={requireSubjectPlanApproval}
+        onRequireSubjectPlanApprovalChange={setRequireSubjectPlanApproval}
         llmBackend={llmBackend}
         onLLMBackendChange={handleLLMBackendChange}
         ttsBackend={ttsBackend}

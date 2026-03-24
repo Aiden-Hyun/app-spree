@@ -10,14 +10,15 @@ interface PipelineStepperProps {
 }
 
 const PIPELINE_STEPS = JOB_STATUS_ORDER.filter(
-  (s) => s !== 'pending' && s !== 'completed'
+  (s) => s !== 'pending' && s !== 'completed' && s !== 'paused'
 );
 
 export function PipelineStepper({ currentStatus }: PipelineStepperProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
 
-  const currentIndex = JOB_STATUS_ORDER.indexOf(currentStatus);
+  const displayStatus = currentStatus === 'paused' ? 'llm_generating' : currentStatus;
+  const currentIndex = JOB_STATUS_ORDER.indexOf(displayStatus);
   const isFailed = currentStatus === 'failed';
   const isCompleted = currentStatus === 'completed';
 
@@ -25,7 +26,7 @@ export function PipelineStepper({ currentStatus }: PipelineStepperProps) {
     <View style={styles.container}>
       {PIPELINE_STEPS.map((step, index) => {
         const stepIndex = JOB_STATUS_ORDER.indexOf(step);
-        const isActive = step === currentStatus;
+        const isActive = step === displayStatus;
         const isDone = !isFailed && currentIndex > stepIndex;
 
         let iconName: keyof typeof Ionicons.glyphMap = 'ellipse-outline';

@@ -33,7 +33,7 @@ export default function TherapiesScreen() {
   }>();
   const { theme, isDark } = useTheme();
   const [selectedTherapy, setSelectedTherapy] = useState(
-    initialTherapy || "all",
+    (initialTherapy || "all").toLowerCase(),
   );
   const [courses, setCourses] = useState<FirestoreCourse[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -58,18 +58,21 @@ export default function TherapiesScreen() {
     loadData();
   }, []);
 
-  // Filter courses by therapy type (using course id prefix or a therapy field)
+  // Filter courses by actual subject metadata so generated subject catalogs stay grouped correctly.
   const filteredCourses = useMemo(() => {
-    if (selectedTherapy === "all") return courses;
+    const normalizedSelectedTherapy = String(selectedTherapy || "").trim().toLowerCase();
+    if (normalizedSelectedTherapy === "all") return courses;
     return courses.filter(
       (course) =>
-        course.id.toLowerCase().includes(selectedTherapy) ||
-        course.title.toLowerCase().includes(selectedTherapy),
+        String(course.subjectId || "").trim().toLowerCase() === normalizedSelectedTherapy ||
+        String(course.subjectLabel || "").trim().toLowerCase() === normalizedSelectedTherapy,
     );
   }, [courses, selectedTherapy]);
 
   const selectedTherapyData = therapyCategories.find(
-    (t: { id: string }) => t.id === selectedTherapy,
+    (t: { id: string }) =>
+      String(t.id || "").trim().toLowerCase() ===
+      String(selectedTherapy || "").trim().toLowerCase(),
   );
 
   return (
@@ -102,21 +105,29 @@ export default function TherapiesScreen() {
               key={therapy.id}
               style={[
                 styles.filterPill,
-                selectedTherapy === therapy.id && {
+                String(selectedTherapy || "").trim().toLowerCase() ===
+                  String(therapy.id || "").trim().toLowerCase() && {
                   backgroundColor: therapy.color,
                 },
               ]}
-              onPress={() => setSelectedTherapy(therapy.id)}
+              onPress={() => setSelectedTherapy(String(therapy.id || "").trim().toLowerCase())}
             >
               <Ionicons
                 name={therapy.icon as keyof typeof Ionicons.glyphMap}
                 size={16}
-                color={selectedTherapy === therapy.id ? "white" : therapy.color}
+                color={
+                  String(selectedTherapy || "").trim().toLowerCase() ===
+                  String(therapy.id || "").trim().toLowerCase()
+                    ? "white"
+                    : therapy.color
+                }
               />
               <Text
                 style={[
                   styles.filterPillText,
-                  selectedTherapy === therapy.id && styles.filterPillTextActive,
+                  String(selectedTherapy || "").trim().toLowerCase() ===
+                    String(therapy.id || "").trim().toLowerCase() &&
+                    styles.filterPillTextActive,
                 ]}
               >
                 {therapy.label}

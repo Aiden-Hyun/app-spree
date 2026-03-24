@@ -323,6 +323,30 @@ class ClaimLoop:
                 )
                 return True
 
+            if result.requeue_after_seconds:
+                delay_seconds = max(1, int(result.requeue_after_seconds))
+                self.job_repo.patch_runtime(job_id, result.runtime_patch)
+                self.job_repo.patch_summary(job_id, result.summary_patch)
+                self.job_repo.patch_compat_content_job_for_run(
+                    content_job_id,
+                    run_id,
+                    result.compat_content_job_patch,
+                )
+                self.step_run_repo.mark_waiting(step_run_id, delay_seconds)
+                self.queue_repo.schedule_continuation(queue_id, delay_seconds)
+                self.event_repo.emit(
+                    "step_waiting",
+                    job_id,
+                    run_id,
+                    {
+                        "queue_id": queue_id,
+                        "step_run_id": step_run_id,
+                        "step_name": step_name,
+                        "delay_seconds": delay_seconds,
+                    },
+                )
+                return True
+
             self.step_run_repo.mark_succeeded(step_run_id, result.output)
             self.queue_repo.mark_done(queue_id)
             self.event_repo.emit(

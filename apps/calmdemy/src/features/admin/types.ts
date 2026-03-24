@@ -12,6 +12,7 @@ export type JobStatus =
   | 'post_processing'
   | 'uploading'
   | 'publishing'
+  | 'paused'
   | 'completed'
   | 'failed';
 
@@ -25,6 +26,7 @@ export const JOB_STATUS_ORDER: JobStatus[] = [
   'post_processing',
   'uploading',
   'publishing',
+  'paused',
   'completed',
 ];
 
@@ -38,6 +40,7 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   post_processing: 'Processing Audio',
   uploading: 'Uploading',
   publishing: 'Publishing',
+  paused: 'Paused',
   completed: 'Completed',
   failed: 'Failed',
 };
@@ -67,7 +70,8 @@ export type FactoryContentType =
   | 'bedtime_story'
   | 'emergency_meditation'
   | 'course_session'
-  | 'course';
+  | 'course'
+  | 'full_subject';
 
 export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   guided_meditation: 'Guided Meditation',
@@ -76,6 +80,7 @@ export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   emergency_meditation: 'Emergency Meditation',
   course_session: 'Course Session',
   course: 'Full Course (9 audio)',
+  full_subject: 'Full Subject',
 };
 
 // ==================== COURSE REGENERATION ====================
@@ -104,6 +109,51 @@ export interface ScriptApprovalRequest {
   requestedAt?: Timestamp;
 }
 
+export interface SubjectPlanApprovalRequest {
+  enabled: boolean;
+  awaitingApproval?: boolean;
+  approvedBy?: string;
+  approvedAt?: Timestamp;
+  requestedBy?: string;
+  requestedAt?: Timestamp;
+}
+
+export interface SubjectLevelCounts {
+  l100: number;
+  l200: number;
+  l300: number;
+  l400: number;
+}
+
+export type SubjectCourseLevel = 100 | 200 | 300 | 400;
+
+export interface SubjectPlanCourse {
+  sequence: number;
+  level: SubjectCourseLevel;
+  code: string;
+  title: string;
+  description: string;
+  learningGoals?: string[];
+  prerequisites?: string[];
+  childJobId?: string;
+  childStatus?: JobStatus;
+  childError?: string;
+}
+
+export interface SubjectPlan {
+  subjectId: string;
+  subjectLabel: string;
+  overview?: string;
+  courses: SubjectPlanCourse[];
+}
+
+export interface SubjectChildCounts {
+  pending: number;
+  running: number;
+  completed: number;
+  failed: number;
+}
+
 // ==================== JOB PARAMS ====================
 
 export interface ContentJobParams {
@@ -125,6 +175,10 @@ export interface ContentJobParams {
   subjectIcon?: string;
   targetAudience?: 'beginner' | 'intermediate';
   tone?: 'gentle' | 'energetic' | 'very calm';
+
+  // Full-subject params (only when contentType === 'full_subject')
+  levelCounts?: SubjectLevelCounts;
+  courseCount?: number;
 }
 
 // ==================== CONTENT JOB ====================
@@ -186,6 +240,7 @@ export interface ContentJob {
   v2DispatchedBy?: string;
   v2DispatchedAt?: Timestamp;
   scriptApproval?: ScriptApprovalRequest;
+  parentJobId?: string;
 
   // Course-specific outputs
   courseProgress?: string;         // e.g. "Script 3/9", "Audio 5/9"
@@ -205,6 +260,17 @@ export interface ContentJob {
   courseRegeneration?: CourseRegenerationRequest;
   courseSessionIds?: string[];     // published session doc IDs
   courseId?: string;               // published course doc ID
+
+  // Full-subject outputs
+  subjectProgress?: string;
+  subjectPlan?: SubjectPlan;
+  subjectPlanApproval?: SubjectPlanApprovalRequest;
+  childJobIds?: string[];
+  childCounts?: SubjectChildCounts;
+  pauseRequested?: boolean;
+  pausedAt?: Timestamp;
+  launchCursor?: number;
+  maxActiveChildCourses?: number;
 
   // Metadata
   error?: string;
@@ -277,6 +343,8 @@ export interface ContentDraft {
   targetAudience: string;
   tone: string;
   requireScriptApprovalBeforeTts: boolean;
+  levelCounts: SubjectLevelCounts;
+  requireSubjectPlanApproval: boolean;
 
   // Model configuration
   llmBackend: JobBackend;
@@ -392,4 +460,5 @@ export interface CreateJobInput {
   imagePrompt?: string;
   autoPublish: boolean;
   requireScriptApprovalBeforeTts?: boolean;
+  requireSubjectPlanApproval?: boolean;
 }

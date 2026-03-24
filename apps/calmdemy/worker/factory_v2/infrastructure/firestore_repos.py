@@ -402,6 +402,23 @@ class FirestoreStepRunRepo:
             merge=True,
         )
 
+    def mark_waiting(
+        self,
+        step_run_id: str,
+        delay_seconds: int,
+    ) -> None:
+        self.db.collection("factory_step_runs").document(step_run_id).set(
+            {
+                "state": "waiting",
+                "error_code": None,
+                "error_message": None,
+                "retry_delay_seconds": delay_seconds,
+                "watchdog_state": "waiting",
+                "updated_at": fs.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+
 
 class FirestoreEventRepo:
     def __init__(self, db):

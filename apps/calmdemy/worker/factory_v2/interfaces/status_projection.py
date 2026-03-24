@@ -19,6 +19,9 @@ _COMPAT_STAGE_BY_STEP = {
     "synthesize_course_audio": "tts_converting",
     "upload_course_audio": "uploading",
     "publish_course": "publishing",
+    "generate_subject_plan": "llm_generating",
+    "launch_subject_children": "llm_generating",
+    "watch_subject_children": "llm_generating",
 }
 
 

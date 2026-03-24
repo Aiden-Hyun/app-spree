@@ -99,6 +99,34 @@ class Orchestrator:
         script_approval = self._single_script_approval(job)
         return bool(script_approval.get("enabled") and script_approval.get("awaitingApproval"))
 
+    @staticmethod
+    def _subject_plan_approval(job: dict) -> dict:
+        runtime = dict(job.get("runtime") or {})
+        plan_approval = runtime.get("subject_plan_approval")
+        if isinstance(plan_approval, dict):
+            return dict(plan_approval)
+
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        plan_approval = payload.get("subjectPlanApproval")
+        if isinstance(plan_approval, dict):
+            return dict(plan_approval)
+        return {}
+
+    def _subject_plan_approval_awaiting(self, job: dict) -> bool:
+        plan_approval = self._subject_plan_approval(job)
+        return bool(plan_approval.get("enabled") and plan_approval.get("awaitingApproval"))
+
+    @staticmethod
+    def _subject_state(job: dict) -> str:
+        runtime = dict(job.get("runtime") or {})
+        state = str(runtime.get("subject_state") or "").strip().lower()
+        if state:
+            return state
+        summary = dict(job.get("summary") or {})
+        state = str(summary.get("subjectState") or "").strip().lower()
+        return state or "watching"
+
     def _seed_course_checkpoint_steps(
         self,
         job: dict,
@@ -492,6 +520,40 @@ class Orchestrator:
     ) -> None:
         job = self.job_repo.get(job_id)
         workflow = workflow_for_job_type(job["job_type"])
+
+        if job["job_type"] == "subject":
+            if step_name == "generate_subject_plan":
+                if self._subject_plan_approval_awaiting(job):
+                    self.job_repo.mark_completed(job_id, run_id)
+                    self.run_repo.mark_completed(run_id)
+                    return
+                self._ensure_step_enqueued(job, job_id, run_id, "launch_subject_children")
+                return
+
+            if step_name == "launch_subject_children":
+                subject_state = self._subject_state(job)
+                if subject_state == "failed":
+                    self.job_repo.mark_failed(job_id, run_id, step_name, "child_job_failed")
+                    self.run_repo.mark_failed(run_id, step_name, "child_job_failed")
+                    return
+                if subject_state in {"completed", "paused"}:
+                    self.job_repo.mark_completed(job_id, run_id)
+                    self.run_repo.mark_completed(run_id)
+                    return
+                self._ensure_step_enqueued(job, job_id, run_id, "watch_subject_children")
+                return
+
+            if step_name == "watch_subject_children":
+                subject_state = self._subject_state(job)
+                if subject_state == "failed":
+                    self.job_repo.mark_failed(job_id, run_id, step_name, "child_job_failed")
+                    self.run_repo.mark_failed(run_id, step_name, "child_job_failed")
+                    return
+                if subject_state in {"completed", "paused"}:
+                    self.job_repo.mark_completed(job_id, run_id)
+                    self.run_repo.mark_completed(run_id)
+                    return
+                return
 
         if job["job_type"] == "course":
             if step_name == "generate_course_scripts":

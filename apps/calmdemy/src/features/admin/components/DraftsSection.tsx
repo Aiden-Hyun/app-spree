@@ -66,9 +66,18 @@ export function DraftsSection({ drafts, onDelete, onSelect }: DraftsSectionProps
 }
 
 function getDraftLabel(draft: ContentDraft): string {
+  const totalSubjectCourses =
+    (draft.levelCounts?.l100 || 0) +
+    (draft.levelCounts?.l200 || 0) +
+    (draft.levelCounts?.l300 || 0) +
+    (draft.levelCounts?.l400 || 0);
   const base =
     draft.contentType === 'course'
       ? (draft.courseTitle || draft.topic)
+      : draft.contentType === 'full_subject'
+        ? draft.subjectId
+          ? `${draft.subjectId.toUpperCase()} (${totalSubjectCourses} courses)`
+          : ''
       : (draft.title || draft.topic);
   const typeLabel = CONTENT_TYPE_LABELS[draft.contentType] || 'Content';
   if (base) {

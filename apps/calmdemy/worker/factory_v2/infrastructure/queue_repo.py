@@ -337,6 +337,32 @@ class FirestoreQueueRepo:
             }
         )
 
+    def schedule_continuation(
+        self,
+        queue_id: str,
+        delay_seconds: int,
+    ) -> None:
+        available_at = datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() + max(1, delay_seconds),
+            tz=timezone.utc,
+        )
+        self.db.collection("factory_step_queue").document(queue_id).update(
+            {
+                "state": "ready",
+                "error_code": None,
+                "error_message": None,
+                "available_at": available_at,
+                "lease_owner": None,
+                "lease_expires_at": None,
+                "last_step_heartbeat_at": None,
+                "step_started_at": None,
+                "step_deadline_at": None,
+                "heartbeat_interval_sec": None,
+                "progress_detail": None,
+                "updated_at": fs.SERVER_TIMESTAMP,
+            }
+        )
+
     def cancel_ready_for_run(
         self,
         run_id: str,

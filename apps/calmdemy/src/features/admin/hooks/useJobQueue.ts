@@ -10,8 +10,13 @@ import {
   cancelJob,
   requestDeleteJob,
   regenerateCourseSessions,
+  approveSubjectPlan,
   approvePendingScripts,
+  pauseFullSubjectJob,
+  regenerateSubjectPlan,
   regeneratePendingScripts,
+  resumeFullSubjectJob,
+  subscribeToChildJobs,
   subscribeToJobStepTimeline,
   setWorkerDesiredState,
   setWorkerIdleTimeout,
@@ -118,6 +123,28 @@ export function useJobDetail(jobId: string) {
     await regeneratePendingScripts(job);
   }, [job, jobId]);
 
+  const approveSubjectPlanAction = useCallback(async (input?: {
+    courseEdits?: Record<string, { title?: string; description?: string }>;
+  }) => {
+    if (!jobId || !job) return;
+    await approveSubjectPlan(job, input);
+  }, [job, jobId]);
+
+  const regenerateSubjectPlanAction = useCallback(async () => {
+    if (!jobId || !job) return;
+    await regenerateSubjectPlan(job);
+  }, [job, jobId]);
+
+  const pauseSubjectAction = useCallback(async () => {
+    if (!jobId || !job) return;
+    await pauseFullSubjectJob(job);
+  }, [job, jobId]);
+
+  const resumeSubjectAction = useCallback(async () => {
+    if (!jobId || !job) return;
+    await resumeFullSubjectJob(job);
+  }, [job, jobId]);
+
   return {
     job,
     isLoading,
@@ -125,9 +152,35 @@ export function useJobDetail(jobId: string) {
     cancel,
     requestDelete,
     regenerateCourse,
+    approveSubjectPlan: approveSubjectPlanAction,
     approvePendingScripts: approvePendingScriptsAction,
+    pauseSubject: pauseSubjectAction,
+    regenerateSubjectPlan: regenerateSubjectPlanAction,
     regeneratePendingScripts: regeneratePendingScriptsAction,
+    resumeSubject: resumeSubjectAction,
   };
+}
+
+export function useChildJobs(parentJobId?: string) {
+  const [jobs, setJobs] = useState<ContentJob[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!parentJobId) {
+      setJobs([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const unsubscribe = subscribeToChildJobs(parentJobId, (updatedJobs) => {
+      setJobs(updatedJobs);
+      setIsLoading(false);
+    });
+    return unsubscribe;
+  }, [parentJobId]);
+
+  return { jobs, isLoading };
 }
 
 // ==================== STEP TIMELINE HOOK ====================

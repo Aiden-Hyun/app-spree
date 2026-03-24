@@ -13,6 +13,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { PipelineStepper } from './PipelineStepper';
@@ -36,39 +37,51 @@ import { Theme } from '@/theme';
 
 type Props = {
   job: ContentJob;
+  childJobs?: ContentJob[];
+  isChildJobsLoading?: boolean;
   timeline?: JobStepTimelineEntry[];
   isTimelineLoading?: boolean;
   isAwaitingApproval: boolean;
+  isAwaitingSubjectPlanApproval: boolean;
   isReviewable: boolean;
   isDeletable: boolean;
+  onApproveSubjectPlan: (input?: {
+    courseEdits?: Record<string, { title?: string; description?: string }>;
+  }) => Promise<void>;
   onRetry: () => void;
   onCancel: () => void;
   onPublish: () => void;
+  onPauseSubject: () => Promise<void>;
   publishButtonLabel?: string;
   onRegenerateCourse: (input: {
     mode: CourseRegenerationMode;
     targetSessionCodes: string[];
     formattedScriptEdits?: Record<string, string>;
   }) => Promise<void>;
+  onRegenerateSubjectPlan: () => Promise<void>;
   onApprovePendingScripts: (input?: {
     rawScriptEdits?: Record<string, string>;
     script?: string;
   }) => Promise<void>;
   onRegeneratePendingScripts: () => Promise<void>;
+  onResumeSubject: () => Promise<void>;
   onDelete: () => void;
   onReview: () => void;
 };
 
 const SECTION_IDS = [
   'pipeline',
+  'workers',
   'stepTimeline',
   'courseProgress',
   'jobDetails',
+  'subjectProgress',
+  'subjectPlan',
+  'subjectChildren',
   'watchdog',
   'coursePlan',
   'publishedCourse',
   'customInstructions',
-  'generatedScript',
   'error',
   'imagePrompt',
   'thumbnail',
@@ -79,21 +92,29 @@ const SECTION_IDS = [
 
 export function JobDetailView({
   job,
+  childJobs = [],
+  isChildJobsLoading = false,
   timeline = [],
   isTimelineLoading = false,
   isAwaitingApproval,
+  isAwaitingSubjectPlanApproval,
   isReviewable,
   isDeletable,
+  onApproveSubjectPlan,
   onRetry,
   onCancel,
   onPublish,
+  onPauseSubject,
   publishButtonLabel = 'Publish Now',
   onRegenerateCourse,
+  onRegenerateSubjectPlan,
   onApprovePendingScripts,
   onRegeneratePendingScripts,
+  onResumeSubject,
   onDelete,
   onReview,
 }: Props) {
+  const router = useRouter();
   const { theme } = useTheme();
   const { width: viewportWidth } = useWindowDimensions();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -102,7 +123,6 @@ export function JobDetailView({
   );
   const [errorManuallyCollapsed, setErrorManuallyCollapsed] = useState(false);
   const [selectedCourseScript, setSelectedCourseScript] = useState<string>('');
-  const [pipelineTab, setPipelineTab] = useState<'pipeline' | 'workers'>('pipeline');
   const [regenerationMode, setRegenerationMode] = useState<CourseRegenerationMode>('audio_only');
   const [selectedRegenerationSessions, setSelectedRegenerationSessions] = useState<string[]>([]);
   const [regenerationScriptEdits, setRegenerationScriptEdits] = useState<Record<string, string>>({});
@@ -111,6 +131,14 @@ export function JobDetailView({
   const [approvalScriptEdits, setApprovalScriptEdits] = useState<Record<string, string>>({});
   const [singleApprovalScriptEdit, setSingleApprovalScriptEdit] = useState('');
   const [showScriptApprovalModal, setShowScriptApprovalModal] = useState(false);
+  const [approvingSubjectPlan, setApprovingSubjectPlan] = useState(false);
+  const [pausingSubject, setPausingSubject] = useState(false);
+  const [regeneratingSubjectPlan, setRegeneratingSubjectPlan] = useState(false);
+  const [resumingSubject, setResumingSubject] = useState(false);
+  const [showSubjectPlanApprovalModal, setShowSubjectPlanApprovalModal] = useState(false);
+  const [subjectPlanEdits, setSubjectPlanEdits] = useState<
+    Record<string, { title: string; description: string }>
+  >({});
   const previousJobIdRef = useRef(job.id);
 
   const courseScripts = useMemo(
@@ -151,6 +179,10 @@ export function JobDetailView({
     isAwaitingRegeneratedScriptApproval ||
     isAwaitingInitialScriptApproval ||
     isAwaitingSingleScriptApproval;
+  const childJobMap = useMemo(() => {
+    const entries = childJobs.map((childJob) => [childJob.id, childJob] as const);
+    return Object.fromEntries(entries);
+  }, [childJobs]);
   const approvalSessionCodes = isAwaitingRegeneratedScriptApproval &&
     Array.isArray(job.courseRegeneration?.targetSessionCodes)
       ? job.courseRegeneration.targetSessionCodes
@@ -242,16 +274,20 @@ export function JobDetailView({
   ]);
 
   useEffect(() => {
-    setPipelineTab('pipeline');
-  }, [job.id]);
-
-  useEffect(() => {
     if (isAwaitingAnyScriptApproval) {
       setShowScriptApprovalModal(true);
       return;
     }
     setShowScriptApprovalModal(false);
   }, [isAwaitingAnyScriptApproval, job.id]);
+
+  useEffect(() => {
+    if (isAwaitingSubjectPlanApproval) {
+      setShowSubjectPlanApprovalModal(true);
+      return;
+    }
+    setShowSubjectPlanApprovalModal(false);
+  }, [isAwaitingSubjectPlanApproval, job.id]);
 
   useEffect(() => {
     if (!isAwaitingAnyScriptApproval || job.contentType !== 'course') {
@@ -284,6 +320,24 @@ export function JobDetailView({
 
     setSingleApprovalScriptEdit(String(job.generatedScript || ''));
   }, [isAwaitingSingleScriptApproval, job.generatedScript, job.id]);
+
+  useEffect(() => {
+    if (!isAwaitingSubjectPlanApproval || job.contentType !== 'full_subject' || !job.subjectPlan) {
+      setSubjectPlanEdits({});
+      return;
+    }
+
+    const nextEdits = Object.fromEntries(
+      (job.subjectPlan.courses || []).map((course) => [
+        course.code,
+        {
+          title: String(course.title || ''),
+          description: String(course.description || ''),
+        },
+      ])
+    );
+    setSubjectPlanEdits(nextEdits);
+  }, [isAwaitingSubjectPlanApproval, job.contentType, job.subjectPlan, job.id]);
 
   const handleApprovePendingScripts = async () => {
     if (approvingScripts) {
@@ -436,12 +490,126 @@ export function JobDetailView({
     );
   };
 
+  const handleApproveSubjectPlan = async () => {
+    if (
+      approvingSubjectPlan ||
+      job.contentType !== 'full_subject' ||
+      !job.subjectPlan
+    ) {
+      return;
+    }
+
+    const courseEdits: Record<string, { title: string; description: string }> = {};
+    for (const course of job.subjectPlan.courses || []) {
+      const edit = subjectPlanEdits[course.code];
+      const nextTitle = String(edit?.title ?? course.title ?? '').trim();
+      const nextDescription = String(edit?.description ?? course.description ?? '').trim();
+      if (!nextTitle) {
+        Alert.alert('Title Required', `${course.code} needs a title before approval.`);
+        return;
+      }
+      if (!nextDescription) {
+        Alert.alert('Description Required', `${course.code} needs a description before approval.`);
+        return;
+      }
+      courseEdits[course.code] = {
+        title: nextTitle,
+        description: nextDescription,
+      };
+    }
+
+    try {
+      setApprovingSubjectPlan(true);
+      await onApproveSubjectPlan({ courseEdits });
+      setShowSubjectPlanApprovalModal(false);
+      Alert.alert(
+        'Lineup Approved',
+        'The lineup is approved. Child course jobs will begin launching shortly.'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Approval Failed',
+        error instanceof Error ? error.message : 'Unable to approve the subject lineup.'
+      );
+    } finally {
+      setApprovingSubjectPlan(false);
+    }
+  };
+
+  const handleRegenerateSubjectPlan = async () => {
+    if (regeneratingSubjectPlan) {
+      return;
+    }
+
+    try {
+      setRegeneratingSubjectPlan(true);
+      await onRegenerateSubjectPlan();
+      setShowSubjectPlanApprovalModal(false);
+      Alert.alert(
+        'Regeneration Started',
+        'Queued a fresh subject curriculum generation.'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Regeneration Failed',
+        error instanceof Error ? error.message : 'Unable to regenerate the subject lineup.'
+      );
+    } finally {
+      setRegeneratingSubjectPlan(false);
+    }
+  };
+
+  const handlePauseSubject = async () => {
+    if (pausingSubject) {
+      return;
+    }
+    try {
+      setPausingSubject(true);
+      await onPauseSubject();
+      Alert.alert(
+        'Pause Requested',
+        'This full subject will stop launching new child course jobs as soon as it reaches a safe checkpoint.'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Pause Failed',
+        error instanceof Error ? error.message : 'Unable to pause this full subject job.'
+      );
+    } finally {
+      setPausingSubject(false);
+    }
+  };
+
+  const handleResumeSubject = async () => {
+    if (resumingSubject) {
+      return;
+    }
+    try {
+      setResumingSubject(true);
+      await onResumeSubject();
+      Alert.alert(
+        'Resuming',
+        'This full subject will resume launching child course jobs shortly.'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Resume Failed',
+        error instanceof Error ? error.message : 'Unable to resume this full subject job.'
+      );
+    } finally {
+      setResumingSubject(false);
+    }
+  };
+
   const createdDate = job.createdAt?.toDate
     ? job.createdAt.toDate().toLocaleString()
     : 'Unknown';
 
   const sections = buildSections({
     job,
+    childJobs,
+    childJobMap,
+    isChildJobsLoading,
     timeline,
     isTimelineLoading,
     theme,
@@ -452,8 +620,6 @@ export function JobDetailView({
     courseScripts,
     setSelectedCourseScript,
     courseProgressModel,
-    pipelineTab,
-    setPipelineTab,
     regenerationMode,
     setRegenerationMode,
     selectedRegenerationSessions,
@@ -463,6 +629,9 @@ export function JobDetailView({
     regenerating,
     setRegenerating,
     onRegenerateCourse,
+    onOpenChildJob: (childJobId) => {
+      router.push({ pathname: '/admin/job/[id]', params: { id: childJobId } });
+    },
     onOpenScriptApprovalModal: () => setShowScriptApprovalModal(true),
     onRegeneratePendingScripts: handleRegeneratePendingScripts,
   });
@@ -620,12 +789,43 @@ export function JobDetailView({
           />
         )}
 
+        {isAwaitingSubjectPlanApproval && (
+          <PrimaryButton
+            label="Review & Approve Lineup"
+            icon="list-outline"
+            color={theme.colors.success}
+            onPress={() => setShowSubjectPlanApprovalModal(true)}
+          />
+        )}
+
         {isReviewable && (
           <PrimaryButton
             label="Review Audio"
             icon="play-circle-outline"
             color={theme.colors.primary}
             onPress={onReview}
+          />
+        )}
+
+        {job.contentType === 'full_subject' && job.status !== 'paused' && job.status !== 'completed' && job.status !== 'failed' && (
+          <PrimaryButton
+            label={pausingSubject ? 'Requesting Pause...' : 'Pause Full Subject'}
+            icon="pause-outline"
+            color={theme.colors.warning}
+            onPress={() => {
+              void handlePauseSubject();
+            }}
+          />
+        )}
+
+        {job.contentType === 'full_subject' && job.status === 'paused' && (
+          <PrimaryButton
+            label={resumingSubject ? 'Resuming...' : 'Resume Full Subject'}
+            icon="play-outline"
+            color={theme.colors.primary}
+            onPress={() => {
+              void handleResumeSubject();
+            }}
           />
         )}
 
@@ -782,12 +982,150 @@ export function JobDetailView({
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={isAwaitingSubjectPlanApproval && showSubjectPlanApprovalModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSubjectPlanApprovalModal(false)}
+      >
+        <View style={styles.approvalModalOverlay}>
+          <View style={styles.approvalModalCard}>
+            <View style={styles.approvalModalHeader}>
+              <View style={styles.approvalModalTitleBlock}>
+                <Text style={styles.approvalModalTitle}>Approve Subject Lineup</Text>
+                <Text style={styles.approvalModalSubtitle}>
+                  Review and edit the generated course titles and descriptions before child course jobs launch.
+                </Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.approvalModalCloseButton,
+                  pressed && { opacity: 0.75 },
+                ]}
+                onPress={() => setShowSubjectPlanApprovalModal(false)}
+              >
+                <Ionicons name="close" size={18} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.approvalModalScroll}
+              contentContainerStyle={styles.approvalModalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.approvalModalBody}>
+                Levels and counts are locked for this run. You can edit each generated title and description before approval.
+              </Text>
+              <View style={styles.scriptEditorList}>
+                {(job.subjectPlan?.courses || []).map((course) => {
+                  const edit = subjectPlanEdits[course.code] || {
+                    title: course.title,
+                    description: course.description,
+                  };
+                  return (
+                    <View key={course.code} style={styles.scriptEditorCard}>
+                      <Text style={styles.scriptEditorTitle}>
+                        {course.code} · {course.level} level
+                      </Text>
+                      <Text style={styles.scriptEditorMeta}>
+                        Sequence {course.sequence}
+                      </Text>
+                      <TextInput
+                        editable={!approvingSubjectPlan && !regeneratingSubjectPlan}
+                        style={styles.subjectPlanTitleInput}
+                        value={edit.title}
+                        onChangeText={(value) =>
+                          setSubjectPlanEdits((prev) => ({
+                            ...prev,
+                            [course.code]: {
+                              title: value,
+                              description: prev[course.code]?.description ?? course.description,
+                            },
+                          }))
+                        }
+                        placeholder="Course title"
+                        placeholderTextColor={theme.colors.textMuted}
+                      />
+                      <TextInput
+                        multiline
+                        editable={!approvingSubjectPlan && !regeneratingSubjectPlan}
+                        style={[styles.scriptEditorInput, styles.approvalScriptEditorInput]}
+                        value={edit.description}
+                        onChangeText={(value) =>
+                          setSubjectPlanEdits((prev) => ({
+                            ...prev,
+                            [course.code]: {
+                              title: prev[course.code]?.title ?? course.title,
+                              description: value,
+                            },
+                          }))
+                        }
+                        placeholder="Course description"
+                        placeholderTextColor={theme.colors.textMuted}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.approvalModalActions}>
+              <View style={styles.approvalModalSecondaryRow}>
+                <Pressable
+                  onPress={() => setShowSubjectPlanApprovalModal(false)}
+                  style={({ pressed }) => [
+                    styles.approvalModalSecondaryButton,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text style={styles.approvalModalSecondaryButtonText}>Close</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    void handleRegenerateSubjectPlan();
+                  }}
+                  disabled={regeneratingSubjectPlan || approvingSubjectPlan}
+                  style={({ pressed }) => [
+                    styles.approvalModalRegenerateButton,
+                    (regeneratingSubjectPlan || approvingSubjectPlan) && { opacity: 0.6 },
+                    pressed && !regeneratingSubjectPlan && !approvingSubjectPlan && { opacity: 0.85 },
+                  ]}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={theme.colors.warning} />
+                  <Text style={styles.approvalModalRegenerateButtonText}>
+                    {regeneratingSubjectPlan ? 'Starting...' : 'Regenerate Lineup'}
+                  </Text>
+                </Pressable>
+              </View>
+              <Pressable
+                onPress={() => {
+                  void handleApproveSubjectPlan();
+                }}
+                disabled={approvingSubjectPlan || regeneratingSubjectPlan}
+                style={({ pressed }) => [
+                  styles.approvalModalPrimaryButton,
+                  (pressed || approvingSubjectPlan || regeneratingSubjectPlan) && { opacity: 0.85 },
+                ]}
+              >
+                <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+                <Text style={styles.approvalModalPrimaryButtonText}>
+                  {approvingSubjectPlan ? 'Approving...' : 'Approve Lineup & Launch Courses'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
 
 function buildSections(params: {
   job: ContentJob;
+  childJobs: ContentJob[];
+  childJobMap: Record<string, ContentJob>;
+  isChildJobsLoading: boolean;
   timeline: JobStepTimelineEntry[];
   isTimelineLoading: boolean;
   theme: Theme;
@@ -798,8 +1136,6 @@ function buildSections(params: {
   courseScripts: Record<string, string>;
   setSelectedCourseScript: (code: string) => void;
   courseProgressModel: CourseProgressModel | null;
-  pipelineTab: 'pipeline' | 'workers';
-  setPipelineTab: (tab: 'pipeline' | 'workers') => void;
   regenerationMode: CourseRegenerationMode;
   setRegenerationMode: (mode: CourseRegenerationMode) => void;
   selectedRegenerationSessions: string[];
@@ -813,11 +1149,15 @@ function buildSections(params: {
     targetSessionCodes: string[];
     formattedScriptEdits?: Record<string, string>;
   }) => Promise<void>;
+  onOpenChildJob: (childJobId: string) => void;
   onOpenScriptApprovalModal: () => void;
   onRegeneratePendingScripts: () => void;
 }) {
   const {
     job,
+    childJobs,
+    childJobMap,
+    isChildJobsLoading,
     timeline,
     isTimelineLoading,
     theme,
@@ -828,8 +1168,6 @@ function buildSections(params: {
     courseScripts,
     setSelectedCourseScript,
     courseProgressModel,
-    pipelineTab,
-    setPipelineTab,
     regenerationMode,
     setRegenerationMode,
     selectedRegenerationSessions,
@@ -839,6 +1177,7 @@ function buildSections(params: {
     regenerating,
     setRegenerating,
     onRegenerateCourse,
+    onOpenChildJob,
     onOpenScriptApprovalModal,
     onRegeneratePendingScripts,
   } = params;
@@ -871,6 +1210,7 @@ function buildSections(params: {
       requestedRegeneration.awaitingScriptApproval
   );
   const selectedSessionSet = new Set(selectedRegenerationSessions);
+  const subjectPlanCourses = job.subjectPlan?.courses || [];
 
   const toggleSessionSelection = (sessionCode: string) => {
     setSelectedRegenerationSessions((prev) => (
@@ -942,47 +1282,7 @@ function buildSections(params: {
       content: (
         <View style={styles.pipelinePanel}>
           {showCourseConcurrency && courseProgressModel ? (
-            <>
-              <View style={styles.pipelineTabsRow}>
-                <Pressable
-                  onPress={() => setPipelineTab('pipeline')}
-                  style={[
-                    styles.pipelineTab,
-                    pipelineTab === 'pipeline' && styles.pipelineTabActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.pipelineTabText,
-                      pipelineTab === 'pipeline' && styles.pipelineTabTextActive,
-                    ]}
-                  >
-                    Pipeline
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setPipelineTab('workers')}
-                  style={[
-                    styles.pipelineTab,
-                    pipelineTab === 'workers' && styles.pipelineTabActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.pipelineTabText,
-                      pipelineTab === 'workers' && styles.pipelineTabTextActive,
-                    ]}
-                  >
-                    Workers
-                  </Text>
-                </Pressable>
-              </View>
-              {pipelineTab === 'pipeline' ? (
-                <CoursePipelineMap model={courseProgressModel} />
-              ) : (
-                <WorkerSwimlanes model={courseProgressModel} />
-              )}
-            </>
+            <CoursePipelineMap model={courseProgressModel} />
           ) : (
             <>
               {showCourseFallbackNotice && (
@@ -995,6 +1295,35 @@ function buildSections(params: {
           )}
         </View>
       ),
+    },
+    {
+      id: 'workers',
+      title: 'Workers',
+      summaryItems: toSummaryItems([
+        {
+          label: 'Run',
+          value: showCourseConcurrency
+            ? truncate(courseProgressModel?.selectedRunId || '', 12)
+            : undefined,
+        },
+        {
+          label: 'Workers',
+          value: showCourseConcurrency
+            ? courseProgressModel?.workerLanes.length || 0
+            : undefined,
+        },
+      ]),
+      shouldRender:
+        job.contentType === 'course' &&
+        (isTimelineLoading || showCourseConcurrency),
+      content: isTimelineLoading ? (
+        <View style={styles.timelineLoadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text style={styles.emptySubtext}>Loading worker activity...</Text>
+        </View>
+      ) : showCourseConcurrency && courseProgressModel ? (
+        <WorkerSwimlanes model={courseProgressModel} />
+      ) : null,
     },
     {
       id: 'stepTimeline',
@@ -1094,6 +1423,41 @@ function buildSections(params: {
       ),
     },
     {
+      id: 'subjectProgress',
+      title: 'Subject Progress',
+      summaryItems: toSummaryItems([
+        { label: 'Progress', value: job.subjectProgress },
+        {
+          label: 'Children',
+          value: job.childJobIds?.length ? `${job.childJobIds.length}` : undefined,
+        },
+      ]),
+      shouldRender: job.contentType === 'full_subject' && Boolean(job.subjectProgress),
+      content: (
+        <View style={styles.subjectProgressCard}>
+          <Text style={styles.subjectProgressText}>{job.subjectProgress}</Text>
+          <View style={styles.subjectCountRow}>
+            <View style={styles.subjectCountChip}>
+              <Text style={styles.subjectCountValue}>{job.childCounts?.pending || 0}</Text>
+              <Text style={styles.subjectCountLabel}>Pending</Text>
+            </View>
+            <View style={styles.subjectCountChip}>
+              <Text style={styles.subjectCountValue}>{job.childCounts?.running || 0}</Text>
+              <Text style={styles.subjectCountLabel}>Running</Text>
+            </View>
+            <View style={styles.subjectCountChip}>
+              <Text style={styles.subjectCountValue}>{job.childCounts?.completed || 0}</Text>
+              <Text style={styles.subjectCountLabel}>Done</Text>
+            </View>
+            <View style={styles.subjectCountChip}>
+              <Text style={styles.subjectCountValue}>{job.childCounts?.failed || 0}</Text>
+              <Text style={styles.subjectCountLabel}>Failed</Text>
+            </View>
+          </View>
+        </View>
+      ),
+    },
+    {
       id: 'jobDetails',
       title: 'Job Details',
       summaryItems: toSummaryItems([
@@ -1125,6 +1489,15 @@ function buildSections(params: {
               <InfoRow label="Tone" value={job.params.tone || ''} />
               <InfoRow label="Description" value={job.params.topic} />
             </>
+          ) : job.contentType === 'full_subject' ? (
+            <>
+              <InfoRow label="Subject" value={job.params.subjectLabel || job.params.subjectId || ''} />
+              <InfoRow label="100 Level" value={`${job.params.levelCounts?.l100 ?? 0}`} />
+              <InfoRow label="200 Level" value={`${job.params.levelCounts?.l200 ?? 0}`} />
+              <InfoRow label="300 Level" value={`${job.params.levelCounts?.l300 ?? 0}`} />
+              <InfoRow label="400 Level" value={`${job.params.levelCounts?.l400 ?? 0}`} />
+              <InfoRow label="Total Courses" value={`${job.params.courseCount || 0}`} />
+            </>
           ) : (
             <>
               <InfoRow label="Topic" value={job.params.topic} />
@@ -1141,18 +1514,35 @@ function buildSections(params: {
           <InfoRow
             label="Review Before TTS"
             value={
-              (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)?.enabled
-                ? (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)
-                    ?.awaitingApproval
-                  ? 'Waiting for approval'
-                  : (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)
-                      ?.scriptApprovedAt
-                    ? 'Enabled (approved)'
-                    : 'Enabled'
+              job.contentType === 'full_subject'
+                ? job.subjectPlanApproval?.enabled
+                  ? job.subjectPlanApproval?.awaitingApproval
+                    ? 'Waiting for lineup approval'
+                    : job.subjectPlanApproval?.approvedAt
+                      ? 'Enabled (approved)'
+                      : 'Enabled'
+                  : 'No'
+                : (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)?.enabled
+                  ? (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)
+                      ?.awaitingApproval
+                    ? 'Waiting for approval'
+                    : (job.contentType === 'course' ? job.courseScriptApproval : job.scriptApproval)
+                        ?.scriptApprovedAt
+                      ? 'Enabled (approved)'
+                      : 'Enabled'
                 : 'No'
             }
           />
-          <InfoRow label="Auto-publish" value={job.autoPublish ? 'Yes' : 'No (needs approval)'} />
+          {job.contentType !== 'full_subject' && (
+            <InfoRow label="Auto-publish" value={job.autoPublish ? 'Yes' : 'No (needs approval)'} />
+          )}
+          {job.contentType === 'full_subject' && (
+            <>
+              <InfoRow label="Max Active Children" value={`${job.maxActiveChildCourses || 0}`} />
+              <InfoRow label="Launch Cursor" value={`${job.launchCursor || 0}`} />
+              <InfoRow label="Pause Requested" value={job.pauseRequested ? 'Yes' : 'No'} />
+            </>
+          )}
           <InfoRow label="LLM Model" value={job.llmModel} />
           <InfoRow label="TTS Model" value={job.ttsModel} />
           <InfoRow label="Narrator" value={getVoiceLabelById(job.ttsVoice)} />
@@ -1177,6 +1567,135 @@ function buildSections(params: {
           {job.v2DispatchError && <InfoRow label="V2 Dispatch Error" value={job.v2DispatchError} />}
           <InfoRow label="Created" value={createdDate} />
         </>
+      ),
+    },
+    {
+      id: 'subjectPlan',
+      title: 'Subject Lineup',
+      summaryItems: toSummaryItems([
+        { label: 'Courses', value: subjectPlanCourses.length || undefined },
+        {
+          label: 'Awaiting Approval',
+          value: job.subjectPlanApproval?.awaitingApproval ? 'Yes' : undefined,
+        },
+      ]),
+      shouldRender: job.contentType === 'full_subject' && subjectPlanCourses.length > 0,
+      content: (
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            {job.subjectPlan?.overview ? (
+              <Text style={[styles.scriptText, { marginBottom: 12 }]}>{job.subjectPlan.overview}</Text>
+            ) : null}
+            <View style={styles.subjectLineupHeader}>
+              <Text style={styles.subjectLineupHeaderText}>Code</Text>
+              <Text style={styles.subjectLineupHeaderText}>Level</Text>
+              <Text style={styles.subjectLineupHeaderTextWide}>Course</Text>
+              <Text style={styles.subjectLineupHeaderText}>Status</Text>
+            </View>
+            {subjectPlanCourses.map((course) => {
+              const childJob = course.childJobId ? childJobMap[course.childJobId] : undefined;
+              const statusContent = (
+                <>
+                  <Text style={styles.subjectLineupStatus}>
+                    {childJob?.status
+                      ? JOB_STATUS_LABELS[childJob.status]
+                      : course.childStatus
+                        ? JOB_STATUS_LABELS[course.childStatus]
+                        : job.subjectPlanApproval?.awaitingApproval
+                          ? 'Awaiting approval'
+                          : 'Not launched'}
+                  </Text>
+                  {childJob?.id ? (
+                    <Text style={styles.subjectLineupChildId}>{truncate(childJob.id, 10)}</Text>
+                  ) : null}
+                </>
+              );
+              return (
+                <View key={course.code} style={styles.subjectLineupRow}>
+                  <Text style={styles.subjectLineupCode}>{course.code}</Text>
+                  <Text style={styles.subjectLineupMeta}>{course.level}</Text>
+                  <View style={styles.subjectLineupMain}>
+                    <Text style={styles.subjectLineupTitle}>{course.title}</Text>
+                    <Text style={styles.subjectLineupDescription}>{course.description}</Text>
+                    {Array.isArray(course.learningGoals) && course.learningGoals.length > 0 ? (
+                      <Text style={styles.subjectLineupGoals}>
+                        Goals: {course.learningGoals.join(' • ')}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {childJob?.id ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.subjectLineupStatusBlock,
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      onPress={() => onOpenChildJob(childJob.id)}
+                    >
+                      {statusContent}
+                    </Pressable>
+                  ) : (
+                    <View style={styles.subjectLineupStatusBlock}>{statusContent}</View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ),
+    },
+    {
+      id: 'subjectChildren',
+      title: 'Child Course Jobs',
+      summaryItems: toSummaryItems([
+        { label: 'Children', value: childJobs.length || undefined },
+        { label: 'Loading', value: isChildJobsLoading ? 'Yes' : undefined },
+      ]),
+      shouldRender: job.contentType === 'full_subject' && (isChildJobsLoading || childJobs.length > 0),
+      content: isChildJobsLoading ? (
+        <View style={styles.timelineLoadingRow}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text style={styles.emptySubtext}>Loading child jobs...</Text>
+        </View>
+      ) : (
+        <View style={styles.scrollBox}>
+          <ScrollView nestedScrollEnabled>
+            {childJobs.map((childJob) => (
+              <Pressable
+                key={childJob.id}
+                style={({ pressed }) => [
+                  styles.subjectChildRow,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => onOpenChildJob(childJob.id)}
+              >
+                <View style={styles.subjectChildMain}>
+                  <Text style={styles.subjectChildTitle}>
+                    {String(childJob.params.courseCode || '').trim() || childJob.id}
+                    {childJob.params.courseTitle ? ` — ${childJob.params.courseTitle}` : ''}
+                  </Text>
+                  <Text style={styles.subjectChildMeta}>{childJob.id}</Text>
+                </View>
+                <Text
+                  style={[
+                    styles.subjectChildStatus,
+                    {
+                      color:
+                        childJob.status === 'completed'
+                          ? theme.colors.success
+                          : childJob.status === 'failed'
+                            ? theme.colors.error
+                            : childJob.status === 'paused'
+                              ? theme.colors.warning
+                              : theme.colors.primary,
+                    },
+                  ]}
+                >
+                  {JOB_STATUS_LABELS[childJob.status]}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
       ),
     },
     {
@@ -1317,24 +1836,6 @@ function buildSections(params: {
         <View style={styles.scrollBox}>
           <ScrollView nestedScrollEnabled>
             <Text style={styles.scriptText}>{job.params.customInstructions}</Text>
-          </ScrollView>
-        </View>
-      ),
-    },
-    {
-      id: 'generatedScript',
-      title: 'Generated Script',
-      summaryItems: toSummaryItems([
-        {
-          label: 'Length',
-          value: job.generatedScript ? `${job.generatedScript.length}` : undefined,
-        },
-      ]),
-      shouldRender: Boolean(job.generatedScript),
-      content: (
-        <View style={styles.scrollBox}>
-          <ScrollView nestedScrollEnabled>
-            <Text style={styles.scriptText}>{job.generatedScript}</Text>
           </ScrollView>
         </View>
       ),
@@ -1786,14 +2287,17 @@ function estimateWebSectionHeight(sectionId: string, expanded: boolean, summaryC
 
   const expandedWeights: Record<string, number> = {
     pipeline: 7.5,
+    workers: 7.2,
     stepTimeline: 6.5,
     courseProgress: 2.4,
+    subjectProgress: 3.2,
     jobDetails: 5.2,
+    subjectPlan: 7.4,
+    subjectChildren: 5.4,
     watchdog: 3.2,
     coursePlan: 6.8,
     publishedCourse: 2.6,
     customInstructions: 4.6,
-    generatedScript: 6.2,
     error: 3.8,
     imagePrompt: 5.4,
     thumbnail: 4.8,
@@ -1807,6 +2311,7 @@ function estimateWebSectionHeight(sectionId: string, expanded: boolean, summaryC
 
 function getPreferredWebSectionColumn(sectionId: string, columnCount: number) {
   const preferredColumns: Record<string, number> = {
+    workers: 1,
     thumbnail: 1,
     courseScripts: 2,
   };
@@ -1891,6 +2396,7 @@ function isAwaitingInitialScriptApprovalJob(job: ContentJob): boolean {
 function isAwaitingSingleScriptApprovalJob(job: ContentJob): boolean {
   return Boolean(
     job.contentType !== 'course' &&
+      job.contentType !== 'full_subject' &&
       job.status === 'completed' &&
       job.scriptApproval?.enabled &&
       job.scriptApproval.awaitingApproval
@@ -1917,9 +2423,20 @@ function buildInitialExpandedSections(job: ContentJob): Record<string, boolean> 
     }
     if (job.contentType === 'course') {
       initial.courseScripts = true;
-    } else {
-      initial.generatedScript = true;
     }
+  }
+
+  if (
+    job.contentType === 'full_subject' &&
+    job.status === 'completed' &&
+    job.subjectPlanApproval?.enabled &&
+    job.subjectPlanApproval.awaitingApproval
+  ) {
+    initial.subjectPlan = true;
+  }
+
+  if (job.contentType === 'course') {
+    initial.pipeline = true;
   }
 
   return initial;
@@ -2100,43 +2617,154 @@ const createStyles = (theme: Theme) =>
     pipelinePanel: {
       gap: 12,
     },
-    pipelineTabsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 4,
-      alignSelf: 'flex-start',
-      borderWidth: 1,
-      borderColor: theme.colors.gray[200],
-      borderRadius: 999,
-      backgroundColor: theme.colors.gray[100],
-      padding: 3,
-    },
-    pipelineTab: {
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 999,
-      borderWidth: 0,
-      backgroundColor: 'transparent',
-    },
-    pipelineTabActive: {
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.gray[300],
-    },
-    pipelineTabText: {
-      fontFamily: 'DMSans-SemiBold',
-      fontSize: 12,
-      color: theme.colors.textMuted,
-    },
-    pipelineTabTextActive: {
-      color: theme.colors.text,
-    },
     pipelineFallbackNotice: {
       fontFamily: 'DMSans-Regular',
       fontSize: 12,
       color: theme.colors.warning,
       lineHeight: 18,
+    },
+    subjectProgressCard: {
+      gap: 12,
+    },
+    subjectProgressText: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 15,
+      color: theme.colors.text,
+    },
+    subjectCountRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    subjectCountChip: {
+      minWidth: 74,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: theme.colors.gray[100],
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      alignItems: 'center',
+    },
+    subjectCountValue: {
+      fontFamily: 'DMSans-Bold',
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    subjectCountLabel: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      marginTop: 2,
+    },
+    subjectLineupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingBottom: 8,
+      marginBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[200],
+    },
+    subjectLineupHeaderText: {
+      width: 68,
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      textTransform: 'uppercase',
+    },
+    subjectLineupHeaderTextWide: {
+      flex: 1,
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      textTransform: 'uppercase',
+    },
+    subjectLineupRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[200],
+    },
+    subjectLineupCode: {
+      width: 68,
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.text,
+    },
+    subjectLineupMeta: {
+      width: 68,
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    subjectLineupMain: {
+      flex: 1,
+      gap: 4,
+    },
+    subjectLineupTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    subjectLineupDescription: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.text,
+      lineHeight: 18,
+    },
+    subjectLineupGoals: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      lineHeight: 17,
+    },
+    subjectLineupStatusBlock: {
+      width: 92,
+      alignItems: 'flex-end',
+      gap: 4,
+    },
+    subjectLineupStatus: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      color: theme.colors.text,
+      textAlign: 'right',
+    },
+    subjectLineupChildId: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 10,
+      color: theme.colors.textMuted,
+      textAlign: 'right',
+    },
+    subjectChildRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[200],
+    },
+    subjectChildMain: {
+      flex: 1,
+      gap: 3,
+    },
+    subjectChildTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.text,
+    },
+    subjectChildMeta: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 11,
+      color: theme.colors.textMuted,
+    },
+    subjectChildStatus: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 12,
+      textAlign: 'right',
     },
     regenerationBanner: {
       fontFamily: 'DMSans-SemiBold',
@@ -2397,6 +3025,17 @@ const createStyles = (theme: Theme) =>
     },
     approvalScriptEditorInput: {
       minHeight: 180,
+      backgroundColor: theme.colors.background,
+    },
+    subjectPlanTitleInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.gray[200],
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 10,
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 14,
+      color: theme.colors.text,
       backgroundColor: theme.colors.background,
     },
     regenerationButtonRow: {
