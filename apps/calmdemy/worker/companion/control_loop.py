@@ -54,25 +54,25 @@ COMPANION_QWEN_MEMORY_GUARD_ENABLED = (
     != "false"
 )
 COMPANION_QWEN_MEMORY_GUARD_SOFT_FREE_RATIO = float(
-    os.getenv("COMPANION_QWEN_MEMORY_GUARD_SOFT_FREE_RATIO", "0.20")
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_SOFT_FREE_RATIO", "0.28")
 )
 COMPANION_QWEN_MEMORY_GUARD_HARD_FREE_RATIO = float(
-    os.getenv("COMPANION_QWEN_MEMORY_GUARD_HARD_FREE_RATIO", "0.14")
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_HARD_FREE_RATIO", "0.20")
 )
 COMPANION_QWEN_MEMORY_GUARD_CRITICAL_FREE_RATIO = float(
-    os.getenv("COMPANION_QWEN_MEMORY_GUARD_CRITICAL_FREE_RATIO", "0.08")
+    os.getenv("COMPANION_QWEN_MEMORY_GUARD_CRITICAL_FREE_RATIO", "0.14")
 )
 COMPANION_QWEN_MEMORY_GUARD_SOFT_MAX_STACKS = max(
-    1,
-    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_SOFT_MAX_STACKS", "3")),
+    0,
+    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_SOFT_MAX_STACKS", "2")),
 )
 COMPANION_QWEN_MEMORY_GUARD_HARD_MAX_STACKS = max(
-    1,
-    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_HARD_MAX_STACKS", "2")),
+    0,
+    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_HARD_MAX_STACKS", "1")),
 )
 COMPANION_QWEN_MEMORY_GUARD_CRITICAL_MAX_STACKS = max(
-    1,
-    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_CRITICAL_MAX_STACKS", "1")),
+    0,
+    int(os.getenv("COMPANION_QWEN_MEMORY_GUARD_CRITICAL_MAX_STACKS", "0")),
 )
 
 ACTIVE_STATUSES = [
@@ -665,15 +665,21 @@ def _apply_qwen_memory_guard(
     base_desired_ids = {
         stack_id for stack_id in desired_ids if stack_id not in qwen_ids
     }
-    kept_qwen_ids = set(
-        _pick_stack_ids(
-            qwen_candidate_stacks,
-            needed_count=qwen_cap,
-            running_ids=set(running.keys()),
-            active_owners=active_owners,
-            selected_ids=base_desired_ids,
+    kept_qwen_ids = {
+        stack_id
+        for stack_id in active_owners
+        if stack_id in qwen_ids
+    }
+    if qwen_cap > len(kept_qwen_ids):
+        kept_qwen_ids.update(
+            _pick_stack_ids(
+                qwen_candidate_stacks,
+                needed_count=qwen_cap,
+                running_ids=set(running.keys()),
+                active_owners=active_owners,
+                selected_ids=base_desired_ids | kept_qwen_ids,
+            )
         )
-    )
     limited_desired_ids = base_desired_ids | kept_qwen_ids
 
     if limited_desired_ids != desired_ids:

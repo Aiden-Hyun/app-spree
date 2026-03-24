@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   where,
   limit,
   Timestamp,
@@ -105,6 +106,121 @@ function cloneSubjectPlan(plan: SubjectPlan): SubjectPlan {
           prerequisites: Array.isArray(course.prerequisites) ? [...course.prerequisites] : undefined,
         }))
       : [],
+  };
+}
+
+function emptySubjectChildCounts() {
+  return {
+    pending: 0,
+    running: 0,
+    completed: 0,
+    failed: 0,
+  };
+}
+
+function normalizeJobStatus(value: unknown): JobStatus | undefined {
+  const status = String(value || '').trim().toLowerCase();
+  switch (status) {
+    case 'pending':
+    case 'llm_generating':
+    case 'qa_formatting':
+    case 'image_generating':
+    case 'tts_pending':
+    case 'tts_converting':
+    case 'post_processing':
+    case 'uploading':
+    case 'publishing':
+    case 'paused':
+    case 'completed':
+    case 'failed':
+      return status;
+    default:
+      return undefined;
+  }
+}
+
+function courseCodeForJob(job: Pick<ContentJob, 'params'> | Record<string, any>): string {
+  return String((job.params || {}).courseCode || '').trim().toUpperCase();
+}
+
+function childUpdatedAtMs(job: Pick<ContentJob, 'updatedAt' | 'completedAt' | 'createdAt'>): number {
+  return (
+    job.updatedAt?.toDate?.().getTime?.() ||
+    job.completedAt?.toDate?.().getTime?.() ||
+    job.createdAt?.toDate?.().getTime?.() ||
+    0
+  );
+}
+
+function pickReusableSubjectChildren(
+  job: ContentJob,
+  childJobs: ContentJob[]
+): {
+  reusableChildIds: string[];
+  detachedChildIds: string[];
+  nextPlan: SubjectPlan | undefined;
+  nextCounts: { pending: number; running: number; completed: number; failed: number };
+} {
+  const subjectPlan = job.subjectPlan ? cloneSubjectPlan(job.subjectPlan) : undefined;
+  if (!subjectPlan) {
+    return {
+      reusableChildIds: [],
+      detachedChildIds: childJobs.map((child) => child.id),
+      nextPlan: undefined,
+      nextCounts: emptySubjectChildCounts(),
+    };
+  }
+
+  const completedByCode = new Map<string, ContentJob[]>();
+  childJobs.forEach((childJob) => {
+    if (normalizeJobStatus(childJob.status) !== 'completed') return;
+    const courseCode = courseCodeForJob(childJob);
+    if (!courseCode) return;
+    const current = completedByCode.get(courseCode) || [];
+    current.push(childJob);
+    completedByCode.set(courseCode, current);
+  });
+  completedByCode.forEach((jobsForCode) => {
+    jobsForCode.sort((left, right) => childUpdatedAtMs(right) - childUpdatedAtMs(left));
+  });
+
+  const selectedChildIds = new Set<string>();
+  const reusableChildIds: string[] = [];
+
+  subjectPlan.courses = subjectPlan.courses.map((course) => {
+    const courseCode = String(course.code || '').trim().toUpperCase();
+    const candidates = completedByCode.get(courseCode) || [];
+    const preferredChildId = String(course.childJobId || '').trim();
+    const { childJobId: _previousChildJobId, childStatus: _previousChildStatus, childError: _previousChildError, ...restCourse } = course;
+    let selectedChild =
+      (preferredChildId
+        ? candidates.find((candidate) => candidate.id === preferredChildId)
+        : undefined) ||
+      candidates.find((candidate) => !selectedChildIds.has(candidate.id));
+
+    if (!selectedChild) {
+      return restCourse;
+    }
+
+    selectedChildIds.add(selectedChild.id);
+    reusableChildIds.push(selectedChild.id);
+    return {
+      ...restCourse,
+      childJobId: selectedChild.id,
+      childStatus: 'completed' as JobStatus,
+    };
+  });
+
+  return {
+    reusableChildIds,
+    detachedChildIds: childJobs
+      .map((child) => child.id)
+      .filter((childId) => !selectedChildIds.has(childId)),
+    nextPlan: subjectPlan,
+    nextCounts: {
+      ...emptySubjectChildCounts(),
+      completed: reusableChildIds.length,
+    },
   };
 }
 
@@ -258,12 +374,7 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
     jobData.autoPublish = true;
     jobData.subjectProgress = 'Pending subject curriculum generation';
     jobData.childJobIds = [];
-    jobData.childCounts = {
-      pending: 0,
-      running: 0,
-      completed: 0,
-      failed: 0,
-    };
+    jobData.childCounts = emptySubjectChildCounts();
     jobData.launchCursor = 0;
     jobData.maxActiveChildCourses = 2;
     jobData.pauseRequested = false;
@@ -637,8 +748,15 @@ export async function setWorkerIdleTimeout(
 // ==================== RETRY JOB ====================
 
 export async function retryJob(jobId: string): Promise<void> {
-  await updateDoc(doc(jobsCollection, jobId), {
-    status: 'pending',
+  const jobRef = doc(jobsCollection, jobId);
+  const jobSnapshot = await getDoc(jobRef);
+  if (!jobSnapshot.exists()) {
+    throw new Error('Job not found.');
+  }
+
+  const job = { id: jobSnapshot.id, ...(jobSnapshot.data() as Record<string, any>) } as ContentJob;
+  const basePatch = {
+    status: 'pending' as JobStatus,
     error: null,
     errorCode: null,
     updatedAt: serverTimestamp(),
@@ -651,7 +769,51 @@ export async function retryJob(jobId: string): Promise<void> {
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
     ...freshDispatchResetFields(),
+  };
+
+  if (job.contentType !== 'full_subject') {
+    await updateDoc(jobRef, basePatch);
+    return;
+  }
+
+  const childSnapshot = await getDocs(query(jobsCollection, where('parentJobId', '==', jobId)));
+  const childJobs = childSnapshot.docs.map(
+    (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as ContentJob)
+  );
+  const { reusableChildIds, detachedChildIds, nextPlan, nextCounts } = pickReusableSubjectChildren(
+    job,
+    childJobs
+  );
+
+  const batch = writeBatch(db);
+  detachedChildIds.forEach((childJobId) => {
+    batch.update(doc(jobsCollection, childJobId), {
+      parentJobId: null,
+      retrySupersededParentJobId: jobId,
+      retrySupersededAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
   });
+
+  const preservedCount = reusableChildIds.length;
+  const totalCourses = nextPlan?.courses.length || 0;
+  const remainingCount = Math.max(0, totalCourses - preservedCount);
+  const subjectProgress =
+    preservedCount > 0
+      ? `Retrying ${remainingCount} remaining child course${remainingCount === 1 ? '' : 's'} • preserving ${preservedCount} completed`
+      : 'Retrying child course generation from the approved lineup';
+
+  batch.update(jobRef, {
+    ...basePatch,
+    pauseRequested: false,
+    pausedAt: null,
+    subjectPlan: nextPlan || null,
+    subjectProgress,
+    childJobIds: reusableChildIds,
+    childCounts: nextCounts,
+    launchCursor: 0,
+  });
+  await batch.commit();
 }
 
 export interface RegenerateCourseSessionsInput {
@@ -1088,12 +1250,7 @@ export async function regenerateSubjectPlan(job: ContentJob): Promise<void> {
     subjectProgress: 'Regenerating subject curriculum',
     launchCursor: 0,
     childJobIds: [],
-    childCounts: {
-      pending: 0,
-      running: 0,
-      completed: 0,
-      failed: 0,
-    },
+    childCounts: emptySubjectChildCounts(),
     pauseRequested: false,
     pausedAt: null,
     ...freshDispatchResetFields(),

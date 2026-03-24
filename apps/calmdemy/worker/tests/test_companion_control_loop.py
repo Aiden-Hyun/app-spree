@@ -146,8 +146,8 @@ class CompanionControlLoopTests(unittest.TestCase):
             )
 
         qwen_ids = sorted(stack_id for stack_id in desired_ids if "qwen" in stack_id)
-        self.assertEqual(qwen_ids, ["local-tts-qwen", "local-tts-qwen-2"])
-        self.assertEqual(resolved_workload["qwen_stack_cap"], 2)
+        self.assertEqual(qwen_ids, [])
+        self.assertEqual(resolved_workload["qwen_stack_cap"], 0)
 
     def test_desired_auto_stack_ids_keeps_active_qwen_workers_while_capping_idle_pool(self) -> None:
         enabled_stacks = [stack for stack in load_stack_config() if stack.get("enabled", True)]
@@ -157,7 +157,7 @@ class CompanionControlLoopTests(unittest.TestCase):
             "non_tts_outstanding": 0,
             "tts_outstanding": {"qwen3-base": 6},
             "wildcard_tts_outstanding": 0,
-            "active_owners": {"local-tts-qwen-5", "local-tts-qwen-6"},
+            "active_owners": {"local-tts-qwen-4", "local-tts-qwen-5"},
             "has_any_work": True,
         }
 
@@ -171,11 +171,40 @@ class CompanionControlLoopTests(unittest.TestCase):
             desired_ids, _ = _desired_auto_stack_ids(
                 object(),
                 enabled_stacks,
-                running={"local-tts-qwen-5": 1001, "local-tts-qwen-6": 1002},
+                running={"local-tts-qwen-4": 1001, "local-tts-qwen-5": 1002},
             )
 
         qwen_ids = sorted(stack_id for stack_id in desired_ids if "qwen" in stack_id)
-        self.assertEqual(qwen_ids, ["local-tts-qwen-5", "local-tts-qwen-6"])
+        self.assertEqual(qwen_ids, ["local-tts-qwen-4", "local-tts-qwen-5"])
+
+    def test_desired_auto_stack_ids_caps_to_one_qwen_worker_before_critical_memory(self) -> None:
+        enabled_stacks = [stack for stack in load_stack_config() if stack.get("enabled", True)]
+        workload = {
+            "pending_jobs": False,
+            "delete_jobs": False,
+            "non_tts_outstanding": 0,
+            "tts_outstanding": {"qwen3-base": 6},
+            "wildcard_tts_outstanding": 0,
+            "active_owners": set(),
+            "has_any_work": True,
+        }
+
+        with (
+            patch("companion.control_loop._collect_auto_workload", return_value=workload),
+            patch(
+                "companion.control_loop._system_memory_snapshot",
+                return_value={"freeRatio": 0.19, "freeBytes": 7_000_000_000},
+            ),
+        ):
+            desired_ids, resolved_workload = _desired_auto_stack_ids(
+                object(),
+                enabled_stacks,
+                running={},
+            )
+
+        qwen_ids = sorted(stack_id for stack_id in desired_ids if "qwen" in stack_id)
+        self.assertEqual(qwen_ids, ["local-tts-qwen"])
+        self.assertEqual(resolved_workload["qwen_stack_cap"], 1)
 
 
 if __name__ == "__main__":

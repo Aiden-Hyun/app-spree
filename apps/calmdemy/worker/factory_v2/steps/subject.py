@@ -529,6 +529,11 @@ def _launch_cursor(runtime: dict[str, Any], job_data: dict[str, Any]) -> int:
     return max(0, int(raw or 0))
 
 
+def _launch_scan_cursor(plan: dict[str, Any], runtime: dict[str, Any], job_data: dict[str, Any]) -> int:
+    total_courses = len(list(plan.get("courses") or []))
+    return min(_launch_cursor(runtime, job_data), total_courses)
+
+
 def _child_jobs(ctx: StepContext) -> list[dict[str, Any]]:
     parent_job_id = _content_job_id(ctx.job)
     query = ctx.db.collection("content_jobs").where("parentJobId", "==", parent_job_id)
@@ -572,8 +577,9 @@ def _sync_plan_children(plan: dict[str, Any], child_jobs: list[dict[str, Any]]) 
             next_course["childError"] = str(child_job.get("error") or "").strip() or None
             child_job_ids.append(child_job["id"])
         else:
-            next_course["childStatus"] = None
-            next_course["childError"] = None
+            next_course.pop("childJobId", None)
+            next_course.pop("childStatus", None)
+            next_course.pop("childError", None)
         next_courses.append(next_course)
 
     return {**plan, "courses": next_courses}, child_job_ids
@@ -724,7 +730,7 @@ def execute_launch_subject_children(ctx: StepContext) -> StepResult:
 
     existing_children = _child_jobs(ctx)
     plan, child_job_ids = _sync_plan_children(plan, existing_children)
-    launch_cursor = max(_launch_cursor(runtime, job_data), len(child_job_ids))
+    launch_cursor = _launch_scan_cursor(plan, runtime, job_data)
     max_active = _max_active_children(runtime, job_data)
     child_counts = _compute_child_counts(existing_children)
 
@@ -792,7 +798,7 @@ def execute_watch_subject_children(ctx: StepContext) -> StepResult:
     child_jobs = _child_jobs(ctx)
     plan, child_job_ids = _sync_plan_children(plan, child_jobs)
     child_counts = _compute_child_counts(child_jobs)
-    launch_cursor = max(_launch_cursor(runtime, live_job or job_data), len(child_job_ids))
+    launch_cursor = _launch_scan_cursor(plan, runtime, live_job or job_data)
     max_active = _max_active_children(runtime, live_job or job_data)
     pause_requested = bool((live_job or {}).get("pauseRequested") or runtime.get("pause_requested"))
 
