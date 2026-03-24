@@ -244,6 +244,8 @@ export interface FirestoreCourse {
   thumbnailUrl?: string;
   color: string;
   icon?: string;
+  subjectId?: string;
+  subjectLabel?: string;
   duration_minutes?: number;
   totalDuration?: number;
   difficulty?: string;
