@@ -51,7 +51,7 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
     () => getVisibleActiveWorkerIds(activeWorkers),
     [activeWorkers]
   );
-  const exactTimingLabel = useMemo(() => getExactTimingLabel(job), [job]);
+  const timingLabel = useMemo(() => getTimingLabel(job), [job]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -108,14 +108,14 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
 
-      {exactTimingLabel ? (
+      {timingLabel ? (
         <View style={styles.timingBadge}>
           <Ionicons
             name="stopwatch-outline"
             size={14}
             color={theme.colors.primary}
           />
-          <Text style={styles.timingBadgeText}>{exactTimingLabel}</Text>
+          <Text style={styles.timingBadgeText}>{timingLabel}</Text>
         </View>
       ) : null}
 
@@ -190,9 +190,19 @@ function getVisibleActiveWorkerIds(activeWorkers: ActiveJobWorker[]): string[] {
   );
 }
 
-function getExactTimingLabel(job: ContentJob): string | null {
+function getTimingLabel(job: ContentJob): string | null {
   if (job.timingStatus !== 'exact') {
-    return null;
+    if (job.status === 'completed' || job.status === 'failed') {
+      return null;
+    }
+    const liveElapsedMs =
+      typeof job.activeRunElapsedMs === 'number' && Number.isFinite(job.activeRunElapsedMs)
+        ? job.activeRunElapsedMs
+        : 0;
+    if (liveElapsedMs <= 0) {
+      return null;
+    }
+    return `${formatElapsedMsRoundedToMinute(liveElapsedMs)} active`;
   }
   const elapsedMs =
     typeof job.effectiveElapsedMs === 'number' && Number.isFinite(job.effectiveElapsedMs)
@@ -202,6 +212,19 @@ function getExactTimingLabel(job: ContentJob): string | null {
     return null;
   }
   return `${formatElapsedMsCompact(elapsedMs)} active`;
+}
+
+function formatElapsedMsRoundedToMinute(ms: number): string {
+  const roundedMinutes = Math.max(1, Math.round(Math.max(0, ms) / 60000));
+  if (roundedMinutes < 60) {
+    return `${roundedMinutes}m`;
+  }
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
 }
 
 function formatElapsedMsCompact(ms: number): string {

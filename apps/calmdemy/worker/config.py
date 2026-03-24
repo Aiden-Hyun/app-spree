@@ -45,4 +45,7 @@ IMAGE_WIDTH = int(os.getenv("IMAGE_WIDTH", "1024"))
 IMAGE_HEIGHT = int(os.getenv("IMAGE_HEIGHT", "1024"))
 IMAGE_STEPS = int(os.getenv("IMAGE_STEPS", "24"))
 IMAGE_GUIDANCE = float(os.getenv("IMAGE_GUIDANCE", "3.5"))
+IMAGE_PIPELINE_CACHE_ENABLED = (
+    os.getenv("IMAGE_PIPELINE_CACHE_ENABLED", "false").strip().lower() == "true"
+)
 HF_TOKEN = os.getenv("HF_TOKEN", "")

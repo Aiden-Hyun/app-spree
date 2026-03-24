@@ -2,6 +2,7 @@
 Step 3: Generate a thumbnail image using a local diffusion model.
 """
 
+import gc
 import os
 import tempfile
 
@@ -43,12 +44,19 @@ def _load_pipe():
     device = _get_device()
     dtype = _get_dtype(device)
     PipelineClass = _resolve_pipeline_class(model_id)
+    cache_enabled = bool(config.IMAGE_PIPELINE_CACHE_ENABLED)
 
-    if (_cached_pipe is None
-            or _cached_pipeline_class != PipelineClass
-            or _cached_model_id != model_id
-            or _cached_device != device
-            or _cached_dtype != dtype):
+    if not cache_enabled and _cached_pipe is not None:
+        _release_cached_pipe()
+
+    if (
+        not cache_enabled
+        or _cached_pipe is None
+        or _cached_pipeline_class != PipelineClass
+        or _cached_model_id != model_id
+        or _cached_device != device
+        or _cached_dtype != dtype
+    ):
         cache_dir = os.path.join(config.MODEL_DIR, "flux")
         kwargs = {
             "torch_dtype": dtype,
@@ -89,13 +97,55 @@ def _load_pipe():
         if hasattr(pipe, "enable_vae_tiling"):
             pipe.enable_vae_tiling()
 
-        _cached_pipe = pipe
-        _cached_pipeline_class = PipelineClass
-        _cached_model_id = model_id
-        _cached_device = device
-        _cached_dtype = dtype
+        if cache_enabled:
+            _cached_pipe = pipe
+            _cached_pipeline_class = PipelineClass
+            _cached_model_id = model_id
+            _cached_device = device
+            _cached_dtype = dtype
+        else:
+            _clear_cached_pipe_state()
+            return pipe
 
     return _cached_pipe
+
+
+def _clear_cached_pipe_state() -> None:
+    global _cached_pipe, _cached_pipeline_class, _cached_model_id, _cached_device, _cached_dtype
+    _cached_pipe = None
+    _cached_pipeline_class = None
+    _cached_model_id = None
+    _cached_device = None
+    _cached_dtype = None
+
+
+def _release_cached_pipe() -> None:
+    pipe = _cached_pipe
+    _clear_cached_pipe_state()
+    if pipe is not None:
+        del pipe
+    _empty_runtime_cache()
+
+
+def _empty_runtime_cache() -> None:
+    try:
+        gc.collect()
+    except Exception:
+        pass
+
+    cuda = getattr(torch, "cuda", None)
+    if cuda is not None and hasattr(cuda, "empty_cache"):
+        try:
+            cuda.empty_cache()
+        except Exception:
+            pass
+
+    mps = getattr(torch, "mps", None)
+    if mps is not None and hasattr(mps, "empty_cache"):
+        try:
+            mps.empty_cache()
+        except Exception:
+            pass
 
 
 def _resolve_pipeline_class(model_id: str):
@@ -130,6 +180,9 @@ def generate_image(
 ) -> str:
     """Generate an image from a prompt and return local file path."""
     pipe = _load_pipe()
+    cache_enabled = bool(config.IMAGE_PIPELINE_CACHE_ENABLED)
+    result = None
+    image = None
 
     width = width or config.IMAGE_WIDTH
     height = height or config.IMAGE_HEIGHT
@@ -146,17 +199,25 @@ def generate_image(
     if negative_prompt:
         kwargs["negative_prompt"] = negative_prompt
 
-    result = pipe(**kwargs)
-    image = result.images[0]
+    try:
+        result = pipe(**kwargs)
+        image = result.images[0]
 
-    if not isinstance(image, Image.Image):
-        raise RuntimeError("Image generation did not return a PIL image")
+        if not isinstance(image, Image.Image):
+            raise RuntimeError("Image generation did not return a PIL image")
 
-    tmp_dir = tempfile.mkdtemp(prefix="calmdemy_img_")
-    output_path = os.path.join(tmp_dir, "thumbnail.png")
-    image.save(output_path, format="PNG", optimize=True)
-
-    return output_path
+        tmp_dir = tempfile.mkdtemp(prefix="calmdemy_img_")
+        output_path = os.path.join(tmp_dir, "thumbnail.png")
+        image.save(output_path, format="PNG", optimize=True)
+        return output_path
+    finally:
+        if result is not None:
+            del result
+        if image is not None:
+            del image
+        if not cache_enabled:
+            del pipe
+            _empty_runtime_cache()
 
 
 def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str, plan: dict | None = None) -> str:

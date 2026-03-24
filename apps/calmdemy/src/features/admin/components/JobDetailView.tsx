@@ -1586,7 +1586,7 @@ function buildSections(params: {
               ? formatElapsedMs(job.effectiveElapsedMs)
               : timingStatus === 'legacy'
                 ? formatElapsedMs(legacyElapsedMs)
-                : formatElapsedMs(liveRunElapsedMs),
+                : formatLiveElapsedMs(job, liveRunElapsedMs),
         },
         {
           label: 'Mode',
@@ -1636,7 +1636,10 @@ function buildSections(params: {
         ) : (
           <>
             {liveRunElapsedMs > 0 && (
-              <InfoRow label="Active This Run" value={formatElapsedMs(liveRunElapsedMs) || '0s'} />
+              <InfoRow
+                label="Active This Run"
+                value={formatLiveElapsedMs(job, liveRunElapsedMs) || '0m'}
+              />
             )}
             <Text style={styles.emptySubtext}>
               {job.status === 'completed'
@@ -2415,6 +2418,27 @@ function formatElapsedMs(ms?: number | null) {
     return `${hours}h`;
   }
   return `${hours}h ${minutes}m`;
+}
+
+function formatElapsedMsRoundedToMinute(ms?: number | null) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return '';
+  const roundedMinutes = Math.max(1, Math.round(ms / 60000));
+  if (roundedMinutes < 60) {
+    return `${roundedMinutes}m`;
+  }
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
+function formatLiveElapsedMs(job: ContentJob, ms?: number | null) {
+  if (job.status !== 'completed' && job.status !== 'failed') {
+    return formatElapsedMsRoundedToMinute(ms);
+  }
+  return formatElapsedMs(ms);
 }
 
 function formatParallelism(value?: number | null) {
