@@ -60,13 +60,13 @@ Five-entry manifest / eight-stack runtime default:
    - `ttsModels: [dms]`
 5. `local-tts-qwen`
    - `venv: .venv-qwen`
-   - `replicas: 5`
+   - `replicas: 7`
    - `dispatch: false`
    - `acceptNonTtsSteps: false`
    - `ttsModels: [qwen3-base]`
 
 This profile expands to `local-tts-qwen`, `local-tts-qwen-2`, `local-tts-qwen-3`, `local-tts-qwen-4`,
-and `local-tts-qwen-5`, supporting up to 3 concurrent DMS synth queue items plus 5 concurrent Qwen synth queue items,
+`local-tts-qwen-5`, `local-tts-qwen-6`, and `local-tts-qwen-7`, supporting up to 3 concurrent DMS synth queue items plus 7 concurrent Qwen synth queue items,
 while preserving one dispatcher/non-TTS executor.
 
 ## When to Add a New Venv

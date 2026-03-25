@@ -79,7 +79,7 @@ Course audio is fan-out/fan-in:
 - Queue entries can include `required_tts_model` for synth-step capability routing.
 - Stack manifest entries may set `replicas` to expand into `id`, `id-2`, `id-3`, etc.
 - Default stack profile is one dispatcher/non-TTS stack, three DMS TTS stacks for
-  parallel course synth execution, and a five-worker Qwen voice-clone TTS pool.
+  parallel course synth execution, and a seven-worker Qwen voice-clone TTS pool.
 
 ## Cloud Backend
 
