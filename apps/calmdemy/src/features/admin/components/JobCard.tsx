@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, GestureResponderEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { ActiveJobWorker, ContentJob, JOB_STATUS_LABELS, CONTENT_TYPE_LABELS } from '../types';
@@ -10,6 +10,15 @@ interface JobCardProps {
   job: ContentJob;
   activeWorkers?: ActiveJobWorker[];
   onPress: () => void;
+  onPublish?: (job: ContentJob) => void;
+}
+
+interface PublishBadgeConfig {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  backgroundColor: string;
+  borderColor: string;
 }
 
 function getStatusColor(status: string, theme: Theme): string {
@@ -42,7 +51,7 @@ function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
   }
 }
 
-export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
+export function JobCard({ job, activeWorkers = [], onPress, onPublish }: JobCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const statusColor = getStatusColor(job.status, theme);
@@ -53,6 +62,8 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
   );
   const timingLabel = useMemo(() => getTimingLabel(job), [job]);
   const ttsProgressLabel = useMemo(() => getTtsProgressLabel(job), [job]);
+  const publishBadge = useMemo(() => getPublishBadge(job, theme), [job, theme]);
+  const canPublishFromCard = useMemo(() => canPublishFromFactoryCard(job), [job]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -65,6 +76,14 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
   }, [job.createdAt]);
+
+  const handlePublishPress = (event: GestureResponderEvent) => {
+    event.stopPropagation?.();
+    if (!canPublishFromCard || !onPublish) {
+      return;
+    }
+    onPublish(job);
+  };
 
   return (
     <Pressable
@@ -108,6 +127,31 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
+
+      {publishBadge ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.publishBadge,
+            {
+              backgroundColor: publishBadge.backgroundColor,
+              borderColor: publishBadge.borderColor,
+            },
+            canPublishFromCard && styles.publishBadgeAction,
+            pressed && canPublishFromCard && styles.publishBadgePressed,
+          ]}
+          disabled={!canPublishFromCard || !onPublish}
+          onPress={handlePublishPress}
+        >
+          <Ionicons
+            name={publishBadge.icon}
+            size={14}
+            color={publishBadge.color}
+          />
+          <Text style={[styles.publishBadgeText, { color: publishBadge.color }]}>
+            {canPublishFromCard ? `${publishBadge.label} • Publish` : publishBadge.label}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {ttsProgressLabel ? (
         <View style={styles.ttsProgressBadge}>
@@ -297,6 +341,119 @@ function getCourseAudioSessionCounts(job: ContentJob): { completed: number; tota
   };
 }
 
+function getPublishBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | null {
+  if (job.status !== 'completed' || job.contentType === 'full_subject') {
+    return null;
+  }
+
+  if (job.contentType === 'course') {
+    const isPublished = Boolean(String(job.courseId || '').trim());
+    const previewCount = (job.coursePreviewSessions || []).length;
+    const hasPendingUpdate = previewCount > 0;
+
+    if (!isPublished && !hasPendingUpdate) {
+      return null;
+    }
+
+    if (hasPendingUpdate && isPublished) {
+      return {
+        label: 'Update Pending',
+        icon: 'time-outline',
+        color: theme.colors.warning,
+        backgroundColor: `${theme.colors.warning}12`,
+        borderColor: `${theme.colors.warning}28`,
+      };
+    }
+
+    if (isPublished) {
+      return {
+        label: 'Published',
+        icon: 'checkmark-circle-outline',
+        color: theme.colors.success,
+        backgroundColor: `${theme.colors.success}12`,
+        borderColor: `${theme.colors.success}28`,
+      };
+    }
+
+    return {
+      label: 'Not Published',
+      icon: 'cloud-upload-outline',
+      color: theme.colors.gray[600],
+      backgroundColor: `${theme.colors.gray[500]}12`,
+      borderColor: `${theme.colors.gray[500]}28`,
+    };
+  }
+
+  const isPublished = Boolean(String(job.publishedContentId || '').trim());
+  const hasPublishableOutput = isPublished || Boolean(String(job.audioPath || '').trim());
+  if (!hasPublishableOutput) {
+    return null;
+  }
+  if (isPublished) {
+    return {
+      label: 'Published',
+      icon: 'checkmark-circle-outline',
+      color: theme.colors.success,
+      backgroundColor: `${theme.colors.success}12`,
+      borderColor: `${theme.colors.success}28`,
+    };
+  }
+
+  return {
+    label: 'Not Published',
+    icon: 'cloud-upload-outline',
+    color: theme.colors.gray[600],
+    backgroundColor: `${theme.colors.gray[500]}12`,
+    borderColor: `${theme.colors.gray[500]}28`,
+  };
+}
+
+function canPublishFromFactoryCard(job: ContentJob): boolean {
+  if (job.status !== 'completed' || job.contentType === 'full_subject') {
+    return false;
+  }
+
+  const isCourseRegenAwaitingScriptApproval = Boolean(
+    job.contentType === 'course' &&
+      job.courseRegeneration?.active &&
+      job.courseRegeneration.mode === 'script_and_audio' &&
+      job.courseRegeneration.awaitingScriptApproval
+  );
+  const isCourseInitialAwaitingScriptApproval = Boolean(
+    job.contentType === 'course' &&
+      job.courseScriptApproval?.enabled &&
+      job.courseScriptApproval.awaitingApproval
+  );
+  const isSingleAwaitingScriptApproval = Boolean(
+    job.contentType !== 'course' &&
+      job.scriptApproval?.enabled &&
+      job.scriptApproval.awaitingApproval
+  );
+
+  if (
+    isCourseRegenAwaitingScriptApproval ||
+    isCourseInitialAwaitingScriptApproval ||
+    isSingleAwaitingScriptApproval
+  ) {
+    return false;
+  }
+
+  const isCourseRegenAwaitingPublish = Boolean(
+    job.contentType === 'course' &&
+      job.courseRegeneration?.active &&
+      job.courseRegeneration.requiresPublishApproval
+  );
+  if (isCourseRegenAwaitingPublish) {
+    return false;
+  }
+
+  if (job.contentType === 'course') {
+    return !String(job.courseId || '').trim() && Boolean((job.coursePreviewSessions || []).length > 0);
+  }
+
+  return !String(job.publishedContentId || '').trim() && Boolean(String(job.audioPath || '').trim());
+}
+
 function formatElapsedMsRoundedToMinute(ms: number): string {
   const roundedMinutes = Math.max(1, Math.round(Math.max(0, ms) / 60000));
   if (roundedMinutes < 60) {
@@ -371,6 +528,31 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+    },
+    publishBadge: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+    },
+    publishBadgeAction: {
+      shadowColor: theme.colors.primary,
+      shadowOpacity: 0.08,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    publishBadgePressed: {
+      opacity: 0.85,
+    },
+    publishBadgeText: {
+      fontFamily: 'DMSans-Medium',
+      fontSize: 12,
     },
     workerPanel: {
       marginTop: 10,

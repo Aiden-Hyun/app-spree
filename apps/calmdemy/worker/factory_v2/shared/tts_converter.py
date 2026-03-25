@@ -12,6 +12,11 @@ import wave
 import shutil
 
 from models.registry import get_tts
+from factory_v2.shared.course_tts_segment_cache import (
+    is_segment_cache_enabled,
+    persist_segment_audio,
+    restore_segment_audio,
+)
 import config
 from observability import get_logger
 
@@ -103,6 +108,12 @@ def _read_wav_params(wav_path: str) -> tuple[int, int, int]:
         return wf.getnchannels(), wf.getsampwidth(), wf.getframerate()
 
 
+def _stash_wav_part(source_path: str, stable_path: str) -> None:
+    """Copy a generated WAV part to a stable path for final concatenation."""
+    os.makedirs(os.path.dirname(stable_path), exist_ok=True)
+    shutil.copyfile(source_path, stable_path)
+
+
 def convert_to_audio(script: str, job_data: dict) -> str:
     """Convert script to WAV audio, handling pause markers."""
     global _cached_tts, _cached_tts_id, _cached_voice_id
@@ -128,17 +139,28 @@ def convert_to_audio(script: str, job_data: dict) -> str:
 
     # Split script on pause markers
     segments = _split_on_pauses(script)
-    logger.info("Script split into segments", extra={"segment_count": len(segments)})
+    cache_enabled = is_segment_cache_enabled(job_data)
+    logger.info(
+        "Script split into segments",
+        extra={"segment_count": len(segments), "segment_cache_enabled": cache_enabled},
+    )
 
     # Synthesize each segment
     tmp_dir = tempfile.mkdtemp(prefix="calmdemy_tts_")
+    parts_dir = os.path.join(tmp_dir, "parts")
+    stable_dir = os.path.join(tmp_dir, "stable")
+    os.makedirs(parts_dir, exist_ok=True)
+    os.makedirs(stable_dir, exist_ok=True)
     wav_parts = []
     tts_params = None  # (channels, sample_width, sample_rate)
-    pending_silences: list[tuple[float, str]] = []
+    pending_silences: list[tuple[float, str, str]] = []
+    cache_hits = 0
+    synthesized_segments = 0
 
     try:
         for i, seg in enumerate(segments):
-            part_path = os.path.join(tmp_dir, f"part_{i:04d}.wav")
+            part_path = os.path.join(parts_dir, f"part_{i:04d}.wav")
+            stable_part_path = os.path.join(stable_dir, f"part_{i:04d}.wav")
 
             if seg["type"] == "pause":
                 if tts_params:
@@ -150,16 +172,25 @@ def convert_to_audio(script: str, job_data: dict) -> str:
                         channels=channels,
                         sample_width=sample_width,
                     )
+                    _stash_wav_part(part_path, stable_part_path)
                 else:
                     # Defer silence generation until we know TTS WAV params
-                    pending_silences.append((seg["seconds"], part_path))
+                    pending_silences.append((seg["seconds"], part_path, stable_part_path))
             else:
-                _cached_tts.synthesize(seg["content"], part_path)
+                segment_text = str(seg["content"] or "").strip()
+                restored = cache_enabled and restore_segment_audio(job_data, segment_text, part_path)
+                if restored:
+                    cache_hits += 1
+                else:
+                    _cached_tts.synthesize(segment_text, part_path)
+                    synthesized_segments += 1
+                    if cache_enabled:
+                        persist_segment_audio(job_data, segment_text, part_path)
                 if tts_params is None:
                     tts_params = _read_wav_params(part_path)
                     # Backfill any leading pauses now that we know WAV params
                     channels, sample_width, sample_rate = tts_params
-                    for seconds, pause_path in pending_silences:
+                    for seconds, pause_path, pause_stable_path in pending_silences:
                         _generate_silence(
                             seconds,
                             pause_path,
@@ -167,14 +198,16 @@ def convert_to_audio(script: str, job_data: dict) -> str:
                             channels=channels,
                             sample_width=sample_width,
                         )
+                        _stash_wav_part(pause_path, pause_stable_path)
                     pending_silences = []
+                _stash_wav_part(part_path, stable_part_path)
 
-            wav_parts.append(part_path)
+            wav_parts.append(stable_part_path)
 
         if pending_silences:
             # Script had only pauses; fall back to defaults
             logger.warning("No audio segments found; using default WAV params for silence.")
-            for seconds, pause_path in pending_silences:
+            for seconds, pause_path, pause_stable_path in pending_silences:
                 _generate_silence(
                     seconds,
                     pause_path,
@@ -182,6 +215,7 @@ def convert_to_audio(script: str, job_data: dict) -> str:
                     channels=DEFAULT_CHANNELS,
                     sample_width=DEFAULT_SAMPLE_WIDTH,
                 )
+                _stash_wav_part(pause_path, pause_stable_path)
 
         # Concatenate all parts
         output_path = os.path.join(tmp_dir, "full_output.wav")
@@ -190,7 +224,14 @@ def convert_to_audio(script: str, job_data: dict) -> str:
         # Get duration
         with wave.open(output_path, 'r') as wf:
             duration = wf.getnframes() / wf.getframerate()
-        logger.info("Full audio generated", extra={"duration_sec": round(duration, 1)})
+        logger.info(
+            "Full audio generated",
+            extra={
+                "duration_sec": round(duration, 1),
+                "segment_cache_hits": cache_hits,
+                "synthesized_segments": synthesized_segments,
+            },
+        )
 
         return output_path
 

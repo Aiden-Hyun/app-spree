@@ -18,6 +18,7 @@ interface JobListProps {
   isLoading: boolean;
   hasDrafts: boolean;
   onJobSelect: (jobId: string) => void;
+  onJobPublish?: (job: ContentJob) => void;
   headerComponent?: React.ReactElement | null;
   footerComponent?: React.ReactElement | null;
 }
@@ -33,6 +34,7 @@ export function JobList({
   isLoading,
   hasDrafts,
   onJobSelect,
+  onJobPublish,
   headerComponent = null,
   footerComponent = null,
 }: JobListProps) {
@@ -92,6 +94,7 @@ export function JobList({
               job={item.parentJob}
               activeWorkers={activeWorkersByJobId[item.parentJob.id] || []}
               onPress={() => onJobSelect(item.parentJob.id)}
+              onPublish={onJobPublish}
             />
           </View>
 
@@ -103,6 +106,7 @@ export function JobList({
                     job={childJob}
                     activeWorkers={activeWorkersByJobId[childJob.id] || []}
                     onPress={() => onJobSelect(childJob.id)}
+                    onPublish={onJobPublish}
                   />
                 </View>
               ))}

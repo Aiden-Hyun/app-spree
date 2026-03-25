@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
@@ -25,6 +25,8 @@ import { DraftsSection } from '@features/admin/components/DraftsSection';
 import { JobList } from '@features/admin/components/JobList';
 import { FactoryMetrics } from '@features/admin/types';
 import { WorkerLogsPanel } from '@features/admin/components/WorkerLogsPanel';
+import { publishCompletedJob } from '@features/admin/data/adminRepository';
+import { ContentJob } from '@features/admin/types';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -148,6 +150,44 @@ export default function AdminDashboard() {
     }
   };
 
+  const confirmAction = (message: string) => {
+    if (Platform.OS !== 'web') {
+      return Promise.resolve(true);
+    }
+
+    const webConfirm = (
+      globalThis as typeof globalThis & { confirm?: (value?: string) => boolean }
+    ).confirm;
+    return Promise.resolve(typeof webConfirm === 'function' ? webConfirm(message) : true);
+  };
+
+  const startPublish = async (job: ContentJob) => {
+    await publishCompletedJob(job.id);
+  };
+
+  const handlePublishJob = async (job: ContentJob) => {
+    const message = 'This will make the content visible to users. Continue?';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+      await startPublish(job);
+      return;
+    }
+
+    Alert.alert('Publish Content', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Publish',
+        onPress: async () => {
+          await startPublish(job);
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <JobList
@@ -156,6 +196,9 @@ export default function AdminDashboard() {
         isLoading={isLoading}
         hasDrafts={drafts.length > 0}
         onJobSelect={(jobId) => router.push(`/admin/job/${jobId}`)}
+        onJobPublish={(job) => {
+          void handlePublishJob(job);
+        }}
         headerComponent={
           <>
             <FactoryOverview

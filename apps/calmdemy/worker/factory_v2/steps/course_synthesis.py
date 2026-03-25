@@ -31,6 +31,22 @@ from .course_common import (
 logger = get_logger(__name__)
 
 
+def _course_tts_job_data(
+    ctx: StepContext,
+    job_data: dict[str, Any],
+    session_code: str,
+) -> dict[str, Any]:
+    content_job_id = _content_job_id(ctx.job)
+    if not content_job_id:
+        return dict(job_data)
+
+    return {
+        **dict(job_data),
+        "_factoryContentJobId": content_job_id,
+        "_courseTtsSessionCode": str(session_code).strip().upper(),
+    }
+
+
 def _persist_course_audio_checkpoint(
     ctx: StepContext,
     audio_results: dict[str, dict[str, Any]],
@@ -144,7 +160,10 @@ def _synthesize_course_session_audio_inline(
     if not script:
         raise ValueError(f"Missing formatted script for {session_code}")
 
-    wav_path = convert_to_audio(script, job_data)
+    wav_path = convert_to_audio(
+        script,
+        _course_tts_job_data(ctx, job_data, session_code),
+    )
     mp3_path = post_process_audio(wav_path)
 
     session_job_data = {
@@ -183,6 +202,7 @@ def _assemble_course_session_audio(
     from factory_v2.shared.tts_converter import convert_to_audio
 
     session_code, chunks = _course_session_chunks(formatted_scripts, course_code, session_def)
+    tts_job_data = _course_tts_job_data(ctx, job_data, session_code)
     wav_paths: list[str] = []
     for chunk_index, chunk_text in enumerate(chunks):
         part_path = chunk_wav_path(ctx.run_id, session_code, chunk_index)
@@ -195,7 +215,7 @@ def _assemble_course_session_audio(
                     "chunk_index": chunk_index,
                 },
             )
-            tmp_wav_path = convert_to_audio(chunk_text, job_data)
+            tmp_wav_path = convert_to_audio(chunk_text, tts_job_data)
             _stash_generated_wav(tmp_wav_path, str(part_path))
         wav_paths.append(str(part_path))
         ctx.progress(f"Assembled chunk {chunk_index + 1}/{len(chunks)} for {session_code}")
@@ -327,6 +347,7 @@ def execute_synthesize_course_audio_chunk(ctx: StepContext) -> StepResult:
         raise ValueError(f"Unknown course synth chunk shard '{ctx.shard_key}'")
 
     session_code, chunks = _course_session_chunks(formatted_scripts, course_code, session_def)
+    tts_job_data = _course_tts_job_data(ctx, job_data, session_code)
 
     chunk_index_raw = ctx.step_input.get("chunk_index")
     if chunk_index_raw is None and parsed is not None:
@@ -339,7 +360,7 @@ def execute_synthesize_course_audio_chunk(ctx: StepContext) -> StepResult:
 
     output_path = chunk_wav_path(ctx.run_id, session_code, chunk_index)
     if not output_path.is_file():
-        tmp_wav_path = convert_to_audio(chunks[chunk_index], job_data)
+        tmp_wav_path = convert_to_audio(chunks[chunk_index], tts_job_data)
         _stash_generated_wav(tmp_wav_path, str(output_path))
 
     logger.info(
