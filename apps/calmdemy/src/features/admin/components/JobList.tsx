@@ -22,6 +22,11 @@ interface JobListProps {
   footerComponent?: React.ReactElement | null;
 }
 
+interface JobGroup {
+  parentJob: ContentJob;
+  childJobs: ContentJob[];
+}
+
 export function JobList({
   jobs,
   activeWorkersByJobId = {},
@@ -33,6 +38,7 @@ export function JobList({
 }: JobListProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const groupedJobs = useMemo(() => buildJobGroups(jobs), [jobs]);
 
   if (isLoading) {
     return (
@@ -77,15 +83,31 @@ export function JobList({
 
   return (
     <FlatList
-      data={jobs}
-      keyExtractor={(item) => item.id}
+      data={groupedJobs}
+      keyExtractor={(item) => item.parentJob.id}
       renderItem={({ item }) => (
-        <View style={styles.jobItem}>
-          <JobCard
-            job={item}
-            activeWorkers={activeWorkersByJobId[item.id] || []}
-            onPress={() => onJobSelect(item.id)}
-          />
+        <View style={styles.jobGroup}>
+          <View style={styles.jobItem}>
+            <JobCard
+              job={item.parentJob}
+              activeWorkers={activeWorkersByJobId[item.parentJob.id] || []}
+              onPress={() => onJobSelect(item.parentJob.id)}
+            />
+          </View>
+
+          {item.childJobs.length > 0 ? (
+            <View style={styles.childJobs}>
+              {item.childJobs.map((childJob) => (
+                <View key={childJob.id} style={[styles.jobItem, styles.childJobItem]}>
+                  <JobCard
+                    job={childJob}
+                    activeWorkers={activeWorkersByJobId[childJob.id] || []}
+                    onPress={() => onJobSelect(childJob.id)}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       )}
       ListHeaderComponent={headerComponent}
@@ -95,6 +117,38 @@ export function JobList({
       showsVerticalScrollIndicator={false}
     />
   );
+}
+
+function buildJobGroups(jobs: ContentJob[]): JobGroup[] {
+  const jobsById = new Map(jobs.map((job) => [job.id, job]));
+  const childJobsByParentId = new Map<string, ContentJob[]>();
+  const groupedJobs: JobGroup[] = [];
+
+  jobs.forEach((job) => {
+    const parentJobId = String(job.parentJobId || '').trim();
+    const parentJob = parentJobId ? jobsById.get(parentJobId) : undefined;
+    const shouldNestUnderParent =
+      Boolean(parentJob) &&
+      parentJob?.contentType === 'full_subject' &&
+      job.contentType === 'course';
+
+    if (shouldNestUnderParent) {
+      const existingChildren = childJobsByParentId.get(parentJobId) || [];
+      existingChildren.push(job);
+      childJobsByParentId.set(parentJobId, existingChildren);
+      return;
+    }
+
+    groupedJobs.push({
+      parentJob: job,
+      childJobs: [],
+    });
+  });
+
+  return groupedJobs.map((group) => ({
+    ...group,
+    childJobs: childJobsByParentId.get(group.parentJob.id) || [],
+  }));
 }
 
 const createStyles = (theme: Theme) =>
@@ -118,7 +172,19 @@ const createStyles = (theme: Theme) =>
     list: {
       paddingBottom: 100,
     },
+    jobGroup: {
+      gap: 8,
+    },
     jobItem: {
       marginHorizontal: 16,
+    },
+    childJobs: {
+      gap: 8,
+    },
+    childJobItem: {
+      marginLeft: 40,
+      paddingLeft: 12,
+      borderLeftWidth: 2,
+      borderLeftColor: theme.colors.border,
     },
   });
