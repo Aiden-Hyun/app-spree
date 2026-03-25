@@ -6,6 +6,7 @@ from .scheduler import workflow_for_job_type
 from ..shared.lineage_timing import finalize_job_timing
 from ..shared.metrics import record_job_metric
 from ..shared.course_tts_chunks import make_chunk_shard_key, parse_chunk_shard_key, split_course_tts_chunks
+from ..shared.course_tts_progress import build_course_tts_progress
 
 COURSE_AUDIO_SHARDS = ("INT", "M1L", "M1P", "M2L", "M2P", "M3L", "M3P", "M4L", "M4P")
 COURSE_AUDIO_CHUNK_STEP = "synthesize_course_audio_chunk"
@@ -338,6 +339,16 @@ class Orchestrator:
 
     def _fan_out_course_audio(self, job: dict, job_id: str, run_id: str) -> None:
         completed_shards = self._completed_course_audio_shards(job)
+        content_job_id = self._content_job_id(job)
+        if content_job_id:
+            tts_progress = build_course_tts_progress(job)
+            if tts_progress:
+                self.job_repo.patch_compat_content_job_for_run(
+                    content_job_id,
+                    run_id,
+                    {"ttsProgress": tts_progress},
+                )
+
         if completed_shards:
             # Surface checkpoint-reused shards in this run's timeline so UI does not
             # show them as "waiting" when they are already completed.

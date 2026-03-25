@@ -52,6 +52,7 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
     [activeWorkers]
   );
   const timingLabel = useMemo(() => getTimingLabel(job), [job]);
+  const ttsProgressLabel = useMemo(() => getTtsProgressLabel(job), [job]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -107,6 +108,17 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
+
+      {ttsProgressLabel ? (
+        <View style={styles.ttsProgressBadge}>
+          <Ionicons
+            name="volume-high-outline"
+            size={14}
+            color={theme.colors.info}
+          />
+          <Text style={styles.ttsProgressBadgeText}>{ttsProgressLabel}</Text>
+        </View>
+      ) : null}
 
       {timingLabel ? (
         <View
@@ -222,6 +234,69 @@ function getTimingLabel(job: ContentJob): string | null {
   return `${formatElapsedMsCompact(elapsedMs)} active`;
 }
 
+function getTtsProgressLabel(job: ContentJob): string | null {
+  if (job.status !== 'tts_converting' || job.contentType !== 'course') {
+    return null;
+  }
+
+  const totalChunks =
+    typeof job.ttsProgress?.totalChunks === 'number' && Number.isFinite(job.ttsProgress.totalChunks)
+      ? job.ttsProgress.totalChunks
+      : 0;
+  const completedChunks =
+    typeof job.ttsProgress?.completedChunks === 'number' &&
+    Number.isFinite(job.ttsProgress.completedChunks)
+      ? Math.max(0, Math.min(totalChunks, job.ttsProgress.completedChunks))
+      : 0;
+
+  if (totalChunks > 0) {
+    const percent =
+      typeof job.ttsProgress?.percent === 'number' && Number.isFinite(job.ttsProgress.percent)
+        ? Math.max(0, Math.min(100, Math.round(job.ttsProgress.percent)))
+        : Math.round((completedChunks / totalChunks) * 100);
+    return `TTS ${percent}% | ${completedChunks}/${totalChunks} chunks`;
+  }
+
+  const sessionCounts = getCourseAudioSessionCounts(job);
+  if (!sessionCounts) {
+    return null;
+  }
+
+  const sessionPercent = Math.round((sessionCounts.completed / sessionCounts.total) * 100);
+  return `TTS ${sessionPercent}% | ${sessionCounts.completed}/${sessionCounts.total} audio`;
+}
+
+function getCourseAudioSessionCounts(job: ContentJob): { completed: number; total: number } | null {
+  const progressMatch = String(job.courseProgress || '').match(/Audio\s+(\d+)\/(\d+)/i);
+  if (progressMatch) {
+    const completed = Number(progressMatch[1]);
+    const total = Number(progressMatch[2]);
+    if (Number.isFinite(completed) && Number.isFinite(total) && total > 0) {
+      return {
+        completed: Math.max(0, Math.min(total, Math.round(completed))),
+        total: Math.max(1, Math.round(total)),
+      };
+    }
+  }
+
+  const audioResults = job.courseAudioResults || {};
+  const completed = Object.values(audioResults).filter((result) => {
+    if (!result || typeof result !== 'object') {
+      return false;
+    }
+    return Boolean(String(result.storagePath || '').trim());
+  }).length;
+
+  if (completed <= 0) {
+    return { completed: 0, total: 9 };
+  }
+
+  return {
+    completed,
+    total: 9,
+  };
+}
+
 function formatElapsedMsRoundedToMinute(ms: number): string {
   const roundedMinutes = Math.max(1, Math.round(Math.max(0, ms) / 60000));
   if (roundedMinutes < 60) {
@@ -314,6 +389,24 @@ const createStyles = (theme: Theme) =>
     timingBadgeText: {
       fontFamily: 'DMSans-Medium',
       fontSize: 12,
+    },
+    ttsProgressBadge: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      backgroundColor: `${theme.colors.info}12`,
+      borderWidth: 1,
+      borderColor: `${theme.colors.info}28`,
+    },
+    ttsProgressBadgeText: {
+      fontFamily: 'DMSans-Medium',
+      fontSize: 12,
+      color: theme.colors.info,
     },
     workerHeader: {
       flexDirection: 'row',

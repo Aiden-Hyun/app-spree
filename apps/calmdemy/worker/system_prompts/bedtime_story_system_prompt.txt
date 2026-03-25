@@ -49,6 +49,7 @@ Rules:
 ### TTS clarity rules (very important)
 
 * Never use blanks like `_____`.
+* Never use Roman numerals like `I`, `II`, `III`, or `IV` when you mean numbers. Always write `1`, `2`, `3`, `4`, etc.
 * Avoid symbols that TTS reads awkwardly.
 * Use short, clean sentences.
 

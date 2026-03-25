@@ -156,6 +156,17 @@ export interface SubjectChildCounts {
 
 export type TimingStatus = 'exact' | 'legacy' | 'unavailable';
 
+export interface CourseTtsProgress {
+  mode?: 'chunk_words';
+  percent?: number;
+  completedChunks?: number;
+  totalChunks?: number;
+  completedWords?: number;
+  totalWords?: number;
+  completedSessions?: number;
+  totalSessions?: number;
+}
+
 // ==================== JOB PARAMS ====================
 
 export interface ContentJobParams {
@@ -275,6 +286,7 @@ export interface ContentJob {
   pausedAt?: Timestamp;
   launchCursor?: number;
   maxActiveChildCourses?: number;
+  ttsProgress?: CourseTtsProgress;
 
   // Timing
   timingStatus?: TimingStatus;

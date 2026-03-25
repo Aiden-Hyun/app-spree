@@ -12,6 +12,10 @@ from factory_v2.shared.lineage_timing import (
     copy_artifacts,
     merge_artifacts,
 )
+from factory_v2.shared.course_tts_progress import (
+    build_course_tts_progress,
+    format_course_tts_progress_label,
+)
 from factory_v2.shared.worker_status import update_worker_status
 
 from ..steps.base import StepContext
@@ -108,6 +112,40 @@ class ClaimLoop:
         if extra:
             fields.update(extra)
         return fields
+
+    def _patch_course_tts_progress(
+        self,
+        *,
+        job_id: str,
+        run_id: str,
+        step_name: str,
+        content_job_id: str,
+        updated_job: dict[str, Any],
+    ) -> None:
+        if not content_job_id:
+            return
+        if str(updated_job.get("job_type") or "").strip() != "course":
+            return
+        if step_name not in {"synthesize_course_audio_chunk", "synthesize_course_audio"}:
+            return
+
+        succeeded_chunk_shards = self.step_run_repo.succeeded_shard_keys(
+            job_id,
+            run_id,
+            "synthesize_course_audio_chunk",
+        )
+        tts_progress = build_course_tts_progress(
+            updated_job,
+            succeeded_chunk_shards=succeeded_chunk_shards,
+        )
+        if not tts_progress:
+            return
+
+        patch: dict[str, Any] = {"ttsProgress": tts_progress}
+        course_progress = format_course_tts_progress_label(tts_progress)
+        if course_progress:
+            patch["courseProgress"] = course_progress
+        self.job_repo.patch_compat_content_job_for_run(content_job_id, run_id, patch)
 
     def run_once(self) -> bool:
         claimed = self.queue_scheduler.claim_next(
@@ -374,6 +412,13 @@ class ClaimLoop:
                 result.compat_content_job_patch,
             )
             updated_job = self.job_repo.get(job_id)
+            self._patch_course_tts_progress(
+                job_id=job_id,
+                run_id=run_id,
+                step_name=step_name,
+                content_job_id=content_job_id,
+                updated_job=updated_job,
+            )
             artifact_updates = build_artifact_updates(
                 before_job=claimed_job,
                 after_job=updated_job,

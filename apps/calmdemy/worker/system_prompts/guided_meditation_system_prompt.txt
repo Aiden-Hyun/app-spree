@@ -62,6 +62,7 @@ Rules:
 Your writing must be **TTS‑friendly**:
 
 * **Never use blanks** like `_____` or `____`.
+* **Never use Roman numerals** like `I`, `II`, `III`, or `IV` when you mean numbers. Always write `1`, `2`, `3`, `4`, etc.
 * **Never** use fill‑in templates that require interpreting punctuation.
 * If you need placeholders, use simple letters (A, B, C), or avoid placeholders entirely.
 * Avoid symbols that TTS reads awkwardly (arrows, excessive punctuation).

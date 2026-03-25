@@ -41,7 +41,7 @@ def _build_session_script_prompt(
     if session_type == "intro":
         intro_outline = plan.get("intro", {}).get("outline", "Welcome to the course.")
         return (
-            f"You are CalmNest Course Scriptwriter. Write a Course Intro script "
+            f"You are Calmdemy Course Scriptwriter. Write a Course Intro script "
             f"for the course '{course_title}' (code: {course_code}).\\n\\n"
             f"Therapy approach: {approach}\\n"
             f"Tone: {tone}\\n"
@@ -55,6 +55,7 @@ def _build_session_script_prompt(
             f"- Include a short educational disclaimer (not treatment).\\n"
             f"- Spoken narration only. No markdown, headings, bullets, numbered lists, separators, or speaker labels.\\n"
             f"- Use natural spoken paragraphs, not article sections.\\n"
+            f"- Never use Roman numerals like I, II, III, or IV when you mean numbers. Always write 1, 2, 3, 4, etc.\\n"
             f"- Use [PAUSE Xs] markers for pauses (e.g. [PAUSE 3s]).\\n"
             f"- Write ONLY the narration script. No titles or metadata at the top.\\n"
             f"- End with ---END---"
@@ -68,7 +69,7 @@ def _build_session_script_prompt(
         summary = module.get("lessonSummary", "")
         objective = module.get("objective", "")
         return (
-            f"You are CalmNest Course Scriptwriter. Write a Lesson script "
+            f"You are Calmdemy Course Scriptwriter. Write a Lesson script "
             f"for Module {module_idx + 1} of '{course_title}' ({course_code}).\\n\\n"
             f"Module title: {module.get('moduleTitle', '')}\\n"
             f"Lesson title: {title}\\n"
@@ -82,6 +83,7 @@ def _build_session_script_prompt(
             f"- Clear teaching with one example and one tool.\\n"
             f"- Spoken narration only. No markdown, headings, bullets, numbered lists, speaker labels, or separators.\\n"
             f"- Use natural spoken paragraphs, not article sections or list formatting.\\n"
+            f"- Never use Roman numerals like I, II, III, or IV when you mean numbers. Always write 1, 2, 3, 4, etc.\\n"
             f"- Define ideas in plain language instead of quoting textbook definitions.\\n"
             f"- Use [PAUSE Xs] markers for pauses.\\n"
             f"- Include a gentle closing and takeaway line.\\n"
@@ -96,7 +98,7 @@ def _build_session_script_prompt(
     prompts = module.get("reflectionPrompts", [])
     takeaway = module.get("keyTakeaway", "")
     return (
-        f"You are CalmNest Course Scriptwriter. Write a Practice script "
+        f"You are Calmdemy Course Scriptwriter. Write a Practice script "
         f"for Module {module_idx + 1} of '{course_title}' ({course_code}).\\n\\n"
         f"Module title: {module.get('moduleTitle', '')}\\n"
         f"Practice title: {title}\\n"
@@ -111,6 +113,7 @@ def _build_session_script_prompt(
         f"- Guided exercise with varied prompts and intentional pauses.\\n"
         f"- Spoken narration only. No markdown, headings, bullets, numbered lists, speaker labels, or separators.\\n"
         f"- Use natural spoken paragraphs, not article sections or checklist formatting.\\n"
+        f"- Never use Roman numerals like I, II, III, or IV when you mean numbers. Always write 1, 2, 3, 4, etc.\\n"
         f"- Use [PAUSE Xs] markers for pauses (3s-10s).\\n"
         f"- Include re-centering language and reflection.\\n"
         f"- Clear start and end.\\n"
