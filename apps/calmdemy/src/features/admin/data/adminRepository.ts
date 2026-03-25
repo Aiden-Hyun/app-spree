@@ -48,8 +48,10 @@ const workerControlCollection = collection(db, 'worker_control');
 const stepRunsCollection = collection(db, 'factory_step_runs');
 const COURSE_SHARD_SUFFIXES = ['INT', 'M1L', 'M1P', 'M2L', 'M2P', 'M3L', 'M3P', 'M4L', 'M4P'];
 
-function freshDispatchResetFields(): Record<string, null | false | string> {
-  return {
+function freshDispatchResetFields(
+  options?: { preserveTiming?: boolean }
+): Record<string, null | false | string> {
+  const base: Record<string, null | false | string> = {
     jobRunId: null,
     runAttempt: null,
     runWorkerId: null,
@@ -61,6 +63,13 @@ function freshDispatchResetFields(): Record<string, null | false | string> {
     v2DispatchError: null,
     v2DispatchedBy: null,
     v2DispatchedAt: null,
+    activeRunElapsedMs: null,
+  };
+  if (options?.preserveTiming) {
+    return base;
+  }
+  return {
+    ...base,
     timingStatus: 'unavailable',
     effectiveElapsedMs: null,
     effectiveWorkerMs: null,
@@ -70,7 +79,6 @@ function freshDispatchResetFields(): Record<string, null | false | string> {
     parallelismFactor: null,
     timingComputedAt: null,
     timingVersion: null,
-    activeRunElapsedMs: null,
   };
 }
 
@@ -367,6 +375,7 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   // Course jobs get extra tracking fields
   if (input.contentType === 'course') {
     jobData.courseProgress = 'Pending';
+    jobData.generateThumbnailDuringRun = Boolean(input.generateThumbnailDuringRun);
     if (input.requireScriptApprovalBeforeTts) {
       jobData.courseScriptApproval = makePendingScriptApprovalPayload(userId);
     }
@@ -1353,6 +1362,35 @@ export async function publishCompletedJob(jobId: string): Promise<void> {
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
     ...freshDispatchResetFields(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function requestCourseThumbnailGeneration(job: ContentJob): Promise<void> {
+  if (job.contentType !== 'course') {
+    throw new Error('Thumbnail generation is only supported for course jobs.');
+  }
+  if (job.status !== 'completed') {
+    throw new Error('Finish the course job before generating a deferred thumbnail.');
+  }
+
+  await updateDoc(doc(jobsCollection, job.id), {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    publishInProgress: false,
+    publishLeaseOwner: null,
+    publishLeaseExpiresAt: null,
+    courseProgress: job.thumbnailUrl
+      ? 'Regenerating course thumbnail'
+      : 'Generating deferred course thumbnail',
+    thumbnailGenerationRequested: true,
+    ...freshDispatchResetFields({ preserveTiming: true }),
     updatedAt: serverTimestamp(),
   });
 }

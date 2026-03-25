@@ -610,6 +610,7 @@ def _make_child_course_job(ctx: StepContext, job_data: dict[str, Any], course: d
         "ttsVoice": job_data.get("ttsVoice"),
         "title": course.get("title"),
         "autoPublish": True,
+        "generateThumbnailDuringRun": False,
         "courseProgress": "Pending",
         "parentJobId": _content_job_id(ctx.job),
         "createdAt": fs.SERVER_TIMESTAMP,

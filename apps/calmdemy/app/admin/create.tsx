@@ -80,6 +80,7 @@ type DraftPayload = {
   subjectId: string;
   targetAudience: string;
   tone: string;
+  generateThumbnailDuringRun: boolean;
   requireScriptApprovalBeforeTts: boolean;
   levelCounts: SubjectLevelCounts;
   requireSubjectPlanApproval: boolean;
@@ -120,6 +121,7 @@ export default function CreateContentScreen() {
   const [subjectId, setSubjectId] = useState('');
   const [targetAudience, setTargetAudience] = useState<string>('beginner');
   const [tone, setTone] = useState<string>('gentle');
+  const [generateThumbnailDuringRun, setGenerateThumbnailDuringRun] = useState(false);
   const [requireScriptApprovalBeforeTts, setRequireScriptApprovalBeforeTts] = useState(false);
   const [levelCounts, setLevelCounts] = useState<SubjectLevelCounts>({
     l100: 0,
@@ -197,6 +199,7 @@ export default function CreateContentScreen() {
         setSubjectId(draft.subjectId);
         setTargetAudience(draft.targetAudience || 'beginner');
         setTone(draft.tone || 'gentle');
+        setGenerateThumbnailDuringRun(Boolean(draft.generateThumbnailDuringRun));
         setRequireScriptApprovalBeforeTts(Boolean(draft.requireScriptApprovalBeforeTts));
         setLevelCounts(
           draft.levelCounts || {
@@ -233,6 +236,7 @@ export default function CreateContentScreen() {
           subjectId: draft.subjectId,
           targetAudience: draft.targetAudience,
           tone: draft.tone,
+          generateThumbnailDuringRun: Boolean(draft.generateThumbnailDuringRun),
           requireScriptApprovalBeforeTts: Boolean(draft.requireScriptApprovalBeforeTts),
           levelCounts: draft.levelCounts || {
             l100: 0,
@@ -346,6 +350,7 @@ export default function CreateContentScreen() {
     subjectId,
     targetAudience,
     tone,
+    generateThumbnailDuringRun,
     requireScriptApprovalBeforeTts,
     levelCounts,
     requireSubjectPlanApproval,
@@ -370,6 +375,7 @@ export default function CreateContentScreen() {
     subjectId,
     targetAudience,
     tone,
+    generateThumbnailDuringRun,
     requireScriptApprovalBeforeTts,
     levelCounts,
     requireSubjectPlanApproval,
@@ -548,6 +554,7 @@ export default function CreateContentScreen() {
             : (title.trim() || undefined),
         imagePrompt: isFullSubject ? undefined : (imagePrompt.trim() || undefined),
         autoPublish: isFullSubject ? true : autoPublish,
+        generateThumbnailDuringRun: isCourse ? generateThumbnailDuringRun : undefined,
         requireScriptApprovalBeforeTts: isCourse ? requireScriptApprovalBeforeTts : false,
         requireSubjectPlanApproval: isFullSubject ? requireSubjectPlanApproval : false,
       };
@@ -603,6 +610,8 @@ export default function CreateContentScreen() {
         onTargetAudienceChange={setTargetAudience}
         tone={tone}
         onToneChange={setTone}
+        generateThumbnailDuringRun={generateThumbnailDuringRun}
+        onGenerateThumbnailDuringRunChange={setGenerateThumbnailDuringRun}
         requireScriptApprovalBeforeTts={requireScriptApprovalBeforeTts}
         onRequireScriptApprovalBeforeTtsChange={setRequireScriptApprovalBeforeTts}
         levelCounts={levelCounts}

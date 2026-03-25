@@ -53,6 +53,7 @@ type Props = {
   onCancel: () => void;
   onPublish: () => void;
   onPauseSubject: () => Promise<void>;
+  onRequestThumbnail: () => void;
   publishButtonLabel?: string;
   onRegenerateCourse: (input: {
     mode: CourseRegenerationMode;
@@ -108,6 +109,7 @@ export function JobDetailView({
   onCancel,
   onPublish,
   onPauseSubject,
+  onRequestThumbnail,
   publishButtonLabel = 'Publish Now',
   onRegenerateCourse,
   onRegenerateSubjectPlan,
@@ -837,6 +839,18 @@ export function JobDetailView({
             onPress={onReview}
           />
         )}
+
+        {job.contentType === 'course' &&
+          job.status === 'completed' &&
+          !isAwaitingAnyScriptApproval &&
+          !isAwaitingSubjectPlanApproval && (
+            <PrimaryButton
+              label={job.thumbnailUrl ? 'Regenerate Thumbnail' : 'Generate Thumbnail'}
+              icon="image-outline"
+              color={theme.colors.secondary}
+              onPress={onRequestThumbnail}
+            />
+          )}
 
         {job.contentType === 'full_subject' && job.status !== 'paused' && job.status !== 'completed' && job.status !== 'failed' && (
           <PrimaryButton
@@ -2447,6 +2461,9 @@ function formatParallelism(value?: number | null) {
 }
 
 function resolveTimingStatus(job: ContentJob): 'exact' | 'legacy' | 'unavailable' {
+  if (job.status !== 'completed' && job.status !== 'failed') {
+    return 'unavailable';
+  }
   if (job.timingStatus === 'exact') return 'exact';
   if (job.timingStatus === 'legacy') return 'legacy';
   return getLegacyElapsedMs(job) !== undefined ? 'legacy' : 'unavailable';

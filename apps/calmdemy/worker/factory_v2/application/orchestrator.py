@@ -44,6 +44,29 @@ class Orchestrator:
         return str(payload.get("thumbnailUrl") or "").strip()
 
     @staticmethod
+    def _course_generates_thumbnail_during_run(job: dict) -> bool:
+        runtime = dict(job.get("runtime") or {})
+        if isinstance(runtime.get("generate_thumbnail_during_run"), bool):
+            return bool(runtime.get("generate_thumbnail_during_run"))
+
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        value = payload.get("generateThumbnailDuringRun")
+        if isinstance(value, bool):
+            return value
+        return True
+
+    @staticmethod
+    def _course_thumbnail_generation_requested(job: dict) -> bool:
+        runtime = dict(job.get("runtime") or {})
+        if isinstance(runtime.get("thumbnail_generation_requested"), bool):
+            return bool(runtime.get("thumbnail_generation_requested"))
+
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        return bool(payload.get("thumbnailGenerationRequested"))
+
+    @staticmethod
     def _course_regeneration(job: dict) -> dict:
         runtime = dict(job.get("runtime") or {})
         regeneration = runtime.get("course_regeneration")
@@ -139,14 +162,15 @@ class Orchestrator:
         """
         Mark reusable course prerequisites as completed when a run starts mid-pipeline.
 
-        Regeneration runs often begin after thumbnail generation and reuse the existing
-        thumbnail. Without surfacing that checkpoint in the new run, publish_course
-        never becomes eligible because it waits for generate_course_thumbnail.
+        Regeneration and deferred-thumbnail runs can begin after parts of the
+        course have already completed in earlier runs. Surfacing those prior
+        results in the new run keeps publish gating and the UI in sync.
         """
         if job.get("job_type") != "course":
             return
 
         if first_step not in {
+            "generate_course_thumbnail",
             "generate_course_scripts",
             "format_course_scripts",
             "synthesize_course_audio",
@@ -156,21 +180,36 @@ class Orchestrator:
             return
 
         thumbnail_url = self._course_thumbnail_url(job)
-        if not thumbnail_url:
-            return
+        if thumbnail_url and not (
+            first_step == "generate_course_thumbnail"
+            and self._course_thumbnail_generation_requested(job)
+        ):
+            step_run_id = self.step_run_repo.ensure_ready(
+                job_id,
+                run_id,
+                "generate_course_thumbnail",
+            )
+            self.step_run_repo.mark_succeeded_from_checkpoint(
+                step_run_id,
+                {
+                    "reused_from_checkpoint": True,
+                    "thumbnail_url": thumbnail_url,
+                },
+            )
 
-        step_run_id = self.step_run_repo.ensure_ready(
-            job_id,
-            run_id,
-            "generate_course_thumbnail",
-        )
-        self.step_run_repo.mark_succeeded_from_checkpoint(
-            step_run_id,
-            {
-                "reused_from_checkpoint": True,
-                "thumbnail_url": thumbnail_url,
-            },
-        )
+        if self._course_has_uploaded_audio(job):
+            upload_step_run_id = self.step_run_repo.ensure_ready(
+                job_id,
+                run_id,
+                "upload_course_audio",
+            )
+            self.step_run_repo.mark_succeeded_from_checkpoint(
+                upload_step_run_id,
+                {
+                    "reused_from_checkpoint": True,
+                    "audio_reused": True,
+                },
+            )
 
     @staticmethod
     def _completed_course_audio_shards(job: dict) -> set[str]:
@@ -188,6 +227,10 @@ class Orchestrator:
                     completed.add(shard)
                     break
         return completed
+
+    @staticmethod
+    def _course_has_uploaded_audio(job: dict) -> bool:
+        return len(Orchestrator._completed_course_audio_shards(job)) == len(COURSE_AUDIO_SHARDS)
 
     @staticmethod
     def _formatted_course_scripts(job: dict) -> dict[str, str]:
@@ -521,8 +564,8 @@ class Orchestrator:
         """
         Heal course runs that already uploaded audio but never enqueued publish.
 
-        This can happen when a regeneration run reuses an existing thumbnail and
-        therefore never executes generate_course_thumbnail in the current run.
+        This can happen when a regeneration run reuses existing prerequisites or
+        when a deferred-thumbnail course only requires audio upload before publish.
         """
         job = self.job_repo.get(job_id)
         if job.get("job_type") != "course":
@@ -534,7 +577,16 @@ class Orchestrator:
             return False
         if self.step_run_repo.has_succeeded(job_id, run_id, "publish_course"):
             return False
-        if not self.step_run_repo.has_succeeded(job_id, run_id, "generate_course_thumbnail"):
+
+        requires_thumbnail = (
+            self._course_generates_thumbnail_during_run(job)
+            or self._course_thumbnail_generation_requested(job)
+        )
+        if requires_thumbnail and not self.step_run_repo.has_succeeded(
+            job_id,
+            run_id,
+            "generate_course_thumbnail",
+        ):
             if not self._course_thumbnail_url(job):
                 return False
 
@@ -589,6 +641,17 @@ class Orchestrator:
                 return
 
         if job["job_type"] == "course":
+            if step_name == "generate_course_plan" and self._course_generates_thumbnail_during_run(job):
+                self._ensure_step_enqueued(job, job_id, run_id, "generate_course_thumbnail")
+            if step_name == "generate_course_thumbnail":
+                if self.step_run_repo.has_succeeded(job_id, run_id, "upload_course_audio"):
+                    self._ensure_step_enqueued(job, job_id, run_id, "publish_course")
+                    return
+                if self._course_thumbnail_generation_requested(job):
+                    self.job_repo.mark_completed(job_id, run_id)
+                    self.run_repo.mark_completed(run_id)
+                    return
+                return
             if step_name == "generate_course_scripts":
                 if (
                     self._course_regeneration_awaiting_script_approval(job)
@@ -615,6 +678,24 @@ class Orchestrator:
                 return
             if step_name == "synthesize_course_audio":
                 self._maybe_fan_in_course_audio(job, job_id, run_id)
+                return
+            if step_name == "upload_course_audio":
+                requires_thumbnail = (
+                    self._course_generates_thumbnail_during_run(job)
+                    or self._course_thumbnail_generation_requested(job)
+                )
+                if requires_thumbnail and not self.step_run_repo.has_succeeded(
+                    job_id,
+                    run_id,
+                    "generate_course_thumbnail",
+                ):
+                    if not self._course_thumbnail_url(job):
+                        return
+                self._ensure_step_enqueued(job, job_id, run_id, "publish_course")
+                return
+            if step_name == "publish_course" and self._course_thumbnail_generation_requested(job):
+                self.job_repo.mark_completed(job_id, run_id)
+                self.run_repo.mark_completed(run_id)
                 return
         elif step_name == "generate_script" and self._single_script_approval_awaiting(job):
             self.job_repo.mark_completed(job_id, run_id)

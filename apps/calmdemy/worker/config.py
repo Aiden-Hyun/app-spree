@@ -40,10 +40,10 @@ LMSTUDIO_HOST = os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 # Image generation
-IMAGE_MODEL_ID = os.getenv("IMAGE_MODEL_ID", "black-forest-labs/FLUX.2-klein-4B")
-IMAGE_WIDTH = int(os.getenv("IMAGE_WIDTH", "1024"))
-IMAGE_HEIGHT = int(os.getenv("IMAGE_HEIGHT", "1024"))
-IMAGE_STEPS = int(os.getenv("IMAGE_STEPS", "24"))
+IMAGE_MODEL_ID = os.getenv("IMAGE_MODEL_ID", "stabilityai/sd-turbo")
+IMAGE_WIDTH = int(os.getenv("IMAGE_WIDTH", "512"))
+IMAGE_HEIGHT = int(os.getenv("IMAGE_HEIGHT", "512"))
+IMAGE_STEPS = int(os.getenv("IMAGE_STEPS", "10"))
 IMAGE_GUIDANCE = float(os.getenv("IMAGE_GUIDANCE", "3.5"))
 IMAGE_PIPELINE_CACHE_ENABLED = (
     os.getenv("IMAGE_PIPELINE_CACHE_ENABLED", "false").strip().lower() == "true"

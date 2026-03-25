@@ -55,11 +55,10 @@ COURSE_WORKFLOW = WorkflowSpec(
         "publish_course",
     ],
     edges={
-        "generate_course_plan": ["generate_course_thumbnail", "generate_course_scripts"],
+        "generate_course_plan": ["generate_course_scripts"],
         "generate_course_scripts": ["format_course_scripts"],
         "format_course_scripts": ["synthesize_course_audio"],
         "synthesize_course_audio": ["upload_course_audio"],
-        "generate_course_thumbnail": ["publish_course"],
         "upload_course_audio": ["publish_course"],
     },
     terminal_step="publish_course",

@@ -16,6 +16,7 @@ import {
   pauseFullSubjectJob,
   regenerateSubjectPlan,
   regeneratePendingScripts,
+  requestCourseThumbnailGeneration,
   resumeFullSubjectJob,
   subscribeToChildJobs,
   subscribeToJobStepTimeline,
@@ -125,6 +126,11 @@ export function useJobDetail(jobId: string) {
     await regeneratePendingScripts(job);
   }, [job, jobId]);
 
+  const requestThumbnailAction = useCallback(async () => {
+    if (!jobId || !job) return;
+    await requestCourseThumbnailGeneration(job);
+  }, [job, jobId]);
+
   const approveSubjectPlanAction = useCallback(async (input?: {
     courseEdits?: Record<string, { title?: string; description?: string }>;
   }) => {
@@ -157,6 +163,7 @@ export function useJobDetail(jobId: string) {
     approveSubjectPlan: approveSubjectPlanAction,
     approvePendingScripts: approvePendingScriptsAction,
     pauseSubject: pauseSubjectAction,
+    requestThumbnail: requestThumbnailAction,
     regenerateSubjectPlan: regenerateSubjectPlanAction,
     regeneratePendingScripts: regeneratePendingScriptsAction,
     resumeSubject: resumeSubjectAction,

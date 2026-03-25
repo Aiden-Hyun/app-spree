@@ -100,6 +100,44 @@ class ImageGeneratorTests(unittest.TestCase):
             self.assertTrue(os.path.exists(output_path))
             shutil.rmtree(os.path.dirname(output_path), ignore_errors=True)
 
+    def test_sd_turbo_uses_one_step_zero_guidance_defaults(self) -> None:
+        output_paths: list[str] = []
+
+        with (
+            patch.object(image_generator.config, "IMAGE_PIPELINE_CACHE_ENABLED", False),
+            patch.object(image_generator.config, "IMAGE_MODEL_ID", "stabilityai/sd-turbo"),
+            patch.object(image_generator, "_resolve_pipeline_class", return_value=_FakePipelineClass),
+            patch.object(image_generator, "_empty_runtime_cache"),
+        ):
+            output_path = image_generator.generate_image(
+                "soft forest clearing",
+                negative_prompt="text, logo, people",
+                width=8,
+                height=8,
+            )
+            output_paths.append(output_path)
+
+        self.assertEqual(len(_FakePipelineClass.created_pipes), 1)
+        call_kwargs = _FakePipelineClass.created_pipes[0].calls[0]
+        self.assertEqual(call_kwargs["num_inference_steps"], 1)
+        self.assertEqual(call_kwargs["guidance_scale"], 0.0)
+        self.assertNotIn("negative_prompt", call_kwargs)
+
+        for output_path in output_paths:
+            self.assertTrue(os.path.exists(output_path))
+            shutil.rmtree(os.path.dirname(output_path), ignore_errors=True)
+
+    def test_resolve_pipeline_class_uses_auto_pipeline_for_sd_turbo(self) -> None:
+        PipelineClass = image_generator._resolve_pipeline_class("stabilityai/sd-turbo")
+        self.assertEqual(PipelineClass.__name__, "AutoPipelineForText2Image")
+
+    def test_model_cache_dir_is_model_specific(self) -> None:
+        flux_dir = image_generator._model_cache_dir("black-forest-labs/FLUX.2-klein-4B")
+        turbo_dir = image_generator._model_cache_dir("stabilityai/sd-turbo")
+        self.assertNotEqual(flux_dir, turbo_dir)
+        self.assertTrue(flux_dir.endswith("black-forest-labs--FLUX.2-klein-4B"))
+        self.assertTrue(turbo_dir.endswith("stabilityai--sd-turbo"))
+
 
 if __name__ == "__main__":
     unittest.main()

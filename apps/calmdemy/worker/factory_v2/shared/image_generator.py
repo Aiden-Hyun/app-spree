@@ -4,6 +4,7 @@ Step 3: Generate a thumbnail image using a local diffusion model.
 
 import gc
 import os
+import re
 import tempfile
 
 import torch
@@ -25,6 +26,79 @@ DEFAULT_FALLBACK_URL = (
 )
 
 
+def _normalize_model_id(model_id: str | None = None) -> str:
+    return str(model_id or config.IMAGE_MODEL_ID or "").strip()
+
+
+def _model_cache_dir(model_id: str | None = None) -> str:
+    normalized = _normalize_model_id(model_id)
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "--", normalized).strip("-") or "default"
+    return os.path.join(config.MODEL_DIR, "image_models", safe_name)
+
+
+def _model_generation_defaults(model_id: str | None = None) -> dict[str, object]:
+    model_lower = _normalize_model_id(model_id).lower()
+    if "sd-turbo" in model_lower or "sdxl-turbo" in model_lower:
+        return {
+            "preferred_width": 512,
+            "preferred_height": 512,
+            "num_inference_steps": 1,
+            "guidance_scale": 0.0,
+            "supports_negative_prompt": False,
+        }
+    return {
+        "preferred_width": None,
+        "preferred_height": None,
+        "num_inference_steps": None,
+        "guidance_scale": None,
+        "supports_negative_prompt": True,
+    }
+
+
+def _pipeline_pretrained_kwargs(model_id: str, dtype) -> dict[str, object]:
+    model_lower = _normalize_model_id(model_id).lower()
+    kwargs: dict[str, object] = {
+        "torch_dtype": dtype,
+        "cache_dir": _model_cache_dir(model_id),
+        # Avoid meta-tensor loading paths that can break on MPS/CPU.
+        "low_cpu_mem_usage": False,
+        "device_map": None,
+    }
+    if config.HF_TOKEN:
+        kwargs["token"] = config.HF_TOKEN
+    if ("sd-turbo" in model_lower or "sdxl-turbo" in model_lower) and dtype == torch.float16:
+        kwargs["variant"] = "fp16"
+    return kwargs
+
+
+def _load_pretrained_pipeline(PipelineClass, model_id: str, kwargs: dict[str, object]):
+    model_lower = _normalize_model_id(model_id).lower()
+    try:
+        return PipelineClass.from_pretrained(model_id, **kwargs)
+    except ValueError as e:
+        # Some Flux checkpoints omit optional components; retry with explicit None for FluxPipeline.
+        if PipelineClass.__name__ != "FluxPipeline":
+            raise
+        msg = str(e)
+        missing = ("feature_extractor", "image_encoder", "text_encoder_2", "tokenizer_2")
+        if not any(part in msg for part in missing):
+            raise
+        return PipelineClass.from_pretrained(
+            model_id,
+            text_encoder_2=None,
+            tokenizer_2=None,
+            image_encoder=None,
+            feature_extractor=None,
+            **kwargs,
+        )
+    except OSError:
+        if "variant" not in kwargs or not ("sd-turbo" in model_lower or "sdxl-turbo" in model_lower):
+            raise
+        fallback_kwargs = dict(kwargs)
+        fallback_kwargs.pop("variant", None)
+        return PipelineClass.from_pretrained(model_id, **fallback_kwargs)
+
+
 def _get_device() -> str:
     if torch.backends.mps.is_available():
         return "mps"
@@ -40,7 +114,7 @@ def _get_dtype(device: str):
 def _load_pipe():
     global _cached_pipe, _cached_pipeline_class, _cached_model_id, _cached_device, _cached_dtype
 
-    model_id = config.IMAGE_MODEL_ID
+    model_id = _normalize_model_id()
     device = _get_device()
     dtype = _get_dtype(device)
     PipelineClass = _resolve_pipeline_class(model_id)
@@ -57,35 +131,8 @@ def _load_pipe():
         or _cached_device != device
         or _cached_dtype != dtype
     ):
-        cache_dir = os.path.join(config.MODEL_DIR, "flux")
-        kwargs = {
-            "torch_dtype": dtype,
-            "cache_dir": cache_dir,
-            # Avoid meta-tensor loading paths that can break on MPS/CPU.
-            "low_cpu_mem_usage": False,
-            "device_map": None,
-        }
-        if config.HF_TOKEN:
-            kwargs["token"] = config.HF_TOKEN
-
-        try:
-            pipe = PipelineClass.from_pretrained(model_id, **kwargs)
-        except ValueError as e:
-            # Some flux checkpoints omit optional components; retry with explicit None for FluxPipeline.
-            if PipelineClass.__name__ != "FluxPipeline":
-                raise
-            msg = str(e)
-            missing = ("feature_extractor", "image_encoder", "text_encoder_2", "tokenizer_2")
-            if not any(part in msg for part in missing):
-                raise
-            pipe = PipelineClass.from_pretrained(
-                model_id,
-                text_encoder_2=None,
-                tokenizer_2=None,
-                image_encoder=None,
-                feature_extractor=None,
-                **kwargs,
-            )
+        kwargs = _pipeline_pretrained_kwargs(model_id, dtype)
+        pipe = _load_pretrained_pipeline(PipelineClass, model_id, kwargs)
         pipe.to(device)
         pipe.set_progress_bar_config(disable=True)
 
@@ -166,8 +213,12 @@ def _resolve_pipeline_class(model_id: str):
                 return Flux2Pipeline
         return Flux2Pipeline
 
-    from diffusers import FluxPipeline
-    return FluxPipeline
+    if "flux" in model_lower:
+        from diffusers import FluxPipeline
+        return FluxPipeline
+
+    from diffusers import AutoPipelineForText2Image
+    return AutoPipelineForText2Image
 
 
 def generate_image(
@@ -180,14 +231,25 @@ def generate_image(
 ) -> str:
     """Generate an image from a prompt and return local file path."""
     pipe = _load_pipe()
+    model_defaults = _model_generation_defaults()
     cache_enabled = bool(config.IMAGE_PIPELINE_CACHE_ENABLED)
     result = None
     image = None
 
-    width = width or config.IMAGE_WIDTH
-    height = height or config.IMAGE_HEIGHT
-    num_inference_steps = num_inference_steps or config.IMAGE_STEPS
-    guidance_scale = guidance_scale if guidance_scale is not None else config.IMAGE_GUIDANCE
+    width = width or int(model_defaults.get("preferred_width") or config.IMAGE_WIDTH)
+    height = height or int(model_defaults.get("preferred_height") or config.IMAGE_HEIGHT)
+    num_inference_steps = int(
+        num_inference_steps
+        or model_defaults.get("num_inference_steps")
+        or config.IMAGE_STEPS
+    )
+    guidance_scale = (
+        guidance_scale
+        if guidance_scale is not None
+        else model_defaults.get("guidance_scale")
+        if model_defaults.get("guidance_scale") is not None
+        else config.IMAGE_GUIDANCE
+    )
 
     kwargs = {
         "prompt": prompt,
@@ -196,7 +258,7 @@ def generate_image(
         "num_inference_steps": num_inference_steps,
         "guidance_scale": guidance_scale,
     }
-    if negative_prompt:
+    if negative_prompt and bool(model_defaults.get("supports_negative_prompt", True)):
         kwargs["negative_prompt"] = negative_prompt
 
     try:

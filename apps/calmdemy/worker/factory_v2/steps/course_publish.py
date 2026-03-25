@@ -137,6 +137,9 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
     request_status = str(job_data.get("status") or "").strip().lower()
     auto_publish = bool(job_data.get("autoPublish", True))
     manual_publish = request_status == "publishing"
+    thumbnail_generation_requested = bool(
+        runtime.get("thumbnail_generation_requested") or job_data.get("thumbnailGenerationRequested")
+    )
     regeneration = _course_regeneration(runtime, job_data)
     regeneration_active = bool(regeneration.get("active"))
     requires_publish_approval = bool(regeneration.get("requiresPublishApproval"))
@@ -159,6 +162,7 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
                 "courseProgress": "Completed (awaiting approval)",
                 "jobRunId": ctx.run_id,
                 "courseRegeneration": regeneration if regeneration_active else None,
+                "thumbnailGenerationRequested": False,
             },
         )
 
@@ -166,10 +170,16 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
 
     existing_course_id = runtime.get("course_id") or job_data.get("courseId")
     existing_session_ids = runtime.get("course_session_ids") or job_data.get("courseSessionIds")
-    if existing_course_id and (regeneration_active or manual_publish):
+    if existing_course_id and (regeneration_active or manual_publish or thumbnail_generation_requested):
         publish_token = str(existing_course_id)
 
-    if existing_course_id and existing_session_ids and not regeneration_active and not manual_publish:
+    if (
+        existing_course_id
+        and existing_session_ids
+        and not regeneration_active
+        and not manual_publish
+        and not thumbnail_generation_requested
+    ):
         return StepResult(
             output={"course_id": existing_course_id, "session_count": len(existing_session_ids)},
             summary_patch={"currentStep": "publish_course", "courseId": existing_course_id},
@@ -227,5 +237,6 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
             "courseProgress": "Published",
             "jobRunId": ctx.run_id,
             "courseRegeneration": None,
+            "thumbnailGenerationRequested": False,
         },
     )

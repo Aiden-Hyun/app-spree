@@ -132,6 +132,14 @@ class _UnusedQueueRepo:
     pass
 
 
+class _ConfigurableStepRunRepo:
+    def __init__(self, succeeded: set[tuple[str, str, str]] | None = None):
+        self._succeeded = set(succeeded or set())
+
+    def has_succeeded(self, job_id: str, run_id: str, step_name: str) -> bool:
+        return (job_id, run_id, step_name) in self._succeeded
+
+
 class CourseScriptApprovalTests(unittest.TestCase):
     def test_initial_course_script_approval_pauses_after_script_generation(self) -> None:
         course_code = "CBT101"
@@ -240,6 +248,55 @@ class CourseScriptApprovalTests(unittest.TestCase):
         self.assertEqual(start_new_run.call_args.kwargs["first_step"], "format_course_scripts")
         self.assertEqual(ensure_step_enqueued.call_args.args[-2:], ("run-789", "generate_course_thumbnail"))
 
+    def test_bootstrap_skips_thumbnail_enqueue_when_course_defers_it(self) -> None:
+        content_job_id = "job-1"
+        db = _FakeDB({"content_jobs": {content_job_id: {}}})
+        content_job = {
+            "contentType": "course",
+            "status": "pending",
+            "generateThumbnailDuringRun": False,
+            "coursePlan": _build_plan(),
+            "courseScriptApproval": {
+                "enabled": True,
+                "awaitingApproval": False,
+                "scriptApprovedBy": "admin-1",
+            },
+        }
+
+        with patch(
+            "factory_v2.interfaces.bootstrap.Orchestrator.start_new_run",
+            return_value="run-790",
+        ) as start_new_run, patch(
+            "factory_v2.interfaces.bootstrap.Orchestrator._ensure_step_enqueued",
+        ) as ensure_step_enqueued:
+            run_id = bootstrap_from_content_job(db, content_job_id, content_job)
+
+        self.assertEqual(run_id, "run-790")
+        self.assertEqual(start_new_run.call_args.kwargs["first_step"], "format_course_scripts")
+        ensure_step_enqueued.assert_not_called()
+
+    def test_bootstrap_starts_thumbnail_only_run_when_requested(self) -> None:
+        content_job_id = "job-1"
+        db = _FakeDB({"content_jobs": {content_job_id: {}}})
+        content_job = {
+            "contentType": "course",
+            "status": "pending",
+            "thumbnailGenerationRequested": True,
+            "coursePlan": _build_plan(),
+            "courseAudioResults": {
+                "CBT101INT": {"storagePath": "audio/test.mp3", "durationSec": 60}
+            },
+        }
+
+        with patch(
+            "factory_v2.interfaces.bootstrap.Orchestrator.start_new_run",
+            return_value="run-791",
+        ) as start_new_run:
+            run_id = bootstrap_from_content_job(db, content_job_id, content_job)
+
+        self.assertEqual(run_id, "run-791")
+        self.assertEqual(start_new_run.call_args.kwargs["first_step"], "generate_course_thumbnail")
+
     def test_orchestrator_marks_run_complete_when_initial_script_approval_is_waiting(self) -> None:
         job = {
             "job_type": "course",
@@ -258,6 +315,48 @@ class CourseScriptApprovalTests(unittest.TestCase):
 
         self.assertEqual(job_repo.completed_calls, [("job-1", "run-1")])
         self.assertEqual(run_repo.completed_calls, ["run-1"])
+
+    def test_orchestrator_allows_publish_after_upload_when_thumbnail_is_deferred(self) -> None:
+        job = {
+            "job_type": "course",
+            "runtime": {"generate_thumbnail_during_run": False},
+        }
+        job_repo = _RecordingJobRepo(job)
+        run_repo = _RecordingRunRepo()
+        orchestrator = Orchestrator(
+            job_repo=job_repo,
+            run_repo=run_repo,
+            step_run_repo=_ConfigurableStepRunRepo(),
+            queue_repo=_UnusedQueueRepo(),
+        )
+
+        with patch.object(orchestrator, "_ensure_step_enqueued") as ensure_step_enqueued:
+            orchestrator.on_step_success("job-1", "run-1", "upload_course_audio")
+
+        ensure_step_enqueued.assert_called_once()
+        self.assertEqual(ensure_step_enqueued.call_args.args[-2:], ("run-1", "publish_course"))
+
+    def test_thumbnail_only_course_run_completes_without_recomputing_timing(self) -> None:
+        job = {
+            "job_type": "course",
+            "runtime": {"thumbnail_generation_requested": True},
+            "request": {"content_job": {"thumbnailGenerationRequested": True}},
+        }
+        job_repo = _RecordingJobRepo(job)
+        run_repo = _RecordingRunRepo()
+        orchestrator = Orchestrator(
+            job_repo=job_repo,
+            run_repo=run_repo,
+            step_run_repo=_ConfigurableStepRunRepo(),
+            queue_repo=_UnusedQueueRepo(),
+        )
+
+        with patch.object(orchestrator, "_finalize_completed_job") as finalize_completed_job:
+            orchestrator.on_step_success("job-1", "run-1", "generate_course_thumbnail")
+
+        self.assertEqual(job_repo.completed_calls, [("job-1", "run-1")])
+        self.assertEqual(run_repo.completed_calls, ["run-1"])
+        finalize_completed_job.assert_not_called()
 
 
 class SingleContentScriptApprovalTests(unittest.TestCase):

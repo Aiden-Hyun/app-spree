@@ -23,7 +23,7 @@ function getStatusColor(status: string, theme: Theme): string {
     case 'pending':
       return theme.colors.gray[400];
     default:
-      return theme.colors.primary;
+      return theme.colors.info;
   }
 }
 
@@ -109,13 +109,21 @@ export function JobCard({ job, activeWorkers = [], onPress }: JobCardProps) {
       </View>
 
       {timingLabel ? (
-        <View style={styles.timingBadge}>
+        <View
+          style={[
+            styles.timingBadge,
+            {
+              backgroundColor: `${statusColor}12`,
+              borderColor: `${statusColor}28`,
+            },
+          ]}
+        >
           <Ionicons
             name="stopwatch-outline"
             size={14}
-            color={theme.colors.primary}
+            color={statusColor}
           />
-          <Text style={styles.timingBadgeText}>{timingLabel}</Text>
+          <Text style={[styles.timingBadgeText, { color: statusColor }]}>{timingLabel}</Text>
         </View>
       ) : null}
 
@@ -191,10 +199,7 @@ function getVisibleActiveWorkerIds(activeWorkers: ActiveJobWorker[]): string[] {
 }
 
 function getTimingLabel(job: ContentJob): string | null {
-  if (job.timingStatus !== 'exact') {
-    if (job.status === 'completed' || job.status === 'failed') {
-      return null;
-    }
+  if (job.status !== 'completed' && job.status !== 'failed') {
     const liveElapsedMs =
       typeof job.activeRunElapsedMs === 'number' && Number.isFinite(job.activeRunElapsedMs)
         ? job.activeRunElapsedMs
@@ -203,6 +208,9 @@ function getTimingLabel(job: ContentJob): string | null {
       return null;
     }
     return `${formatElapsedMsRoundedToMinute(liveElapsedMs)} active`;
+  }
+  if (job.timingStatus !== 'exact') {
+    return null;
   }
   const elapsedMs =
     typeof job.effectiveElapsedMs === 'number' && Number.isFinite(job.effectiveElapsedMs)
@@ -301,14 +309,11 @@ const createStyles = (theme: Theme) =>
       borderRadius: 999,
       paddingHorizontal: 10,
       paddingVertical: 5,
-      backgroundColor: `${theme.colors.primary}12`,
       borderWidth: 1,
-      borderColor: `${theme.colors.primary}28`,
     },
     timingBadgeText: {
       fontFamily: 'DMSans-Medium',
       fontSize: 12,
-      color: theme.colors.primary,
     },
     workerHeader: {
       flexDirection: 'row',

@@ -23,6 +23,8 @@ def _extract_runtime(content_job: dict, existing_runtime: dict | None = None) ->
         "image_path": content_job.get("imagePath"),
         "thumbnail_url": content_job.get("thumbnailUrl"),
         "image_model": content_job.get("imageModel"),
+        "generate_thumbnail_during_run": content_job.get("generateThumbnailDuringRun"),
+        "thumbnail_generation_requested": content_job.get("thumbnailGenerationRequested"),
         "storage_path": content_job.get("audioPath"),
         "duration_sec": content_job.get("audioDurationSec"),
         "published_content_id": content_job.get("publishedContentId"),
@@ -48,6 +50,13 @@ def _extract_runtime(content_job: dict, existing_runtime: dict | None = None) ->
     }
 
 
+def _course_generates_thumbnail_during_run(content_job: dict) -> bool:
+    value = content_job.get("generateThumbnailDuringRun")
+    if isinstance(value, bool):
+        return value
+    return True
+
+
 def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None = None) -> str:
     """
     Create/merge a factory_v2 job from an existing content_jobs doc and start a run.
@@ -66,40 +75,44 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     status = content_job.get("status", "pending")
     is_course = content_type == "course"
     is_subject = content_type == "full_subject"
+    generate_thumbnail_during_run = _course_generates_thumbnail_during_run(content_job)
 
     trigger = "bootstrap"
     first_step = "generate_course_plan" if is_course else "generate_subject_plan" if is_subject else None
     if status == "pending" and is_course:
-        regeneration = content_job.get("courseRegeneration") or {}
-        if isinstance(regeneration, dict) and regeneration.get("active"):
-            mode = str(regeneration.get("mode") or "audio_only").strip().lower()
-            if mode == "script_and_audio":
-                awaiting_script_approval = bool(regeneration.get("awaitingScriptApproval"))
-                script_approved = bool(
-                    regeneration.get("scriptApprovedAt") or regeneration.get("scriptApprovedBy")
-                )
-                first_step = (
-                    "format_course_scripts"
-                    if script_approved and not awaiting_script_approval
-                    else "generate_course_scripts"
-                )
-            else:
-                first_step = "format_course_scripts"
+        if bool(content_job.get("thumbnailGenerationRequested")) and content_job.get("coursePlan"):
+            first_step = "generate_course_thumbnail"
         else:
-            script_approval = content_job.get("courseScriptApproval") or {}
-            if (
-                isinstance(script_approval, dict)
-                and script_approval.get("enabled")
-            ):
-                has_existing_plan = bool(content_job.get("coursePlan"))
-                script_approved = bool(
-                    script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy")
-                )
-                awaiting_script_approval = bool(script_approval.get("awaitingApproval"))
-                if script_approved and not awaiting_script_approval:
+            regeneration = content_job.get("courseRegeneration") or {}
+            if isinstance(regeneration, dict) and regeneration.get("active"):
+                mode = str(regeneration.get("mode") or "audio_only").strip().lower()
+                if mode == "script_and_audio":
+                    awaiting_script_approval = bool(regeneration.get("awaitingScriptApproval"))
+                    script_approved = bool(
+                        regeneration.get("scriptApprovedAt") or regeneration.get("scriptApprovedBy")
+                    )
+                    first_step = (
+                        "format_course_scripts"
+                        if script_approved and not awaiting_script_approval
+                        else "generate_course_scripts"
+                    )
+                else:
                     first_step = "format_course_scripts"
-                elif has_existing_plan:
-                    first_step = "generate_course_scripts"
+            else:
+                script_approval = content_job.get("courseScriptApproval") or {}
+                if (
+                    isinstance(script_approval, dict)
+                    and script_approval.get("enabled")
+                ):
+                    has_existing_plan = bool(content_job.get("coursePlan"))
+                    script_approved = bool(
+                        script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy")
+                    )
+                    awaiting_script_approval = bool(script_approval.get("awaitingApproval"))
+                    if script_approved and not awaiting_script_approval:
+                        first_step = "format_course_scripts"
+                    elif has_existing_plan:
+                        first_step = "generate_course_scripts"
     elif status == "pending":
         if is_subject:
             subject_plan = content_job.get("subjectPlan") or {}
@@ -185,6 +198,7 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     if (
         is_course
         and first_step in {"generate_course_scripts", "format_course_scripts"}
+        and generate_thumbnail_during_run
         and not str(content_job.get("thumbnailUrl") or "").strip()
     ):
         orchestrator._ensure_step_enqueued(

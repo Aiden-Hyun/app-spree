@@ -28,6 +28,7 @@ export default function JobDetailScreen() {
     approveSubjectPlan,
     approvePendingScripts,
     pauseSubject,
+    requestThumbnail,
     regenerateSubjectPlan,
     regeneratePendingScripts,
     resumeSubject,
@@ -120,6 +121,9 @@ export default function JobDetailScreen() {
   const startResumeSubject = async () => {
     await resumeSubject();
   };
+  const startRequestThumbnail = async () => {
+    await requestThumbnail();
+  };
 
   const handleApprovePendingScripts = async (input?: {
     rawScriptEdits?: Record<string, string>;
@@ -207,6 +211,33 @@ export default function JobDetailScreen() {
         text: 'Approve',
         onPress: async () => {
           await startApproveSubjectPlan(input);
+        },
+      },
+    ]);
+  };
+
+  const handleRequestThumbnail = async () => {
+    if (!job) return;
+    const hasThumbnail = Boolean(job.thumbnailUrl);
+    const message = hasThumbnail
+      ? 'This will generate a new thumbnail for the completed course and refresh the published course if one already exists.'
+      : 'This will generate a thumbnail for the completed course. If the course is already published, the published course will be updated too.';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+      await startRequestThumbnail();
+      return;
+    }
+
+    Alert.alert(hasThumbnail ? 'Regenerate Thumbnail' : 'Generate Thumbnail', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: hasThumbnail ? 'Regenerate' : 'Generate',
+        onPress: async () => {
+          await startRequestThumbnail();
         },
       },
     ]);
@@ -301,6 +332,7 @@ export default function JobDetailScreen() {
         onPublish={handlePublish}
         publishButtonLabel={publishButtonLabel}
         onPauseSubject={startPauseSubject}
+        onRequestThumbnail={handleRequestThumbnail}
         onRegenerateCourse={regenerateCourse}
         onRegenerateSubjectPlan={startRegenerateSubjectPlan}
         onApprovePendingScripts={handleApprovePendingScripts}

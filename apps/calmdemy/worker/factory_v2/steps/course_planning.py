@@ -191,9 +191,12 @@ def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
     thumbnail_url = runtime.get("thumbnail_url") or job_data.get("thumbnailUrl") or ""
     image_path = runtime.get("image_path") or job_data.get("imagePath") or ""
     image_prompt = runtime.get("image_prompt") or job_data.get("imagePrompt") or ""
+    force_regenerate = bool(
+        runtime.get("thumbnail_generation_requested") or job_data.get("thumbnailGenerationRequested")
+    )
     content_job_id = _content_job_id(ctx.job)
 
-    if not thumbnail_url:
+    if force_regenerate or not thumbnail_url:
         try:
             title = job_data.get("params", {}).get("courseTitle", plan.get("courseTitle", "Untitled Course"))
             image_prompt = image_prompt or build_image_prompt(
@@ -233,6 +236,7 @@ def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
             "imagePath": image_path,
             "thumbnailUrl": thumbnail_url,
             "imageModel": config.IMAGE_MODEL_ID,
+            "thumbnailGenerationRequested": False,
             "jobRunId": ctx.run_id,
         },
     )

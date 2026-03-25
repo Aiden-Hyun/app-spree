@@ -55,6 +55,8 @@ type Props = {
   onTargetAudienceChange: (v: string) => void;
   tone: string;
   onToneChange: (v: string) => void;
+  generateThumbnailDuringRun: boolean;
+  onGenerateThumbnailDuringRunChange: (v: boolean) => void;
   requireScriptApprovalBeforeTts: boolean;
   onRequireScriptApprovalBeforeTtsChange: (v: boolean) => void;
   levelCounts: SubjectLevelCounts;
@@ -295,6 +297,30 @@ export function CreateContentForm(props: Props) {
             onChangeText={props.onImagePromptChange}
             multiline
           />
+
+          {props.isCourse && (
+            <>
+              <Text style={styles.sectionTitle}>Thumbnail Timing</Text>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleInfo}>
+                  <Text style={styles.toggleLabel}>Generate thumbnail during run</Text>
+                  <Text style={styles.toggleDescription}>
+                    Turn this on to create the thumbnail before the course finishes. Leave it off to keep image generation optional and run it later from the completed job.
+                  </Text>
+                </View>
+                <Switch
+                  value={props.generateThumbnailDuringRun}
+                  onValueChange={props.onGenerateThumbnailDuringRunChange}
+                  trackColor={{ false: theme.colors.gray[300], true: `${theme.colors.primary}80` }}
+                  thumbColor={
+                    props.generateThumbnailDuringRun
+                      ? theme.colors.primary
+                      : theme.colors.gray[400]
+                  }
+                />
+              </View>
+            </>
+          )}
 
           <Text style={styles.sectionTitle}>Script Approval</Text>
           <View style={styles.toggleRow}>

@@ -160,6 +160,13 @@ function completedShardsFromContentJob(job: ContentJob): Set<CourseShardKey> {
   return completed;
 }
 
+function courseGeneratesThumbnailDuringRun(job: ContentJob): boolean {
+  if (typeof job.generateThumbnailDuringRun === 'boolean') {
+    return job.generateThumbnailDuringRun;
+  }
+  return true;
+}
+
 function pickNewestEntry(entries: JobStepTimelineEntry[]): JobStepTimelineEntry | undefined {
   if (entries.length === 0) return undefined;
   return [...entries].sort((a, b) => timestampMs(b) - timestampMs(a))[0];
@@ -452,6 +459,23 @@ export function deriveCourseProgressModel(
     const entries = stageEntries.get(stepName) || [];
     stages[stepName] = buildStageProgress(stepName, entries);
   });
+
+  const thumbnailIsDeferred = !courseGeneratesThumbnailDuringRun(job);
+  if (thumbnailIsDeferred && stages.generate_course_thumbnail.state === 'waiting') {
+    if (job.thumbnailUrl || job.imagePath) {
+      stages.generate_course_thumbnail = {
+        ...stages.generate_course_thumbnail,
+        state: 'succeeded',
+        workerLabel: 'Deferred run',
+      };
+    } else if (!job.thumbnailGenerationRequested) {
+      stages.generate_course_thumbnail = {
+        ...stages.generate_course_thumbnail,
+        state: 'cancelled',
+        workerLabel: 'Deferred',
+      };
+    }
+  }
 
   const hasLegacyRootSynth =
     rootSynthEntries.length > 0 && shardSynthEntries.size === 0;

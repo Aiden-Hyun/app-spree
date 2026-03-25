@@ -219,6 +219,8 @@ export interface ContentJob {
   imagePath?: string;
   thumbnailUrl?: string;
   imageModel?: string;
+  generateThumbnailDuringRun?: boolean;
+  thumbnailGenerationRequested?: boolean;
   lastCompletedStage?: JobStatus;
   failedStage?: JobStatus;
   resumeAvailable?: boolean;
@@ -356,6 +358,7 @@ export interface ContentDraft {
   subjectId: string;
   targetAudience: string;
   tone: string;
+  generateThumbnailDuringRun: boolean;
   requireScriptApprovalBeforeTts: boolean;
   levelCounts: SubjectLevelCounts;
   requireSubjectPlanApproval: boolean;
@@ -508,6 +511,7 @@ export interface CreateJobInput {
   title?: string;
   imagePrompt?: string;
   autoPublish: boolean;
+  generateThumbnailDuringRun?: boolean;
   requireScriptApprovalBeforeTts?: boolean;
   requireSubjectPlanApproval?: boolean;
 }
