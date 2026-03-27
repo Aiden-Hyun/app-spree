@@ -28,15 +28,28 @@ import {
   BACKEND_LABELS,
   CONTENT_TYPE_LABELS,
   CourseRegenerationMode,
+  FactoryJob,
+  FactoryJobRun,
+  JobExecutionRunState,
   JOB_STATUS_LABELS,
+  JobStatus,
   ContentJob,
+  JobExecutionView,
   JobStepTimelineEntry,
 } from '../types';
 import { getVoiceLabelById } from '../constants/models';
+import {
+  formatExecutionStatusSource,
+  formatFactoryJobStateLabel,
+  formatRunStateLabel,
+} from '../utils/jobExecutionState';
 import { Theme } from '@/theme';
 
 type Props = {
   job: ContentJob;
+  factoryJob?: FactoryJob | null;
+  factoryRun?: FactoryJobRun | null;
+  executionView?: JobExecutionView | null;
   activeWorkers?: ActiveJobWorker[];
   childJobs?: ContentJob[];
   isChildJobsLoading?: boolean;
@@ -95,6 +108,9 @@ const SECTION_IDS = [
 
 export function JobDetailView({
   job,
+  factoryJob = null,
+  factoryRun = null,
+  executionView = null,
   activeWorkers = [],
   childJobs = [],
   isChildJobsLoading = false,
@@ -123,8 +139,21 @@ export function JobDetailView({
   const { theme } = useTheme();
   const { width: viewportWidth } = useWindowDimensions();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const effectiveStatus = executionView?.effectiveStatus || job.status;
+  const effectiveRunStatus = executionView?.effectiveRunStatus || job.lastRunStatus;
+  const engineRunId = executionView?.engineRunId || job.v2RunId;
+  const projectionDrift = executionView?.projectionDrift || [];
+  const isProjectionDrifted = Boolean(executionView?.isProjectionDrifted);
+  const currentStatusColor =
+    effectiveStatus === 'completed'
+      ? theme.colors.success
+      : effectiveStatus === 'failed'
+        ? theme.colors.error
+        : effectiveStatus === 'paused'
+          ? theme.colors.warning
+          : theme.colors.primary;
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() =>
-    buildInitialExpandedSections(job)
+    buildInitialExpandedSections(job, effectiveStatus)
   );
   const [errorManuallyCollapsed, setErrorManuallyCollapsed] = useState(false);
   const [selectedCourseScript, setSelectedCourseScript] = useState<string>('');
@@ -158,34 +187,34 @@ export function JobDetailView({
   const courseProgressModel = useMemo(
     () =>
       job.contentType === 'course'
-        ? deriveCourseProgressModel(job, timeline, job.v2RunId)
+        ? deriveCourseProgressModel(job, timeline, engineRunId)
         : null,
-    [job, timeline]
+    [engineRunId, job, timeline]
   );
   const liveRunElapsedMs = useMemo(
     () =>
-      computeLiveRunElapsedMsFromTimeline(timeline, job.v2RunId, timingNowMs) ||
+      computeLiveRunElapsedMsFromTimeline(timeline, engineRunId, timingNowMs) ||
       (typeof job.activeRunElapsedMs === 'number' ? job.activeRunElapsedMs : 0),
-    [job.activeRunElapsedMs, job.v2RunId, timeline, timingNowMs]
+    [engineRunId, job.activeRunElapsedMs, timeline, timingNowMs]
   );
-  const timingStatus = useMemo(() => resolveTimingStatus(job), [job]);
+  const timingStatus = useMemo(() => resolveTimingStatus(job, effectiveStatus), [effectiveStatus, job]);
   const legacyElapsedMs = useMemo(() => getLegacyElapsedMs(job), [job]);
   const isAwaitingRegeneratedScriptApproval = Boolean(
     job.contentType === 'course' &&
-      job.status === 'completed' &&
+      effectiveStatus === 'completed' &&
       job.courseRegeneration?.active &&
       job.courseRegeneration.mode === 'script_and_audio' &&
       job.courseRegeneration.awaitingScriptApproval
   );
   const isAwaitingSingleScriptApproval = Boolean(
     job.contentType !== 'course' &&
-      job.status === 'completed' &&
+      effectiveStatus === 'completed' &&
       job.scriptApproval?.enabled &&
       job.scriptApproval.awaitingApproval
   );
   const isAwaitingInitialScriptApproval = Boolean(
     job.contentType === 'course' &&
-      job.status === 'completed' &&
+      effectiveStatus === 'completed' &&
       job.courseScriptApproval?.enabled &&
       job.courseScriptApproval.awaitingApproval
   );
@@ -201,7 +230,7 @@ export function JobDetailView({
   useEffect(() => {
     const hasRunningIntervals = timeline.some(
       (entry) =>
-        entry.runId === job.v2RunId &&
+        entry.runId === engineRunId &&
         entry.state === 'running' &&
         String(entry.workerId || '').trim().toLowerCase() !== 'checkpoint'
     );
@@ -211,7 +240,7 @@ export function JobDetailView({
 
     const interval = setInterval(() => setTimingNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [job.v2RunId, timeline]);
+  }, [engineRunId, timeline]);
   const approvalSessionCodes = isAwaitingRegeneratedScriptApproval &&
     Array.isArray(job.courseRegeneration?.targetSessionCodes)
       ? job.courseRegeneration.targetSessionCodes
@@ -257,7 +286,7 @@ export function JobDetailView({
       return;
     }
     previousJobIdRef.current = job.id;
-    setExpandedSections(buildInitialExpandedSections(job));
+    setExpandedSections(buildInitialExpandedSections(job, effectiveStatus));
     setErrorManuallyCollapsed(false);
     setRegenerationMode('audio_only');
     setRegenerationScriptEdits({});
@@ -273,6 +302,7 @@ export function JobDetailView({
     }
     setSelectedCourseScript('');
   }, [
+    effectiveStatus,
     job,
     courseScriptKeys,
     job.contentType,
@@ -636,6 +666,13 @@ export function JobDetailView({
 
   const sections = buildSections({
     job,
+    factoryJob,
+    factoryRun,
+    executionView,
+    effectiveStatus,
+    effectiveRunStatus,
+    engineRunId,
+    engineStepName: executionView?.engineStepName,
     activeWorkers,
     childJobs,
     childJobMap,
@@ -748,18 +785,30 @@ export function JobDetailView({
             style={[
               styles.statusValue,
               {
-                color:
-                  job.status === 'completed'
-                    ? theme.colors.success
-                    : job.status === 'failed'
-                      ? theme.colors.error
-                      : theme.colors.primary,
+                color: currentStatusColor,
               },
             ]}
           >
-            {JOB_STATUS_LABELS[job.status]}
+            {JOB_STATUS_LABELS[effectiveStatus]}
+          </Text>
+          <Text style={styles.statusSubtext}>
+            {executionView ? formatExecutionStatusSource(executionView.statusSource) : 'Compatibility projection'}
           </Text>
         </View>
+
+        {isProjectionDrifted && (
+          <View style={styles.driftCard}>
+            <View style={styles.driftHeader}>
+              <Ionicons name="git-compare-outline" size={16} color={theme.colors.warning} />
+              <Text style={styles.driftTitle}>Projection Drift Detected</Text>
+            </View>
+            {projectionDrift.map((message) => (
+              <Text key={message} style={styles.driftMessage}>
+                {message}
+              </Text>
+            ))}
+          </View>
+        )}
 
         {useWebSectionColumns ? (
           <View style={styles.sectionColumns}>
@@ -804,7 +853,7 @@ export function JobDetailView({
         )}
 
         {/* Actions */}
-        {job.status === 'failed' && (
+        {effectiveStatus === 'failed' && (
           <PrimaryButton
             label="Retry Job"
             icon="refresh"
@@ -841,7 +890,7 @@ export function JobDetailView({
         )}
 
         {job.contentType === 'course' &&
-          job.status === 'completed' &&
+          effectiveStatus === 'completed' &&
           !isAwaitingAnyScriptApproval &&
           !isAwaitingSubjectPlanApproval && (
             <PrimaryButton
@@ -852,7 +901,7 @@ export function JobDetailView({
             />
           )}
 
-        {job.contentType === 'full_subject' && job.status !== 'paused' && job.status !== 'completed' && job.status !== 'failed' && (
+        {job.contentType === 'full_subject' && effectiveStatus !== 'paused' && effectiveStatus !== 'completed' && effectiveStatus !== 'failed' && (
           <PrimaryButton
             label={pausingSubject ? 'Requesting Pause...' : 'Pause Full Subject'}
             icon="pause-outline"
@@ -863,7 +912,7 @@ export function JobDetailView({
           />
         )}
 
-        {job.contentType === 'full_subject' && job.status === 'paused' && (
+        {job.contentType === 'full_subject' && effectiveStatus === 'paused' && (
           <PrimaryButton
             label={resumingSubject ? 'Resuming...' : 'Resume Full Subject'}
             icon="play-outline"
@@ -892,7 +941,7 @@ export function JobDetailView({
           />
         )}
 
-        {job.status !== 'completed' && job.status !== 'failed' && (
+        {effectiveStatus !== 'completed' && effectiveStatus !== 'failed' && (
           <Pressable
             style={({ pressed }) => [
               styles.cancelButton,
@@ -1168,6 +1217,13 @@ export function JobDetailView({
 
 function buildSections(params: {
   job: ContentJob;
+  factoryJob: FactoryJob | null;
+  factoryRun: FactoryJobRun | null;
+  executionView: JobExecutionView | null;
+  effectiveStatus: JobStatus;
+  effectiveRunStatus?: JobExecutionRunState;
+  engineRunId?: string;
+  engineStepName?: string;
   activeWorkers: ActiveJobWorker[];
   childJobs: ContentJob[];
   childJobMap: Record<string, ContentJob>;
@@ -1204,6 +1260,13 @@ function buildSections(params: {
 }) {
   const {
     job,
+    factoryJob,
+    factoryRun,
+    executionView,
+    effectiveStatus,
+    effectiveRunStatus,
+    engineRunId,
+    engineStepName,
     activeWorkers,
     childJobs,
     childJobMap,
@@ -1253,7 +1316,7 @@ function buildSections(params: {
   );
   const isCourseRegenerationEligible =
     job.contentType === 'course' &&
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     !isInitialCourseScriptApprovalPending;
   const publishedCourseRegeneration = Boolean(job.courseId);
   const requestedRegeneration = job.courseRegeneration;
@@ -1338,7 +1401,7 @@ function buildSections(params: {
       id: 'pipeline',
       title: 'Pipeline Progress',
       summaryItems: toSummaryItems([
-        { label: 'Current', value: JOB_STATUS_LABELS[job.status] },
+        { label: 'Current', value: JOB_STATUS_LABELS[effectiveStatus] },
         {
           label: 'Run',
           value: showCourseConcurrency
@@ -1358,7 +1421,7 @@ function buildSections(params: {
                   Detailed timeline unavailable or not yet populated; showing compatibility progress.
                 </Text>
               )}
-              <PipelineStepper currentStatus={job.status} />
+              <PipelineStepper currentStatus={effectiveStatus} />
             </>
           )}
         </View>
@@ -1534,7 +1597,7 @@ function buildSections(params: {
       shouldRender: job.contentType === 'course' && Boolean(job.courseProgress),
       content: (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {job.status !== 'completed' && job.status !== 'failed' && (
+          {effectiveStatus !== 'completed' && effectiveStatus !== 'failed' && (
             <ActivityIndicator size="small" color={theme.colors.primary} />
           )}
           <Text
@@ -1542,9 +1605,9 @@ function buildSections(params: {
               fontFamily: 'DMSans-SemiBold',
               fontSize: 15,
               color:
-                job.status === 'completed'
+                effectiveStatus === 'completed'
                   ? theme.colors.success
-                  : job.status === 'failed'
+                  : effectiveStatus === 'failed'
                     ? theme.colors.error
                     : theme.colors.primary,
             }}
@@ -1600,7 +1663,7 @@ function buildSections(params: {
               ? formatElapsedMs(job.effectiveElapsedMs)
               : timingStatus === 'legacy'
                 ? formatElapsedMs(legacyElapsedMs)
-                : formatLiveElapsedMs(job, liveRunElapsedMs),
+                : formatLiveElapsedMs(effectiveStatus, liveRunElapsedMs),
         },
         {
           label: 'Mode',
@@ -1617,8 +1680,8 @@ function buildSections(params: {
       shouldRender:
         timingStatus !== 'unavailable' ||
         liveRunElapsedMs > 0 ||
-        job.status === 'completed' ||
-        job.status === 'failed',
+        effectiveStatus === 'completed' ||
+        effectiveStatus === 'failed',
       content:
         timingStatus === 'exact' ? (
           <>
@@ -1652,13 +1715,13 @@ function buildSections(params: {
             {liveRunElapsedMs > 0 && (
               <InfoRow
                 label="Active This Run"
-                value={formatLiveElapsedMs(job, liveRunElapsedMs) || '0m'}
+                value={formatLiveElapsedMs(effectiveStatus, liveRunElapsedMs) || '0m'}
               />
             )}
             <Text style={styles.emptySubtext}>
-              {job.status === 'completed'
+              {effectiveStatus === 'completed'
                 ? 'Exact lineage timing is unavailable for this historical or approval-paused run.'
-                : job.status === 'failed'
+                : effectiveStatus === 'failed'
                   ? 'This run did not finish successfully, so no exact final timing was recorded.'
                   : 'Exact timing will appear after the job finishes successfully.'}
             </Text>
@@ -1752,6 +1815,10 @@ function buildSections(params: {
               <InfoRow label="Pause Requested" value={job.pauseRequested ? 'Yes' : 'No'} />
             </>
           )}
+          <InfoRow label="Resolved Status" value={JOB_STATUS_LABELS[effectiveStatus]} />
+          {job.status !== effectiveStatus && (
+            <InfoRow label="Projected Status" value={JOB_STATUS_LABELS[job.status]} />
+          )}
           <InfoRow label="LLM Model" value={job.llmModel} />
           <InfoRow label="TTS Model" value={job.ttsModel} />
           <InfoRow label="Narrator" value={getVoiceLabelById(job.ttsVoice)} />
@@ -1767,12 +1834,23 @@ function buildSections(params: {
             <InfoRow label="Resume Available" value={job.resumeAvailable ? 'Yes' : 'No'} />
           )}
           {job.engine && <InfoRow label="Engine" value={job.engine.toUpperCase()} />}
+          {factoryJob?.currentState && (
+            <InfoRow label="Engine State" value={formatFactoryJobStateLabel(factoryJob.currentState)} />
+          )}
+          {engineStepName && <InfoRow label="Engine Step" value={formatStepName(engineStepName)} />}
           {job.jobRunId && <InfoRow label="Run ID" value={job.jobRunId} />}
           {typeof job.runAttempt === 'number' && (
             <InfoRow label="Run Attempt" value={`${job.runAttempt}`} />
           )}
-          {job.lastRunStatus && <InfoRow label="Run Status" value={job.lastRunStatus} />}
-          {job.v2RunId && <InfoRow label="V2 Run ID" value={job.v2RunId} />}
+          {effectiveRunStatus && <InfoRow label="Run Status" value={formatRunStateLabel(effectiveRunStatus)} />}
+          {job.lastRunStatus && job.lastRunStatus !== effectiveRunStatus && (
+            <InfoRow label="Projected Run Status" value={formatRunStateLabel(job.lastRunStatus)} />
+          )}
+          {engineRunId && <InfoRow label="V2 Run ID" value={engineRunId} />}
+          {job.v2RunId && job.v2RunId !== engineRunId && (
+            <InfoRow label="Projected V2 Run ID" value={job.v2RunId} />
+          )}
+          {factoryRun?.trigger && <InfoRow label="Run Trigger" value={factoryRun.trigger} />}
           {job.v2DispatchError && <InfoRow label="V2 Dispatch Error" value={job.v2DispatchError} />}
           <InfoRow label="Created" value={createdDate} />
         </>
@@ -2448,8 +2526,8 @@ function formatElapsedMsRoundedToMinute(ms?: number | null) {
   return `${hours}h ${minutes}m`;
 }
 
-function formatLiveElapsedMs(job: ContentJob, ms?: number | null) {
-  if (job.status !== 'completed' && job.status !== 'failed') {
+function formatLiveElapsedMs(status: JobStatus, ms?: number | null) {
+  if (status !== 'completed' && status !== 'failed') {
     return formatElapsedMsRoundedToMinute(ms);
   }
   return formatElapsedMs(ms);
@@ -2460,8 +2538,8 @@ function formatParallelism(value?: number | null) {
   return `${value.toFixed(2)}x`;
 }
 
-function resolveTimingStatus(job: ContentJob): 'exact' | 'legacy' | 'unavailable' {
-  if (job.status !== 'completed' && job.status !== 'failed') {
+function resolveTimingStatus(job: ContentJob, status: JobStatus): 'exact' | 'legacy' | 'unavailable' {
+  if (status !== 'completed' && status !== 'failed') {
     return 'unavailable';
   }
   if (job.timingStatus === 'exact') return 'exact';
@@ -2583,12 +2661,16 @@ function formatActiveWorkerMeta(worker: ActiveJobWorker) {
 }
 
 function formatQueuedTaskTitle(entry: JobStepTimelineEntry) {
-  const stepName = String(entry.stepName || '').trim();
-  if (!stepName) {
+  return formatStepName(entry.stepName);
+}
+
+function formatStepName(stepName?: string) {
+  const normalized = String(stepName || '').trim();
+  if (!normalized) {
     return 'Queued Task';
   }
 
-  return stepName
+  return normalized
     .split('_')
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -2730,36 +2812,36 @@ function getCanonicalCourseSessionCodes(job: ContentJob): string[] {
   });
 }
 
-function isAwaitingRegeneratedScriptApprovalJob(job: ContentJob): boolean {
+function isAwaitingRegeneratedScriptApprovalJob(job: ContentJob, status = job.status): boolean {
   return Boolean(
     job.contentType === 'course' &&
-      job.status === 'completed' &&
+      status === 'completed' &&
       job.courseRegeneration?.active &&
       job.courseRegeneration.mode === 'script_and_audio' &&
       job.courseRegeneration.awaitingScriptApproval
   );
 }
 
-function isAwaitingInitialScriptApprovalJob(job: ContentJob): boolean {
+function isAwaitingInitialScriptApprovalJob(job: ContentJob, status = job.status): boolean {
   return Boolean(
     job.contentType === 'course' &&
-      job.status === 'completed' &&
+      status === 'completed' &&
       job.courseScriptApproval?.enabled &&
       job.courseScriptApproval.awaitingApproval
   );
 }
 
-function isAwaitingSingleScriptApprovalJob(job: ContentJob): boolean {
+function isAwaitingSingleScriptApprovalJob(job: ContentJob, status = job.status): boolean {
   return Boolean(
     job.contentType !== 'course' &&
       job.contentType !== 'full_subject' &&
-      job.status === 'completed' &&
+      status === 'completed' &&
       job.scriptApproval?.enabled &&
       job.scriptApproval.awaitingApproval
   );
 }
 
-function buildInitialExpandedSections(job: ContentJob): Record<string, boolean> {
+function buildInitialExpandedSections(job: ContentJob, status = job.status): Record<string, boolean> {
   const initial = SECTION_IDS.reduce<Record<string, boolean>>((acc, sectionId) => {
     acc[sectionId] = false;
     return acc;
@@ -2770,11 +2852,11 @@ function buildInitialExpandedSections(job: ContentJob): Record<string, boolean> 
   }
 
   if (
-    isAwaitingRegeneratedScriptApprovalJob(job) ||
-    isAwaitingInitialScriptApprovalJob(job) ||
-    isAwaitingSingleScriptApprovalJob(job)
+    isAwaitingRegeneratedScriptApprovalJob(job, status) ||
+    isAwaitingInitialScriptApprovalJob(job, status) ||
+    isAwaitingSingleScriptApprovalJob(job, status)
   ) {
-    if (isAwaitingRegeneratedScriptApprovalJob(job)) {
+    if (isAwaitingRegeneratedScriptApprovalJob(job, status)) {
       initial.courseRegeneration = true;
     }
     if (job.contentType === 'course') {
@@ -2784,7 +2866,7 @@ function buildInitialExpandedSections(job: ContentJob): Record<string, boolean> 
 
   if (
     job.contentType === 'full_subject' &&
-    job.status === 'completed' &&
+    status === 'completed' &&
     job.subjectPlanApproval?.enabled &&
     job.subjectPlanApproval.awaitingApproval
   ) {
@@ -2946,6 +3028,38 @@ const createStyles = (theme: Theme) =>
     statusValue: {
       fontFamily: 'DMSans-Bold',
       fontSize: 22,
+    },
+    statusSubtext: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      marginTop: 6,
+      textAlign: 'center',
+    },
+    driftCard: {
+      gap: 8,
+      marginBottom: 16,
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: `${theme.colors.warning}55`,
+      backgroundColor: `${theme.colors.warning}12`,
+    },
+    driftHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    driftTitle: {
+      fontFamily: 'DMSans-SemiBold',
+      fontSize: 13,
+      color: theme.colors.warning,
+    },
+    driftMessage: {
+      fontFamily: 'DMSans-Regular',
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.colors.text,
     },
     controlButton: {
       flexDirection: 'row',

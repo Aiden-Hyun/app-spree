@@ -321,6 +321,59 @@ export interface ContentJob {
   createdBy: string;
 }
 
+// ==================== FACTORY V2 ENGINE STATE ====================
+
+export type FactoryJobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export type JobExecutionRunState = 'running' | 'completed' | 'failed';
+
+export interface FactoryJobSummary {
+  currentStep?: string;
+  lastRunStatus?: JobExecutionRunState;
+  lastRunId?: string;
+  failedStep?: string;
+  errorCode?: string;
+  subjectState?: string;
+  launchCursor?: number;
+}
+
+export interface FactoryJob {
+  id: string;
+  jobType?: 'single_content' | 'course' | 'subject';
+  currentState?: FactoryJobState;
+  currentRunId?: string;
+  summary?: FactoryJobSummary;
+  runtime?: Record<string, any>;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface FactoryJobRun {
+  id: string;
+  jobId?: string;
+  runNumber?: number;
+  state?: JobExecutionRunState;
+  trigger?: string;
+  startedAt?: Timestamp;
+  endedAt?: Timestamp;
+  failedStep?: string;
+  errorCode?: string;
+  updatedAt?: Timestamp;
+}
+
+export type JobExecutionStatusSource = 'content_job' | 'factory_job' | 'mixed';
+
+export interface JobExecutionView {
+  effectiveStatus: JobStatus;
+  effectiveRunStatus?: JobExecutionRunState;
+  statusSource: JobExecutionStatusSource;
+  engineCurrentState?: FactoryJobState;
+  engineRunId?: string;
+  engineStepName?: string;
+  projectionDrift: string[];
+  isProjectionDrifted: boolean;
+}
+
 // ==================== STEP TIMELINE ====================
 
 export type JobStepTimelineSource = 'v2';

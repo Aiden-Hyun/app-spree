@@ -19,15 +19,17 @@ export default function AdminCourseSessionReviewScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { job, isLoading } = useJobDetail(id);
+  const { job, executionView, isLoading } = useJobDetail(id);
   const audioPlayer = useAudioPlayer();
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
   const [loadingAudio, setLoadingAudio] = useState(false);
 
-  const canReview =
-    job?.status === "completed" &&
-    !job.autoPublish &&
-    !job.courseRegeneration?.awaitingScriptApproval;
+  const canReview = Boolean(
+    job &&
+      executionView?.effectiveStatus === "completed" &&
+      !job.autoPublish &&
+      !job.courseRegeneration?.awaitingScriptApproval
+  );
   const session = job?.coursePreviewSessions?.find((s) => s.code === sessionCode);
 
   useEffect(() => {

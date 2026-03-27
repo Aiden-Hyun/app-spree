@@ -20,6 +20,9 @@ export default function JobDetailScreen() {
   const styles = createStyles(theme);
   const {
     job,
+    factoryJob,
+    factoryRun,
+    executionView,
     isLoading,
     retry,
     cancel,
@@ -37,9 +40,11 @@ export default function JobDetailScreen() {
     job?.contentType === 'full_subject' ? id : undefined
   );
   const { workersByJobId } = useActiveJobWorkers(job ? [job.id] : []);
+  const effectiveStatus = executionView?.effectiveStatus || job?.status;
+  const effectiveRunId = executionView?.engineRunId || job?.v2RunId;
   const { timeline, isLoading: isTimelineLoading } = useJobStepTimeline(
     id || '',
-    job?.v2RunId
+    effectiveRunId
   );
 
   const handleRetry = () => retry();
@@ -67,7 +72,7 @@ export default function JobDetailScreen() {
     if (!job) return;
     const isPublishingRegeneratedSessions =
       job.contentType === 'course' &&
-      job.status === 'completed' &&
+      effectiveStatus === 'completed' &&
       Boolean(job.courseRegeneration?.active && job.courseRegeneration.requiresPublishApproval);
     const message = isPublishingRegeneratedSessions
       ? 'This will replace the selected live course sessions with regenerated audio. Continue?'
@@ -96,7 +101,37 @@ export default function JobDetailScreen() {
       ]
     );
   };
-  const handleDelete = () => requestDelete();
+  const handleDelete = async () => {
+    if (!job) return;
+    const message =
+      job.contentType === 'full_subject'
+        ? 'This will delete the full subject job and also request deletion for all non-completed child course jobs. Completed child jobs will be kept. Continue?'
+        : 'This will delete the job and its generated artifacts. Continue?';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+      await requestDelete();
+      return;
+    }
+
+    Alert.alert(
+      job.contentType === 'full_subject' ? 'Delete Full Subject' : 'Delete Job',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await requestDelete();
+          },
+        },
+      ]
+    );
+  };
   const startApprovePendingScripts = async (input?: {
     rawScriptEdits?: Record<string, string>;
     script?: string;
@@ -262,7 +297,7 @@ export default function JobDetailScreen() {
 
   const isCourseRegenAwaitingPublish =
     job.contentType === 'course' &&
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     Boolean(
       job.courseRegeneration?.active &&
         job.courseRegeneration.requiresPublishApproval &&
@@ -270,7 +305,7 @@ export default function JobDetailScreen() {
     );
   const isCourseRegenAwaitingScriptApproval =
     job.contentType === 'course' &&
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     Boolean(
       job.courseRegeneration?.active &&
         job.courseRegeneration.mode === 'script_and_audio' &&
@@ -278,16 +313,16 @@ export default function JobDetailScreen() {
     );
   const isCourseInitialAwaitingScriptApproval =
     job.contentType === 'course' &&
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     Boolean(job.courseScriptApproval?.enabled && job.courseScriptApproval.awaitingApproval);
   const isSingleAwaitingScriptApproval =
     job.contentType !== 'course' &&
     job.contentType !== 'full_subject' &&
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     Boolean(job.scriptApproval?.enabled && job.scriptApproval.awaitingApproval);
   const isSubjectPlanAwaitingApproval =
     job.contentType === 'full_subject' &&
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     Boolean(job.subjectPlanApproval?.enabled && job.subjectPlanApproval.awaitingApproval);
   const isAwaitingAnyScriptApproval =
     isCourseRegenAwaitingScriptApproval ||
@@ -297,13 +332,13 @@ export default function JobDetailScreen() {
     !isAwaitingAnyScriptApproval &&
     !isSubjectPlanAwaitingApproval &&
     (isCourseRegenAwaitingPublish ||
-      (job.status === 'completed' && !job.autoPublish && !job.publishedContentId));
+      (effectiveStatus === 'completed' && !job.autoPublish && !job.publishedContentId));
   const isReviewable =
-    job.status === 'completed' &&
+    effectiveStatus === 'completed' &&
     !isAwaitingAnyScriptApproval &&
     (!job.autoPublish || isCourseRegenAwaitingPublish);
   const isDeletable =
-    job.status === 'failed' || (job.status === 'completed' && !job.autoPublish);
+    effectiveStatus === 'failed' || (effectiveStatus === 'completed' && !job.autoPublish);
   const publishButtonLabel = isCourseRegenAwaitingPublish
     ? 'Publish Regenerated Sessions'
     : 'Publish Now';
@@ -317,6 +352,9 @@ export default function JobDetailScreen() {
       />
       <JobDetailView
         job={job}
+        factoryJob={factoryJob}
+        factoryRun={factoryRun}
+        executionView={executionView}
         activeWorkers={workersByJobId[job.id] || []}
         childJobs={childJobs}
         isChildJobsLoading={isChildJobsLoading}

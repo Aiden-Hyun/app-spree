@@ -22,6 +22,7 @@
 
 - Source of job creation and admin controls.
 - Compatibility projection target for status and output fields.
+- Not the canonical execution record for V2 runtime state.
 
 ### Internal engine tables
 
@@ -69,5 +70,7 @@ This replaces previous runtime coupling to `worker/pipeline/*`.
 ## Compatibility Decisions
 
 - `content_jobs.status` labels remain unchanged for UI compatibility.
+- Canonical V2 execution state lives in `factory_jobs.current_state` and `factory_job_runs.state`.
+- Admin detail views should prefer `factory_jobs` / `factory_job_runs` for live runtime truth and use `content_jobs` as the compatibility projection plus control surface.
 - Deprecated V1-era fields remain for one release and can be removed in a follow-up migration.
 - Cloud backend support is removed.

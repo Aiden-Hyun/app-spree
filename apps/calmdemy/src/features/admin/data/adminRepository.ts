@@ -21,6 +21,8 @@ import {
   ActiveJobWorker,
   ContentJob,
   CourseRegenerationMode,
+  FactoryJob,
+  FactoryJobRun,
   CreateJobInput,
   JobStatus,
   SubjectPlan,
@@ -45,6 +47,8 @@ export type { Subject } from '../../meditate/data/meditateRepository';
 const jobsCollection = collection(db, 'content_jobs');
 const usersCollection = collection(db, 'users');
 const workerControlCollection = collection(db, 'worker_control');
+const factoryJobsCollection = collection(db, 'factory_jobs');
+const factoryJobRunsCollection = collection(db, 'factory_job_runs');
 const stepRunsCollection = collection(db, 'factory_step_runs');
 const COURSE_SHARD_SUFFIXES = ['INT', 'M1L', 'M1P', 'M2L', 'M2P', 'M3L', 'M3P', 'M4L', 'M4P'];
 
@@ -145,6 +149,45 @@ function normalizeJobStatus(value: unknown): JobStatus | undefined {
     default:
       return undefined;
   }
+}
+
+function toFactoryJob(docId: string, data: Record<string, any>): FactoryJob {
+  const summary = data.summary as Record<string, any> | undefined;
+  return {
+    id: docId,
+    jobType: data.job_type,
+    currentState: data.current_state,
+    currentRunId: data.current_run_id,
+    summary: summary
+      ? {
+          currentStep: summary.currentStep,
+          lastRunStatus: summary.lastRunStatus,
+          lastRunId: summary.lastRunId,
+          failedStep: summary.failedStep,
+          errorCode: summary.errorCode,
+          subjectState: summary.subjectState,
+          launchCursor: summary.launchCursor,
+        }
+      : undefined,
+    runtime: data.runtime,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
+function toFactoryJobRun(docId: string, data: Record<string, any>): FactoryJobRun {
+  return {
+    id: docId,
+    jobId: data.job_id,
+    runNumber: data.run_number,
+    state: data.state,
+    trigger: data.trigger,
+    startedAt: data.started_at,
+    endedAt: data.ended_at,
+    failedStep: data.failed_step,
+    errorCode: data.error_code,
+    updatedAt: data.updated_at,
+  };
 }
 
 function courseCodeForJob(job: Pick<ContentJob, 'params'> | Record<string, any>): string {
@@ -485,6 +528,56 @@ export function subscribeToJob(
     const data = docSnapshot.data() as Record<string, any>;
     callback({ id: docSnapshot.id, ...data } as ContentJob);
   });
+}
+
+export function subscribeToFactoryJob(
+  jobId: string | undefined,
+  callback: (job: FactoryJob | null) => void
+): Unsubscribe {
+  if (!jobId) {
+    callback(null);
+    return () => undefined;
+  }
+
+  return onSnapshot(
+    doc(factoryJobsCollection, jobId),
+    (docSnapshot) => {
+      if (!docSnapshot.exists()) {
+        callback(null);
+        return;
+      }
+      callback(toFactoryJob(docSnapshot.id, docSnapshot.data() as Record<string, any>));
+    },
+    (error) => {
+      console.warn('Error subscribing to factory job:', error);
+      callback(null);
+    }
+  );
+}
+
+export function subscribeToFactoryJobRun(
+  runId: string | undefined,
+  callback: (run: FactoryJobRun | null) => void
+): Unsubscribe {
+  if (!runId) {
+    callback(null);
+    return () => undefined;
+  }
+
+  return onSnapshot(
+    doc(factoryJobRunsCollection, runId),
+    (docSnapshot) => {
+      if (!docSnapshot.exists()) {
+        callback(null);
+        return;
+      }
+      callback(toFactoryJobRun(docSnapshot.id, docSnapshot.data() as Record<string, any>));
+    },
+    (error) => {
+      console.warn('Error subscribing to factory job run:', error);
+      callback(null);
+    }
+  );
 }
 
 export function subscribeToChildJobs(

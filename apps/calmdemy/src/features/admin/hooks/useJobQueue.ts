@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   subscribeToJobs,
   subscribeToJob,
+  subscribeToFactoryJob,
+  subscribeToFactoryJobRun,
   subscribeToWorkerControl,
   subscribeToWorkerStatus,
   subscribeToActiveJobWorkers,
@@ -27,7 +29,10 @@ import {
   ContentJob,
   ContentDraft,
   CreateJobInput,
+  FactoryJob,
+  FactoryJobRun,
   JobStatus,
+  JobExecutionView,
   WorkerControl,
   WorkerDesiredState,
   WorkerStatus,
@@ -39,6 +44,7 @@ import {
   CourseRegenerationMode,
 } from '../types';
 import { getDrafts, deleteDraft as removeDraft } from '../data/draftRepository';
+import { resolveJobExecutionView } from '../utils/jobExecutionState';
 import {
   subscribeToStacksStatus,
   subscribeToFactoryMetrics,
@@ -72,6 +78,8 @@ export function useJobQueue(statusFilter?: JobStatus) {
 
 export function useJobDetail(jobId: string) {
   const [job, setJob] = useState<ContentJob | null>(null);
+  const [factoryJob, setFactoryJob] = useState<FactoryJob | null>(null);
+  const [factoryRun, setFactoryRun] = useState<FactoryJobRun | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -85,6 +93,39 @@ export function useJobDetail(jobId: string) {
 
     return unsubscribe;
   }, [jobId]);
+
+  const factoryJobId =
+    job?.engine === 'v2'
+      ? String(job.v2JobId || job.id || '').trim() || undefined
+      : job?.v2JobId
+        ? String(job.v2JobId).trim() || undefined
+        : undefined;
+
+  useEffect(() => {
+    if (!factoryJobId) {
+      setFactoryJob(null);
+      return;
+    }
+
+    return subscribeToFactoryJob(factoryJobId, setFactoryJob);
+  }, [factoryJobId]);
+
+  const factoryRunId =
+    String(factoryJob?.currentRunId || job?.v2RunId || '').trim() || undefined;
+
+  useEffect(() => {
+    if (!factoryRunId) {
+      setFactoryRun(null);
+      return;
+    }
+
+    return subscribeToFactoryJobRun(factoryRunId, setFactoryRun);
+  }, [factoryRunId]);
+
+  const executionView: JobExecutionView | null = useMemo(
+    () => resolveJobExecutionView(job, factoryJob, factoryRun),
+    [job, factoryJob, factoryRun]
+  );
 
   const retry = useCallback(async () => {
     if (!jobId) return;
@@ -155,6 +196,9 @@ export function useJobDetail(jobId: string) {
 
   return {
     job,
+    factoryJob,
+    factoryRun,
+    executionView,
     isLoading,
     retry,
     cancel,
