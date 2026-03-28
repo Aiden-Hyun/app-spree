@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, GestureResponderEvent } from 'react-native';
+import { View, Text, StyleSheet, Pressable, GestureResponderEvent, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import {
@@ -136,6 +136,7 @@ export function JobCard({
     [job, effectiveStatus]
   );
   const displayError = effectiveStatus === 'failed' ? job.error : undefined;
+  const thumbnailUrl = useMemo(() => String(job.thumbnailUrl || '').trim(), [job.thumbnailUrl]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -207,6 +208,14 @@ export function JobCard({
         <Text style={styles.metaDot}>·</Text>
         <Text style={styles.metaText}>{job.llmModel}</Text>
       </View>
+
+      {thumbnailUrl ? (
+        <Image
+          source={{ uri: thumbnailUrl }}
+          style={styles.thumbnailPreview}
+          resizeMode="cover"
+        />
+      ) : null}
 
       {publishBadge ? (
         <Pressable
@@ -673,6 +682,14 @@ const createStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+    },
+    thumbnailPreview: {
+      width: 88,
+      height: 88,
+      marginTop: 12,
+      alignSelf: 'flex-start',
+      borderRadius: 12,
+      backgroundColor: theme.colors.gray[100],
     },
     publishBadge: {
       marginTop: 10,

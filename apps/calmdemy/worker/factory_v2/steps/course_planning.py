@@ -213,6 +213,7 @@ def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
                 "contentType": "course",
                 "_factoryContentJobId": content_job_id,
                 "_factoryStepName": ctx.step_name,
+                "_factoryOverwriteExistingAsset": force_regenerate,
             },
         )
 

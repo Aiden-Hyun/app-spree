@@ -20,6 +20,7 @@ class _FakeBlob:
         self._exists = False
         self.metadata = None
         self.cache_control = None
+        self.upload_calls = 0
 
     def exists(self) -> bool:
         return self._exists
@@ -29,6 +30,7 @@ class _FakeBlob:
 
     def upload_from_filename(self, filename: str, content_type: str | None = None, retry=None, timeout=None) -> None:
         self._exists = True
+        self.upload_calls += 1
 
     def patch(self) -> None:
         self._exists = True
@@ -141,6 +143,42 @@ class IdempotentRetriesTests(unittest.TestCase):
 
         self.assertEqual(first_path, second_path)
         self.assertEqual(first_url, second_url)
+
+    def test_upload_image_overwrites_existing_blob_when_requested(self) -> None:
+        bucket = _FakeBucket()
+        job_data = {
+            "contentType": "course",
+            "params": {"topic": "Mindfulness practice"},
+            "_factoryContentJobId": "content-123",
+            "_factoryStepName": "generate_course_thumbnail",
+        }
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as first_tmp:
+            first_tmp.write(b"png-v1")
+            first_path = first_tmp.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as second_tmp:
+            second_tmp.write(b"png-v2")
+            second_path = second_tmp.name
+
+        try:
+            with patch("factory_v2.shared.storage_uploader.storage.bucket", return_value=bucket):
+                initial_storage_path, initial_url = upload_image(first_path, job_data)
+                replaced_storage_path, replaced_url = upload_image(
+                    second_path,
+                    {
+                        **job_data,
+                        "_factoryOverwriteExistingAsset": True,
+                    },
+                )
+        finally:
+            if os.path.exists(first_path):
+                os.remove(first_path)
+            if os.path.exists(second_path):
+                os.remove(second_path)
+
+        blob = bucket.blob(initial_storage_path)
+        self.assertEqual(initial_storage_path, replaced_storage_path)
+        self.assertNotEqual(initial_url, replaced_url)
+        self.assertEqual(blob.upload_calls, 2)
 
     def test_publish_content_uses_deterministic_document_id(self) -> None:
         db = _FakeDB()

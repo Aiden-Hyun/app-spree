@@ -177,14 +177,18 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
 
     bucket = storage.bucket(config.STORAGE_BUCKET)
     blob = bucket.blob(storage_path)
-    if blob.exists():
+    overwrite_existing = bool(job_data.get("_factoryOverwriteExistingAsset"))
+    if blob.exists() and not overwrite_existing:
         download_token = _ensure_download_token(blob)
         logger.info("Image upload reused existing blob", extra={"storage_path": storage_path})
     else:
         if not os.path.isfile(image_path):
             raise FileNotFoundError(f"Missing image file for upload: {image_path}")
+        if blob.exists():
+            blob.reload()
         download_token = uuid.uuid4().hex
         blob.metadata = {
+            **dict(blob.metadata or {}),
             "firebaseStorageDownloadTokens": download_token,
             "factoryContentJobId": str(job_data.get("_factoryContentJobId") or ""),
             "factoryStepName": str(job_data.get("_factoryStepName") or "generate_image"),
@@ -195,6 +199,8 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
         )
         blob.cache_control = "public, max-age=31536000"
         blob.patch()
+        if overwrite_existing:
+            logger.info("Image upload replaced existing blob", extra={"storage_path": storage_path})
 
     download_url = _build_download_url(storage_path, download_token)
 
