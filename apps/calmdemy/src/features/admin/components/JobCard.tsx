@@ -11,6 +11,7 @@ interface JobCardProps {
   activeWorkers?: ActiveJobWorker[];
   onPress: () => void;
   onPublish?: (job: ContentJob) => void;
+  onGenerateThumbnail?: (job: ContentJob) => void;
 }
 
 interface PublishBadgeConfig {
@@ -51,7 +52,13 @@ function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
   }
 }
 
-export function JobCard({ job, activeWorkers = [], onPress, onPublish }: JobCardProps) {
+export function JobCard({
+  job,
+  activeWorkers = [],
+  onPress,
+  onPublish,
+  onGenerateThumbnail,
+}: JobCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const statusColor = getStatusColor(job.status, theme);
@@ -64,6 +71,8 @@ export function JobCard({ job, activeWorkers = [], onPress, onPublish }: JobCard
   const ttsProgressLabel = useMemo(() => getTtsProgressLabel(job), [job]);
   const publishBadge = useMemo(() => getPublishBadge(job, theme), [job, theme]);
   const canPublishFromCard = useMemo(() => canPublishFromFactoryCard(job), [job]);
+  const thumbnailBadge = useMemo(() => getThumbnailBadge(job, theme), [job, theme]);
+  const canGenerateThumbnailFromCard = useMemo(() => canGenerateThumbnailFromCardList(job), [job]);
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -83,6 +92,14 @@ export function JobCard({ job, activeWorkers = [], onPress, onPublish }: JobCard
       return;
     }
     onPublish(job);
+  };
+
+  const handleGenerateThumbnailPress = (event: GestureResponderEvent) => {
+    event.stopPropagation?.();
+    if (!canGenerateThumbnailFromCard || !onGenerateThumbnail) {
+      return;
+    }
+    onGenerateThumbnail(job);
   };
 
   return (
@@ -149,6 +166,31 @@ export function JobCard({ job, activeWorkers = [], onPress, onPublish }: JobCard
           />
           <Text style={[styles.publishBadgeText, { color: publishBadge.color }]}>
             {canPublishFromCard ? `${publishBadge.label} • Publish` : publishBadge.label}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {thumbnailBadge ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.thumbnailBadge,
+            {
+              backgroundColor: thumbnailBadge.backgroundColor,
+              borderColor: thumbnailBadge.borderColor,
+            },
+            canGenerateThumbnailFromCard && styles.thumbnailBadgeAction,
+            pressed && canGenerateThumbnailFromCard && styles.thumbnailBadgePressed,
+          ]}
+          disabled={!canGenerateThumbnailFromCard || !onGenerateThumbnail}
+          onPress={handleGenerateThumbnailPress}
+        >
+          <Ionicons
+            name={thumbnailBadge.icon}
+            size={14}
+            color={thumbnailBadge.color}
+          />
+          <Text style={[styles.thumbnailBadgeText, { color: thumbnailBadge.color }]}>
+            {thumbnailBadge.label}
           </Text>
         </Pressable>
       ) : null}
@@ -408,6 +450,30 @@ function getPublishBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | nu
   };
 }
 
+function getThumbnailBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | null {
+  if (job.contentType !== 'course' || job.status !== 'completed') {
+    return null;
+  }
+
+  if (String(job.thumbnailUrl || '').trim()) {
+    return {
+      label: 'Thumbnail Complete',
+      icon: 'checkmark-circle-outline',
+      color: theme.colors.success,
+      backgroundColor: `${theme.colors.success}12`,
+      borderColor: `${theme.colors.success}28`,
+    };
+  }
+
+  return {
+    label: 'Generate Thumbnail',
+    icon: 'image-outline',
+    color: theme.colors.secondary,
+    backgroundColor: `${theme.colors.secondary}12`,
+    borderColor: `${theme.colors.secondary}28`,
+  };
+}
+
 function canPublishFromFactoryCard(job: ContentJob): boolean {
   if (job.status !== 'completed' || job.contentType === 'full_subject') {
     return false;
@@ -452,6 +518,22 @@ function canPublishFromFactoryCard(job: ContentJob): boolean {
   }
 
   return !String(job.publishedContentId || '').trim() && Boolean(String(job.audioPath || '').trim());
+}
+
+function canGenerateThumbnailFromCardList(job: ContentJob): boolean {
+  const awaitingScriptApproval = Boolean(
+    (job.courseRegeneration?.active &&
+      job.courseRegeneration.mode === 'script_and_audio' &&
+      job.courseRegeneration.awaitingScriptApproval) ||
+      (job.courseScriptApproval?.enabled && job.courseScriptApproval.awaitingApproval)
+  );
+
+  return (
+    job.contentType === 'course' &&
+    job.status === 'completed' &&
+    !awaitingScriptApproval &&
+    !String(job.thumbnailUrl || '').trim()
+  );
 }
 
 function formatElapsedMsRoundedToMinute(ms: number): string {
@@ -551,6 +633,31 @@ const createStyles = (theme: Theme) =>
       opacity: 0.85,
     },
     publishBadgeText: {
+      fontFamily: 'DMSans-Medium',
+      fontSize: 12,
+    },
+    thumbnailBadge: {
+      marginTop: 10,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+    },
+    thumbnailBadgeAction: {
+      shadowColor: theme.colors.secondary,
+      shadowOpacity: 0.08,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    thumbnailBadgePressed: {
+      opacity: 0.85,
+    },
+    thumbnailBadgeText: {
       fontFamily: 'DMSans-Medium',
       fontSize: 12,
     },

@@ -25,7 +25,10 @@ import { DraftsSection } from '@features/admin/components/DraftsSection';
 import { JobList } from '@features/admin/components/JobList';
 import { FactoryMetrics } from '@features/admin/types';
 import { WorkerLogsPanel } from '@features/admin/components/WorkerLogsPanel';
-import { publishCompletedJob } from '@features/admin/data/adminRepository';
+import {
+  publishCompletedJob,
+  requestCourseThumbnailGeneration,
+} from '@features/admin/data/adminRepository';
 import { ContentJob } from '@features/admin/types';
 
 export default function AdminDashboard() {
@@ -165,6 +168,10 @@ export default function AdminDashboard() {
     await publishCompletedJob(job.id);
   };
 
+  const startGenerateThumbnail = async (job: ContentJob) => {
+    await requestCourseThumbnailGeneration(job);
+  };
+
   const handlePublishJob = async (job: ContentJob) => {
     const message = 'This will make the content visible to users. Continue?';
 
@@ -188,6 +195,46 @@ export default function AdminDashboard() {
     ]);
   };
 
+  const handleGenerateThumbnailJob = async (job: ContentJob) => {
+    const awaitingScriptApproval = Boolean(
+      (job.courseRegeneration?.active &&
+        job.courseRegeneration.mode === 'script_and_audio' &&
+        job.courseRegeneration.awaitingScriptApproval) ||
+        (job.courseScriptApproval?.enabled && job.courseScriptApproval.awaitingApproval)
+    );
+
+    if (
+      job.contentType !== 'course' ||
+      job.status !== 'completed' ||
+      awaitingScriptApproval ||
+      String(job.thumbnailUrl || '').trim()
+    ) {
+      return;
+    }
+
+    const message =
+      'This will generate a thumbnail for the completed course. If the course is already published, the published course will be updated too.';
+
+    if (Platform.OS === 'web') {
+      const confirmed = await confirmAction(message);
+      if (!confirmed) {
+        return;
+      }
+      await startGenerateThumbnail(job);
+      return;
+    }
+
+    Alert.alert('Generate Thumbnail', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Generate',
+        onPress: async () => {
+          await startGenerateThumbnail(job);
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <JobList
@@ -198,6 +245,9 @@ export default function AdminDashboard() {
         onJobSelect={(jobId) => router.push(`/admin/job/${jobId}`)}
         onJobPublish={(job) => {
           void handlePublishJob(job);
+        }}
+        onJobGenerateThumbnail={(job) => {
+          void handleGenerateThumbnailJob(job);
         }}
         headerComponent={
           <>

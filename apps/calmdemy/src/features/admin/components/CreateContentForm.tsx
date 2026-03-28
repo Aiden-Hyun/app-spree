@@ -305,7 +305,7 @@ export function CreateContentForm(props: Props) {
                 <View style={styles.toggleInfo}>
                   <Text style={styles.toggleLabel}>Generate thumbnail during run</Text>
                   <Text style={styles.toggleDescription}>
-                    Turn this on to create the thumbnail before the course finishes. Leave it off to keep image generation optional and run it later from the completed job.
+                    On by default. Turn this off only if you want to defer thumbnail generation and run it later from the completed job.
                   </Text>
                 </View>
                 <Switch

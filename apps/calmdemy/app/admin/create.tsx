@@ -91,6 +91,10 @@ type DraftPayload = {
   ttsVoice: string;
 };
 
+function normalizeGenerateThumbnailDuringRun(value?: boolean): boolean {
+  return value !== false;
+}
+
 export default function CreateContentScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -121,7 +125,7 @@ export default function CreateContentScreen() {
   const [subjectId, setSubjectId] = useState('');
   const [targetAudience, setTargetAudience] = useState<string>('beginner');
   const [tone, setTone] = useState<string>('gentle');
-  const [generateThumbnailDuringRun, setGenerateThumbnailDuringRun] = useState(false);
+  const [generateThumbnailDuringRun, setGenerateThumbnailDuringRun] = useState(true);
   const [requireScriptApprovalBeforeTts, setRequireScriptApprovalBeforeTts] = useState(false);
   const [levelCounts, setLevelCounts] = useState<SubjectLevelCounts>({
     l100: 0,
@@ -199,7 +203,9 @@ export default function CreateContentScreen() {
         setSubjectId(draft.subjectId);
         setTargetAudience(draft.targetAudience || 'beginner');
         setTone(draft.tone || 'gentle');
-        setGenerateThumbnailDuringRun(Boolean(draft.generateThumbnailDuringRun));
+        setGenerateThumbnailDuringRun(
+          normalizeGenerateThumbnailDuringRun(draft.generateThumbnailDuringRun)
+        );
         setRequireScriptApprovalBeforeTts(Boolean(draft.requireScriptApprovalBeforeTts));
         setLevelCounts(
           draft.levelCounts || {
@@ -236,7 +242,9 @@ export default function CreateContentScreen() {
           subjectId: draft.subjectId,
           targetAudience: draft.targetAudience,
           tone: draft.tone,
-          generateThumbnailDuringRun: Boolean(draft.generateThumbnailDuringRun),
+          generateThumbnailDuringRun: normalizeGenerateThumbnailDuringRun(
+            draft.generateThumbnailDuringRun
+          ),
           requireScriptApprovalBeforeTts: Boolean(draft.requireScriptApprovalBeforeTts),
           levelCounts: draft.levelCounts || {
             l100: 0,

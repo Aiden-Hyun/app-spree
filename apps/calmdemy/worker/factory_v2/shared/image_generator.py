@@ -282,6 +282,70 @@ def generate_image(
             _empty_runtime_cache()
 
 
+def _clean_prompt_fragment(value: object) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    return text.rstrip(".,;: ")
+
+
+def _collect_course_plan_highlights(plan: dict | None) -> list[str]:
+    if not isinstance(plan, dict):
+        return []
+
+    highlights: list[str] = []
+    intro = plan.get("intro") or {}
+    intro_outline = _clean_prompt_fragment(intro.get("outline")) if isinstance(intro, dict) else ""
+    if intro_outline:
+        highlights.append(f"Intro outline: {intro_outline}")
+
+    modules = list(plan.get("modules") or [])
+    for module in modules[:2]:
+        if not isinstance(module, dict):
+            continue
+        module_title = _clean_prompt_fragment(module.get("moduleTitle"))
+        objective = _clean_prompt_fragment(module.get("objective"))
+        lesson_summary = _clean_prompt_fragment(module.get("lessonSummary"))
+        practice_type = _clean_prompt_fragment(module.get("practiceType"))
+        if module_title:
+            highlights.append(f"Module theme: {module_title}")
+        if objective:
+            highlights.append(f"Module objective: {objective}")
+        if lesson_summary:
+            highlights.append(f"Lesson summary: {lesson_summary}")
+        if practice_type:
+            highlights.append(f"Practice type: {practice_type}")
+        if len(highlights) >= 6:
+            break
+
+    return highlights[:6]
+
+
+def _fallback_image_prompt(job_data: dict, title: str, topic: str, content_type: str, plan: dict | None = None) -> str:
+    params = job_data.get("params", {}) or {}
+    goal = _clean_prompt_fragment((plan or {}).get("courseGoal"))
+    subject = _clean_prompt_fragment(params.get("subjectLabel"))
+    tone = _clean_prompt_fragment(params.get("tone"))
+    module_title = ""
+    if isinstance(plan, dict):
+        first_module = next(
+            (module for module in list(plan.get("modules") or []) if isinstance(module, dict)),
+            None,
+        )
+        if first_module:
+            module_title = _clean_prompt_fragment(first_module.get("moduleTitle"))
+
+    anchor = module_title or goal or _clean_prompt_fragment(topic) or _clean_prompt_fragment(title) or "the course theme"
+    descriptor_parts = [part for part in [subject, tone] if part]
+    descriptor = " ".join(descriptor_parts).strip()
+    if descriptor:
+        descriptor = f"{descriptor} "
+
+    return (
+        f"Distinct {descriptor}app thumbnail for {title}: a serene, premium visual centered on {anchor}, "
+        f"inspired by {goal or _clean_prompt_fragment(topic) or content_type}, soft cinematic light, "
+        "intentional color palette, clean composition, no text, no logos, no people."
+    )
+
+
 def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str, plan: dict | None = None) -> str:
     """Generate or return an image prompt for a job."""
     image_prompt = (job_data.get("imagePrompt") or "").strip()
@@ -290,6 +354,7 @@ def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str
 
     from .llm_generator import _get_llm_adapter
 
+    params = job_data.get("params", {}) or {}
     base_context = [
         f"Content type: {content_type}",
         f"Title: {title}",
@@ -297,17 +362,25 @@ def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str
     ]
     if plan:
         goal = plan.get("courseGoal") or ""
-        subject = job_data.get("params", {}).get("subjectLabel", "")
+        subject = params.get("subjectLabel", "")
         if goal:
             base_context.append(f"Course goal: {goal}")
         if subject:
             base_context.append(f"Subject: {subject}")
+        base_context.extend(_collect_course_plan_highlights(plan))
+    audience = _clean_prompt_fragment(params.get("targetAudience"))
+    tone = _clean_prompt_fragment(params.get("tone"))
+    if audience:
+        base_context.append(f"Audience: {audience}")
+    if tone:
+        base_context.append(f"Tone: {tone}")
 
     prompt = (
-        "You write concise, photoreal image prompts for app thumbnails. "
+        "You write distinct, premium image prompts for app thumbnails. "
         "Output a single sentence only. "
-        "Rules: calming, soft light, minimalist, no text, no logos, no people. "
-        "Include natural scenery or abstract gradients if helpful.\n\n"
+        "Use the provided context to generate an appropriate visual concept that fits the course. "
+        "Use one clear visual metaphor or scene. "
+        "No text, no logos, no people.\n\n"
         + "\n".join(base_context)
     )
 
@@ -320,4 +393,4 @@ def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str
     except Exception as e:
         logger.warning("Prompt generation failed", extra={"error": str(e)})
 
-    return "Calming minimalist nature scene, soft light, gentle colors, no text, no people, high quality."
+    return _fallback_image_prompt(job_data, title, topic, content_type, plan=plan)

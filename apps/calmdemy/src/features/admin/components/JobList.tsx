@@ -19,6 +19,7 @@ interface JobListProps {
   hasDrafts: boolean;
   onJobSelect: (jobId: string) => void;
   onJobPublish?: (job: ContentJob) => void;
+  onJobGenerateThumbnail?: (job: ContentJob) => void;
   headerComponent?: React.ReactElement | null;
   footerComponent?: React.ReactElement | null;
 }
@@ -35,6 +36,7 @@ export function JobList({
   hasDrafts,
   onJobSelect,
   onJobPublish,
+  onJobGenerateThumbnail,
   headerComponent = null,
   footerComponent = null,
 }: JobListProps) {
@@ -95,6 +97,7 @@ export function JobList({
               activeWorkers={activeWorkersByJobId[item.parentJob.id] || []}
               onPress={() => onJobSelect(item.parentJob.id)}
               onPublish={onJobPublish}
+              onGenerateThumbnail={onJobGenerateThumbnail}
             />
           </View>
 
@@ -107,6 +110,7 @@ export function JobList({
                     activeWorkers={activeWorkersByJobId[childJob.id] || []}
                     onPress={() => onJobSelect(childJob.id)}
                     onPublish={onJobPublish}
+                    onGenerateThumbnail={onJobGenerateThumbnail}
                   />
                 </View>
               ))}

@@ -138,6 +138,94 @@ class ImageGeneratorTests(unittest.TestCase):
         self.assertTrue(flux_dir.endswith("black-forest-labs--FLUX.2-klein-4B"))
         self.assertTrue(turbo_dir.endswith("stabilityai--sd-turbo"))
 
+    def test_build_image_prompt_uses_richer_course_context(self) -> None:
+        captured: dict[str, object] = {}
+
+        class _Adapter:
+            def generate(self, prompt: str, max_tokens: int = 0) -> str:
+                captured["prompt"] = prompt
+                captured["max_tokens"] = max_tokens
+                return "A quiet geometric path through layered blue-green terraces, dawn haze, refined editorial lighting, no text."
+
+        job_data = {
+            "params": {
+                "subjectLabel": "CBT",
+                "targetAudience": "beginner",
+                "tone": "gentle",
+            }
+        }
+        plan = {
+            "courseGoal": "Help learners interrupt spiraling anxious thoughts.",
+            "intro": {"outline": "A grounded orientation to noticing thought loops without judgment."},
+            "modules": [
+                {
+                    "moduleTitle": "Name the Thought Spiral",
+                    "objective": "Spot repeating worry loops early.",
+                    "lessonSummary": "Recognize the first signs of rumination in daily life.",
+                    "practiceType": "guided reflection",
+                }
+            ],
+        }
+
+        with patch("factory_v2.shared.llm_generator._get_llm_adapter", return_value=_Adapter()):
+            prompt = image_generator.build_image_prompt(
+                job_data,
+                "Reset the Spiral",
+                "rumination and anxious thought loops",
+                "course",
+                plan=plan,
+            )
+
+        self.assertIn("layered blue-green terraces", prompt)
+        self.assertEqual(captured["max_tokens"], 120)
+        llm_prompt = str(captured["prompt"])
+        self.assertIn("Course goal: Help learners interrupt spiraling anxious thoughts.", llm_prompt)
+        self.assertIn("Module theme: Name the Thought Spiral", llm_prompt)
+        self.assertIn("Module objective: Spot repeating worry loops early", llm_prompt)
+        self.assertIn("Lesson summary: Recognize the first signs of rumination in daily life", llm_prompt)
+        self.assertIn("Audience: beginner", llm_prompt)
+        self.assertIn("Tone: gentle", llm_prompt)
+        self.assertIn(
+            "Use the provided context to generate an appropriate visual concept that fits the course.",
+            llm_prompt,
+        )
+
+    def test_build_image_prompt_fallback_uses_specific_context(self) -> None:
+        job_data = {
+            "params": {
+                "subjectLabel": "CBT",
+                "tone": "gentle",
+            }
+        }
+        plan = {
+            "courseGoal": "Build steadier attention during moments of overwhelm.",
+            "modules": [
+                {
+                    "moduleTitle": "Ground the Body",
+                }
+            ],
+        }
+
+        with patch(
+            "factory_v2.shared.llm_generator._get_llm_adapter",
+            side_effect=RuntimeError("adapter unavailable"),
+        ):
+            prompt = image_generator.build_image_prompt(
+                job_data,
+                "Steady Attention",
+                "focus during overwhelm",
+                "course",
+                plan=plan,
+            )
+
+        self.assertIn("Steady Attention", prompt)
+        self.assertIn("Ground the Body", prompt)
+        self.assertIn("Build steadier attention during moments of overwhelm", prompt)
+        self.assertNotEqual(
+            prompt,
+            "Calming minimalist nature scene, soft light, gentle colors, no text, no people, high quality.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

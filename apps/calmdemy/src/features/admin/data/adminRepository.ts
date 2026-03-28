@@ -418,7 +418,9 @@ export async function createContentJob(input: CreateJobInput): Promise<string> {
   // Course jobs get extra tracking fields
   if (input.contentType === 'course') {
     jobData.courseProgress = 'Pending';
-    jobData.generateThumbnailDuringRun = Boolean(input.generateThumbnailDuringRun);
+    if (typeof input.generateThumbnailDuringRun === 'boolean') {
+      jobData.generateThumbnailDuringRun = input.generateThumbnailDuringRun;
+    }
     if (input.requireScriptApprovalBeforeTts) {
       jobData.courseScriptApproval = makePendingScriptApprovalPayload(userId);
     }
