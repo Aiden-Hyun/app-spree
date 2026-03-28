@@ -1,3 +1,5 @@
+"""Artifact-lineage and timing helpers for answering "what produced this output?"."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -145,6 +147,7 @@ def build_artifact_updates(
     step_input: dict[str, Any] | None = None,
     step_output: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
+    """Derive lineage records that should be attached after a successful step."""
     step_input = dict(step_input or {})
     step_output = dict(step_output or {})
     before_runtime = _runtime(before_job)
@@ -423,6 +426,7 @@ def _duration_ms(intervals: Iterable[tuple[int, int]]) -> int:
 
 
 def compute_live_run_elapsed_ms(db, job_id: str, run_id: str) -> int:
+    """Approximate active runtime by merging step intervals without double-counting overlap."""
     intervals: list[tuple[int, int]] = []
     now_ms = int(now_utc().timestamp() * 1000)
     for doc in _step_run_docs_for_job(db, job_id):
@@ -551,6 +555,7 @@ def finalize_job_timing(
     run_id: str,
     content_job_id: str,
 ) -> dict[str, Any] | None:
+    """Persist final timing/lineage summaries once a run has truly produced publishable output."""
     if not job_id or not content_job_id or not run_id:
         return None
 

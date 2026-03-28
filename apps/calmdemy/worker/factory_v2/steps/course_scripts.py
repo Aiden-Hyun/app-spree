@@ -1,3 +1,5 @@
+"""Course script steps: generate raw scripts first, then QA-format each session."""
+
 from __future__ import annotations
 
 import json
@@ -26,6 +28,7 @@ def _build_session_script_prompt(
     plan: dict,
     job_data: dict,
 ) -> str:
+    """Build a prompt tailored to the intro/lesson/practice flavor of one session."""
     params = job_data.get("params", {})
     course_code = params.get("courseCode", "COURSE101")
     course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled"))
@@ -124,6 +127,7 @@ def _build_session_script_prompt(
 
 
 def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
+    """Generate any missing session scripts and optionally stop for approval."""
     from factory_v2.shared.llm_generator import _get_llm_adapter
 
     job_data = _content_job_data(ctx.job)
@@ -175,6 +179,8 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
         and not bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
     )
     if await_regeneration_script_approval:
+        # Regeneration approval is narrower than initial approval: only the
+        # targeted sessions need review, but the flow shape is the same.
         regeneration["awaitingScriptApproval"] = True
         target_session_codes = regeneration.get("targetSessionCodes") or []
         target_count = len(target_session_codes) if isinstance(target_session_codes, list) else 0
@@ -240,6 +246,7 @@ def execute_generate_course_scripts(ctx: StepContext) -> StepResult:
 
 
 def execute_format_course_scripts(ctx: StepContext) -> StepResult:
+    """Normalize each raw session script so TTS receives cleaner narration text."""
     from factory_v2.shared.qa_formatter import format_script
 
     job_data = _content_job_data(ctx.job)

@@ -1,3 +1,5 @@
+"""Step heartbeat/watchdog helpers for long-running queue executions."""
+
 from __future__ import annotations
 
 import os
@@ -81,6 +83,13 @@ def coerce_datetime(value: Any) -> datetime | None:
 
 
 class StepExecutionWatchdog:
+    """Background heartbeat helper for one running step.
+
+    The worker thread does the actual step work. This helper keeps the queue
+    lease alive, updates step-run heartbeat fields, and surfaces progress text
+    so recovery logic can tell the difference between "busy" and "stuck".
+    """
+
     def __init__(
         self,
         *,
@@ -124,6 +133,7 @@ class StepExecutionWatchdog:
         self._last_progress_detail: str | None = None
 
     def _active_step_payload(self, *, heartbeat_at: datetime) -> dict[str, Any]:
+        """Build the worker-status payload shown in admin/recovery views."""
         return {
             "jobId": self.job_id,
             "currentQueueId": self.queue_id,
@@ -149,6 +159,7 @@ class StepExecutionWatchdog:
         return detail
 
     def _heartbeat(self) -> None:
+        """Refresh queue, step-run, and worker-status heartbeats in one place."""
         heartbeat_at = datetime.now(timezone.utc)
         progress_detail = self._consume_progress_detail()
         try:
@@ -193,6 +204,7 @@ class StepExecutionWatchdog:
         self._thread.start()
 
     def progress(self, detail: str | None = None) -> None:
+        """Record the latest human-readable progress detail for the next heartbeat."""
         if not detail:
             return
         with self._progress_lock:
@@ -213,6 +225,7 @@ class StepExecutionWatchdog:
         )
 
     def stop(self) -> None:
+        """Stop the heartbeat thread and clear the worker's active-step snapshot."""
         self._stop_event.set()
         if self._thread is not None:
             self._thread.join(timeout=1.0)

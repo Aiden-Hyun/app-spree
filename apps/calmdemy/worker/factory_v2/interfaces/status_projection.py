@@ -1,3 +1,5 @@
+"""Helpers that keep legacy `content_jobs` status fields aligned with V2 state."""
+
 from __future__ import annotations
 
 from firebase_admin import firestore as fs
@@ -26,10 +28,12 @@ _COMPAT_STAGE_BY_STEP = {
 
 
 def compat_failed_stage(step_name: str) -> str:
+    """Map internal step names to the legacy stage labels the admin UI expects."""
     return _COMPAT_STAGE_BY_STEP.get(step_name, "pending")
 
 
 def patch_running_status(job_repo, content_job_id: str, run_id: str, step_name: str) -> None:
+    """Project a step start into the compatibility document used by older screens."""
     job_repo.patch_compat_content_job_for_run(
         content_job_id,
         run_id,
@@ -51,6 +55,7 @@ def patch_failed_status(
     error_msg: str,
     error_code: str,
 ) -> None:
+    """Project a terminal step failure into the compatibility document."""
     job_repo.patch_compat_content_job_for_run(
         content_job_id,
         run_id,

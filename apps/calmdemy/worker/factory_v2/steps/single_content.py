@@ -1,3 +1,5 @@
+"""Step executors for the single-content workflow (non-course, non-subject jobs)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -36,6 +38,7 @@ def _script_approval(runtime: dict[str, Any], job_data: dict[str, Any]) -> dict[
 
 
 def execute_generate_script(ctx: StepContext) -> StepResult:
+    """Generate the draft script/title unless runtime already contains reusable output."""
     from factory_v2.shared.llm_generator import generate_script
 
     job_data = _content_job_data(ctx.job)
@@ -54,6 +57,8 @@ def execute_generate_script(ctx: StepContext) -> StepResult:
     )
 
     if await_script_approval:
+        # Approval checkpoints deliberately return a "completed" compat status so
+        # the admin UI shows the draft as ready for review instead of "stuck".
         script_approval["awaitingApproval"] = True
         return StepResult(
             output={"word_count": len(script.split()), "awaiting_script_approval": True},
@@ -96,6 +101,7 @@ def execute_generate_script(ctx: StepContext) -> StepResult:
 
 
 def execute_format_script(ctx: StepContext) -> StepResult:
+    """Run QA formatting over the generated script before image/TTS steps use it."""
     from factory_v2.shared.qa_formatter import format_script
 
     job_data = _content_job_data(ctx.job)
@@ -122,6 +128,7 @@ def execute_format_script(ctx: StepContext) -> StepResult:
 
 
 def execute_generate_image(ctx: StepContext) -> StepResult:
+    """Build or reuse an image prompt, then generate and upload the thumbnail."""
     from factory_v2.shared.image_generator import build_image_prompt, generate_image
     from factory_v2.shared.storage_uploader import upload_image
 
@@ -168,6 +175,7 @@ def execute_generate_image(ctx: StepContext) -> StepResult:
 
 
 def execute_synthesize_audio(ctx: StepContext) -> StepResult:
+    """Convert the formatted script into a WAV file using the configured TTS model."""
     from factory_v2.shared.tts_converter import convert_to_audio
 
     job_data = _content_job_data(ctx.job)
@@ -187,6 +195,7 @@ def execute_synthesize_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_post_process_audio(ctx: StepContext) -> StepResult:
+    """Normalize the raw WAV and encode it into the final MP3 artifact."""
     from factory_v2.shared.audio_processor import post_process_audio
 
     runtime = _runtime(ctx.job)
@@ -205,6 +214,7 @@ def execute_post_process_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_upload_audio(ctx: StepContext) -> StepResult:
+    """Upload the MP3 and persist its storage path/duration for later publish."""
     from factory_v2.shared.storage_uploader import upload_audio
 
     job_data = _content_job_data(ctx.job)
@@ -237,6 +247,7 @@ def execute_upload_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_publish_content(ctx: StepContext) -> StepResult:
+    """Publish the final content document or stop at a manual-approval checkpoint."""
     from factory_v2.shared.content_publisher import publish_content
 
     job_data = _content_job_data(ctx.job)
@@ -258,6 +269,8 @@ def execute_publish_content(ctx: StepContext) -> StepResult:
         raise ValueError("Missing runtime.formatted_script")
 
     if not auto_publish and request_status != "publishing":
+        # This mirrors the course approval flow: generation can finish while
+        # publish remains a separate explicit admin action.
         return StepResult(
             output={"awaiting_approval": True},
             summary_patch={

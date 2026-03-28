@@ -1,3 +1,5 @@
+"""Course publish steps: fan-in confirmation first, then writes to app collections."""
+
 from __future__ import annotations
 
 import math
@@ -26,6 +28,7 @@ def _publish_course(
     audio_results: dict[str, dict[str, Any]],
     job_data: dict,
 ) -> tuple[str, list[str]]:
+    """Write/update the course doc plus all of its session docs in Firestore."""
     params = job_data.get("params", {})
     course_code = params.get("courseCode", "COURSE101")
     course_title = params.get("courseTitle", plan.get("courseTitle", "Untitled"))
@@ -98,6 +101,7 @@ def _publish_course(
 
 
 def execute_upload_course_audio(ctx: StepContext) -> StepResult:
+    """Project that all course audio uploads are now ready for the publish step."""
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -120,6 +124,7 @@ def execute_upload_course_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_publish_course(ctx: StepContext) -> StepResult:
+    """Publish the course or stop at an approval checkpoint when required."""
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -148,6 +153,8 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
         should_publish = False
 
     if not should_publish:
+        # Regeneration can intentionally stop here so an admin can review the new
+        # sessions before the existing course is overwritten in production.
         preview_sessions = _build_course_preview_sessions(course_code, plan, audio_results)
         return StepResult(
             output={"awaiting_approval": True, "preview_count": len(preview_sessions)},
@@ -180,6 +187,8 @@ def execute_publish_course(ctx: StepContext) -> StepResult:
         and not manual_publish
         and not thumbnail_generation_requested
     ):
+        # A normal rerun should not duplicate publish side effects when the
+        # course already exists and nothing requested a replacement publish.
         return StepResult(
             output={"course_id": existing_course_id, "session_count": len(existing_session_ids)},
             summary_patch={"currentStep": "publish_course", "courseId": existing_course_id},

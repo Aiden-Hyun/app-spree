@@ -1,3 +1,5 @@
+"""Course planning steps: generate the course outline first, then the thumbnail."""
+
 from __future__ import annotations
 
 import ast
@@ -24,6 +26,7 @@ def _load_system_prompt() -> str:
 
 
 def _build_course_plan_prompt(job_data: dict) -> str:
+    """Build the tightly constrained JSON-only prompt for course-plan generation."""
     params = job_data.get("params", {})
     system_prompt = _load_system_prompt()
 
@@ -129,6 +132,7 @@ def _clean_json_text(text: str) -> str:
 
 
 def _parse_plan(raw: str) -> dict:
+    """Parse model output defensively, repairing common JSON-ish formatting mistakes."""
     text = raw.strip()
     if text.startswith("```"):
         first_newline = text.index("\n")
@@ -154,6 +158,7 @@ def _parse_plan(raw: str) -> dict:
 
 
 def execute_generate_course_plan(ctx: StepContext) -> StepResult:
+    """Generate the reusable course plan unless one already exists in runtime/request data."""
     from factory_v2.shared.llm_generator import _get_llm_adapter
 
     job_data = _content_job_data(ctx.job)
@@ -181,6 +186,7 @@ def execute_generate_course_plan(ctx: StepContext) -> StepResult:
 
 
 def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
+    """Generate or reuse the course thumbnail and project its storage metadata."""
     from factory_v2.shared.image_generator import build_image_prompt, generate_image
     from factory_v2.shared.storage_uploader import upload_image
 
@@ -198,12 +204,24 @@ def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
 
     if force_regenerate or not thumbnail_url:
         title = job_data.get("params", {}).get("courseTitle", plan.get("courseTitle", "Untitled Course"))
-        image_prompt = image_prompt or build_image_prompt(
+        # Regeneration intentionally rebuilds the prompt from the latest plan so
+        # the new image reflects the current course contents instead of stale copy.
+        image_prompt = build_image_prompt(
             job_data,
             title,
             job_data.get("params", {}).get("topic", ""),
             "course",
             plan=plan,
+            ignore_saved_prompt=force_regenerate,
+        ) if force_regenerate else (
+            image_prompt
+            or build_image_prompt(
+                job_data,
+                title,
+                job_data.get("params", {}).get("topic", ""),
+                "course",
+                plan=plan,
+            )
         )
         local_image_path = generate_image(image_prompt)
         image_path, thumbnail_url = upload_image(

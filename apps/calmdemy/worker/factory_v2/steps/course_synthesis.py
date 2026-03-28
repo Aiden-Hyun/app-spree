@@ -1,3 +1,5 @@
+"""Course audio synthesis steps, including chunk fan-out and session fan-in."""
+
 from __future__ import annotations
 
 import os
@@ -51,6 +53,11 @@ def _persist_course_audio_checkpoint(
     ctx: StepContext,
     audio_results: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
+    """Checkpoint completed session audio into both V2 runtime and legacy compat fields.
+
+    This makes course audio generation resumable. If a worker dies after 7/9
+    sessions, the next run only needs to enqueue the missing shards.
+    """
     job_id = str(ctx.job.get("id") or "").strip()
     if not job_id:
         return dict(audio_results)
@@ -151,6 +158,7 @@ def _synthesize_course_session_audio_inline(
     course_code: str,
     session_def: dict[str, Any],
 ) -> str:
+    """Legacy/root-mode course synthesis path that handles one whole session inline."""
     from factory_v2.shared.audio_processor import post_process_audio
     from factory_v2.shared.storage_uploader import upload_audio
     from factory_v2.shared.tts_converter import convert_to_audio
@@ -197,6 +205,7 @@ def _assemble_course_session_audio(
     course_code: str,
     session_def: dict[str, Any],
 ) -> str:
+    """Fan-in path for chunked TTS: stitch chunk WAVs, post-process, and upload."""
     from factory_v2.shared.audio_processor import post_process_audio
     from factory_v2.shared.storage_uploader import upload_audio
     from factory_v2.shared.tts_converter import convert_to_audio
@@ -248,6 +257,7 @@ def _assemble_course_session_audio(
 
 
 def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
+    """Synthesize either one session shard or the full course, depending on `ctx.shard_key`."""
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -264,6 +274,8 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
 
     requested_shard = str(ctx.shard_key or "root").strip().upper()
     if requested_shard and requested_shard != "ROOT":
+        # Session-level shard jobs are the fan-in stage after all chunk jobs for
+        # a session have completed successfully.
         session_def = _session_def_by_shard(requested_shard)
         if session_def is None:
             raise ValueError(f"Unknown course synth shard '{requested_shard}'")
@@ -293,6 +305,8 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
         )
 
     for index, session_def in enumerate(SESSION_DEFS):
+        # Root-mode execution is the fallback path used when fan-out chunking is
+        # disabled or when older jobs still expect the simpler linear behavior.
         session_code = f"{course_code}{session_def['suffix']}"
         if audio_results.get(session_code, {}).get("storagePath"):
             continue
@@ -323,6 +337,7 @@ def execute_synthesize_course_audio(ctx: StepContext) -> StepResult:
 
 
 def execute_synthesize_course_audio_chunk(ctx: StepContext) -> StepResult:
+    """Synthesize exactly one chunk for one course session shard."""
     from factory_v2.shared.tts_converter import convert_to_audio
 
     job_data = _content_job_data(ctx.job)

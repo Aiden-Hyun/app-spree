@@ -1,9 +1,12 @@
+"""Small helpers for interpreting lease timestamps in queue/recovery code."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
 
 def lease_expired(lease_expires_at) -> bool:
+    """Return `True` when a queue lease is missing, invalid, or already expired."""
     if lease_expires_at is None:
         return True
 

@@ -1,3 +1,5 @@
+"""Bridge from legacy `content_jobs` documents into V2 workflow state."""
+
 from __future__ import annotations
 
 from firebase_admin import firestore as fs
@@ -13,6 +15,12 @@ from ..infrastructure.queue_repo import FirestoreQueueRepo
 
 
 def _extract_runtime(content_job: dict, existing_runtime: dict | None = None) -> dict:
+    """Build the V2 runtime snapshot from legacy fields on `content_jobs`.
+
+    This is the compatibility handoff point: values that used to live only on
+    `content_jobs` are copied into `factory_jobs.runtime` so V2 steps can read
+    from one canonical runtime shape.
+    """
     existing_runtime = dict(existing_runtime or {})
     return {
         "generated_script": content_job.get("generatedScript"),
@@ -80,6 +88,8 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     trigger = "bootstrap"
     first_step = "generate_course_plan" if is_course else "generate_subject_plan" if is_subject else None
     if status == "pending" and is_course:
+        # Resume the course at the earliest missing step instead of re-running
+        # the whole pipeline when plan/scripts/approvals already exist.
         if bool(content_job.get("thumbnailGenerationRequested")) and content_job.get("coursePlan"):
             first_step = "generate_course_thumbnail"
         else:
@@ -201,6 +211,8 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
         and generate_thumbnail_during_run
         and not str(content_job.get("thumbnailUrl") or "").strip()
     ):
+        # Script regeneration can jump into the middle of the course workflow,
+        # but we still want the thumbnail step present if the course needs one.
         orchestrator._ensure_step_enqueued(
             job_repo.get(v2_job_id),
             v2_job_id,

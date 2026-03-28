@@ -1,3 +1,5 @@
+"""Utilities for splitting long course scripts into chunk-sized TTS work units."""
+
 from __future__ import annotations
 
 import os
@@ -83,6 +85,7 @@ def _split_text_unit(text: str, max_words: int) -> list[str]:
 
 
 def split_course_tts_chunks(script: str) -> list[str]:
+    """Split a session script into retry-friendly chunks while preserving pause markers."""
     units: list[dict] = []
     for segment in _split_on_pauses(script):
         if segment["type"] == "pause":
@@ -143,10 +146,12 @@ def split_course_tts_chunks(script: str) -> list[str]:
 
 
 def make_chunk_shard_key(session_shard: str, chunk_index: int) -> str:
+    """Build the persisted shard key format used by chunk queue items and step runs."""
     return f"{str(session_shard).strip().upper()}-P{int(chunk_index) + 1:02d}"
 
 
 def parse_chunk_shard_key(shard_key: str) -> tuple[str, int] | None:
+    """Parse a persisted chunk shard key back into `(session_shard, chunk_index)`."""
     match = re.match(r"^([A-Z0-9]+)-P(\d+)$", str(shard_key or "").strip().upper())
     if not match:
         return None

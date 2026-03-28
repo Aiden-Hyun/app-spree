@@ -1,3 +1,10 @@
+"""Central workflow coordinator for Content Factory V2.
+
+The orchestrator owns the parts of the workflow that are bigger than a single
+step executor: creating runs, enqueueing follow-up work, and repairing course
+fan-out/fan-in edges after interruptions.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -15,7 +22,7 @@ COURSE_AUDIO_CHUNK_STEP = "synthesize_course_audio_chunk"
 
 
 class Orchestrator:
-    """Coordinates run creation and downstream step enqueueing."""
+    """Coordinates run creation, step fan-out, and run completion/failure logic."""
 
     def __init__(self, job_repo, run_repo, step_run_repo, queue_repo):
         self.job_repo = job_repo
@@ -361,6 +368,11 @@ class Orchestrator:
         trigger: str = "new",
         first_step: str | None = None,
     ) -> str:
+        """Create a new run record and enqueue the first step for that run.
+
+        `first_step` lets retries/regenerations jump into the middle of a
+        workflow instead of replaying everything from the beginning.
+        """
         job = self.job_repo.get(job_id)
         run_number = self.run_repo.next_run_number(job_id)
         run_id = f"{job_id}-r{run_number}"
@@ -381,6 +393,7 @@ class Orchestrator:
         return run_id
 
     def _fan_out_course_audio(self, job: dict, job_id: str, run_id: str) -> None:
+        """Expand course audio generation into per-session, per-chunk queue items."""
         completed_shards = self._completed_course_audio_shards(job)
         content_job_id = self._content_job_id(job)
         if content_job_id:
@@ -659,6 +672,11 @@ class Orchestrator:
         step_name: str,
         shard_key: str = "root",
     ) -> None:
+        """Advance the workflow after a step succeeds.
+
+        Most job types can follow the static DAG in `scheduler.py`, but course
+        and subject jobs have special branching rules, so their logic lives here.
+        """
         job = self.job_repo.get(job_id)
         workflow = workflow_for_job_type(job["job_type"])
 
@@ -700,6 +718,9 @@ class Orchestrator:
                 return
 
         if job["job_type"] == "course":
+            # Course runs have two extra orchestration concerns:
+            # 1. thumbnail generation can happen in parallel or be reused
+            # 2. audio synthesis fans out into chunk shards, then fans back in
             if step_name == "generate_course_plan" and self._course_generates_thumbnail_during_run(job):
                 self._ensure_step_enqueued(job, job_id, run_id, "generate_course_thumbnail")
             if step_name == "generate_course_thumbnail":
@@ -790,6 +811,7 @@ class Orchestrator:
         reason: str = "Cancelled by admin",
         error_code: str = "cancelled_by_admin",
     ) -> None:
+        """Stop a run and cancel any queued follow-up work that has not started yet."""
         job = self.job_repo.get(job_id)
         summary = dict(job.get("summary") or {})
         failed_step = str(summary.get("currentStep") or "").strip() or "pending"
@@ -835,6 +857,7 @@ class Orchestrator:
             )
 
     def on_step_failed(self, job_id: str, run_id: str, step_name: str, error_code: str) -> None:
+        """Project terminal failure state and cancel any downstream queue items."""
         self.job_repo.mark_failed(job_id, run_id, step_name, error_code)
         self.run_repo.mark_failed(run_id, step_name, error_code)
         if not hasattr(self.job_repo, "db"):

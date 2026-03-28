@@ -1,3 +1,5 @@
+"""Background recovery routines for stale leases, stuck steps, and missing fan transitions."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -20,6 +22,8 @@ logger = get_logger(__name__)
 
 
 class RecoveryManager:
+    """Periodic self-healing logic shared by workers and the companion process."""
+
     def __init__(
         self,
         db,
@@ -185,6 +189,7 @@ class RecoveryManager:
         payload: dict[str, Any],
         reason: str,
     ) -> dict[str, Any] | None:
+        """Atomically convert a stuck queue item into either a retry or a terminal failure."""
         if self.step_run_repo is None:
             return None
 
@@ -353,6 +358,7 @@ class RecoveryManager:
         )
 
     def recover_stuck_steps(self, max_docs: int = 100) -> dict[str, int]:
+        """Find stuck leased/running steps and move them back onto a safe path."""
         recovered = {
             "stuck_detected": 0,
             "watchdog_retries": 0,
@@ -399,6 +405,8 @@ class RecoveryManager:
                     recycled = bool(recycle_result)
 
             if not terminated:
+                # If the worker still looks healthy we leave the step alone and
+                # give the watchdog more time to observe another heartbeat.
                 continue
             if owner:
                 self._clear_worker_active_step(
@@ -474,6 +482,11 @@ class RecoveryManager:
         return recovered
 
     def recover_worker_tick(self) -> dict[str, int]:
+        """Recovery pass used by normal workers.
+
+        Workers focus on the fixes they are most likely to notice quickly while
+        processing jobs: stale leases, stuck steps, and course fan-in/upload/publish.
+        """
         recovered = {
             "stale_leases": self.queue_repo.recover_stale_leases(),
             "stuck_detected": 0,
@@ -496,6 +509,11 @@ class RecoveryManager:
         return recovered
 
     def recover_companion_tick(self) -> dict[str, int]:
+        """Recovery pass used by the companion/coordinator process.
+
+        The companion has broader responsibility, so it also repairs missing
+        course fan-out work in addition to the worker-level checks.
+        """
         recovered = {
             "stale_leases": self.queue_repo.recover_stale_leases(),
             "stuck_detected": 0,

@@ -1,3 +1,5 @@
+"""Typed domain records for the state persisted in Firestore collections."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -7,6 +9,8 @@ from typing import Any
 
 
 class JobState(str, Enum):
+    """High-level lifecycle states for a factory job run as a whole."""
+
     QUEUED = "queued"
     RUNNING = "running"
     AWAITING_APPROVAL = "awaiting_approval"
@@ -16,6 +20,8 @@ class JobState(str, Enum):
 
 
 class StepState(str, Enum):
+    """Lifecycle states for a single workflow step execution."""
+
     READY = "ready"
     LEASED = "leased"
     RUNNING = "running"
@@ -27,6 +33,8 @@ class StepState(str, Enum):
 
 @dataclass(slots=True)
 class FactoryJob:
+    """Durable snapshot of a job plus the mutable runtime/summary projections."""
+
     id: str
     job_type: str
     request: dict[str, Any]
@@ -39,6 +47,8 @@ class FactoryJob:
 
 @dataclass(slots=True)
 class JobRun:
+    """One concrete execution attempt for a job."""
+
     id: str
     job_id: str
     run_number: int
@@ -50,6 +60,8 @@ class JobRun:
 
 @dataclass(slots=True)
 class StepRun:
+    """Audit record for one step execution, including retries and sharded steps."""
+
     id: str
     job_id: str
     run_id: str
@@ -69,6 +81,8 @@ class StepRun:
 
 @dataclass(slots=True)
 class Artifact:
+    """Metadata about an output produced by a step and tracked in runtime lineage."""
+
     id: str
     job_id: str
     run_id: str

@@ -1,3 +1,5 @@
+"""Daily aggregate metric writers for completed or failed factory jobs."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -30,6 +32,7 @@ def record_job_metric(
     stage: str | None = None,
     error: str | None = None,
 ) -> None:
+    """Increment the per-day metrics document for one finished job outcome."""
     try:
         content_type = job_data.get("contentType", "unknown")
         date_key = datetime.now(timezone.utc).date().isoformat()

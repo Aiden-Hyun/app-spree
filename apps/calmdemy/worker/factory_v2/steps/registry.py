@@ -1,3 +1,5 @@
+"""Runtime registry that maps persisted step names to Python callables."""
+
 from __future__ import annotations
 
 from importlib import import_module
@@ -32,6 +34,7 @@ EXECUTOR_PATHS: dict[str, tuple[str, str]] = {
 
 
 def get_executor(step_name: str) -> StepExecutor:
+    """Resolve the executor for a stored step name and fail loudly if it is missing."""
     target = EXECUTOR_PATHS.get(step_name)
     if target is None:
         raise KeyError(f"No executor registered for step '{step_name}'")

@@ -1,3 +1,5 @@
+"""Shared course constants and lookup helpers reused across multiple step files."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +9,8 @@ DEFAULT_FALLBACK_URL = (
     "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80"
 )
 
+# This is the canonical course session layout. Multiple steps use it to keep
+# plan generation, script generation, TTS, upload, and publish in sync.
 SESSION_DEFS = [
     {"suffix": "INT", "type": "intro", "label": "Course Intro", "order": 0, "duration_min": 2},
     {"suffix": "M1L", "type": "lesson", "label": "Module 1 — Lesson", "order": 1, "duration_min": 5},
@@ -21,6 +25,7 @@ SESSION_DEFS = [
 
 
 def _content_job_data(job: dict) -> dict[str, Any]:
+    """Read the original legacy payload that was copied into the V2 job request."""
     request = job.get("request") or {}
     payload = request.get("content_job") or request.get("job_data") or {}
     if not payload:
@@ -29,6 +34,7 @@ def _content_job_data(job: dict) -> dict[str, Any]:
 
 
 def _runtime(job: dict) -> dict[str, Any]:
+    """Return the mutable runtime snapshot accumulated by earlier steps."""
     return dict(job.get("runtime") or {})
 
 
@@ -44,6 +50,7 @@ def _content_job_id(job: dict) -> str:
 
 
 def _count_audio_results(audio_results: dict[str, dict[str, Any]]) -> int:
+    """Count only sessions whose audio upload has finished and produced a storage path."""
     count = 0
     for payload in audio_results.values():
         if isinstance(payload, dict) and payload.get("storagePath"):
@@ -72,6 +79,7 @@ def _course_script_approval(runtime: dict[str, Any], job_data: dict[str, Any]) -
 
 
 def _session_def_by_shard(shard_key: str) -> dict[str, Any] | None:
+    """Map a shard label like `M2P` back to the matching session definition."""
     shard = str(shard_key or "").strip().upper()
     for session_def in SESSION_DEFS:
         if session_def["suffix"] == shard:
@@ -80,6 +88,7 @@ def _session_def_by_shard(shard_key: str) -> dict[str, Any] | None:
 
 
 def _get_session_title(session_def: dict, plan: dict) -> str:
+    """Resolve the user-facing session title from the plan plus the static layout."""
     if session_def["type"] == "intro":
         return plan.get("intro", {}).get("title", "Course Intro")
 
@@ -97,6 +106,7 @@ def _build_course_preview_sessions(
     plan: dict,
     audio_results: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    """Build a lightweight preview payload for approval screens before publish."""
     sessions: list[dict[str, Any]] = []
     for session_def in SESSION_DEFS:
         session_code = f"{course_code}{session_def['suffix']}"

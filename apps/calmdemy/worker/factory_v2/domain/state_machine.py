@@ -1,3 +1,5 @@
+"""Transition guards that keep job and step states moving through valid paths."""
+
 from __future__ import annotations
 
 from .entities import JobState, StepState
@@ -30,11 +32,13 @@ _STEP_TRANSITIONS: dict[StepState, set[StepState]] = {
 
 
 def validate_job_transition(current: JobState, target: JobState) -> None:
+    """Raise if the requested job-state transition would break the workflow contract."""
     if target not in _JOB_TRANSITIONS.get(current, set()):
         raise InvalidTransitionError(f"Invalid job transition: {current.value} -> {target.value}")
 
 
 def validate_step_transition(current: StepState, target: StepState) -> None:
+    """Raise if the requested step-state transition is not allowed."""
     allowed = _STEP_TRANSITIONS.get(current, set())
     if target not in allowed:
         raise InvalidTransitionError(f"Invalid step transition: {current.value} -> {target.value}")

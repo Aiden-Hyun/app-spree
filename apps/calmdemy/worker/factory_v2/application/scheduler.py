@@ -1,3 +1,5 @@
+"""Workflow definitions for each V2 job type and the edges between their steps."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -5,15 +7,23 @@ from dataclasses import dataclass, field
 
 @dataclass(slots=True)
 class WorkflowSpec:
+    """Static description of a workflow DAG.
+
+    `steps` keeps the happy-path ordering humans expect to read, while `edges`
+    is the machine-readable dependency graph the orchestrator actually follows.
+    """
+
     name: str
     steps: list[str]
     edges: dict[str, list[str]] = field(default_factory=dict)
     terminal_step: str = ""
 
     def next_steps(self, step_name: str) -> list[str]:
+        """Return the direct children that may be scheduled after `step_name` succeeds."""
         return list(self.edges.get(step_name, []))
 
     def prerequisites(self, step_name: str) -> list[str]:
+        """Return the direct parent steps that must succeed before `step_name` can run."""
         required: list[str] = []
         for source, targets in self.edges.items():
             if step_name in targets:
@@ -80,6 +90,7 @@ SUBJECT_WORKFLOW = WorkflowSpec(
 
 
 def workflow_for_job_type(job_type: str) -> WorkflowSpec:
+    """Map persisted job types to the workflow spec the orchestrator should use."""
     if job_type == "course":
         return COURSE_WORKFLOW
     if job_type == "subject":

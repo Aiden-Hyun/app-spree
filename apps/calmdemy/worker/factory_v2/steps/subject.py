@@ -1,3 +1,5 @@
+"""Subject workflow steps that plan, launch, and supervise child course jobs."""
+
 from __future__ import annotations
 
 import ast
@@ -445,6 +447,7 @@ def _assign_codes(db, job_data: dict[str, Any], courses: list[dict[str, Any]]) -
 
 
 def _build_subject_plan(ctx: StepContext, job_data: dict[str, Any]) -> dict[str, Any]:
+    """Generate a validated subject lineup, retrying with repair prompts if needed."""
     from factory_v2.shared.llm_generator import _get_llm_adapter
 
     counts = _level_counts(job_data)
@@ -646,6 +649,7 @@ def _subject_progress_text(plan: dict[str, Any], counts: dict[str, int], launch_
 
 
 def execute_generate_subject_plan(ctx: StepContext) -> StepResult:
+    """Generate the subject lineup and optionally stop for approval before launching children."""
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
 
@@ -723,6 +727,7 @@ def execute_generate_subject_plan(ctx: StepContext) -> StepResult:
 
 
 def execute_launch_subject_children(ctx: StepContext) -> StepResult:
+    """Launch as many child course jobs as the configured concurrency window allows."""
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     plan = _subject_plan(runtime, job_data)
@@ -740,6 +745,8 @@ def execute_launch_subject_children(ctx: StepContext) -> StepResult:
     next_courses = list(plan.get("courses") or [])
 
     while available_slots > 0 and launch_cursor < len(next_courses):
+        # `launch_cursor` lets the subject job resume safely without re-launching
+        # earlier courses if the worker restarts mid-batch.
         course = dict(next_courses[launch_cursor])
         if course.get("childJobId"):
             launch_cursor += 1
@@ -789,6 +796,7 @@ def execute_launch_subject_children(ctx: StepContext) -> StepResult:
 
 
 def execute_watch_subject_children(ctx: StepContext) -> StepResult:
+    """Poll child jobs, top up any newly free launch slots, and decide whether to requeue."""
     job_data = _content_job_data(ctx.job)
     runtime = _runtime(ctx.job)
     live_job = _live_content_job(ctx)

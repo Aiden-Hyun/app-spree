@@ -1,3 +1,5 @@
+"""Firestore-backed repositories for factory jobs, runs, steps, and events."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -8,6 +10,8 @@ from firebase_admin import firestore as fs
 
 
 class FirestoreJobRepo:
+    """Persistence helpers for the `factory_jobs` collection and compat patches."""
+
     def __init__(self, db):
         self.db = db
 
@@ -82,6 +86,7 @@ class FirestoreJobRepo:
         )
 
     def patch_runtime(self, job_id: str, patch: dict) -> None:
+        """Patch only the runtime subdocument so step executors can update incrementally."""
         if not patch:
             return
         payload = {"updated_at": fs.SERVER_TIMESTAMP}
@@ -90,6 +95,7 @@ class FirestoreJobRepo:
         self.db.collection("factory_jobs").document(job_id).update(payload)
 
     def patch_summary(self, job_id: str, patch: dict) -> None:
+        """Patch only the summary subdocument used by admin views and quick status cards."""
         if not patch:
             return
         payload = {"updated_at": fs.SERVER_TIMESTAMP}
@@ -139,6 +145,8 @@ class FirestoreJobRepo:
 
 
 class FirestoreRunRepo:
+    """Persistence helpers for per-run lifecycle data in `factory_job_runs`."""
+
     def __init__(self, db):
         self.db = db
 
@@ -206,6 +214,8 @@ class FirestoreRunRepo:
 
 
 class FirestoreStepRunRepo:
+    """Persistence helpers for per-step audit records in `factory_step_runs`."""
+
     def __init__(self, db):
         self.db = db
 
@@ -214,6 +224,7 @@ class FirestoreStepRunRepo:
         return f"{run_id}__{step_name}__{shard_key}"
 
     def ensure_ready(self, job_id: str, run_id: str, step_name: str, shard_key: str = "root") -> str:
+        """Create the step-run doc if needed without failing duplicate enqueue paths."""
         step_run_id = self.make_step_run_id(run_id, step_name, shard_key)
         doc_ref = self.db.collection("factory_step_runs").document(step_run_id)
         payload = {
@@ -421,6 +432,8 @@ class FirestoreStepRunRepo:
 
 
 class FirestoreEventRepo:
+    """Append-only writer for `factory_events`, used mainly for debugging/recovery."""
+
     def __init__(self, db):
         self.db = db
 

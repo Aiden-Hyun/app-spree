@@ -1,6 +1,4 @@
-"""
-Worker heartbeat helpers.
-"""
+"""Worker-status writers used by admin screens, watchdogs, and recovery code."""
 
 from typing import Any
 
@@ -39,7 +37,7 @@ def update_worker_status(
     clear_current_step: bool = False,
     extra_patch: dict[str, Any] | None = None,
 ) -> None:
-    """Write a heartbeat document for this worker."""
+    """Write the worker heartbeat plus optional active-step details in one document."""
     payload: dict[str, Any] = {
         "workerId": worker_id,
         "workerType": worker_type,

@@ -1,3 +1,5 @@
+"""Dispatcher that upgrades legacy `content_jobs` rows into V2 runs."""
+
 from __future__ import annotations
 
 import os
@@ -72,6 +74,7 @@ def _claim_for_v2(
     worker_id: str,
     stack_defs: list[dict],
 ) -> Optional[tuple[dict, bool]]:
+    """Atomically lock one eligible legacy job so exactly one dispatcher boots it."""
     tx = db.transaction()
 
     @firestore.transactional
@@ -100,6 +103,8 @@ def _claim_for_v2(
             )
             return None
         if data.get("status") == "pending":
+            # We validate worker capability before bootstrapping the run so jobs
+            # fail fast with a clear admin-visible message instead of stalling.
             if not any(
                 stack.get("enabled", True) and stack.get("acceptNonTtsSteps", True)
                 for stack in stack_defs

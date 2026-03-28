@@ -456,10 +456,18 @@ def _fallback_image_prompt(job_data: dict, title: str, topic: str, content_type:
     )
 
 
-def build_image_prompt(job_data: dict, title: str, topic: str, content_type: str, plan: dict | None = None) -> str:
+def build_image_prompt(
+    job_data: dict,
+    title: str,
+    topic: str,
+    content_type: str,
+    plan: dict | None = None,
+    *,
+    ignore_saved_prompt: bool = False,
+) -> str:
     """Generate or return an image prompt for a job."""
     image_prompt = (job_data.get("imagePrompt") or "").strip()
-    if image_prompt:
+    if image_prompt and not ignore_saved_prompt:
         return image_prompt
 
     from .llm_generator import _get_llm_adapter

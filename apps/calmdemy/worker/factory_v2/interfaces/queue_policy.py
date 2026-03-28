@@ -1,3 +1,5 @@
+"""Queue-selection rules that match ready work to the right worker stacks."""
+
 from __future__ import annotations
 
 import time
@@ -22,6 +24,8 @@ logger = get_logger(__name__)
 
 @dataclass(slots=True)
 class WorkerCapabilityPlan:
+    """Normalized snapshot of what a worker stack can legally claim."""
+
     accept_non_tts_steps: bool
     supported_tts_models: frozenset[str] | None
     extra_capability_keys: frozenset[str]
@@ -32,6 +36,8 @@ class WorkerCapabilityPlan:
 
 @dataclass(slots=True)
 class QueueCandidate:
+    """A ready queue doc plus the metadata used to rank why it was selected."""
+
     doc_id: str
     doc_ref: Any
     payload: dict[str, Any]
@@ -52,6 +58,7 @@ def build_worker_capability_plan(
     supported_tts_models: set[str] | None,
     extra_capability_keys: set[str] | None = None,
 ) -> WorkerCapabilityPlan:
+    """Normalize raw stack config into a shape that is cheap to reuse during claiming."""
     normalized_models = (
         frozenset(str(model).strip().lower() for model in supported_tts_models if str(model).strip())
         if supported_tts_models is not None
@@ -84,6 +91,7 @@ def supports_worker_payload(
     payload: dict,
     plan: WorkerCapabilityPlan,
 ) -> bool:
+    """Return whether the worker plan is allowed to execute this queue payload."""
     return worker_supports_capability(
         capability_key_for_payload(payload),
         accept_non_tts_steps=plan.accept_non_tts_steps,
@@ -106,6 +114,7 @@ def active_tts_counts_by_job(
     payloads: list[dict],
     plan: WorkerCapabilityPlan,
 ) -> dict[str, int]:
+    """Count how many TTS items per job are already active on compatible workers."""
     counts: dict[str, int] = {}
     for payload in payloads:
         if not is_tts_step(payload.get("step_name")):
@@ -126,6 +135,12 @@ def rank_claim_candidates(
     active_tts_by_job: dict[str, int],
     tts_per_job_soft_limit: int,
 ) -> list[QueueCandidate]:
+    """Prefer oldest work first, but softly spread TTS load across jobs.
+
+    The soft limit does not make a candidate ineligible. It only pushes that
+    candidate later in the ordering so one large course job does not monopolize
+    the entire TTS fleet.
+    """
     ordered = sorted(
         candidates,
         key=lambda candidate: (
@@ -167,6 +182,8 @@ def rank_claim_candidates(
 
 
 class QueueScheduler:
+    """High-level queue claimer that hides capability lookups and ranking rules."""
+
     def __init__(self, queue_repo, no_match_log_interval_sec: float = 30.0):
         self.queue_repo = queue_repo
         self.no_match_log_interval_sec = max(5.0, float(no_match_log_interval_sec))
@@ -218,6 +235,7 @@ class QueueScheduler:
         plan: WorkerCapabilityPlan,
         candidate_limit: int,
     ) -> tuple[list[QueueCandidate], bool]:
+        """Fetch ready docs from both indexed and legacy paths, then filter by capability."""
         candidates: list[QueueCandidate] = []
         seen_ids: set[str] = set()
         ready_docs_seen = False
@@ -291,6 +309,7 @@ class QueueScheduler:
         candidate_limit: int = 200,
         tts_per_job_soft_limit: int = 2,
     ) -> tuple[str, dict] | None:
+        """Claim the best matching ready queue item for this worker, if one exists."""
         plan = build_worker_capability_plan(
             accept_non_tts_steps=accept_non_tts_steps,
             supported_tts_models=supported_tts_models,

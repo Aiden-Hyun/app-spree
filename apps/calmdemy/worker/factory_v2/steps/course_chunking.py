@@ -1,3 +1,5 @@
+"""Helpers for turning one formatted course session into chunked TTS work units."""
+
 from __future__ import annotations
 
 from factory_v2.shared.course_tts_chunks import split_course_tts_chunks
@@ -8,6 +10,7 @@ def _course_session_chunks(
     course_code: str,
     session_def: dict,
 ) -> tuple[str, list[str]]:
+    """Return the full session code and the chunk list for that session's script."""
     session_code = f"{course_code}{session_def['suffix']}"
     script = formatted_scripts.get(session_code)
     if not script:

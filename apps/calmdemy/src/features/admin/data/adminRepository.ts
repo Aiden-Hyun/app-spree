@@ -1321,6 +1321,8 @@ export async function regeneratePendingScripts(job: ContentJob): Promise<void> {
     error: null,
     errorCode: null,
     failedStage: null,
+    imagePrompt: null,
+    imagePath: null,
     startedAt: null,
     completedAt: null,
     runEndedAt: null,

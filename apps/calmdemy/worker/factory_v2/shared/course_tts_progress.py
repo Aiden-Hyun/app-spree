@@ -1,3 +1,5 @@
+"""Helpers for turning chunk/session completion into UI-friendly course TTS progress."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -52,6 +54,7 @@ def build_course_tts_progress(
     *,
     succeeded_chunk_shards: set[str] | None = None,
 ) -> dict[str, Any] | None:
+    """Build a normalized progress snapshot from runtime checkpoints plus in-flight chunks."""
     formatted_scripts = _formatted_scripts(job)
     if not formatted_scripts:
         return None
@@ -116,6 +119,7 @@ def build_course_tts_progress(
 
 
 def format_course_tts_progress_label(progress: dict[str, Any] | None) -> str | None:
+    """Convert the structured progress payload into the short label shown in admin UI."""
     if not isinstance(progress, dict):
         return None
 

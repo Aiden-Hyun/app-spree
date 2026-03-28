@@ -1,3 +1,5 @@
+"""Worker-side loop that claims queue items, executes steps, and projects results."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -29,6 +31,8 @@ logger = get_logger(__name__)
 
 
 class ClaimLoop:
+    """One worker process's execution engine for V2 queue items."""
+
     def __init__(
         self,
         *,
@@ -128,6 +132,7 @@ class ClaimLoop:
         content_job_id: str,
         updated_job: dict[str, Any],
     ) -> None:
+        """Refresh the user-facing course TTS progress snapshot after shard updates."""
         if not content_job_id:
             return
         if str(updated_job.get("job_type") or "").strip() != "course":
@@ -154,6 +159,11 @@ class ClaimLoop:
         self.job_repo.patch_compat_content_job_for_run(content_job_id, run_id, patch)
 
     def run_once(self) -> bool:
+        """Claim at most one queue item, execute it, and project the outcome.
+
+        Returning `True` means the worker did some useful work this tick, even
+        if that work was ultimately a retry/failure projection.
+        """
         claimed = self.queue_scheduler.claim_next(
             worker_id=self.worker_id,
             accept_non_tts_steps=self.accept_non_tts_steps,
@@ -211,6 +221,8 @@ class ClaimLoop:
 
         active_run_id = str(claimed_job.get("current_run_id") or "").strip()
         if active_run_id and active_run_id != run_id:
+            # A newer run has taken over this job, so this queue item must not
+            # write stale results back into the compatibility projection.
             superseded_error = f"Run '{run_id}' superseded by active run '{active_run_id}'"
             self.step_run_repo.mark_failed(step_run_id, "superseded_run", superseded_error)
             self.queue_repo.mark_failed(queue_id, "superseded_run", superseded_error)
@@ -239,6 +251,8 @@ class ClaimLoop:
 
         run_state_before_step = self.run_repo.run_state(run_id)
         if run_state_before_step != "running":
+            # This guard catches runs that were cancelled/failed between the time
+            # the queue item became ready and the time a worker actually claimed it.
             superseded_error = f"Run '{run_id}' is not running (state={run_state_before_step or 'missing'})"
             self.step_run_repo.mark_failed(step_run_id, "superseded_run", superseded_error)
             self.queue_repo.mark_failed(queue_id, "superseded_run", superseded_error)
@@ -375,6 +389,8 @@ class ClaimLoop:
                 return True
 
             if result.requeue_after_seconds:
+                # Some steps are intentionally long-lived watchers. They update
+                # runtime/summary state now, then reschedule themselves later.
                 delay_seconds = max(1, int(result.requeue_after_seconds))
                 self.job_repo.patch_runtime(job_id, result.runtime_patch)
                 self.job_repo.patch_summary(job_id, result.summary_patch)
@@ -436,6 +452,8 @@ class ClaimLoop:
                 step_output=result.output,
             )
             if artifact_updates:
+                # Artifacts are stored separately from the step output so later
+                # observability code can answer "which step produced this file?"
                 self.job_repo.patch_runtime(
                     job_id,
                     {
@@ -469,6 +487,8 @@ class ClaimLoop:
             )
 
             if retryable and retry_count < self.max_step_retries:
+                # Retry scheduling happens here instead of inside step executors so
+                # we get one consistent backoff policy across the entire engine.
                 delay_seconds = self._retry_delay_seconds(retry_count)
                 next_attempt = retry_count + 2
                 self.step_run_repo.mark_retry_scheduled(

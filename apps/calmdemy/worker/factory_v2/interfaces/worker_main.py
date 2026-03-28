@@ -1,3 +1,5 @@
+"""Top-level worker loop for the Content Factory V2 runtime."""
+
 from __future__ import annotations
 
 import time
@@ -26,7 +28,7 @@ logger = get_logger(__name__)
 
 
 class WorkerMain:
-    """V2 worker loop coordinator."""
+    """Coordinates dispatch, step execution, deletes, and periodic recovery."""
 
     def __init__(
         self,
@@ -133,6 +135,7 @@ class WorkerMain:
         return None
 
     def _cleanup_factory_records(self, job_id: str) -> None:
+        """Remove V2 bookkeeping documents after a delete job succeeds."""
         self.db.collection("factory_jobs").document(job_id).delete()
         for collection_name in ("factory_job_runs", "factory_step_runs", "factory_step_queue", "factory_events"):
             query = self.db.collection(collection_name).where("job_id", "==", job_id).limit(500)
@@ -140,6 +143,7 @@ class WorkerMain:
                 snapshot.reference.delete()
 
     def _handle_delete_requests(self) -> bool:
+        """Give delete jobs priority so storage/doc cleanup is not starved by queue work."""
         delete_job = self._next_delete_job()
         if not delete_job:
             return False
@@ -154,6 +158,7 @@ class WorkerMain:
         return True
 
     def _run_recovery_tick(self) -> None:
+        """Run one recovery sweep and log only the counters that changed."""
         recovered = self.recovery_manager.recover_worker_tick()
         if recovered.get("stale_leases"):
             logger.info(
@@ -202,6 +207,15 @@ class WorkerMain:
             )
 
     def run_forever(self) -> None:
+        """Main worker loop.
+
+        The order matters:
+        1. publish worker heartbeat
+        2. handle delete requests
+        3. run periodic recovery
+        4. optionally dispatch new legacy jobs into V2
+        5. claim and execute one queue item
+        """
         while True:
             try:
                 update_worker_status(

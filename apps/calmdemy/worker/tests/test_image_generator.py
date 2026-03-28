@@ -230,6 +230,34 @@ class ImageGeneratorTests(unittest.TestCase):
             "Calming minimalist nature scene, soft light, gentle colors, no text, no people, high quality.",
         )
 
+    def test_build_image_prompt_can_ignore_saved_prompt(self) -> None:
+        captured: dict[str, object] = {}
+
+        class _Adapter:
+            def generate(self, prompt: str, max_tokens: int = 0) -> str:
+                captured["prompt"] = prompt
+                captured["max_tokens"] = max_tokens
+                return "Fresh regenerated prompt"
+
+        job_data = {
+            "imagePrompt": "Old saved prompt",
+            "params": {
+                "subjectLabel": "CBT",
+            },
+        }
+
+        with patch("factory_v2.shared.llm_generator._get_llm_adapter", return_value=_Adapter()):
+            prompt = image_generator.build_image_prompt(
+                job_data,
+                "Reset the Spiral",
+                "rumination",
+                "course",
+                ignore_saved_prompt=True,
+            )
+
+        self.assertEqual(prompt, "Fresh regenerated prompt")
+        self.assertEqual(captured["max_tokens"], 120)
+
     def test_generate_image_uses_coreml_backend_when_configured(self) -> None:
         fake_run_calls: list[dict[str, object]] = []
 

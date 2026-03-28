@@ -1,3 +1,5 @@
+"""Helpers for encoding what kind of worker capability a queue item needs."""
+
 from __future__ import annotations
 
 TTS_STEP_NAMES = {
@@ -28,6 +30,7 @@ def capability_key_for_step(
     step_name: str | None,
     required_tts_model: str | None = None,
 ) -> str:
+    """Collapse step requirements into one capability key stored on queue docs."""
     if is_image_step(step_name):
         return "image"
 
@@ -65,6 +68,7 @@ def worker_supports_capability(
     supported_tts_models: set[str] | None,
     extra_capability_keys: set[str] | None = None,
 ) -> bool:
+    """Return whether a worker stack is allowed to claim a capability key."""
     normalized_key = str(capability_key or "").strip().lower()
     if not normalized_key or normalized_key == "default":
         return accept_non_tts_steps
@@ -91,6 +95,7 @@ def worker_capability_keys(
     supported_tts_models: set[str] | None,
     extra_capability_keys: set[str] | None = None,
 ) -> list[str]:
+    """List every capability key a worker should query for during queue scans."""
     keys: list[str] = []
     if accept_non_tts_steps:
         keys.append("default")

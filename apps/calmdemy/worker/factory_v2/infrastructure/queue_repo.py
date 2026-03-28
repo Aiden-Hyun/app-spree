@@ -1,3 +1,5 @@
+"""Firestore-backed queue primitives used by workers and recovery routines."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
@@ -11,6 +13,8 @@ from ..shared.queue_capabilities import capability_key_for_step
 
 
 class FirestoreQueueRepo:
+    """Low-level queue operations over the `factory_step_queue` collection."""
+
     def __init__(self, db):
         self.db = db
 
@@ -39,6 +43,11 @@ class FirestoreQueueRepo:
         available_at: datetime | None = None,
         required_tts_model: str | None = None,
     ) -> str:
+        """Create a ready queue item for one run/step/shard combination.
+
+        Queue ids are deterministic, so enqueueing the same work twice is safe
+        and behaves like an idempotent "ensure exists" operation.
+        """
         queue_id = self.make_queue_id(run_id, step_name, shard_key)
         doc_ref = self.db.collection("factory_step_queue").document(queue_id)
         normalized_tts_model = str(required_tts_model or "").strip().lower()
@@ -128,6 +137,7 @@ class FirestoreQueueRepo:
         lease_seconds: int = 300,
         payload_validator: Callable[[dict], bool] | None = None,
     ) -> dict | None:
+        """Atomically move a ready doc into the leased state for one worker."""
         now = datetime.now(timezone.utc)
         tx = self.db.transaction()
 
@@ -228,6 +238,7 @@ class FirestoreQueueRepo:
         deadline_at: datetime | None = None,
         heartbeat_interval_sec: int | None = None,
     ) -> None:
+        """Promote a leased item to running once executor work actually starts."""
         now = datetime.now(timezone.utc)
         self.db.collection("factory_step_queue").document(queue_id).update(
             {
@@ -258,6 +269,7 @@ class FirestoreQueueRepo:
         heartbeat_interval_sec: int | None = None,
         progress_detail: str | None = None,
     ) -> None:
+        """Refresh lease/heartbeat fields while a worker is actively executing a step."""
         now = datetime.now(timezone.utc)
         payload: dict[str, Any] = {
             "state": "running",
