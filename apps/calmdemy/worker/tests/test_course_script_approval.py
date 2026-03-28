@@ -108,12 +108,17 @@ class _RecordingJobRepo:
     def __init__(self, job: dict):
         self._job = copy.deepcopy(job)
         self.completed_calls: list[tuple[str, str]] = []
+        self.compat_patches: list[tuple[str, str, dict]] = []
 
     def get(self, job_id: str) -> dict:
         return copy.deepcopy(self._job)
 
     def mark_completed(self, job_id: str, run_id: str) -> None:
         self.completed_calls.append((job_id, run_id))
+
+    def patch_compat_content_job_for_run(self, content_job_id: str, run_id: str, patch: dict) -> bool:
+        self.compat_patches.append((content_job_id, run_id, copy.deepcopy(patch)))
+        return True
 
 
 class _RecordingRunRepo:
@@ -335,6 +340,111 @@ class CourseScriptApprovalTests(unittest.TestCase):
 
         ensure_step_enqueued.assert_called_once()
         self.assertEqual(ensure_step_enqueued.call_args.args[-2:], ("run-1", "publish_course"))
+
+    def test_orchestrator_waits_for_regenerated_thumbnail_before_publish(self) -> None:
+        job = {
+            "job_type": "course",
+            "runtime": {"thumbnail_generation_requested": True},
+            "request": {
+                "content_job": {
+                    "thumbnailGenerationRequested": True,
+                    "thumbnailUrl": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80",
+                }
+            },
+        }
+        job_repo = _RecordingJobRepo(job)
+        run_repo = _RecordingRunRepo()
+        orchestrator = Orchestrator(
+            job_repo=job_repo,
+            run_repo=run_repo,
+            step_run_repo=_ConfigurableStepRunRepo(),
+            queue_repo=_UnusedQueueRepo(),
+        )
+
+        with patch.object(orchestrator, "_ensure_step_enqueued") as ensure_step_enqueued:
+            orchestrator.on_step_success("job-1", "run-1", "upload_course_audio")
+
+        ensure_step_enqueued.assert_not_called()
+
+    def test_recovery_waits_for_regenerated_thumbnail_before_publish(self) -> None:
+        job = {
+            "job_type": "course",
+            "runtime": {
+                "thumbnail_generation_requested": True,
+                "thumbnail_url": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80",
+            },
+            "request": {
+                "content_job": {
+                    "thumbnailGenerationRequested": True,
+                    "thumbnailUrl": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80",
+                }
+            },
+        }
+        job_repo = _RecordingJobRepo(job)
+        run_repo = _RecordingRunRepo()
+        orchestrator = Orchestrator(
+            job_repo=job_repo,
+            run_repo=run_repo,
+            step_run_repo=_ConfigurableStepRunRepo({("job-1", "run-1", "upload_course_audio")}),
+            queue_repo=_UnusedQueueRepo(),
+        )
+
+        with (
+            patch.object(orchestrator, "_seed_course_checkpoint_steps"),
+            patch.object(orchestrator, "_ensure_step_enqueued") as ensure_step_enqueued,
+        ):
+            recovered = orchestrator.recover_course_publish_if_ready("job-1", "run-1")
+
+        self.assertFalse(recovered)
+        ensure_step_enqueued.assert_not_called()
+
+    def test_recovery_finalizes_published_thumbnail_regeneration_without_recomputing_timing(self) -> None:
+        job = {
+            "job_type": "course",
+            "summary": {"currentStep": "publish_course"},
+            "runtime": {
+                "thumbnail_generation_requested": True,
+                "course_id": "course-123",
+                "course_session_ids": ["session-1", "session-2"],
+                "thumbnail_url": "https://cdn.example.com/thumb.jpg",
+            },
+            "request": {
+                "compat": {"content_job_id": "content-1"},
+                "content_job": {
+                    "thumbnailGenerationRequested": True,
+                },
+            },
+        }
+        job_repo = _RecordingJobRepo(job)
+        run_repo = _RecordingRunRepo()
+        orchestrator = Orchestrator(
+            job_repo=job_repo,
+            run_repo=run_repo,
+            step_run_repo=_ConfigurableStepRunRepo(
+                {
+                    ("job-1", "run-1", "upload_course_audio"),
+                    ("job-1", "run-1", "publish_course"),
+                }
+            ),
+            queue_repo=_UnusedQueueRepo(),
+        )
+
+        with (
+            patch.object(orchestrator, "_seed_course_checkpoint_steps"),
+            patch.object(orchestrator, "_finalize_completed_job") as finalize_completed_job,
+        ):
+            recovered = orchestrator.recover_course_publish_if_ready("job-1", "run-1")
+
+        self.assertTrue(recovered)
+        self.assertEqual(job_repo.completed_calls, [("job-1", "run-1")])
+        self.assertEqual(run_repo.completed_calls, ["run-1"])
+        self.assertEqual(job_repo.compat_patches[0][0], "content-1")
+        self.assertEqual(job_repo.compat_patches[0][1], "run-1")
+        self.assertEqual(job_repo.compat_patches[0][2]["status"], "completed")
+        self.assertEqual(job_repo.compat_patches[0][2]["courseProgress"], "Published")
+        self.assertEqual(job_repo.compat_patches[0][2]["thumbnailGenerationRequested"], False)
+        self.assertIsNone(job_repo.compat_patches[0][2]["error"])
+        finalize_completed_job.assert_not_called()
 
     def test_thumbnail_only_course_run_completes_without_recomputing_timing(self) -> None:
         job = {

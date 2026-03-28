@@ -1426,6 +1426,8 @@ export async function cancelJob(jobId: string): Promise<void> {
     publishInProgress: false,
     publishLeaseOwner: null,
     publishLeaseExpiresAt: null,
+    v2Locked: false,
+    activeRunElapsedMs: null,
     updatedAt: serverTimestamp(),
   });
 }

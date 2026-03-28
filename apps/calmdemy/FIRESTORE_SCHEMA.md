@@ -34,6 +34,7 @@ If a field is not listed below, it is not relied on by the app/worker and may be
 | `completed_content` | User read/write own docs | Used to mark content completed.
 | `content_ratings` | User read/write own docs | Like/dislike per user/content.
 | `content_reports` | Create by user, read by admin | Content issue reports.
+| `content_audit_logs` | Admin read-only | Content Manager metadata edit history.
 | `guided_meditations` | Public read | Read-only content.
 | `sleep_meditations` | Public read | Read-only content.
 | `breathing_exercises` | Public read | Read-only content.
@@ -135,6 +136,21 @@ Document ID convention: `${userId}_${contentId}`
 - `category` (`audio_issue`, `wrong_content`, `inappropriate`, `other`)
 - `description` (string or null)
 - `reported_at` (timestamp)
+
+### `content_audit_logs`
+Container document ID convention: `${collection}__${contentId}`
+- `collection` (string)
+- `contentId` (string)
+- `lastEditedAt` (timestamp)
+
+Subcollection: `entries`
+- `createdAt` (timestamp)
+- `actorUid` (string)
+- `actorEmail` (string or null)
+- `reason` (string)
+- `changedFields` (array of strings)
+- `before` (map of editable field name -> prior value)
+- `after` (map of editable field name -> updated value)
 
 ### `daily_quotes`
 - `text` (string)
@@ -373,6 +389,7 @@ If you add new query patterns that combine `where` + `orderBy` or multiple `wher
 - User-owned documents must always carry `user_id` and match the authenticated user.
 - `completed_content` and `playback_progress` document IDs must stay `${userId}_${contentId}` to preserve overwrite semantics.
 - `content_jobs` must be admin-only. If rules are relaxed, the worker can be abused.
+- `content_audit_logs` must remain admin-read-only and client-write-disabled because it stores internal actor identity and change history.
 - Audio content documents must retain the fields expected by screens (see `DATA_ACCESS.md`).
 - If you rename fields, update both type definitions and repositories together.
 

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, initializeAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 import { env } from './core/config/env';
 
@@ -28,6 +29,9 @@ export const auth = (() => {
 
 // Initialize Firestore
 export const db = getFirestore(app);
+
+// Initialize Functions
+export const functions = getFunctions(app, 'northamerica-northeast1');
 
 // Initialize Storage
 export const storage = getStorage(app);

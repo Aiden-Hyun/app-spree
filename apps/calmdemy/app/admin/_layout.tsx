@@ -70,6 +70,18 @@ export default function AdminLayout() {
         name="job/[id]/review/[sessionCode]"
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="content/index"
+        options={{
+          title: 'Content Manager',
+        }}
+      />
+      <Stack.Screen
+        name="content/[collection]/[id]"
+        options={{
+          title: 'Content Detail',
+        }}
+      />
     </Stack>
   );
 }

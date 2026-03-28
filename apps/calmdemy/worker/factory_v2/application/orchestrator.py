@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from firebase_admin import firestore as fs
+
 from .scheduler import workflow_for_job_type
 from ..shared.lineage_timing import finalize_job_timing
 from ..shared.metrics import record_job_metric
@@ -312,6 +314,49 @@ class Orchestrator:
                 outcome="completed",
             )
 
+    def _patch_course_publish_projection(self, job: dict, run_id: str) -> None:
+        content_job_id = self._content_job_id(job)
+        if not content_job_id:
+            return
+
+        runtime = dict(job.get("runtime") or {})
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        course_id = str(runtime.get("course_id") or payload.get("courseId") or "").strip()
+        thumbnail_url = str(runtime.get("thumbnail_url") or payload.get("thumbnailUrl") or "").strip()
+        course_session_ids = runtime.get("course_session_ids") or payload.get("courseSessionIds")
+
+        patch = {
+            "status": "completed",
+            "courseProgress": "Published",
+            "jobRunId": run_id,
+            "lastRunStatus": "completed",
+            "runEndedAt": fs.SERVER_TIMESTAMP,
+            "error": None,
+            "errorCode": None,
+            "failedStage": None,
+            "publishInProgress": False,
+            "publishLeaseOwner": None,
+            "publishLeaseExpiresAt": None,
+            "thumbnailGenerationRequested": False,
+            "courseRegeneration": None,
+        }
+        if course_id:
+            patch["courseId"] = course_id
+        if isinstance(course_session_ids, list) and course_session_ids:
+            patch["courseSessionIds"] = course_session_ids
+        if thumbnail_url:
+            patch["thumbnailUrl"] = thumbnail_url
+
+        self.job_repo.patch_compat_content_job_for_run(content_job_id, run_id, patch)
+
+    def _complete_course_publish_run(self, job: dict, job_id: str, run_id: str) -> None:
+        self.job_repo.mark_completed(job_id, run_id)
+        self.run_repo.mark_completed(run_id)
+        self._patch_course_publish_projection(job, run_id)
+        if not self._course_thumbnail_generation_requested(job):
+            self._finalize_completed_job(job_id, run_id)
+
     def start_new_run(
         self,
         job_id: str,
@@ -587,17 +632,22 @@ class Orchestrator:
         if not self.step_run_repo.has_succeeded(job_id, run_id, "upload_course_audio"):
             return False
         if self.step_run_repo.has_succeeded(job_id, run_id, "publish_course"):
-            return False
+            self._complete_course_publish_run(job, job_id, run_id)
+            return True
 
         requires_thumbnail = (
             self._course_generates_thumbnail_during_run(job)
             or self._course_thumbnail_generation_requested(job)
         )
-        if requires_thumbnail and not self.step_run_repo.has_succeeded(
+        thumbnail_requested = self._course_thumbnail_generation_requested(job)
+        thumbnail_succeeded = self.step_run_repo.has_succeeded(
             job_id,
             run_id,
             "generate_course_thumbnail",
-        ):
+        )
+        if requires_thumbnail and not thumbnail_succeeded:
+            if thumbnail_requested:
+                return False
             if not self._course_thumbnail_url(job):
                 return False
 
@@ -695,18 +745,21 @@ class Orchestrator:
                     self._course_generates_thumbnail_during_run(job)
                     or self._course_thumbnail_generation_requested(job)
                 )
-                if requires_thumbnail and not self.step_run_repo.has_succeeded(
+                thumbnail_requested = self._course_thumbnail_generation_requested(job)
+                thumbnail_succeeded = self.step_run_repo.has_succeeded(
                     job_id,
                     run_id,
                     "generate_course_thumbnail",
-                ):
+                )
+                if requires_thumbnail and not thumbnail_succeeded:
+                    if thumbnail_requested:
+                        return
                     if not self._course_thumbnail_url(job):
                         return
                 self._ensure_step_enqueued(job, job_id, run_id, "publish_course")
                 return
-            if step_name == "publish_course" and self._course_thumbnail_generation_requested(job):
-                self.job_repo.mark_completed(job_id, run_id)
-                self.run_repo.mark_completed(run_id)
+            if step_name == "publish_course":
+                self._complete_course_publish_run(job, job_id, run_id)
                 return
         elif step_name == "generate_script" and self._single_script_approval_awaiting(job):
             self.job_repo.mark_completed(job_id, run_id)
@@ -730,6 +783,58 @@ class Orchestrator:
             ):
                 continue
             self._ensure_step_enqueued(job, job_id, run_id, next_step)
+
+    def cancel_run(
+        self,
+        job_id: str,
+        run_id: str,
+        *,
+        reason: str = "Cancelled by admin",
+        error_code: str = "cancelled_by_admin",
+    ) -> None:
+        job = self.job_repo.get(job_id)
+        summary = dict(job.get("summary") or {})
+        failed_step = str(summary.get("currentStep") or "").strip() or "pending"
+
+        self.run_repo.mark_failed(run_id, failed_step, error_code)
+        if hasattr(self.job_repo, "mark_cancelled"):
+            self.job_repo.mark_cancelled(job_id)
+        if hasattr(self.job_repo, "patch_summary"):
+            self.job_repo.patch_summary(
+                job_id,
+                {
+                    "lastRunStatus": "failed",
+                    "lastRunId": run_id,
+                    "failedStep": failed_step,
+                    "errorCode": error_code,
+                },
+            )
+
+        self.queue_repo.cancel_ready_for_run(
+            run_id,
+            error_code=error_code,
+            error_message=reason,
+        )
+
+        content_job_id = self._content_job_id(job)
+        if content_job_id:
+            self.job_repo.patch_compat_content_job_for_run(
+                content_job_id,
+                run_id,
+                {
+                    "status": "failed",
+                    "error": reason,
+                    "errorCode": error_code,
+                    "jobRunId": run_id,
+                    "lastRunStatus": "failed",
+                    "runEndedAt": fs.SERVER_TIMESTAMP,
+                    "publishInProgress": False,
+                    "publishLeaseOwner": None,
+                    "publishLeaseExpiresAt": None,
+                    "v2Locked": False,
+                    "activeRunElapsedMs": None,
+                },
+            )
 
     def on_step_failed(self, job_id: str, run_id: str, step_name: str, error_code: str) -> None:
         self.job_repo.mark_failed(job_id, run_id, step_name, error_code)

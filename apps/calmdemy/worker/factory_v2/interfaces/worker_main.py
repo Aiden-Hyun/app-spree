@@ -195,6 +195,11 @@ class WorkerMain:
                 "V2 recovered stuck course publish steps",
                 extra={"worker_id": self.worker_id, "recovered": recovered["publish"]},
             )
+        if recovered.get("admin_cancelled"):
+            logger.info(
+                "V2 reconciled admin-cancelled runs",
+                extra={"worker_id": self.worker_id, "recovered": recovered["admin_cancelled"]},
+            )
 
     def run_forever(self) -> None:
         while True:

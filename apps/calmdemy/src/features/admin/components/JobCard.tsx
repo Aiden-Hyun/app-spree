@@ -1,10 +1,20 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, GestureResponderEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
-import { ActiveJobWorker, ContentJob, JOB_STATUS_LABELS, CONTENT_TYPE_LABELS } from '../types';
+import {
+  ActiveJobWorker,
+  ContentJob,
+  CONTENT_TYPE_LABELS,
+  FactoryJob,
+  FactoryJobRun,
+  JOB_STATUS_LABELS,
+  JobStatus,
+} from '../types';
 import { formatCourseCode } from '@shared/utils/courseCodeParser';
 import { Theme } from '@/theme';
+import { subscribeToFactoryJob, subscribeToFactoryJobRun } from '../data/adminRepository';
+import { resolveJobExecutionView } from '../utils/jobExecutionState';
 
 interface JobCardProps {
   job: ContentJob;
@@ -52,6 +62,44 @@ function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
   }
 }
 
+function useJobCardExecutionView(job: ContentJob) {
+  const [factoryJob, setFactoryJob] = useState<FactoryJob | null>(null);
+  const [factoryRun, setFactoryRun] = useState<FactoryJobRun | null>(null);
+
+  const factoryJobId = useMemo(() => {
+    if (job.engine === 'v2') {
+      return String(job.v2JobId || job.id || '').trim() || undefined;
+    }
+    return job.v2JobId ? String(job.v2JobId).trim() || undefined : undefined;
+  }, [job.engine, job.id, job.v2JobId]);
+
+  useEffect(() => {
+    if (!factoryJobId) {
+      setFactoryJob(null);
+      return;
+    }
+    return subscribeToFactoryJob(factoryJobId, setFactoryJob);
+  }, [factoryJobId]);
+
+  const factoryRunId = useMemo(
+    () => String(factoryJob?.currentRunId || job.v2RunId || '').trim() || undefined,
+    [factoryJob?.currentRunId, job.v2RunId]
+  );
+
+  useEffect(() => {
+    if (!factoryRunId) {
+      setFactoryRun(null);
+      return;
+    }
+    return subscribeToFactoryJobRun(factoryRunId, setFactoryRun);
+  }, [factoryRunId]);
+
+  return useMemo(
+    () => resolveJobExecutionView(job, factoryJob, factoryRun),
+    [job, factoryJob, factoryRun]
+  );
+}
+
 export function JobCard({
   job,
   activeWorkers = [],
@@ -61,18 +109,33 @@ export function JobCard({
 }: JobCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const statusColor = getStatusColor(job.status, theme);
+  const executionView = useJobCardExecutionView(job);
+  const effectiveStatus: JobStatus = executionView?.effectiveStatus || job.status;
+  const statusColor = getStatusColor(effectiveStatus, theme);
   const headline = useMemo(() => getJobHeadline(job), [job]);
   const visibleWorkerIds = useMemo(
     () => getVisibleActiveWorkerIds(activeWorkers),
     [activeWorkers]
   );
-  const timingLabel = useMemo(() => getTimingLabel(job), [job]);
-  const ttsProgressLabel = useMemo(() => getTtsProgressLabel(job), [job]);
-  const publishBadge = useMemo(() => getPublishBadge(job, theme), [job, theme]);
-  const canPublishFromCard = useMemo(() => canPublishFromFactoryCard(job), [job]);
-  const thumbnailBadge = useMemo(() => getThumbnailBadge(job, theme), [job, theme]);
-  const canGenerateThumbnailFromCard = useMemo(() => canGenerateThumbnailFromCardList(job), [job]);
+  const timingLabel = useMemo(() => getTimingLabel(job, effectiveStatus), [job, effectiveStatus]);
+  const ttsProgressLabel = useMemo(() => getTtsProgressLabel(job, effectiveStatus), [job, effectiveStatus]);
+  const publishBadge = useMemo(
+    () => getPublishBadge(job, theme, effectiveStatus),
+    [job, theme, effectiveStatus]
+  );
+  const canPublishFromCard = useMemo(
+    () => canPublishFromFactoryCard(job, effectiveStatus),
+    [job, effectiveStatus]
+  );
+  const thumbnailBadge = useMemo(
+    () => getThumbnailBadge(job, theme, effectiveStatus),
+    [job, theme, effectiveStatus]
+  );
+  const canGenerateThumbnailFromCard = useMemo(
+    () => canGenerateThumbnailFromCardList(job, effectiveStatus),
+    [job, effectiveStatus]
+  );
+  const displayError = effectiveStatus === 'failed' ? job.error : undefined;
 
   const timeAgo = useMemo(() => {
     if (!job.createdAt?.toDate) return '';
@@ -109,9 +172,9 @@ export function JobCard({
     >
       <View style={styles.header}>
         <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18` }]}>
-          <Ionicons name={getStatusIcon(job.status)} size={14} color={statusColor} />
+          <Ionicons name={getStatusIcon(effectiveStatus)} size={14} color={statusColor} />
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {JOB_STATUS_LABELS[job.status]}
+            {JOB_STATUS_LABELS[effectiveStatus]}
           </Text>
         </View>
         <Text style={styles.timeText}>{timeAgo}</Text>
@@ -245,9 +308,9 @@ export function JobCard({
         </View>
       ) : null}
 
-      {job.error && (
+      {displayError && (
         <Text style={styles.errorText} numberOfLines={1}>
-          {job.error}
+          {displayError}
         </Text>
       )}
     </Pressable>
@@ -296,8 +359,8 @@ function getVisibleActiveWorkerIds(activeWorkers: ActiveJobWorker[]): string[] {
   );
 }
 
-function getTimingLabel(job: ContentJob): string | null {
-  if (job.status !== 'completed' && job.status !== 'failed') {
+function getTimingLabel(job: ContentJob, status: JobStatus): string | null {
+  if (status !== 'completed' && status !== 'failed') {
     const liveElapsedMs =
       typeof job.activeRunElapsedMs === 'number' && Number.isFinite(job.activeRunElapsedMs)
         ? job.activeRunElapsedMs
@@ -320,8 +383,8 @@ function getTimingLabel(job: ContentJob): string | null {
   return `${formatElapsedMsCompact(elapsedMs)} active`;
 }
 
-function getTtsProgressLabel(job: ContentJob): string | null {
-  if (job.status !== 'tts_converting' || job.contentType !== 'course') {
+function getTtsProgressLabel(job: ContentJob, status: JobStatus): string | null {
+  if (status !== 'tts_converting' || job.contentType !== 'course') {
     return null;
   }
 
@@ -383,8 +446,8 @@ function getCourseAudioSessionCounts(job: ContentJob): { completed: number; tota
   };
 }
 
-function getPublishBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | null {
-  if (job.status !== 'completed' || job.contentType === 'full_subject') {
+function getPublishBadge(job: ContentJob, theme: Theme, status: JobStatus): PublishBadgeConfig | null {
+  if (status !== 'completed' || job.contentType === 'full_subject') {
     return null;
   }
 
@@ -450,8 +513,8 @@ function getPublishBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | nu
   };
 }
 
-function getThumbnailBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | null {
-  if (job.contentType !== 'course' || job.status !== 'completed') {
+function getThumbnailBadge(job: ContentJob, theme: Theme, status: JobStatus): PublishBadgeConfig | null {
+  if (job.contentType !== 'course' || status !== 'completed') {
     return null;
   }
 
@@ -474,8 +537,8 @@ function getThumbnailBadge(job: ContentJob, theme: Theme): PublishBadgeConfig | 
   };
 }
 
-function canPublishFromFactoryCard(job: ContentJob): boolean {
-  if (job.status !== 'completed' || job.contentType === 'full_subject') {
+function canPublishFromFactoryCard(job: ContentJob, status: JobStatus): boolean {
+  if (status !== 'completed' || job.contentType === 'full_subject') {
     return false;
   }
 
@@ -520,7 +583,7 @@ function canPublishFromFactoryCard(job: ContentJob): boolean {
   return !String(job.publishedContentId || '').trim() && Boolean(String(job.audioPath || '').trim());
 }
 
-function canGenerateThumbnailFromCardList(job: ContentJob): boolean {
+function canGenerateThumbnailFromCardList(job: ContentJob, status: JobStatus): boolean {
   const awaitingScriptApproval = Boolean(
     (job.courseRegeneration?.active &&
       job.courseRegeneration.mode === 'script_and_audio' &&
@@ -530,7 +593,7 @@ function canGenerateThumbnailFromCardList(job: ContentJob): boolean {
 
   return (
     job.contentType === 'course' &&
-    job.status === 'completed' &&
+    status === 'completed' &&
     !awaitingScriptApproval &&
     !String(job.thumbnailUrl || '').trim()
   );

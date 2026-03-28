@@ -704,12 +704,14 @@ export function JobDetailView({
     setRegenerationScriptEdits,
     regenerating,
     setRegenerating,
+    canRequestThumbnail,
     onRegenerateCourse,
     onOpenChildJob: (childJobId) => {
       router.push({ pathname: '/admin/job/[id]', params: { id: childJobId } });
     },
     onOpenScriptApprovalModal: () => setShowScriptApprovalModal(true),
     onRegeneratePendingScripts: handleRegeneratePendingScripts,
+    onRequestThumbnail,
   });
 
   const visibleSections = sections.filter((section) => section.shouldRender);
@@ -1243,6 +1245,7 @@ function buildSections(params: {
   setRegenerationScriptEdits: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   regenerating: boolean;
   setRegenerating: React.Dispatch<React.SetStateAction<boolean>>;
+  canRequestThumbnail: boolean;
   onRegenerateCourse: (input: {
     mode: CourseRegenerationMode;
     targetSessionCodes: string[];
@@ -1251,6 +1254,7 @@ function buildSections(params: {
   onOpenChildJob: (childJobId: string) => void;
   onOpenScriptApprovalModal: () => void;
   onRegeneratePendingScripts: () => void;
+  onRequestThumbnail: () => void;
 }) {
   const {
     job,
@@ -1286,10 +1290,12 @@ function buildSections(params: {
     setRegenerationScriptEdits,
     regenerating,
     setRegenerating,
+    canRequestThumbnail,
     onRegenerateCourse,
     onOpenChildJob,
     onOpenScriptApprovalModal,
     onRegeneratePendingScripts,
+    onRequestThumbnail,
   } = params;
 
   const hasCourseConcurrencyData = Boolean(

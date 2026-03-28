@@ -285,6 +285,23 @@ export async function getCourseSessionById(
   }
 }
 
+export async function getCourseSessions(): Promise<FirestoreCourseSession[]> {
+  try {
+    const snapshot = await getDocs(courseSessionsCollection);
+    const sessions = snapshot.docs.map(
+      (docSnapshot) => normalizeCourseSession(docSnapshot.id, docSnapshot.data())
+    );
+    return sessions.sort((a, b) => {
+      const codeCompare = String(a.code || '').localeCompare(String(b.code || ''));
+      if (codeCompare !== 0) return codeCompare;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  } catch (error) {
+    console.error('Error fetching course sessions:', error);
+    return [];
+  }
+}
+
 export async function getCourses(): Promise<FirestoreCourse[]> {
   try {
     const snapshot = await getDocs(coursesCollection);

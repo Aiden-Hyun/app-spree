@@ -4,6 +4,10 @@
 const crypto = require("crypto");
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
+const {
+  REGION: CONTENT_MANAGER_REGION,
+  createUpdateContentMetadataHandler,
+} = require("./content_manager_admin");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -13,6 +17,15 @@ const REGION = "northamerica-northeast1";
 const ALLOWED_STATUSES = new Set(["pending", "publishing"]);
 const DUP_WINDOW_MS = 5 * 60 * 1000;
 const recent = new Map();
+
+exports.updateContentMetadata = functions
+  .region(CONTENT_MANAGER_REGION)
+  .https.onCall(
+    createUpdateContentMetadataHandler({
+      adminLib: admin,
+      functionsLib: functions,
+    })
+  );
 
 /**
  * Cleanup dedupe cache.

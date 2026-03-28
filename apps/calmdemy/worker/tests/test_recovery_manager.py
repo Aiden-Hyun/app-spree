@@ -193,6 +193,7 @@ class _FakeEventRepo:
 class _FakeOrchestrator:
     def __init__(self):
         self.failed_calls: list[tuple[str, str, str, str]] = []
+        self.cancelled_calls: list[tuple[str, str, str, str]] = []
 
     def recover_course_audio_fan_out_if_ready(self, job_id: str, run_id: str) -> int:
         return 1 if job_id == "job-1" and run_id == "run-1" else 0
@@ -205,6 +206,16 @@ class _FakeOrchestrator:
 
     def recover_course_publish_if_ready(self, job_id: str, run_id: str) -> bool:
         return False
+
+    def cancel_run(
+        self,
+        job_id: str,
+        run_id: str,
+        *,
+        reason: str = "Cancelled by admin",
+        error_code: str = "cancelled_by_admin",
+    ) -> None:
+        self.cancelled_calls.append((job_id, run_id, reason, error_code))
 
     def on_step_failed(self, job_id: str, run_id: str, step_name: str, error_code: str) -> None:
         self.failed_calls.append((job_id, run_id, step_name, error_code))
@@ -239,7 +250,53 @@ class RecoveryManagerTests(unittest.TestCase):
                 "fan_in": 2,
                 "upload": 1,
                 "publish": 0,
+                "admin_cancelled": 0,
             },
+        )
+
+    def test_recover_worker_tick_cancels_admin_cancelled_runs(self) -> None:
+        orchestrator = _FakeOrchestrator()
+        recovery_manager = RecoveryManager(
+            db=_FakeDB(
+                {
+                    "factory_jobs": {
+                        "job-1": {
+                            "job_type": "course",
+                            "current_state": "running",
+                            "current_run_id": "run-1",
+                            "request": {"compat": {"content_job_id": "content-1"}},
+                        },
+                        "job-2": {
+                            "job_type": "course",
+                            "current_state": "running",
+                            "current_run_id": "run-2",
+                            "request": {"compat": {"content_job_id": "content-2"}},
+                        },
+                    },
+                    "content_jobs": {
+                        "content-1": {
+                            "status": "failed",
+                            "error": "Cancelled by admin",
+                            "errorCode": "cancelled_by_admin",
+                        },
+                        "content-2": {
+                            "status": "completed",
+                            "errorCode": None,
+                        },
+                    },
+                }
+            ),
+            queue_repo=_FakeQueueRepo(_FakeDB(), stale_leases=0),
+            run_repo=_FakeRunRepo({"run-1": "running", "run-2": "running"}),
+            orchestrator=orchestrator,
+        )
+
+        recovered = recovery_manager.recover_worker_tick()
+
+        self.assertEqual(recovered["admin_cancelled"], 1)
+        self.assertEqual(
+            orchestrator.cancelled_calls,
+            [("job-1", "run-1", "Cancelled by admin", "cancelled_by_admin")],
         )
 
     def test_detects_deadline_exceeded_and_schedules_retry(self) -> None:

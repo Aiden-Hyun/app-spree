@@ -282,6 +282,25 @@ export default function AdminDashboard() {
               onToggle={() => setLogsOpen((prev) => !prev)}
             />
 
+            <Pressable
+              style={({ pressed }) => [
+                styles.managerCard,
+                pressed && { opacity: 0.9 },
+              ]}
+              onPress={() => router.push('/admin/content')}
+            >
+              <View style={styles.managerCardText}>
+                <Text style={styles.managerEyebrow}>New</Text>
+                <Text style={styles.managerTitle}>Content Manager</Text>
+                <Text style={styles.managerDescription}>
+                  Browse published content, inspect metadata, and jump to the live route.
+                </Text>
+              </View>
+              <View style={styles.managerIconWrap}>
+                <Ionicons name="library-outline" size={24} color={theme.colors.primary} />
+              </View>
+            </Pressable>
+
             <FiltersRow
               selectedFilter={filter}
               onFilterChange={setFilter}
@@ -399,6 +418,50 @@ const createStyles = (theme: Theme) =>
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 4,
+    },
+    managerCard: {
+      marginHorizontal: 16,
+      marginTop: 10,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceElevated,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 16,
+    },
+    managerCardText: {
+      flex: 1,
+      gap: 6,
+    },
+    managerEyebrow: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 11,
+      color: theme.colors.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+    },
+    managerTitle: {
+      fontFamily: theme.fonts.display.semiBold,
+      fontSize: 22,
+      color: theme.colors.text,
+    },
+    managerDescription: {
+      fontFamily: theme.fonts.body.regular,
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.textSecondary,
+      maxWidth: 560,
+    },
+    managerIconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: `${theme.colors.primary}14`,
     },
     metricsCard: {
       marginHorizontal: 16,

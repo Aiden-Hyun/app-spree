@@ -16,6 +16,8 @@ This document maps Firestore collections to repository modules and highlights qu
   - Collections: `meditation_sessions`, `users`, `user_favorites`, `listening_history`, `playback_progress`, `completed_content`
 - `src/features/admin/data/adminRepository.ts`
   - Collections: `content_jobs`, `factory_jobs`, `factory_job_runs`, `factory_step_runs`, `users`, `worker_control`, `worker_status`
+- `src/features/content-manager/data/contentManagerAdminRepository.ts`
+  - Collections: `content_audit_logs` (admin read), callable `updateContentMetadata` for server-side writes
 - `src/shared/data/content/*Repository.ts`
   - Collections: `content_ratings`, `completed_content`, `playback_progress`, `content_reports`, `narrators`
 - `src/services/firestoreService.ts`
@@ -47,6 +49,8 @@ Known queries (non-exhaustive):
 - `content_jobs`:
   - `where('status' == status)` + `orderBy('createdAt', 'desc')`
   - If Firestore warns about missing indexes, add a composite index (`status`, `createdAt`).
+- `content_audit_logs/{collection__id}/entries`:
+  - `orderBy('createdAt', 'desc')` for Content Manager audit history
 - `factory_step_runs`:
   - `where('job_id' == jobId)` for admin job detail timeline
   - Requires Firestore index support already defined in `firestore.indexes.json`.
@@ -56,6 +60,7 @@ Known queries (non-exhaustive):
 - **Do not write `undefined` to Firestore.** The admin job creator strips undefined values before write.
 - **Use server timestamps** for event fields (`createdAt`, `updatedAt`, `completed_at`, etc.).
 - **Treat `content_jobs` as the command/control surface plus compatibility projection for V2.** Canonical V2 execution state comes from `factory_jobs` / `factory_job_runs`.
+- **Keep content metadata writes server-side.** Published content docs stay client read-only; Content Manager edits must go through the callable function so admin auth, field validation, and audit logging happen together.
 - **Document ID conventions must remain stable** for:
   - `completed_content` and `playback_progress`: `${userId}_${contentId}`
 - **User-owned collections** must keep `user_id` in each doc to satisfy security rules.

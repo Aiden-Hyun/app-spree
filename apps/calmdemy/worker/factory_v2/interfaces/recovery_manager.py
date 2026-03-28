@@ -55,6 +55,42 @@ class RecoveryManager:
                 continue
             yield doc.id, run_id
 
+    def recover_admin_cancelled_runs(self, limit: int = 25) -> int:
+        recovered = 0
+        query = self.db.collection("factory_jobs").where("current_state", "==", "running").limit(limit)
+        for doc in query.stream():
+            data = doc.to_dict() or {}
+            run_id = str(data.get("current_run_id") or "").strip()
+            if not run_id:
+                continue
+            if self.run_repo.run_state(run_id) != "running":
+                continue
+
+            request = data.get("request") or {}
+            compat = request.get("compat") or {}
+            content_job_id = str(compat.get("content_job_id") or "").strip()
+            if not content_job_id:
+                continue
+
+            content_job_snap = self.db.collection("content_jobs").document(content_job_id).get()
+            if not content_job_snap.exists:
+                continue
+            content_job = content_job_snap.to_dict() or {}
+            status = str(content_job.get("status") or "").strip().lower()
+            error_code = str(content_job.get("errorCode") or "").strip().lower()
+            if status != "failed" or error_code != "cancelled_by_admin":
+                continue
+
+            self.orchestrator.cancel_run(
+                doc.id,
+                run_id,
+                reason=str(content_job.get("error") or "").strip() or "Cancelled by admin",
+                error_code="cancelled_by_admin",
+            )
+            recovered += 1
+
+        return recovered
+
     def _worker_status(self, worker_id: str, cache: dict[str, dict | None]) -> dict | None:
         if worker_id in cache:
             return cache[worker_id]
@@ -447,6 +483,7 @@ class RecoveryManager:
             "fan_in": 0,
             "upload": 0,
             "publish": 0,
+            "admin_cancelled": 0,
         }
         recovered.update(self.recover_stuck_steps())
         for job_id, run_id in self._iter_running_course_jobs(limit=25):
@@ -455,6 +492,7 @@ class RecoveryManager:
                 recovered["upload"] += 1
             if self.orchestrator.recover_course_publish_if_ready(job_id, run_id):
                 recovered["publish"] += 1
+        recovered["admin_cancelled"] += self.recover_admin_cancelled_runs(limit=25)
         return recovered
 
     def recover_companion_tick(self) -> dict[str, int]:
@@ -468,6 +506,7 @@ class RecoveryManager:
             "fan_in": 0,
             "upload": 0,
             "publish": 0,
+            "admin_cancelled": 0,
         }
         recovered.update(self.recover_stuck_steps())
         for job_id, run_id in self._iter_running_course_jobs(limit=50):
@@ -477,4 +516,5 @@ class RecoveryManager:
                 recovered["upload"] += 1
             if self.orchestrator.recover_course_publish_if_ready(job_id, run_id):
                 recovered["publish"] += 1
+        recovered["admin_cancelled"] += self.recover_admin_cancelled_runs(limit=50)
         return recovered
