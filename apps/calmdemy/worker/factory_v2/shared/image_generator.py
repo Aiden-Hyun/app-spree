@@ -5,6 +5,7 @@ Step 3: Generate a thumbnail image using a local diffusion model.
 import gc
 import os
 import re
+import subprocess
 import tempfile
 
 import torch
@@ -28,6 +29,10 @@ DEFAULT_FALLBACK_URL = (
 
 def _normalize_model_id(model_id: str | None = None) -> str:
     return str(model_id or config.IMAGE_MODEL_ID or "").strip()
+
+
+def _image_backend() -> str:
+    return str(getattr(config, "IMAGE_BACKEND", "diffusers") or "diffusers").strip().lower()
 
 
 def _model_cache_dir(model_id: str | None = None) -> str:
@@ -221,35 +226,96 @@ def _resolve_pipeline_class(model_id: str):
     return AutoPipelineForText2Image
 
 
-def generate_image(
+def _generate_image_coreml(
     prompt: str,
-    negative_prompt: str | None = None,
-    width: int | None = None,
-    height: int | None = None,
-    num_inference_steps: int | None = None,
-    guidance_scale: float | None = None,
+    negative_prompt: str | None,
+    *,
+    num_inference_steps: int,
+    guidance_scale: float,
 ) -> str:
-    """Generate an image from a prompt and return local file path."""
+    python_exec = str(getattr(config, "IMAGE_COREML_PYTHON", "") or "").strip()
+    resources_dir = str(getattr(config, "IMAGE_COREML_RESOURCES_DIR", "") or "").strip()
+    model_version = str(
+        getattr(config, "IMAGE_COREML_MODEL_VERSION", "") or "stabilityai/stable-diffusion-xl-base-1.0"
+    ).strip()
+    compute_unit = str(getattr(config, "IMAGE_COREML_COMPUTE_UNIT", "") or "CPU_AND_GPU").strip()
+    timeout_seconds = max(30, int(getattr(config, "IMAGE_COREML_TIMEOUT_SECONDS", 900) or 900))
+    seed = int(getattr(config, "IMAGE_SEED", 93) or 93)
+
+    if not python_exec or not os.path.isfile(python_exec):
+        raise FileNotFoundError(
+            f"IMAGE_COREML_PYTHON is not configured to a valid executable: {python_exec or '<empty>'}"
+        )
+    if not resources_dir or not os.path.isdir(resources_dir):
+        raise FileNotFoundError(
+            f"IMAGE_COREML_RESOURCES_DIR is not configured to a valid directory: {resources_dir or '<empty>'}"
+        )
+
+    coreml_repo_dir = os.path.abspath(os.path.join(os.path.dirname(python_exec), "..", ".."))
+    output_dir = tempfile.mkdtemp(prefix="calmdemy_coreml_")
+    cmd = [
+        python_exec,
+        "-m",
+        "python_coreml_stable_diffusion.pipeline",
+        "--prompt",
+        prompt,
+        "-i",
+        resources_dir,
+        "-o",
+        output_dir,
+        "--compute-unit",
+        compute_unit,
+        "--model-version",
+        model_version,
+        "--seed",
+        str(seed),
+        "--num-inference-steps",
+        str(num_inference_steps),
+        "--guidance-scale",
+        str(guidance_scale),
+    ]
+    if negative_prompt:
+        cmd.extend(["--negative-prompt", negative_prompt])
+
+    result = subprocess.run(
+        cmd,
+        cwd=coreml_repo_dir,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
+        env={
+            **os.environ,
+            "PYTHONUNBUFFERED": "1",
+        },
+    )
+    if result.returncode != 0:
+        details = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            f"Core ML image generation failed with exit code {result.returncode}: {details}"
+        )
+
+    for root, _dirs, files in os.walk(output_dir):
+        for name in files:
+            if name.lower().endswith(".png"):
+                return os.path.join(root, name)
+
+    raise RuntimeError("Core ML image generation completed without producing a PNG output")
+
+
+def _generate_image_diffusers(
+    prompt: str,
+    negative_prompt: str | None,
+    *,
+    width: int,
+    height: int,
+    num_inference_steps: int,
+    guidance_scale: float,
+) -> str:
     pipe = _load_pipe()
-    model_defaults = _model_generation_defaults()
     cache_enabled = bool(config.IMAGE_PIPELINE_CACHE_ENABLED)
     result = None
     image = None
-
-    width = width or int(model_defaults.get("preferred_width") or config.IMAGE_WIDTH)
-    height = height or int(model_defaults.get("preferred_height") or config.IMAGE_HEIGHT)
-    num_inference_steps = int(
-        num_inference_steps
-        or model_defaults.get("num_inference_steps")
-        or config.IMAGE_STEPS
-    )
-    guidance_scale = (
-        guidance_scale
-        if guidance_scale is not None
-        else model_defaults.get("guidance_scale")
-        if model_defaults.get("guidance_scale") is not None
-        else config.IMAGE_GUIDANCE
-    )
 
     kwargs = {
         "prompt": prompt,
@@ -258,7 +324,7 @@ def generate_image(
         "num_inference_steps": num_inference_steps,
         "guidance_scale": guidance_scale,
     }
-    if negative_prompt and bool(model_defaults.get("supports_negative_prompt", True)):
+    if negative_prompt and bool(_model_generation_defaults().get("supports_negative_prompt", True)):
         kwargs["negative_prompt"] = negative_prompt
 
     try:
@@ -280,6 +346,50 @@ def generate_image(
         if not cache_enabled:
             del pipe
             _empty_runtime_cache()
+
+
+def generate_image(
+    prompt: str,
+    negative_prompt: str | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    num_inference_steps: int | None = None,
+    guidance_scale: float | None = None,
+) -> str:
+    """Generate an image from a prompt and return local file path."""
+    model_defaults = _model_generation_defaults()
+
+    width = width or int(model_defaults.get("preferred_width") or config.IMAGE_WIDTH)
+    height = height or int(model_defaults.get("preferred_height") or config.IMAGE_HEIGHT)
+    num_inference_steps = int(
+        num_inference_steps
+        or model_defaults.get("num_inference_steps")
+        or config.IMAGE_STEPS
+    )
+    guidance_scale = (
+        guidance_scale
+        if guidance_scale is not None
+        else model_defaults.get("guidance_scale")
+        if model_defaults.get("guidance_scale") is not None
+        else config.IMAGE_GUIDANCE
+    )
+
+    if _image_backend() == "coreml":
+        return _generate_image_coreml(
+            prompt,
+            negative_prompt,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=float(guidance_scale),
+        )
+
+    return _generate_image_diffusers(
+        prompt,
+        negative_prompt,
+        width=width,
+        height=height,
+        num_inference_steps=num_inference_steps,
+        guidance_scale=float(guidance_scale),
+    )
 
 
 def _clean_prompt_fragment(value: object) -> str:

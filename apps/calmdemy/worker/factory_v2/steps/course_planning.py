@@ -10,7 +10,7 @@ import config
 from observability import get_logger
 
 from .base import StepContext, StepResult
-from .course_common import DEFAULT_FALLBACK_URL, _content_job_data, _content_job_id, _runtime
+from .course_common import _content_job_data, _content_job_id, _runtime
 
 logger = get_logger(__name__)
 
@@ -197,29 +197,24 @@ def execute_generate_course_thumbnail(ctx: StepContext) -> StepResult:
     content_job_id = _content_job_id(ctx.job)
 
     if force_regenerate or not thumbnail_url:
-        try:
-            title = job_data.get("params", {}).get("courseTitle", plan.get("courseTitle", "Untitled Course"))
-            image_prompt = image_prompt or build_image_prompt(
-                job_data,
-                title,
-                job_data.get("params", {}).get("topic", ""),
-                "course",
-                plan=plan,
-            )
-            local_image_path = generate_image(image_prompt)
-            image_path, thumbnail_url = upload_image(
-                local_image_path,
-                {
-                    **job_data,
-                    "contentType": "course",
-                    "_factoryContentJobId": content_job_id,
-                    "_factoryStepName": ctx.step_name,
-                },
-            )
-        except Exception as exc:
-            logger.warning("Course image generation failed", extra={"job_id": ctx.job.get("id"), "error": str(exc)})
-            thumbnail_url = thumbnail_url or DEFAULT_FALLBACK_URL
-            image_prompt = image_prompt or f"Course thumbnail for {job_data.get('params', {}).get('courseTitle', 'Untitled')}"
+        title = job_data.get("params", {}).get("courseTitle", plan.get("courseTitle", "Untitled Course"))
+        image_prompt = image_prompt or build_image_prompt(
+            job_data,
+            title,
+            job_data.get("params", {}).get("topic", ""),
+            "course",
+            plan=plan,
+        )
+        local_image_path = generate_image(image_prompt)
+        image_path, thumbnail_url = upload_image(
+            local_image_path,
+            {
+                **job_data,
+                "contentType": "course",
+                "_factoryContentJobId": content_job_id,
+                "_factoryStepName": ctx.step_name,
+            },
+        )
 
     return StepResult(
         output={"thumbnail_url": thumbnail_url},

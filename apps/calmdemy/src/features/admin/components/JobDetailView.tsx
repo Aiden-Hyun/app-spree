@@ -222,6 +222,12 @@ export function JobDetailView({
     isAwaitingRegeneratedScriptApproval ||
     isAwaitingInitialScriptApproval ||
     isAwaitingSingleScriptApproval;
+  const canRequestThumbnail = Boolean(
+    job.contentType === 'course' &&
+      effectiveStatus === 'completed' &&
+      !isAwaitingAnyScriptApproval &&
+      !isAwaitingSubjectPlanApproval
+  );
   const childJobMap = useMemo(() => {
     const entries = childJobs.map((childJob) => [childJob.id, childJob] as const);
     return Object.fromEntries(entries);
@@ -888,18 +894,6 @@ export function JobDetailView({
             onPress={onReview}
           />
         )}
-
-        {job.contentType === 'course' &&
-          effectiveStatus === 'completed' &&
-          !isAwaitingAnyScriptApproval &&
-          !isAwaitingSubjectPlanApproval && (
-            <PrimaryButton
-              label={job.thumbnailUrl ? 'Regenerate Thumbnail' : 'Generate Thumbnail'}
-              icon="image-outline"
-              color={theme.colors.secondary}
-              onPress={onRequestThumbnail}
-            />
-          )}
 
         {job.contentType === 'full_subject' && effectiveStatus !== 'paused' && effectiveStatus !== 'completed' && effectiveStatus !== 'failed' && (
           <PrimaryButton
@@ -2162,16 +2156,24 @@ function buildSections(params: {
       summaryItems: toSummaryItems([
         { label: 'Source', value: job.thumbnailUrl ? 'URL' : job.imagePath ? 'Path' : '' },
       ]),
-      shouldRender: Boolean(job.thumbnailUrl || job.imagePath),
+      shouldRender: Boolean(job.thumbnailUrl || job.imagePath || canRequestThumbnail),
       content: (
         <>
           {job.thumbnailUrl ? (
             <Image source={{ uri: job.thumbnailUrl }} style={styles.thumbnailImage} />
           ) : (
-            <Text style={styles.emptySubtext}>Thumbnail URL not available.</Text>
+            <Text style={styles.emptySubtext}>Thumbnail not generated yet.</Text>
           )}
           {job.thumbnailUrl && <InfoRow label="Thumbnail URL" value={job.thumbnailUrl} />}
           {job.imagePath && <InfoRow label="Image Path" value={job.imagePath} />}
+          {canRequestThumbnail && (
+            <PrimaryButton
+              label={job.thumbnailUrl ? 'Regenerate Thumbnail' : 'Generate Thumbnail'}
+              icon="image-outline"
+              color={theme.colors.secondary}
+              onPress={onRequestThumbnail}
+            />
+          )}
         </>
       ),
     },

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -62,6 +63,7 @@ class ImageGeneratorTests(unittest.TestCase):
         output_paths: list[str] = []
 
         with (
+            patch.object(image_generator.config, "IMAGE_BACKEND", "diffusers"),
             patch.object(image_generator.config, "IMAGE_PIPELINE_CACHE_ENABLED", False),
             patch.object(image_generator.config, "IMAGE_MODEL_ID", "fake/flux"),
             patch.object(image_generator, "_resolve_pipeline_class", return_value=_FakePipelineClass),
@@ -83,6 +85,7 @@ class ImageGeneratorTests(unittest.TestCase):
         output_paths: list[str] = []
 
         with (
+            patch.object(image_generator.config, "IMAGE_BACKEND", "diffusers"),
             patch.object(image_generator.config, "IMAGE_PIPELINE_CACHE_ENABLED", True),
             patch.object(image_generator.config, "IMAGE_MODEL_ID", "fake/flux"),
             patch.object(image_generator, "_resolve_pipeline_class", return_value=_FakePipelineClass),
@@ -104,6 +107,7 @@ class ImageGeneratorTests(unittest.TestCase):
         output_paths: list[str] = []
 
         with (
+            patch.object(image_generator.config, "IMAGE_BACKEND", "diffusers"),
             patch.object(image_generator.config, "IMAGE_PIPELINE_CACHE_ENABLED", False),
             patch.object(image_generator.config, "IMAGE_MODEL_ID", "stabilityai/sd-turbo"),
             patch.object(image_generator, "_resolve_pipeline_class", return_value=_FakePipelineClass),
@@ -225,6 +229,72 @@ class ImageGeneratorTests(unittest.TestCase):
             prompt,
             "Calming minimalist nature scene, soft light, gentle colors, no text, no people, high quality.",
         )
+
+    def test_generate_image_uses_coreml_backend_when_configured(self) -> None:
+        fake_run_calls: list[dict[str, object]] = []
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_python = os.path.join(temp_dir, "python")
+            resources_dir = os.path.join(temp_dir, "resources")
+            os.makedirs(resources_dir, exist_ok=True)
+            with open(fake_python, "w", encoding="utf-8") as handle:
+                handle.write("#!/bin/sh\n")
+
+            def _fake_run(cmd, **kwargs):
+                fake_run_calls.append({"cmd": cmd, **kwargs})
+                output_dir = cmd[cmd.index("-o") + 1]
+                image_path = os.path.join(output_dir, "thumbnail.png")
+                Image.new("RGB", (8, 8), color="white").save(image_path, format="PNG")
+                return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+            with (
+                patch.object(image_generator.config, "IMAGE_BACKEND", "coreml"),
+                patch.object(image_generator.config, "IMAGE_COREML_PYTHON", fake_python),
+                patch.object(image_generator.config, "IMAGE_COREML_RESOURCES_DIR", resources_dir),
+                patch.object(image_generator.config, "IMAGE_COREML_MODEL_VERSION", "stabilityai/stable-diffusion-xl-base-1.0"),
+                patch.object(image_generator.config, "IMAGE_COREML_COMPUTE_UNIT", "CPU_AND_GPU"),
+                patch.object(image_generator.config, "IMAGE_COREML_TIMEOUT_SECONDS", 120),
+                patch.object(image_generator.config, "IMAGE_SEED", 321),
+                patch.object(image_generator.config, "IMAGE_STEPS", 5),
+                patch.object(image_generator.config, "IMAGE_GUIDANCE", 4.5),
+                patch("factory_v2.shared.image_generator.subprocess.run", side_effect=_fake_run),
+            ):
+                output_path = image_generator.generate_image("floating blueprint fragments", negative_prompt="text")
+
+        self.assertEqual(len(fake_run_calls), 1)
+        call = fake_run_calls[0]
+        cmd = call["cmd"]
+        self.assertIn("python_coreml_stable_diffusion.pipeline", cmd)
+        self.assertIn("--prompt", cmd)
+        self.assertIn("floating blueprint fragments", cmd)
+        self.assertIn("--negative-prompt", cmd)
+        self.assertIn("text", cmd)
+        self.assertIn("--seed", cmd)
+        self.assertIn("321", cmd)
+        self.assertIn("--guidance-scale", cmd)
+        self.assertIn("4.5", cmd)
+        self.assertTrue(os.path.exists(output_path))
+        shutil.rmtree(os.path.dirname(output_path), ignore_errors=True)
+
+    def test_generate_image_raises_when_coreml_backend_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_python = os.path.join(temp_dir, "python")
+            resources_dir = os.path.join(temp_dir, "resources")
+            os.makedirs(resources_dir, exist_ok=True)
+            with open(fake_python, "w", encoding="utf-8") as handle:
+                handle.write("#!/bin/sh\n")
+
+            with (
+                patch.object(image_generator.config, "IMAGE_BACKEND", "coreml"),
+                patch.object(image_generator.config, "IMAGE_COREML_PYTHON", fake_python),
+                patch.object(image_generator.config, "IMAGE_COREML_RESOURCES_DIR", resources_dir),
+                patch(
+                    "factory_v2.shared.image_generator.subprocess.run",
+                    return_value=SimpleNamespace(returncode=1, stdout="", stderr="boom"),
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Core ML image generation failed"):
+                    image_generator.generate_image("floating blueprint fragments")
 
 
 if __name__ == "__main__":
