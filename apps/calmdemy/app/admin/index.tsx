@@ -12,6 +12,7 @@ import {
   useFactoryMetrics,
   useActiveJobWorkers,
 } from '@features/admin/hooks/useJobQueue';
+import { useContentManagerReportsSummary } from '@features/content-manager/hooks/useContentManager';
 import { JobStatus } from '@features/admin/types';
 import { Theme } from '@/theme';
 import {
@@ -43,6 +44,7 @@ export default function AdminDashboard() {
   const { jobs, isLoading } = useJobQueue(filter);
   const { workersByJobId } = useActiveJobWorkers(jobs.map((job) => job.id));
   const { drafts, deleteDraft } = useDrafts();
+  const { openCount: openReportsCount } = useContentManagerReportsSummary();
   const { status: localWorker } = useWorkerStatus('local');
   const { stacks } = useWorkerStacks();
   const { metrics } = useFactoryMetrics();
@@ -294,9 +296,28 @@ export default function AdminDashboard() {
                 <Text style={styles.managerDescription}>
                   Browse published content, inspect metadata, and jump to the live route.
                 </Text>
+                <Text style={styles.managerReportHint}>
+                  {openReportsCount} open report{openReportsCount === 1 ? '' : 's'}
+                </Text>
               </View>
-              <View style={styles.managerIconWrap}>
-                <Ionicons name="library-outline" size={24} color={theme.colors.primary} />
+              <View style={styles.managerActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.managerSecondaryButton,
+                    pressed && { opacity: 0.88 },
+                  ]}
+                  onPress={(event: { stopPropagation?: () => void }) => {
+                    event?.stopPropagation?.();
+                    router.push('/admin/content/reports');
+                  }}
+                >
+                  <Ionicons name="flag-outline" size={16} color={theme.colors.text} />
+                  <Text style={styles.managerSecondaryButtonText}>Reports</Text>
+                </Pressable>
+
+                <View style={styles.managerIconWrap}>
+                  <Ionicons name="library-outline" size={24} color={theme.colors.primary} />
+                </View>
               </View>
             </Pressable>
 
@@ -453,6 +474,33 @@ const createStyles = (theme: Theme) =>
       lineHeight: 20,
       color: theme.colors.textSecondary,
       maxWidth: 560,
+    },
+    managerReportHint: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: theme.colors.textMuted,
+    },
+    managerActions: {
+      alignItems: 'flex-end',
+      gap: 10,
+    },
+    managerSecondaryButton: {
+      minHeight: 36,
+      borderRadius: theme.borderRadius.full,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    managerSecondaryButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 13,
+      color: theme.colors.text,
     },
     managerIconWrap: {
       width: 56,

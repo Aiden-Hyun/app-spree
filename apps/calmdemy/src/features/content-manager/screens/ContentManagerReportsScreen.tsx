@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,16 +13,22 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { Theme } from '@/theme';
+import { ReportCategory } from '@/types';
 import { ContentManagerFilterPills } from '../components/ContentManagerFilterPills';
-import { ContentManagerResultCard } from '../components/ContentManagerResultCard';
-import {
-  useContentManagerCatalog,
-  useContentManagerReportsSummary,
-} from '../hooks/useContentManager';
+import { ContentManagerReportCard } from '../components/ContentManagerReportCard';
+import { useContentManagerReportsInbox } from '../hooks/useContentManager';
 import {
   CONTENT_MANAGER_COLLECTION_LABELS,
   CONTENT_MANAGER_COLLECTIONS,
+  CONTENT_MANAGER_REPORT_CATEGORY_LABELS,
+  ContentManagerReportSummary,
 } from '../types';
+
+const STATUS_OPTIONS = [
+  { id: 'open', label: 'Open' },
+  { id: 'resolved', label: 'Resolved' },
+  { id: 'all', label: 'All' },
+] as const;
 
 const TYPE_OPTIONS = [
   { id: 'all', label: 'All' },
@@ -30,48 +36,84 @@ const TYPE_OPTIONS = [
     id: collection,
     label: CONTENT_MANAGER_COLLECTION_LABELS[collection],
   })),
+  { id: 'unsupported', label: 'Unsupported' },
 ] as const;
 
-const ACCESS_OPTIONS = [
+const CATEGORY_OPTIONS = [
   { id: 'all', label: 'All' },
-  { id: 'free', label: 'Free' },
-  { id: 'premium', label: 'Premium' },
+  ...(Object.entries(CONTENT_MANAGER_REPORT_CATEGORY_LABELS) as Array<[ReportCategory, string]>).map(
+    ([id, label]) => ({
+      id,
+      label,
+    })
+  ),
 ] as const;
 
-export default function ContentManagerScreen() {
+export default function ContentManagerReportsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const {
-    filteredItems,
+    filteredReports,
     filters,
+    openCount,
     isLoading,
     isRefreshing,
+    updatingReportId,
     error,
+    message,
     refresh,
-    setAccess,
     setQuery,
+    setStatus,
     setType,
-  } = useContentManagerCatalog();
-  const { openCount } = useContentManagerReportsSummary();
+    setCategory,
+    updateStatus,
+  } = useContentManagerReportsInbox();
+
+  const handleChangeNote = (reportId: string, note: string) => {
+    setNoteDrafts((current) => ({
+      ...current,
+      [reportId]: note,
+    }));
+  };
+
+  const handleResolve = async (reportId: string, note?: string) => {
+    await updateStatus(reportId, 'resolved', note);
+  };
+
+  const handleReopen = async (reportId: string) => {
+    await updateStatus(reportId, 'open');
+  };
+
+  const handleOpenContent = (report: ContentManagerReportSummary) => {
+    if (!report.supportedLink) {
+      return;
+    }
+    router.push({
+      pathname: '/admin/content/[collection]/[id]',
+      params: {
+        collection: report.supportedLink.collection,
+        id: report.supportedLink.contentId,
+        reportId: report.id,
+      },
+    });
+  };
 
   return (
     <View style={styles.screen}>
       <FlatList
-        data={filteredItems}
-        keyExtractor={(item) => `${item.collection}:${item.id}`}
+        data={filteredReports}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ContentManagerResultCard
-            item={item}
-            onPress={() =>
-              router.push({
-                pathname: '/admin/content/[collection]/[id]',
-                params: {
-                  collection: item.collection,
-                  id: item.id,
-                },
-              })
-            }
+          <ContentManagerReportCard
+            report={item}
+            noteDraft={noteDrafts[item.id]}
+            isUpdating={updatingReportId === item.id}
+            onChangeNote={handleChangeNote}
+            onResolve={handleResolve}
+            onReopen={handleReopen}
+            onOpenContent={item.supportedLink ? handleOpenContent : undefined}
           />
         )}
         ListHeaderComponent={
@@ -79,57 +121,38 @@ export default function ContentManagerScreen() {
             <View style={styles.heroRow}>
               <View style={styles.heroText}>
                 <Text style={styles.eyebrow}>Admin</Text>
-                <Text style={styles.title}>Content Manager</Text>
+                <Text style={styles.title}>Reports Inbox</Text>
                 <Text style={styles.subtitle}>
-                  Find published content, inspect metadata, and jump into the live experience.
+                  Review user-submitted content issues, jump into supported content, and
+                  resolve reports when they are handled.
                 </Text>
-                <Text style={styles.reportsHint}>
+                <Text style={styles.summaryText}>
                   {openCount} open report{openCount === 1 ? '' : 's'}
                 </Text>
               </View>
 
-              <View style={styles.heroActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  testID="content-manager-open-reports"
-                  onPress={() => router.push('/admin/content/reports')}
-                  style={({ pressed }) => [
-                    styles.secondaryHeroButton,
-                    pressed && { opacity: 0.88 },
-                  ]}
-                >
-                  <Ionicons name="flag-outline" size={16} color={theme.colors.text} />
-                  <Text style={styles.secondaryHeroButtonText}>Reports</Text>
-                  {openCount > 0 ? (
-                    <View style={styles.reportCountBadge}>
-                      <Text style={styles.reportCountBadgeText}>{openCount}</Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  testID="content-manager-refresh"
-                  onPress={refresh}
-                  style={({ pressed }) => [
-                    styles.refreshButton,
-                    pressed && { opacity: 0.88 },
-                  ]}
-                >
-                  {isRefreshing ? (
-                    <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="refresh-outline"
-                        size={16}
-                        color={theme.colors.textOnPrimary}
-                      />
-                      <Text style={styles.refreshButtonText}>Refresh</Text>
-                    </>
-                  )}
-                </Pressable>
-              </View>
+              <Pressable
+                accessibilityRole="button"
+                testID="content-manager-reports-refresh"
+                onPress={refresh}
+                style={({ pressed }) => [
+                  styles.refreshButton,
+                  pressed && { opacity: 0.88 },
+                ]}
+              >
+                {isRefreshing ? (
+                  <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="refresh-outline"
+                      size={16}
+                      color={theme.colors.textOnPrimary}
+                    />
+                    <Text style={styles.refreshButtonText}>Refresh</Text>
+                  </>
+                )}
+              </Pressable>
             </View>
 
             <View style={styles.searchBox}>
@@ -137,11 +160,18 @@ export default function ContentManagerScreen() {
               <TextInput
                 value={filters.query}
                 onChangeText={setQuery}
-                placeholder="Search by title, doc id, course code, or session code"
+                placeholder="Search by content title, id, or raw content type"
                 placeholderTextColor={theme.colors.textMuted}
                 style={styles.searchInput}
               />
             </View>
+
+            <ContentManagerFilterPills
+              label="Status"
+              options={STATUS_OPTIONS}
+              selectedId={filters.status}
+              onChange={setStatus}
+            />
 
             <ContentManagerFilterPills
               label="Type"
@@ -151,10 +181,10 @@ export default function ContentManagerScreen() {
             />
 
             <ContentManagerFilterPills
-              label="Access"
-              options={ACCESS_OPTIONS}
-              selectedId={filters.access}
-              onChange={setAccess}
+              label="Category"
+              options={CATEGORY_OPTIONS}
+              selectedId={filters.category}
+              onChange={setCategory}
             />
 
             {error ? (
@@ -164,9 +194,16 @@ export default function ContentManagerScreen() {
               </View>
             ) : null}
 
+            {message ? (
+              <View style={styles.messageCard}>
+                <Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.success} />
+                <Text style={styles.messageText}>{message}</Text>
+              </View>
+            ) : null}
+
             {!isLoading ? (
               <Text style={styles.resultsText}>
-                {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
+                {filteredReports.length} report{filteredReports.length === 1 ? '' : 's'}
               </Text>
             ) : null}
           </View>
@@ -175,14 +212,14 @@ export default function ContentManagerScreen() {
           isLoading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
-              <Text style={styles.emptyTitle}>Loading content</Text>
+              <Text style={styles.emptyTitle}>Loading reports</Text>
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="documents-outline" size={40} color={theme.colors.textMuted} />
-              <Text style={styles.emptyTitle}>No matching content</Text>
+              <Ionicons name="flag-outline" size={40} color={theme.colors.textMuted} />
+              <Text style={styles.emptyTitle}>No matching reports</Text>
               <Text style={styles.emptyBody}>
-                Try a different search term or relax one of the filters.
+                Try a different filter or search term.
               </Text>
             </View>
           )
@@ -248,6 +285,11 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.textSecondary,
       maxWidth: 760,
     },
+    summaryText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: theme.colors.textMuted,
+    },
     refreshButton: {
       alignSelf: Platform.OS === 'web' ? 'flex-start' : 'stretch',
       minWidth: 112,
@@ -264,46 +306,6 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
       color: theme.colors.textOnPrimary,
-    },
-    heroActions: {
-      gap: 10,
-      alignItems: Platform.OS === 'web' ? 'flex-end' : 'stretch',
-    },
-    secondaryHeroButton: {
-      minHeight: 42,
-      borderRadius: theme.borderRadius.full,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      paddingHorizontal: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    secondaryHeroButtonText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 14,
-      color: theme.colors.text,
-    },
-    reportCountBadge: {
-      minWidth: 22,
-      height: 22,
-      borderRadius: theme.borderRadius.full,
-      backgroundColor: theme.colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 6,
-    },
-    reportCountBadgeText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 11,
-      color: theme.colors.textOnPrimary,
-    },
-    reportsHint: {
-      fontFamily: theme.fonts.ui.medium,
-      fontSize: 13,
-      color: theme.colors.textMuted,
     },
     searchBox: {
       flexDirection: 'row',
@@ -336,6 +338,21 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.medium,
       fontSize: 13,
       color: theme.colors.error,
+    },
+    messageCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: `${theme.colors.success}14`,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    messageText: {
+      flex: 1,
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: theme.colors.success,
     },
     resultsText: {
       fontFamily: theme.fonts.ui.medium,

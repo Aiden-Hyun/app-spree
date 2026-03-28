@@ -1,8 +1,9 @@
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/firebase";
-import { ReportCategory } from "@/types";
+import { ContentReportStatus, ReportCategory } from "@/types";
 
 const contentReportsCollection = collection(db, "content_reports");
+const DEFAULT_REPORT_STATUS: ContentReportStatus = "open";
 
 export async function reportContent(
   userId: string,
@@ -18,6 +19,7 @@ export async function reportContent(
       content_type: contentType,
       category,
       description: description || null,
+      status: DEFAULT_REPORT_STATUS,
       reported_at: serverTimestamp(),
     });
     return true;

@@ -18,6 +18,7 @@ import {
   formatEditableValue,
   getContentManagerFieldLabel,
 } from '../data/contentManagerEditConfig';
+import { ContentManagerReportCard } from '../components/ContentManagerReportCard';
 import {
   ContentManagerAuditEntry,
   ContentManagerEditFieldDefinition,
@@ -372,17 +373,22 @@ function HistoryRows({
 
 export default function ContentManagerDetailScreen() {
   const router = useRouter();
-  const { collection: rawCollection, id: rawId } = useLocalSearchParams<{
+  const { collection: rawCollection, id: rawId, reportId: rawReportId } = useLocalSearchParams<{
     collection?: string;
     id?: string;
+    reportId?: string;
   }>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const collection = isContentManagerCollection(rawCollection) ? rawCollection : null;
   const id = typeof rawId === 'string' ? rawId : null;
+  const selectedReportId = typeof rawReportId === 'string' ? rawReportId : null;
   const {
     item,
     history,
+    reports,
+    selectedReport,
+    repairAvailability,
     formValues,
     reason,
     fieldErrors,
@@ -391,9 +397,15 @@ export default function ContentManagerDetailScreen() {
     isLoading,
     isRefreshing,
     isSaving,
+    isRepairing,
+    updatingReportId,
     error,
     saveError,
     saveMessage,
+    repairError,
+    repairMessage,
+    reportError,
+    reportMessage,
     isDirty,
     isValid,
     refresh,
@@ -403,8 +415,11 @@ export default function ContentManagerDetailScreen() {
     toggleFieldOption,
     setReason,
     saveMetadata,
-  } = useContentManagerDetail(collection, id);
+    updateReportStatus,
+    runRepairAction,
+  } = useContentManagerDetail(collection, id, selectedReportId);
   const [copyHint, setCopyHint] = useState('');
+  const [reportNotes, setReportNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!copyHint) return;
@@ -421,6 +436,24 @@ export default function ContentManagerDetailScreen() {
     if (!item) return;
     const copied = await copyTextToClipboard(item.id);
     setCopyHint(copied ? 'Copied ID' : 'Clipboard unavailable');
+  };
+
+  const handleOpenFactoryJob = () => {
+    if (!repairAvailability?.job) return;
+    router.push({
+      pathname: '/admin/job/[id]',
+      params: {
+        id: repairAvailability.job.id,
+      },
+    });
+  };
+
+  const handleResolveReport = async (reportId: string, note?: string) => {
+    await updateReportStatus(reportId, 'resolved', note);
+  };
+
+  const handleReopenReport = async (reportId: string) => {
+    await updateReportStatus(reportId, 'open');
   };
 
   if (isLoading) {
@@ -540,6 +573,160 @@ export default function ContentManagerDetailScreen() {
         )}
       </SectionCard>
 
+      {repairAvailability ? (
+        <SectionCard title="Repair Actions">
+          {repairAvailability.message ? (
+            <Text style={styles.emptyMeta}>{repairAvailability.message}</Text>
+          ) : null}
+
+          {repairError ? (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle-outline" size={16} color={theme.colors.error} />
+              <Text style={styles.errorBannerText}>{repairError}</Text>
+            </View>
+          ) : null}
+
+          {repairMessage ? (
+            <View style={styles.messageBanner}>
+              <Ionicons name="checkmark-circle-outline" size={16} color={theme.colors.success} />
+              <Text style={styles.messageBannerText}>{repairMessage}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.actionsRow}>
+            {repairAvailability.canOpenFactoryJob ? (
+              <Pressable
+                testID="content-manager-open-factory-job"
+                onPress={handleOpenFactoryJob}
+                style={({ pressed }) => [styles.secondaryAction, pressed && { opacity: 0.88 }]}
+              >
+                <Ionicons name="build-outline" size={16} color={theme.colors.text} />
+                <Text style={styles.secondaryActionText}>Open Factory Job</Text>
+              </Pressable>
+            ) : null}
+
+            {repairAvailability.canRegenerateAudioOnly ? (
+              <Pressable
+                testID="content-manager-regenerate-audio-only"
+                onPress={() => runRepairAction('audio_only')}
+                disabled={Boolean(isRepairing)}
+                style={({ pressed }) => [
+                  styles.secondaryAction,
+                  Boolean(isRepairing) && styles.secondaryActionDisabled,
+                  pressed && !isRepairing && { opacity: 0.88 },
+                ]}
+              >
+                {isRepairing === 'audio_only' ? (
+                  <ActivityIndicator size="small" color={theme.colors.text} />
+                ) : (
+                  <>
+                    <Ionicons name="refresh-outline" size={16} color={theme.colors.text} />
+                    <Text style={styles.secondaryActionText}>Regenerate Audio Only</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+
+            {repairAvailability.canRegenerateScriptAndAudio ? (
+              <Pressable
+                testID="content-manager-regenerate-script-and-audio"
+                onPress={() => runRepairAction('script_and_audio')}
+                disabled={Boolean(isRepairing)}
+                style={({ pressed }) => [
+                  styles.primaryAction,
+                  Boolean(isRepairing) && styles.primaryActionDisabled,
+                  pressed && !isRepairing && { opacity: 0.88 },
+                ]}
+              >
+                {isRepairing === 'script_and_audio' ? (
+                  <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
+                ) : (
+                  <>
+                    <Ionicons name="sparkles-outline" size={16} color={theme.colors.textOnPrimary} />
+                    <Text style={styles.primaryActionText}>Regenerate Script + Audio</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+
+            {repairAvailability.canGenerateThumbnail ? (
+              <Pressable
+                testID="content-manager-generate-thumbnail"
+                onPress={() => runRepairAction('thumbnail')}
+                disabled={Boolean(isRepairing)}
+                style={({ pressed }) => [
+                  styles.secondaryAction,
+                  Boolean(isRepairing) && styles.secondaryActionDisabled,
+                  pressed && !isRepairing && { opacity: 0.88 },
+                ]}
+              >
+                {isRepairing === 'thumbnail' ? (
+                  <ActivityIndicator size="small" color={theme.colors.text} />
+                ) : (
+                  <>
+                    <Ionicons name="image-outline" size={16} color={theme.colors.text} />
+                    <Text style={styles.secondaryActionText}>Generate Thumbnail</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+          </View>
+
+          {selectedReport ? (
+            <Text style={styles.sectionHint}>
+              Repair actions do not auto-resolve the selected report.
+            </Text>
+          ) : null}
+        </SectionCard>
+      ) : null}
+
+      <SectionCard title="Reports">
+        {selectedReport ? (
+          <View style={styles.selectedReportHint}>
+            <Ionicons name="flag-outline" size={16} color={theme.colors.primary} />
+            <Text style={styles.selectedReportHintText}>
+              Opened from report {selectedReport.id}. The matching report is highlighted below.
+            </Text>
+          </View>
+        ) : null}
+
+        {reportError ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={16} color={theme.colors.error} />
+            <Text style={styles.errorBannerText}>{reportError}</Text>
+          </View>
+        ) : null}
+
+        {reportMessage ? (
+          <View style={styles.messageBanner}>
+            <Ionicons name="checkmark-circle-outline" size={16} color={theme.colors.success} />
+            <Text style={styles.messageBannerText}>{reportMessage}</Text>
+          </View>
+        ) : null}
+
+        {reports.length > 0 ? (
+          reports.map((report) => (
+            <ContentManagerReportCard
+              key={report.id}
+              report={report}
+              selected={report.id === selectedReport?.id}
+              noteDraft={reportNotes[report.id]}
+              isUpdating={updatingReportId === report.id}
+              onChangeNote={(reportId, note) =>
+                setReportNotes((current) => ({
+                  ...current,
+                  [reportId]: note,
+                }))
+              }
+              onResolve={handleResolveReport}
+              onReopen={handleReopenReport}
+            />
+          ))
+        ) : (
+          <Text style={styles.emptyMeta}>No reports for this content item.</Text>
+        )}
+      </SectionCard>
+
       <SectionCard title="Actions">
         <View style={styles.actionsRow}>
           <Pressable
@@ -577,7 +764,11 @@ export default function ContentManagerDetailScreen() {
         </View>
 
         <Text style={styles.copyHint}>
-          {saveMessage || copyHint || 'Metadata edits require a change reason and create an audit entry.'}
+          {saveMessage ||
+            repairMessage ||
+            reportMessage ||
+            copyHint ||
+            'Metadata edits create audit history. Report status changes are tracked on each report.'}
         </Text>
       </SectionCard>
 
@@ -645,6 +836,11 @@ const createStyles = (theme: Theme) =>
     },
     sectionBody: {
       gap: 14,
+    },
+    sectionHint: {
+      fontFamily: theme.fonts.body.regular,
+      fontSize: 13,
+      color: theme.colors.textSecondary,
     },
     inlineAction: {
       flexDirection: 'row',
@@ -821,6 +1017,21 @@ const createStyles = (theme: Theme) =>
       fontSize: 13,
       color: theme.colors.error,
     },
+    messageBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: `${theme.colors.success}14`,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    messageBannerText: {
+      flex: 1,
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: theme.colors.success,
+    },
     saveBar: {
       gap: 12,
       borderTopWidth: 1,
@@ -906,10 +1117,28 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'center',
       gap: 8,
     },
+    secondaryActionDisabled: {
+      opacity: 0.5,
+    },
     secondaryActionText: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
       color: theme.colors.text,
+    },
+    selectedReportHint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: `${theme.colors.primary}12`,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    selectedReportHintText: {
+      flex: 1,
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 13,
+      color: theme.colors.primary,
     },
     copyHint: {
       fontFamily: theme.fonts.body.regular,

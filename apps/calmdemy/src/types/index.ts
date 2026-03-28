@@ -231,11 +231,19 @@ export interface ContentRating {
 // Content Reports
 export type ReportCategory = "audio_issue" | "wrong_content" | "inappropriate" | "other";
 
+export type ContentReportStatus = "open" | "resolved";
+
 export interface ContentReport {
   id: string;
   user_id: string;
   content_id: string;
   content_type: string;
   category: ReportCategory;
+  description?: string | null;
+  status?: ContentReportStatus;
+  resolution_note?: string | null;
+  resolved_at?: string;
+  resolved_by_uid?: string;
+  resolved_by_email?: string;
   reported_at: string;
 }

@@ -14,6 +14,7 @@ import {
   ContentManagerEditableValues,
   ContentManagerSaveResult,
 } from '../types';
+import { ContentReportStatus } from '@/types';
 
 type UpdateContentMetadataRequest = {
   collection: ContentManagerCollection;
@@ -28,10 +29,27 @@ type UpdateContentMetadataResponse = {
   changedFields: string[];
 };
 
+type UpdateContentReportStatusRequest = {
+  reportId: string;
+  status: ContentReportStatus;
+  resolutionNote?: string | null;
+};
+
+type UpdateContentReportStatusResponse = {
+  ok: boolean;
+  status: ContentReportStatus;
+  changed: boolean;
+};
+
 const updateContentMetadataCallable = httpsCallable<
   UpdateContentMetadataRequest,
   UpdateContentMetadataResponse
 >(functions, 'updateContentMetadata');
+
+const updateContentReportStatusCallable = httpsCallable<
+  UpdateContentReportStatusRequest,
+  UpdateContentReportStatusResponse
+>(functions, 'updateContentReportStatus');
 
 function asTimestamp(value: unknown): Timestamp | undefined {
   return value instanceof Timestamp ? value : undefined;
@@ -88,4 +106,21 @@ export async function getContentManagerAuditEntries(
       createdAt: asTimestamp(data.createdAt),
     };
   });
+}
+
+export async function updateContentReportStatus(
+  reportId: string,
+  status: ContentReportStatus,
+  resolutionNote?: string | null
+): Promise<{ status: ContentReportStatus; changed: boolean }> {
+  const result = await updateContentReportStatusCallable({
+    reportId,
+    status,
+    resolutionNote,
+  });
+
+  return {
+    status: result.data?.status || status,
+    changed: Boolean(result.data?.changed),
+  };
 }

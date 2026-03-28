@@ -10,6 +10,32 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isValidReportCategory(category) {
+      return category in ['audio_issue', 'wrong_content', 'inappropriate', 'other'];
+    }
+
+    function isValidContentReportCreate() {
+      return request.resource.data.keys().hasOnly([
+          'user_id',
+          'content_id',
+          'content_type',
+          'category',
+          'description',
+          'status',
+          'reported_at',
+        ])
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.content_id is string
+        && request.resource.data.content_type is string
+        && isValidReportCategory(request.resource.data.category)
+        && (
+          !('description' in request.resource.data)
+          || request.resource.data.description == null
+          || request.resource.data.description is string
+        )
+        && request.resource.data.status == 'open';
+    }
+
     // Users can read their own user document; cannot set role from client
     match /users/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
@@ -143,7 +169,7 @@ service cloud.firestore {
     }
 
     match /content_reports/{docId} {
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.user_id;
+      allow create: if isSignedIn() && isValidContentReportCreate();
       allow read: if isAdmin();
       allow update, delete: if false;
     }

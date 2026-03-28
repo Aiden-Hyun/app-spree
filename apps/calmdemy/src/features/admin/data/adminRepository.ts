@@ -52,6 +52,52 @@ const factoryJobRunsCollection = collection(db, 'factory_job_runs');
 const stepRunsCollection = collection(db, 'factory_step_runs');
 const COURSE_SHARD_SUFFIXES = ['INT', 'M1L', 'M1P', 'M2L', 'M2P', 'M3L', 'M3P', 'M4L', 'M4P'];
 
+function toContentJob(docId: string, data: Record<string, any>): ContentJob {
+  return { id: docId, ...data } as ContentJob;
+}
+
+function asMillis(value: unknown): number {
+  if (value instanceof Timestamp) {
+    return value.toMillis();
+  }
+  return 0;
+}
+
+function sortJobsNewestFirst(jobs: ContentJob[]): ContentJob[] {
+  return [...jobs].sort((left, right) => {
+    const completedDiff = asMillis(right.completedAt) - asMillis(left.completedAt);
+    if (completedDiff !== 0) {
+      return completedDiff;
+    }
+
+    const updatedDiff = asMillis(right.updatedAt) - asMillis(left.updatedAt);
+    if (updatedDiff !== 0) {
+      return updatedDiff;
+    }
+
+    return asMillis(right.createdAt) - asMillis(left.createdAt);
+  });
+}
+
+async function queryCourseJobsByField(
+  fieldName: 'courseId' | 'courseSessionIds',
+  operator: '==' | 'array-contains',
+  value: string
+): Promise<ContentJob[]> {
+  const normalizedValue = String(value || '').trim();
+  if (!normalizedValue) {
+    return [];
+  }
+
+  const snapshot = await getDocs(
+    query(jobsCollection, where(fieldName, operator as any, normalizedValue), limit(20))
+  );
+
+  return snapshot.docs
+    .map((docSnapshot) => toContentJob(docSnapshot.id, docSnapshot.data() as Record<string, any>))
+    .filter((job) => job.contentType === 'course' && job.status === 'completed');
+}
+
 function freshDispatchResetFields(
   options?: { preserveTiming?: boolean }
 ): Record<string, null | false | string> {
@@ -469,7 +515,7 @@ export async function getContentJobs(
     const snapshot = await getDocs(q);
     return snapshot.docs.map((docSnapshot) => {
       const data = docSnapshot.data() as Record<string, any>;
-      return { id: docSnapshot.id, ...data } as ContentJob;
+      return toContentJob(docSnapshot.id, data);
     });
   } catch (error) {
     console.error('Error fetching content jobs:', error);
@@ -484,9 +530,44 @@ export async function getContentJob(jobId: string): Promise<ContentJob | null> {
     const docSnapshot = await getDoc(doc(jobsCollection, jobId));
     if (!docSnapshot.exists()) return null;
     const data = docSnapshot.data() as Record<string, any>;
-    return { id: docSnapshot.id, ...data } as ContentJob;
+    return toContentJob(docSnapshot.id, data);
   } catch (error) {
     console.error('Error fetching content job:', error);
+    return null;
+  }
+}
+
+export async function getLatestCompletedCourseJobForCourseId(
+  courseId: string
+): Promise<ContentJob | null> {
+  try {
+    const jobs = await queryCourseJobsByField('courseId', '==', courseId);
+    return sortJobsNewestFirst(jobs)[0] || null;
+  } catch (error) {
+    console.error('Error fetching latest completed course job by course id:', error);
+    return null;
+  }
+}
+
+export async function getLatestCompletedCourseJobForCourseSessionId(
+  sessionId: string,
+  fallbackCourseId?: string
+): Promise<ContentJob | null> {
+  try {
+    const bySession = sortJobsNewestFirst(
+      await queryCourseJobsByField('courseSessionIds', 'array-contains', sessionId)
+    )[0];
+    if (bySession) {
+      return bySession;
+    }
+
+    if (!fallbackCourseId) {
+      return null;
+    }
+
+    return await getLatestCompletedCourseJobForCourseId(fallbackCourseId);
+  } catch (error) {
+    console.error('Error fetching latest completed course job by course session id:', error);
     return null;
   }
 }
@@ -512,7 +593,7 @@ export function subscribeToJobs(
   return onSnapshot(q, (snapshot) => {
     const jobs = snapshot.docs.map((docSnapshot) => {
       const data = docSnapshot.data() as Record<string, any>;
-      return { id: docSnapshot.id, ...data } as ContentJob;
+      return toContentJob(docSnapshot.id, data);
     });
     callback(jobs);
   });
@@ -528,7 +609,7 @@ export function subscribeToJob(
       return;
     }
     const data = docSnapshot.data() as Record<string, any>;
-    callback({ id: docSnapshot.id, ...data } as ContentJob);
+    callback(toContentJob(docSnapshot.id, data));
   });
 }
 
@@ -600,7 +681,7 @@ export function subscribeToChildJobs(
   return onSnapshot(q, (snapshot) => {
     const jobs = snapshot.docs.map((docSnapshot) => {
       const data = docSnapshot.data() as Record<string, any>;
-      return { id: docSnapshot.id, ...data } as ContentJob;
+      return toContentJob(docSnapshot.id, data);
     });
     callback(jobs);
   });
@@ -858,7 +939,7 @@ export async function retryJob(jobId: string): Promise<void> {
     throw new Error('Job not found.');
   }
 
-  const job = { id: jobSnapshot.id, ...(jobSnapshot.data() as Record<string, any>) } as ContentJob;
+  const job = toContentJob(jobSnapshot.id, jobSnapshot.data() as Record<string, any>);
   const basePatch = {
     status: 'pending' as JobStatus,
     error: null,
@@ -882,7 +963,7 @@ export async function retryJob(jobId: string): Promise<void> {
 
   const childSnapshot = await getDocs(query(jobsCollection, where('parentJobId', '==', jobId)));
   const childJobs = childSnapshot.docs.map(
-    (docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() } as ContentJob)
+    (docSnapshot) => toContentJob(docSnapshot.id, docSnapshot.data() as Record<string, any>)
   );
   const { reusableChildIds, detachedChildIds, nextPlan, nextCounts } = pickReusableSubjectChildren(
     job,

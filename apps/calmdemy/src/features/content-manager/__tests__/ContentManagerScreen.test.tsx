@@ -7,6 +7,7 @@ import { renderToDom } from '@/test-utils/domRender';
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
 const mockUseContentManagerCatalog = vi.fn();
+const mockUseContentManagerReportsSummary = vi.fn();
 
 function createReactNativeMock() {
   const React = require('react');
@@ -94,6 +95,7 @@ vi.mock('@core/providers/contexts/ThemeContext', () => ({
 
 vi.mock('../hooks/useContentManager', () => ({
   useContentManagerCatalog: () => mockUseContentManagerCatalog(),
+  useContentManagerReportsSummary: () => mockUseContentManagerReportsSummary(),
 }));
 
 describe('ContentManagerScreen', () => {
@@ -113,6 +115,11 @@ describe('ContentManagerScreen', () => {
       setAccess: vi.fn(),
       setQuery: vi.fn(),
       setType: vi.fn(),
+    });
+    mockUseContentManagerReportsSummary.mockReturnValue({
+      openCount: 0,
+      isLoading: false,
+      refresh: vi.fn(),
     });
   });
 
@@ -174,5 +181,20 @@ describe('ContentManagerScreen', () => {
     const { getByTestId, click } = renderToDom(<ContentManagerScreen />);
     click(getByTestId('content-manager-refresh'));
     expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it('opens the reports inbox from the hero action', () => {
+    mockUseContentManagerReportsSummary.mockReturnValue({
+      openCount: 3,
+      isLoading: false,
+      refresh: vi.fn(),
+    });
+
+    const { getByTestId, click, getByText } = renderToDom(<ContentManagerScreen />);
+
+    expect(getByText('3 open reports')).toBeTruthy();
+    click(getByTestId('content-manager-open-reports'));
+
+    expect(mockPush).toHaveBeenCalledWith('/admin/content/reports');
   });
 });

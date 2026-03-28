@@ -93,7 +93,7 @@ describe('AdminLayout', () => {
     expect(getByText('redirect:/')).toBeTruthy();
   });
 
-  it('registers both content manager routes for admins', () => {
+  it('registers content manager and reports routes for admins', () => {
     mockUseAdminAuth.mockReturnValue({
       isAdmin: true,
       isLoading: false,
@@ -102,6 +102,7 @@ describe('AdminLayout', () => {
     const { getByTestId } = renderToDom(<AdminLayout />);
     expect(getByTestId('screen-index')).toBeTruthy();
     expect(getByTestId('screen-content/index')).toBeTruthy();
+    expect(getByTestId('screen-content/reports')).toBeTruthy();
     expect(getByTestId('screen-content/[collection]/[id]')).toBeTruthy();
   });
 });

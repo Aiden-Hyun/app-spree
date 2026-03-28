@@ -77,6 +77,12 @@ export default function AdminLayout() {
         }}
       />
       <Stack.Screen
+        name="content/reports"
+        options={{
+          title: 'Reports Inbox',
+        }}
+      />
+      <Stack.Screen
         name="content/[collection]/[id]"
         options={{
           title: 'Content Detail',

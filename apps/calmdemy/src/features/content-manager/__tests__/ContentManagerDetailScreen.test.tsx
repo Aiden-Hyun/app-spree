@@ -15,6 +15,8 @@ const mockSetFieldValue = vi.fn();
 const mockToggleFieldOption = vi.fn();
 const mockSetReason = vi.fn();
 const mockSaveMetadata = vi.fn();
+const mockUpdateReportStatus = vi.fn();
+const mockRunRepairAction = vi.fn();
 const mockUseContentManagerDetail = vi.fn();
 
 function createReactNativeMock() {
@@ -78,6 +80,7 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({
     collection: 'guided_meditations',
     id: 'item-1',
+    reportId: undefined,
   }),
 }));
 
@@ -125,6 +128,9 @@ describe('ContentManagerDetailScreen', () => {
     mockUseContentManagerDetail.mockReturnValue({
       item: null,
       history: [],
+      reports: [],
+      selectedReport: null,
+      repairAvailability: null,
       formValues: {},
       reason: '',
       fieldErrors: {},
@@ -133,9 +139,15 @@ describe('ContentManagerDetailScreen', () => {
       isLoading: false,
       isRefreshing: false,
       isSaving: false,
+      isRepairing: null,
+      updatingReportId: null,
       error: null,
       saveError: null,
       saveMessage: null,
+      repairError: null,
+      repairMessage: null,
+      reportError: null,
+      reportMessage: null,
       isDirty: false,
       isValid: false,
       refresh: mockRefresh,
@@ -145,6 +157,8 @@ describe('ContentManagerDetailScreen', () => {
       toggleFieldOption: mockToggleFieldOption,
       setReason: mockSetReason,
       saveMetadata: mockSaveMetadata,
+      updateReportStatus: mockUpdateReportStatus,
+      runRepairAction: mockRunRepairAction,
     });
   });
 
@@ -448,5 +462,104 @@ describe('ContentManagerDetailScreen', () => {
         id: 'course-1',
       },
     });
+  });
+
+  it('renders reports and resolves the selected report', () => {
+    mockUseContentManagerDetail.mockReturnValue({
+      ...mockUseContentManagerDetail(),
+      item: buildDetail({ title: 'Calm Breath' }),
+      selectedReport: {
+        id: 'report-1',
+        contentId: 'item-1',
+        contentType: 'guided_meditation',
+        category: 'audio_issue',
+        description: 'Audio cuts out midway.',
+        status: 'open',
+        isSupported: true,
+        supportedLink: {
+          collection: 'guided_meditations',
+          contentId: 'item-1',
+          reportId: 'report-1',
+        },
+        contentCollection: 'guided_meditations',
+        contentTitle: 'Calm Breath',
+        contentIdentifier: 'item-1',
+        contentTypeLabel: 'Guided Meditation',
+      },
+      reports: [
+        {
+          id: 'report-1',
+          contentId: 'item-1',
+          contentType: 'guided_meditation',
+          category: 'audio_issue',
+          description: 'Audio cuts out midway.',
+          status: 'open',
+          isSupported: true,
+          supportedLink: {
+            collection: 'guided_meditations',
+            contentId: 'item-1',
+            reportId: 'report-1',
+          },
+          contentCollection: 'guided_meditations',
+          contentTitle: 'Calm Breath',
+          contentIdentifier: 'item-1',
+          contentTypeLabel: 'Guided Meditation',
+        },
+      ],
+    });
+
+    const { getByText, getByTestId, change, click } = renderToDom(<ContentManagerDetailScreen />);
+
+    expect(getByText('Opened from report report-1. The matching report is highlighted below.')).toBeTruthy();
+    change(getByTestId('content-manager-report-note-report-1'), 'Fixed the source audio.');
+    click(getByTestId('content-manager-report-resolve-report-1'));
+
+    expect(mockUpdateReportStatus).toHaveBeenCalledWith('report-1', 'resolved', undefined);
+  });
+
+  it('shows course-session repair actions and starts audio regeneration', () => {
+    mockUseContentManagerDetail.mockReturnValue({
+      ...mockUseContentManagerDetail(),
+      item: buildDetail({
+        collection: 'course_sessions',
+        typeLabel: 'Course Session',
+        title: 'Lesson 1',
+        code: 'CBT101M1L',
+        identifier: 'CBT101M1L',
+        access: 'premium',
+        previewRoute: { pathname: '/course/session/[id]', params: { id: 'item-1' } },
+        editableFields: getContentManagerEditFields('course_sessions'),
+        editableValues: {
+          title: 'Lesson 1',
+          description: 'Course session',
+          duration_minutes: 12,
+        },
+      }),
+      repairAvailability: {
+        job: {
+          id: 'job-1',
+          status: 'completed',
+          contentType: 'course',
+        },
+        sessionCode: 'CBT101M1L',
+        canOpenFactoryJob: true,
+        canRegenerateAudioOnly: true,
+        canRegenerateScriptAndAudio: true,
+        canGenerateThumbnail: false,
+      },
+    });
+
+    const { getByTestId, click } = renderToDom(<ContentManagerDetailScreen />);
+
+    click(getByTestId('content-manager-open-factory-job'));
+    click(getByTestId('content-manager-regenerate-audio-only'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/admin/job/[id]',
+      params: {
+        id: 'job-1',
+      },
+    });
+    expect(mockRunRepairAction).toHaveBeenCalledWith('audio_only');
   });
 });

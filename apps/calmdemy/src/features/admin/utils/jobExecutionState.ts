@@ -62,6 +62,22 @@ function normalizeRunState(value: unknown): JobExecutionRunState | undefined {
   }
 }
 
+function isFreshDispatchRequest(job: ContentJob, compatStatus: JobStatus, engineCurrentState?: FactoryJobState): boolean {
+  if (compatStatus !== 'pending' && compatStatus !== 'publishing') {
+    return false;
+  }
+
+  if (trimString(job.v2RunId) || normalizeRunState(job.lastRunStatus)) {
+    return false;
+  }
+
+  return (
+    engineCurrentState === 'completed' ||
+    engineCurrentState === 'failed' ||
+    engineCurrentState === 'cancelled'
+  );
+}
+
 function formatWords(value: string): string {
   return value
     .split('_')
@@ -109,6 +125,9 @@ export function resolveJobExecutionView(
     if (compatStatus === 'paused' || subjectState === 'paused') {
       effectiveStatus = 'paused';
       statusSource = engineCurrentState ? 'mixed' : 'content_job';
+    } else if (isFreshDispatchRequest(job, compatStatus, engineCurrentState)) {
+      effectiveStatus = compatStatus;
+      statusSource = 'mixed';
     } else if (engineRunState === 'failed' || engineCurrentState === 'failed' || engineCurrentState === 'cancelled') {
       effectiveStatus = 'failed';
       statusSource = 'factory_job';

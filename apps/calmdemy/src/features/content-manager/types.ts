@@ -1,4 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
+import { ContentJob } from '@features/admin/types';
+import { ContentReportStatus, ReportCategory } from '@/types';
 
 export type ContentManagerCollection =
   | 'guided_meditations'
@@ -97,12 +99,66 @@ export interface ContentManagerSaveResult {
   changedFields: string[];
 }
 
+export type ContentManagerReportsTypeFilter =
+  | 'all'
+  | 'unsupported'
+  | ContentManagerCollection;
+
+export interface ContentManagerReportsFilterState {
+  query: string;
+  status: 'all' | ContentReportStatus;
+  type: ContentManagerReportsTypeFilter;
+  category: 'all' | ReportCategory;
+}
+
 export interface ContentManagerRelation {
   label: string;
   collection: ContentManagerCollection;
   id: string;
   title: string;
   code?: string;
+}
+
+export interface ContentManagerSupportedReportLink {
+  collection: ContentManagerCollection;
+  contentId: string;
+  reportId: string;
+}
+
+export interface ContentManagerReportSummary {
+  id: string;
+  contentId: string;
+  contentType: string;
+  category: ReportCategory;
+  description?: string;
+  status: ContentReportStatus;
+  reportedAt?: Timestamp;
+  resolutionNote?: string;
+  resolvedAt?: Timestamp;
+  resolvedByUid?: string;
+  resolvedByEmail?: string;
+  isSupported: boolean;
+  supportedLink?: ContentManagerSupportedReportLink;
+  contentTitle?: string;
+  contentIdentifier?: string;
+  contentCollection?: ContentManagerCollection;
+  contentTypeLabel?: string;
+  thumbnailUrl?: string;
+}
+
+export interface ContentManagerReportContext {
+  reports: ContentManagerReportSummary[];
+  selectedReport: ContentManagerReportSummary | null;
+}
+
+export interface ContentManagerRepairActionAvailability {
+  job: ContentJob | null;
+  sessionCode?: string;
+  canOpenFactoryJob: boolean;
+  canRegenerateAudioOnly: boolean;
+  canRegenerateScriptAndAudio: boolean;
+  canGenerateThumbnail: boolean;
+  message?: string;
 }
 
 export interface ContentManagerItemDetail extends ContentManagerItemSummary {
@@ -134,6 +190,28 @@ export const CONTENT_MANAGER_DEFAULT_FILTERS: ContentManagerFilterState = {
   query: '',
   type: 'all',
   access: 'all',
+};
+
+export const CONTENT_MANAGER_DEFAULT_REPORT_FILTERS: ContentManagerReportsFilterState = {
+  query: '',
+  status: 'open',
+  type: 'all',
+  category: 'all',
+};
+
+export const CONTENT_MANAGER_REPORT_STATUS_LABELS: Record<
+  ContentReportStatus,
+  string
+> = {
+  open: 'Open',
+  resolved: 'Resolved',
+};
+
+export const CONTENT_MANAGER_REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
+  audio_issue: 'Audio Issue',
+  wrong_content: 'Wrong Content',
+  inappropriate: 'Inappropriate',
+  other: 'Other',
 };
 
 export function isContentManagerCollection(

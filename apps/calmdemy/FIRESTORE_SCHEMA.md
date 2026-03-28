@@ -135,6 +135,11 @@ Document ID convention: `${userId}_${contentId}`
 - `content_type` (string)
 - `category` (`audio_issue`, `wrong_content`, `inappropriate`, `other`)
 - `description` (string or null)
+- `status` (`open` or `resolved`, optional on legacy docs; missing is treated as `open`)
+- `resolution_note` (string or null, admin-managed)
+- `resolved_at` (timestamp, admin-managed)
+- `resolved_by_uid` (string or null, admin-managed)
+- `resolved_by_email` (string or null, admin-managed)
 - `reported_at` (timestamp)
 
 ### `content_audit_logs`

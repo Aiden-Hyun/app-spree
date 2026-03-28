@@ -7,6 +7,7 @@ const admin = require("firebase-admin");
 const {
   REGION: CONTENT_MANAGER_REGION,
   createUpdateContentMetadataHandler,
+  createUpdateContentReportStatusHandler,
 } = require("./content_manager_admin");
 
 if (!admin.apps.length) {
@@ -22,6 +23,15 @@ exports.updateContentMetadata = functions
   .region(CONTENT_MANAGER_REGION)
   .https.onCall(
     createUpdateContentMetadataHandler({
+      adminLib: admin,
+      functionsLib: functions,
+    })
+  );
+
+exports.updateContentReportStatus = functions
+  .region(CONTENT_MANAGER_REGION)
+  .https.onCall(
+    createUpdateContentReportStatusHandler({
       adminLib: admin,
       functionsLib: functions,
     })

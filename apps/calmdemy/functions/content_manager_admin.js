@@ -29,6 +29,7 @@ const BEDTIME_CATEGORY_VALUES = [
   "thriller",
   "fairytale",
 ];
+const CONTENT_REPORT_STATUSES = ["open", "resolved"];
 
 const CONTENT_MANAGER_EDITABLE_FIELDS = {
   guided_meditations: {
@@ -166,6 +167,29 @@ function valuesEqual(left, right) {
   return left === right;
 }
 
+async function requireAdminUser({ adminLib, functionsLib, context }) {
+  const uid = String(context?.auth?.uid || "").trim();
+  if (!uid) {
+    throw getHttpsError(functionsLib, "unauthenticated", "Authentication is required.");
+  }
+
+  const db = adminLib.firestore();
+  const userDoc = await db.collection("users").doc(uid).get();
+  if (!userDoc.exists || userDoc.data()?.role !== "admin") {
+    throw getHttpsError(functionsLib, "permission-denied", "Admin access is required.");
+  }
+
+  const actorEmail =
+    String(context?.auth?.token?.email || userDoc.data()?.email || "").trim() || null;
+
+  return {
+    uid,
+    db,
+    userDoc,
+    actorEmail,
+  };
+}
+
 function serializeAuditValue(value) {
   if (value === undefined) return null;
   if (Array.isArray(value)) {
@@ -237,11 +261,6 @@ function diffSanitizedPatch(existingDoc, sanitizedPatch) {
 
 function createUpdateContentMetadataHandler({ adminLib, functionsLib }) {
   return async (data, context) => {
-    const uid = String(context?.auth?.uid || "").trim();
-    if (!uid) {
-      throw getHttpsError(functionsLib, "unauthenticated", "Authentication is required.");
-    }
-
     const collection = String(data?.collection || "").trim();
     const id = String(data?.id || "").trim();
     const reason = String(data?.reason || "").trim();
@@ -256,11 +275,11 @@ function createUpdateContentMetadataHandler({ adminLib, functionsLib }) {
       throw getHttpsError(functionsLib, "invalid-argument", "Change reason is required.");
     }
 
-    const db = adminLib.firestore();
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (!userDoc.exists || userDoc.data()?.role !== "admin") {
-      throw getHttpsError(functionsLib, "permission-denied", "Admin access is required.");
-    }
+    const { uid, db, actorEmail } = await requireAdminUser({
+      adminLib,
+      functionsLib,
+      context,
+    });
 
     const contentRef = db.collection(collection).doc(id);
     const contentDoc = await contentRef.get();
@@ -283,8 +302,6 @@ function createUpdateContentMetadataHandler({ adminLib, functionsLib }) {
     const auditDocId = `${collection}__${id}`;
     const auditRef = db.collection("content_audit_logs").doc(auditDocId);
     const entryRef = auditRef.collection("entries").doc();
-    const actorEmail =
-      String(context?.auth?.token?.email || userDoc.data()?.email || "").trim() || null;
 
     const batch = db.batch();
     batch.set(
@@ -324,10 +341,94 @@ function createUpdateContentMetadataHandler({ adminLib, functionsLib }) {
   };
 }
 
+function createUpdateContentReportStatusHandler({ adminLib, functionsLib }) {
+  return async (data, context) => {
+    const reportId = String(data?.reportId || "").trim();
+    const status = String(data?.status || "").trim();
+    const resolutionNoteRaw = data?.resolutionNote;
+
+    if (!reportId) {
+      throw getHttpsError(functionsLib, "invalid-argument", "Report id is required.");
+    }
+    if (!CONTENT_REPORT_STATUSES.includes(status)) {
+      throw getHttpsError(functionsLib, "invalid-argument", "Report status is invalid.");
+    }
+    if (
+      resolutionNoteRaw !== undefined &&
+      resolutionNoteRaw !== null &&
+      typeof resolutionNoteRaw !== "string"
+    ) {
+      throw getHttpsError(functionsLib, "invalid-argument", "Resolution note must be a string.");
+    }
+
+    const resolutionNote = normalizeString(resolutionNoteRaw, false);
+    const { uid, db, actorEmail } = await requireAdminUser({
+      adminLib,
+      functionsLib,
+      context,
+    });
+
+    const reportRef = db.collection("content_reports").doc(reportId);
+    const reportDoc = await reportRef.get();
+    if (!reportDoc.exists) {
+      throw getHttpsError(functionsLib, "not-found", "Content report not found.");
+    }
+
+    const current = reportDoc.data() || {};
+    const currentStatus = CONTENT_REPORT_STATUSES.includes(String(current.status || ""))
+      ? String(current.status)
+      : "open";
+    const currentResolutionNote = normalizeString(current.resolution_note, false);
+
+    if (
+      currentStatus === status &&
+      (status !== "resolved" || valuesEqual(currentResolutionNote, resolutionNote))
+    ) {
+      return {
+        ok: true,
+        status,
+        changed: false,
+      };
+    }
+
+    const serverTimestamp = adminLib.firestore.FieldValue.serverTimestamp();
+    if (status === "resolved") {
+      await reportRef.set(
+        {
+          status,
+          resolution_note: resolutionNote,
+          resolved_at: serverTimestamp,
+          resolved_by_uid: uid,
+          resolved_by_email: actorEmail,
+        },
+        { merge: true }
+      );
+    } else {
+      await reportRef.set(
+        {
+          status: "open",
+          resolution_note: null,
+          resolved_at: null,
+          resolved_by_uid: null,
+          resolved_by_email: null,
+        },
+        { merge: true }
+      );
+    }
+
+    return {
+      ok: true,
+      status,
+      changed: true,
+    };
+  };
+}
+
 module.exports = {
   REGION,
   CONTENT_MANAGER_EDITABLE_FIELDS,
   sanitizePatch,
   diffSanitizedPatch,
   createUpdateContentMetadataHandler,
+  createUpdateContentReportStatusHandler,
 };

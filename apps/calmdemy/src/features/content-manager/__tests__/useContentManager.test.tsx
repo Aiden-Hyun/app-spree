@@ -9,6 +9,13 @@ const repoMocks = vi.hoisted(() => ({
   getContentManagerItemDetail: vi.fn(),
   getContentManagerAuditEntries: vi.fn(),
   updateContentMetadata: vi.fn(),
+  updateContentReportStatus: vi.fn(),
+  getContentManagerReports: vi.fn(),
+  getContentManagerReportsForItem: vi.fn(),
+  getOpenContentReportsCount: vi.fn(),
+  getContentManagerRepairActionAvailability: vi.fn(),
+  regenerateCourseSessions: vi.fn(),
+  requestCourseThumbnailGeneration: vi.fn(),
 }));
 
 const focusEffectState = vi.hoisted(() => ({
@@ -29,11 +36,25 @@ vi.mock('../data/contentManagerRepository', () => ({
 vi.mock('../data/contentManagerAdminRepository', () => ({
   getContentManagerAuditEntries: repoMocks.getContentManagerAuditEntries,
   updateContentMetadata: repoMocks.updateContentMetadata,
+  updateContentReportStatus: repoMocks.updateContentReportStatus,
+}));
+
+vi.mock('../data/contentManagerReportsRepository', () => ({
+  getContentManagerReports: repoMocks.getContentManagerReports,
+  getContentManagerReportsForItem: repoMocks.getContentManagerReportsForItem,
+  getOpenContentReportsCount: repoMocks.getOpenContentReportsCount,
+  getContentManagerRepairActionAvailability: repoMocks.getContentManagerRepairActionAvailability,
+}));
+
+vi.mock('@features/admin/data/adminRepository', () => ({
+  regenerateCourseSessions: repoMocks.regenerateCourseSessions,
+  requestCourseThumbnailGeneration: repoMocks.requestCourseThumbnailGeneration,
 }));
 
 import {
   useContentManagerCatalog,
   useContentManagerDetail,
+  useContentManagerReportsInbox,
 } from '../hooks/useContentManager';
 
 function buildDetail(title = 'Calm Breath') {
@@ -122,6 +143,67 @@ function DetailHarness() {
   );
 }
 
+function ReportsInboxHarness() {
+  const inbox = useContentManagerReportsInbox();
+
+  return (
+    <div>
+      <div data-testid="reports-count">{String(inbox.filteredReports.length)}</div>
+      <div data-testid="reports-open-count">{String(inbox.openCount)}</div>
+      <div data-testid="reports-message">{inbox.message || ''}</div>
+      <div data-testid="reports-error">{inbox.error || ''}</div>
+
+      <button
+        data-testid="reports-set-query"
+        type="button"
+        onClick={() => inbox.setQuery('breath')}
+      >
+        Query
+      </button>
+      <button
+        data-testid="reports-set-status-resolved"
+        type="button"
+        onClick={() => inbox.setStatus('resolved')}
+      >
+        Status
+      </button>
+      <button
+        data-testid="reports-resolve"
+        type="button"
+        onClick={() => inbox.updateStatus('report-1', 'resolved', 'Handled')}
+      >
+        Resolve
+      </button>
+    </div>
+  );
+}
+
+function DetailRepairHarness() {
+  const detail = useContentManagerDetail('course_sessions', 'session-1');
+
+  return (
+    <div>
+      <div data-testid="repair-message">{detail.repairMessage || ''}</div>
+      <div data-testid="repair-error">{detail.repairError || ''}</div>
+
+      <button
+        data-testid="repair-audio"
+        type="button"
+        onClick={() => detail.runRepairAction('audio_only')}
+      >
+        Audio
+      </button>
+      <button
+        data-testid="repair-thumbnail"
+        type="button"
+        onClick={() => detail.runRepairAction('thumbnail')}
+      >
+        Thumbnail
+      </button>
+    </div>
+  );
+}
+
 async function flushAsyncWork() {
   await act(async () => {
     await Promise.resolve();
@@ -133,6 +215,10 @@ describe('useContentManager hooks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     focusEffectState.callbacks = [];
+    repoMocks.getContentManagerReports.mockResolvedValue([]);
+    repoMocks.getContentManagerReportsForItem.mockResolvedValue([]);
+    repoMocks.getOpenContentReportsCount.mockResolvedValue(0);
+    repoMocks.getContentManagerRepairActionAvailability.mockResolvedValue(null);
   });
 
   it('refreshes the catalog when the screen regains focus', async () => {
@@ -259,5 +345,168 @@ describe('useContentManager hooks', () => {
 
     expect(getByTestId('detail-mode').textContent).toBe('editing');
     expect(getByTestId('detail-save-error').textContent).toContain('Network down');
+  });
+
+  it('filters reports in the inbox and resolves a report', async () => {
+    repoMocks.getContentManagerReports
+      .mockResolvedValueOnce([
+        {
+          id: 'report-1',
+          contentId: 'item-1',
+          contentType: 'guided_meditation',
+          category: 'audio_issue',
+          description: 'Breath audio is clipped.',
+          status: 'open',
+          isSupported: true,
+          supportedLink: {
+            collection: 'guided_meditations',
+            contentId: 'item-1',
+            reportId: 'report-1',
+          },
+          contentCollection: 'guided_meditations',
+          contentTitle: 'Calm Breath',
+          contentIdentifier: 'item-1',
+          contentTypeLabel: 'Guided Meditation',
+        },
+        {
+          id: 'report-2',
+          contentId: 'item-2',
+          contentType: 'sound',
+          category: 'other',
+          description: 'Rain track loops poorly.',
+          status: 'resolved',
+          isSupported: false,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'report-1',
+          contentId: 'item-1',
+          contentType: 'guided_meditation',
+          category: 'audio_issue',
+          description: 'Breath audio is clipped.',
+          status: 'resolved',
+          isSupported: true,
+          supportedLink: {
+            collection: 'guided_meditations',
+            contentId: 'item-1',
+            reportId: 'report-1',
+          },
+          contentCollection: 'guided_meditations',
+          contentTitle: 'Calm Breath',
+          contentIdentifier: 'item-1',
+          contentTypeLabel: 'Guided Meditation',
+        },
+      ]);
+    repoMocks.updateContentReportStatus.mockResolvedValue({
+      ok: true,
+      status: 'resolved',
+      changed: true,
+    });
+
+    const { getByTestId, click } = renderToDom(<ReportsInboxHarness />);
+    await flushAsyncWork();
+
+    expect(getByTestId('reports-count').textContent).toBe('1');
+    expect(getByTestId('reports-open-count').textContent).toBe('1');
+
+    click(getByTestId('reports-set-status-resolved'));
+    expect(getByTestId('reports-count').textContent).toBe('1');
+
+    click(getByTestId('reports-resolve'));
+    await flushAsyncWork();
+
+    expect(repoMocks.updateContentReportStatus).toHaveBeenCalledWith(
+      'report-1',
+      'resolved',
+      'Handled'
+    );
+    expect(getByTestId('reports-message').textContent).toContain('Report resolved.');
+  });
+
+  it('starts course-session repair actions without auto-resolving reports', async () => {
+    repoMocks.getContentManagerItemDetail.mockResolvedValue({
+      id: 'session-1',
+      collection: 'course_sessions',
+      typeLabel: 'Course Session',
+      title: 'Lesson 1',
+      description: 'Session description',
+      identifier: 'CBT101M1L',
+      code: 'CBT101M1L',
+      access: 'premium',
+      previewRoute: {
+        pathname: '/course/session/[id]' as const,
+        params: { id: 'session-1' },
+      },
+      metadata: [],
+      relations: [
+        {
+          label: 'Course',
+          collection: 'courses',
+          id: 'course-1',
+          title: 'CBT Foundations',
+          code: 'CBT101',
+        },
+      ],
+      editableFields: getContentManagerEditFields('course_sessions'),
+      editableValues: {
+        title: 'Lesson 1',
+        description: 'Session description',
+        duration_minutes: 12,
+      },
+    });
+    repoMocks.getContentManagerAuditEntries.mockResolvedValue([]);
+    repoMocks.getContentManagerReportsForItem.mockResolvedValue([
+      {
+        id: 'report-1',
+        contentId: 'session-1',
+        contentType: 'course_session',
+        category: 'wrong_content',
+        description: 'Audio mismatches the transcript.',
+        status: 'open',
+        isSupported: true,
+        supportedLink: {
+          collection: 'course_sessions',
+          contentId: 'session-1',
+          reportId: 'report-1',
+        },
+        contentCollection: 'course_sessions',
+        contentTitle: 'Lesson 1',
+        contentIdentifier: 'CBT101M1L',
+        contentTypeLabel: 'Course Session',
+      },
+    ]);
+    repoMocks.getContentManagerRepairActionAvailability.mockResolvedValue({
+      job: {
+        id: 'job-1',
+        status: 'completed',
+        contentType: 'course',
+      },
+      sessionCode: 'CBT101M1L',
+      canOpenFactoryJob: true,
+      canRegenerateAudioOnly: true,
+      canRegenerateScriptAndAudio: true,
+      canGenerateThumbnail: false,
+    });
+
+    const { getByTestId, click } = renderToDom(<DetailRepairHarness />);
+    await flushAsyncWork();
+
+    click(getByTestId('repair-audio'));
+    await flushAsyncWork();
+
+    expect(repoMocks.regenerateCourseSessions).toHaveBeenCalledWith(
+      {
+        id: 'job-1',
+        status: 'completed',
+        contentType: 'course',
+      },
+      {
+        mode: 'audio_only',
+        targetSessionCodes: ['CBT101M1L'],
+      }
+    );
+    expect(repoMocks.updateContentReportStatus).not.toHaveBeenCalled();
+    expect(getByTestId('repair-message').textContent).toContain('Audio regeneration requested.');
   });
 });

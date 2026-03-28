@@ -122,6 +122,61 @@ describe('resolveJobExecutionView', () => {
     expect(view?.isProjectionDrifted).toBe(false);
   });
 
+  it('shows a fresh rerun request as pending before the new factory run is bootstrapped', () => {
+    const job = makeJob({
+      status: 'pending',
+      v2RunId: undefined,
+      lastRunStatus: undefined,
+      thumbnailGenerationRequested: true,
+    });
+    const factoryJob = makeFactoryJob({
+      currentState: 'completed',
+      currentRunId: 'job-1-r1',
+      summary: {
+        currentStep: 'publish_course',
+        lastRunStatus: 'completed',
+      },
+    });
+    const factoryRun = makeFactoryRun({
+      id: 'job-1-r1',
+      state: 'completed',
+    });
+
+    const view = resolveJobExecutionView(job, factoryJob, factoryRun);
+
+    expect(view?.effectiveStatus).toBe('pending');
+    expect(view?.effectiveRunStatus).toBe('completed');
+    expect(view?.statusSource).toBe('mixed');
+    expect(view?.isProjectionDrifted).toBe(false);
+  });
+
+  it('shows a fresh publish request as publishing before the new factory run is bootstrapped', () => {
+    const job = makeJob({
+      status: 'publishing',
+      v2RunId: undefined,
+      lastRunStatus: undefined,
+    });
+    const factoryJob = makeFactoryJob({
+      currentState: 'completed',
+      currentRunId: 'job-1-r1',
+      summary: {
+        currentStep: 'publish_course',
+        lastRunStatus: 'completed',
+      },
+    });
+    const factoryRun = makeFactoryRun({
+      id: 'job-1-r1',
+      state: 'completed',
+    });
+
+    const view = resolveJobExecutionView(job, factoryJob, factoryRun);
+
+    expect(view?.effectiveStatus).toBe('publishing');
+    expect(view?.effectiveRunStatus).toBe('completed');
+    expect(view?.statusSource).toBe('mixed');
+    expect(view?.isProjectionDrifted).toBe(false);
+  });
+
   it('falls back to content_jobs when no factory state is available', () => {
     const job = makeJob({
       status: 'uploading',
