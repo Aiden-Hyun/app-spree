@@ -205,7 +205,6 @@ export default function AdminDashboard() {
 
     if (
       job.contentType !== 'course' ||
-      job.status !== 'completed' ||
       awaitingScriptApproval ||
       String(job.thumbnailUrl || '').trim()
     ) {

@@ -1467,7 +1467,13 @@ export async function requestCourseThumbnailGeneration(job: ContentJob): Promise
   if (job.contentType !== 'course') {
     throw new Error('Thumbnail generation is only supported for course jobs.');
   }
-  if (job.status !== 'completed') {
+  const hasCompletedCourseOutputs = Boolean(
+    job.coursePlan ||
+      job.courseId ||
+      (job.coursePreviewSessions || []).length > 0 ||
+      Object.keys(job.courseAudioResults || {}).length > 0
+  );
+  if (!hasCompletedCourseOutputs) {
     throw new Error('Finish the course job before generating a deferred thumbnail.');
   }
 

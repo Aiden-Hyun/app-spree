@@ -140,9 +140,20 @@ class _UnusedQueueRepo:
 class _ConfigurableStepRunRepo:
     def __init__(self, succeeded: set[tuple[str, str, str]] | None = None):
         self._succeeded = set(succeeded or set())
+        self._ready: dict[str, tuple[str, str, str]] = {}
 
     def has_succeeded(self, job_id: str, run_id: str, step_name: str) -> bool:
         return (job_id, run_id, step_name) in self._succeeded
+
+    def ensure_ready(self, job_id: str, run_id: str, step_name: str, shard_key: str = "root") -> str:
+        step_run_id = f"{run_id}__{step_name}__{shard_key}"
+        self._ready[step_run_id] = (job_id, run_id, step_name)
+        return step_run_id
+
+    def mark_succeeded_from_checkpoint(self, step_run_id: str, _output: dict) -> None:
+        payload = self._ready.get(step_run_id)
+        if payload:
+            self._succeeded.add(payload)
 
 
 class CourseScriptApprovalTests(unittest.TestCase):
@@ -389,10 +400,7 @@ class CourseScriptApprovalTests(unittest.TestCase):
             queue_repo=_UnusedQueueRepo(),
         )
 
-        with (
-            patch.object(orchestrator, "_seed_course_checkpoint_steps"),
-            patch.object(orchestrator, "_ensure_step_enqueued") as ensure_step_enqueued,
-        ):
+        with patch.object(orchestrator, "_ensure_step_enqueued") as ensure_step_enqueued:
             recovered = orchestrator.recover_course_publish_if_ready("job-1", "run-1")
 
         self.assertFalse(recovered)

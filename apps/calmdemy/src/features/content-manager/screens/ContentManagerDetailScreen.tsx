@@ -357,7 +357,8 @@ function HistoryRows({
                   {getContentManagerFieldLabel(item.collection, fieldName)}
                 </Text>
                 <Text style={styles.historyChangeValue}>
-                  {formatEditableValue(entry.before[fieldName])} ->{' '}
+                  {formatEditableValue(entry.before[fieldName])}
+                  {' -> '}
                   {formatEditableValue(entry.after[fieldName])}
                 </Text>
               </View>

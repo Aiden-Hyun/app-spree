@@ -183,10 +183,8 @@ class Orchestrator:
             return
 
         thumbnail_url = self._course_thumbnail_url(job)
-        if thumbnail_url and not (
-            first_step == "generate_course_thumbnail"
-            and self._course_thumbnail_generation_requested(job)
-        ):
+        thumbnail_regeneration_requested = self._course_thumbnail_generation_requested(job)
+        if thumbnail_url and not thumbnail_regeneration_requested:
             step_run_id = self.step_run_repo.ensure_ready(
                 job_id,
                 run_id,
