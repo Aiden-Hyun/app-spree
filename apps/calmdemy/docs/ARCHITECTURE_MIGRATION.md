@@ -8,7 +8,6 @@ The following paths are **legacy and retired**. They are frozen and should not r
 - `src/hooks`
 - `src/utils`
 - `src/components`
-- `src/shared/data/contentRepository.ts`
 
 Rule: do not place net-new business logic in these locations. Keep them absent or empty.
 
@@ -57,7 +56,7 @@ Rule: do not place net-new business logic in these locations. Keep them absent o
 - Feature-specific components move to `src/features/<feature>/components`.
 - Migration complete: `src/components` wrappers removed.
 
-### `src/shared/data/contentRepository.ts` → split repositories
+### Shared data repositories → split repositories
 
 - Break into focused modules by domain:
   - narrators
@@ -65,7 +64,7 @@ Rule: do not place net-new business logic in these locations. Keep them absent o
   - completed content
   - content ratings
   - content reports
-- Keep `contentRepository.ts` as a compatibility barrel during rollout.
+- Migration complete: import directly from `src/shared/data/content/*`.
 
 ## 4) Conventions (Opt-In, Effective Immediately)
 

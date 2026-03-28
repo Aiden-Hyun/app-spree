@@ -42,23 +42,3 @@ export async function setAudioActive(active: boolean): Promise<void> {
     console.warn('Failed to set audio active state:', error);
   }
 }
-
-// Legacy exports for backwards compatibility
-// The audioService singleton is no longer needed - use useAudioPlayer hook instead
-export const audioService = {
-  setUpdateCallback: () => {},
-  loadAudio: async () => { console.warn('Use useAudioPlayer hook instead'); },
-  play: async () => {},
-  pause: async () => {},
-  stop: async () => {},
-  seekTo: async () => {},
-  setVolume: async () => {},
-  unloadAudio: async () => {},
-  getCurrentState: (): AudioState => ({
-    isPlaying: false,
-    isLoading: false,
-    duration: 0,
-    position: 0,
-    error: null,
-  }),
-};

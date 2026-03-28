@@ -14,6 +14,9 @@
   - Meditate: `Guided Meditation`, `Browse by Techniques`, `Browse by Theme`.
   - Music: `Albums`, `White Noise`, `Nature Sounds`, `Music`, `ASMR`.
   - Premium lock icons on cards are unchanged.
+- Removed fully unused compatibility shims:
+  - deleted `src/shared/data/contentRepository.ts`
+  - removed the dead `audioService` singleton export from `src/services/audioService.ts`
 
 ## 2026-02-04
 
@@ -26,7 +29,7 @@
   - `completedContentRepository.ts`
   - `contentRatingsRepository.ts`
   - `contentReportsRepository.ts`
-- Kept `src/shared/data/contentRepository.ts` as a compatibility barrel (`export * from "./content"`).
+- Kept `src/shared/data/contentRepository.ts` as a temporary compatibility barrel during rollout.
 - Migrated a vertical slice in `music`: moved `SoundPlayer` to `src/features/music/components/SoundPlayer.tsx`.
 - Added legacy compatibility re-export at `src/components/SoundPlayer.tsx`.
 - Updated imports to prefer `@shared/data/content` and feature/shared alias paths.
