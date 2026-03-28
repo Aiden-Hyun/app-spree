@@ -24,6 +24,7 @@ logger = get_logger(__name__)
 class WorkerCapabilityPlan:
     accept_non_tts_steps: bool
     supported_tts_models: frozenset[str] | None
+    extra_capability_keys: frozenset[str]
     capability_keys: tuple[str, ...]
     wildcard_tts: bool
     has_tts_support: bool
@@ -49,19 +50,27 @@ def build_worker_capability_plan(
     *,
     accept_non_tts_steps: bool,
     supported_tts_models: set[str] | None,
+    extra_capability_keys: set[str] | None = None,
 ) -> WorkerCapabilityPlan:
     normalized_models = (
         frozenset(str(model).strip().lower() for model in supported_tts_models if str(model).strip())
         if supported_tts_models is not None
         else None
     )
+    normalized_extra_capabilities = frozenset(
+        str(value).strip().lower()
+        for value in (extra_capability_keys or set())
+        if str(value).strip()
+    )
     return WorkerCapabilityPlan(
         accept_non_tts_steps=bool(accept_non_tts_steps),
         supported_tts_models=normalized_models,
+        extra_capability_keys=normalized_extra_capabilities,
         capability_keys=tuple(
             worker_capability_keys(
                 accept_non_tts_steps=bool(accept_non_tts_steps),
                 supported_tts_models=set(normalized_models) if normalized_models is not None else None,
+                extra_capability_keys=set(normalized_extra_capabilities),
             )
         ),
         wildcard_tts=normalized_models is None,
@@ -79,6 +88,7 @@ def supports_worker_payload(
         capability_key_for_payload(payload),
         accept_non_tts_steps=plan.accept_non_tts_steps,
         supported_tts_models=set(plan.supported_tts_models) if plan.supported_tts_models is not None else None,
+        extra_capability_keys=set(plan.extra_capability_keys),
     )
 
 
@@ -277,12 +287,14 @@ class QueueScheduler:
         lease_seconds: int = 300,
         accept_non_tts_steps: bool = True,
         supported_tts_models: set[str] | None = None,
+        extra_capability_keys: set[str] | None = None,
         candidate_limit: int = 200,
         tts_per_job_soft_limit: int = 2,
     ) -> tuple[str, dict] | None:
         plan = build_worker_capability_plan(
             accept_non_tts_steps=accept_non_tts_steps,
             supported_tts_models=supported_tts_models,
+            extra_capability_keys=extra_capability_keys,
         )
         now = datetime.now(timezone.utc)
         filtered_candidates, ready_docs_seen = self._fetch_candidates(

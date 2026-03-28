@@ -53,6 +53,7 @@ class CompanionControlLoopTests(unittest.TestCase):
 
         self.assertEqual(workload["tts_outstanding"], {"qwen3-base": 1})
         self.assertEqual(workload["wildcard_tts_outstanding"], 0)
+        self.assertEqual(workload["image_outstanding"], 0)
         self.assertEqual(workload["active_owners"], set())
 
     def test_collect_auto_workload_keeps_recent_running_queue_during_startup_grace(self) -> None:
@@ -81,6 +82,7 @@ class CompanionControlLoopTests(unittest.TestCase):
         )
 
         self.assertEqual(workload["tts_outstanding"], {"dms": 1})
+        self.assertEqual(workload["image_outstanding"], 0)
         self.assertEqual(workload["active_owners"], {"local-tts-dms-3"})
 
     def test_desired_auto_stack_ids_do_not_keep_dms_worker_for_stale_queue(self) -> None:
@@ -90,6 +92,7 @@ class CompanionControlLoopTests(unittest.TestCase):
             "pending_jobs": False,
             "delete_jobs": False,
             "non_tts_outstanding": 0,
+            "image_outstanding": 0,
             "tts_outstanding": {"qwen3-base": 1},
             "wildcard_tts_outstanding": 0,
             "active_owners": set(),
@@ -126,6 +129,7 @@ class CompanionControlLoopTests(unittest.TestCase):
             "pending_jobs": False,
             "delete_jobs": False,
             "non_tts_outstanding": 0,
+            "image_outstanding": 0,
             "tts_outstanding": {"qwen3-base": 6},
             "wildcard_tts_outstanding": 0,
             "active_owners": set(),
@@ -155,6 +159,7 @@ class CompanionControlLoopTests(unittest.TestCase):
             "pending_jobs": False,
             "delete_jobs": False,
             "non_tts_outstanding": 0,
+            "image_outstanding": 0,
             "tts_outstanding": {"qwen3-base": 6},
             "wildcard_tts_outstanding": 0,
             "active_owners": {"local-tts-qwen-4", "local-tts-qwen-5"},
@@ -183,6 +188,7 @@ class CompanionControlLoopTests(unittest.TestCase):
             "pending_jobs": False,
             "delete_jobs": False,
             "non_tts_outstanding": 0,
+            "image_outstanding": 0,
             "tts_outstanding": {"qwen3-base": 6},
             "wildcard_tts_outstanding": 0,
             "active_owners": set(),
@@ -205,6 +211,26 @@ class CompanionControlLoopTests(unittest.TestCase):
         qwen_ids = sorted(stack_id for stack_id in desired_ids if "qwen" in stack_id)
         self.assertEqual(qwen_ids, ["local-tts-qwen"])
         self.assertEqual(resolved_workload["qwen_stack_cap"], 1)
+
+    def test_desired_auto_stack_ids_starts_dedicated_image_worker(self) -> None:
+        enabled_stacks = [stack for stack in load_stack_config() if stack.get("enabled", True)]
+        workload = {
+            "pending_jobs": False,
+            "delete_jobs": False,
+            "non_tts_outstanding": 0,
+            "image_outstanding": 1,
+            "tts_outstanding": {},
+            "wildcard_tts_outstanding": 0,
+            "active_owners": set(),
+            "has_any_work": True,
+        }
+
+        with patch("companion.control_loop._collect_auto_workload", return_value=workload):
+            desired_ids, resolved_workload = _desired_auto_stack_ids(object(), enabled_stacks, running={})
+
+        self.assertEqual(resolved_workload, workload)
+        self.assertIn("local-image", desired_ids)
+        self.assertNotIn("local-primary", desired_ids)
 
 
 if __name__ == "__main__":

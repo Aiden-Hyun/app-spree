@@ -24,6 +24,17 @@ _DEFAULT_STACKS = [
         "dispatch": True,
         "acceptNonTtsSteps": True,
         "ttsModels": list(_NON_DMS_TTS_MODELS),
+        "extraCapabilityKeys": [],
+    },
+    {
+        "id": "local-image",
+        "role": "image",
+        "venv": ".venv",
+        "enabled": True,
+        "dispatch": False,
+        "acceptNonTtsSteps": False,
+        "ttsModels": [],
+        "extraCapabilityKeys": ["image"],
     },
     {
         "id": "local-tts-dms-1",
@@ -33,6 +44,7 @@ _DEFAULT_STACKS = [
         "dispatch": False,
         "acceptNonTtsSteps": False,
         "ttsModels": ["dms"],
+        "extraCapabilityKeys": [],
     },
     {
         "id": "local-tts-dms-2",
@@ -42,6 +54,7 @@ _DEFAULT_STACKS = [
         "dispatch": False,
         "acceptNonTtsSteps": False,
         "ttsModels": ["dms"],
+        "extraCapabilityKeys": [],
     },
     {
         "id": "local-tts-dms-3",
@@ -51,6 +64,7 @@ _DEFAULT_STACKS = [
         "dispatch": False,
         "acceptNonTtsSteps": False,
         "ttsModels": ["dms"],
+        "extraCapabilityKeys": [],
     },
     {
         "id": "local-tts-qwen",
@@ -61,6 +75,7 @@ _DEFAULT_STACKS = [
         "dispatch": False,
         "acceptNonTtsSteps": False,
         "ttsModels": ["qwen3-base"],
+        "extraCapabilityKeys": [],
     },
 ]
 
@@ -95,6 +110,10 @@ def _normalize_tts_models(raw: Any) -> list[str]:
         if lowered not in normalized:
             normalized.append(lowered)
     return normalized
+
+
+def _normalize_capability_keys(raw: Any) -> list[str]:
+    return _normalize_tts_models(raw)
 
 
 def _as_int(value: Any, default: int) -> int:
@@ -140,6 +159,7 @@ def _normalize_stack(raw: dict, index: int) -> dict:
     accept_non_tts = _as_bool(accept_non_tts_raw, role not in {"tts"})
 
     tts_models = _normalize_tts_models(raw.get("ttsModels"))
+    extra_capability_keys = _normalize_capability_keys(raw.get("extraCapabilityKeys"))
     if not tts_models and accept_non_tts:
         # Backward-compatible wildcard for old single-stack setups.
         tts_models = ["*"]
@@ -153,6 +173,7 @@ def _normalize_stack(raw: dict, index: int) -> dict:
         "dispatch": dispatch,
         "acceptNonTtsSteps": accept_non_tts,
         "ttsModels": tts_models,
+        "extraCapabilityKeys": extra_capability_keys,
     }
 
 
@@ -255,6 +276,7 @@ def stack_capability_keys(stack: dict) -> list[str]:
     return worker_capability_keys(
         accept_non_tts_steps=bool(stack.get("acceptNonTtsSteps", True)),
         supported_tts_models=supported_tts_models,
+        extra_capability_keys=set(stack.get("extraCapabilityKeys") or []),
     )
 
 

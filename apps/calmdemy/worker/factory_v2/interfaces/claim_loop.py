@@ -42,6 +42,7 @@ class ClaimLoop:
         orchestrator,
         accept_non_tts_steps: bool,
         supported_tts_models: set[str] | None,
+        extra_capability_keys: set[str] | None,
         max_step_retries: int,
         claim_candidate_limit: int,
         tts_per_job_soft_limit: int,
@@ -65,6 +66,11 @@ class ClaimLoop:
             if supported_tts_models is not None
             else None
         )
+        self.extra_capability_keys = {
+            str(value).strip().lower()
+            for value in (extra_capability_keys or set())
+            if str(value).strip()
+        }
         self.max_step_retries = max(0, int(max_step_retries))
         self.claim_candidate_limit = max(20, int(claim_candidate_limit))
         self.tts_per_job_soft_limit = max(0, int(tts_per_job_soft_limit))
@@ -152,6 +158,7 @@ class ClaimLoop:
             worker_id=self.worker_id,
             accept_non_tts_steps=self.accept_non_tts_steps,
             supported_tts_models=self.supported_tts_models,
+            extra_capability_keys=self.extra_capability_keys,
             candidate_limit=self.claim_candidate_limit,
             tts_per_job_soft_limit=self.tts_per_job_soft_limit,
         )

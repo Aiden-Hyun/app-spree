@@ -6,6 +6,11 @@ TTS_STEP_NAMES = {
     "synthesize_course_audio_chunk",
 }
 
+IMAGE_STEP_NAMES = {
+    "generate_image",
+    "generate_course_thumbnail",
+}
+
 
 def normalize_tts_model(tts_model: str | None) -> str:
     return str(tts_model or "").strip().lower()
@@ -15,10 +20,17 @@ def is_tts_step(step_name: str | None) -> bool:
     return str(step_name or "").strip() in TTS_STEP_NAMES
 
 
+def is_image_step(step_name: str | None) -> bool:
+    return str(step_name or "").strip() in IMAGE_STEP_NAMES
+
+
 def capability_key_for_step(
     step_name: str | None,
     required_tts_model: str | None = None,
 ) -> str:
+    if is_image_step(step_name):
+        return "image"
+
     if not is_tts_step(step_name):
         return "default"
 
@@ -51,10 +63,14 @@ def worker_supports_capability(
     *,
     accept_non_tts_steps: bool,
     supported_tts_models: set[str] | None,
+    extra_capability_keys: set[str] | None = None,
 ) -> bool:
     normalized_key = str(capability_key or "").strip().lower()
     if not normalized_key or normalized_key == "default":
         return accept_non_tts_steps
+
+    if extra_capability_keys and normalized_key in extra_capability_keys:
+        return True
 
     if normalized_key == "tts:any":
         return worker_has_tts_support(supported_tts_models)
@@ -73,10 +89,22 @@ def worker_capability_keys(
     *,
     accept_non_tts_steps: bool,
     supported_tts_models: set[str] | None,
+    extra_capability_keys: set[str] | None = None,
 ) -> list[str]:
     keys: list[str] = []
     if accept_non_tts_steps:
         keys.append("default")
+
+    if extra_capability_keys:
+        for capability_key in sorted(
+            {
+                str(value).strip().lower()
+                for value in extra_capability_keys
+                if str(value).strip()
+            }
+        ):
+            if capability_key not in keys:
+                keys.append(capability_key)
 
     if supported_tts_models is None:
         keys.append("tts:any")

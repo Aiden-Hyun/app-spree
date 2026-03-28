@@ -515,6 +515,7 @@ def _collect_auto_workload_from_payloads(
     tts_outstanding: dict[str, int] = defaultdict(int)
     wildcard_tts_outstanding = 0
     non_tts_outstanding = 0
+    image_outstanding = 0
     active_owners: set[str] = set()
 
     for payload in queue_payloads:
@@ -531,6 +532,9 @@ def _collect_auto_workload_from_payloads(
             active_owners.add(lease_owner)
 
         capability_key = capability_key_for_payload(payload)
+        if capability_key == "image":
+            image_outstanding += 1
+            continue
         if not capability_key.startswith("tts:"):
             non_tts_outstanding += 1
             continue
@@ -549,11 +553,13 @@ def _collect_auto_workload_from_payloads(
         "pending_jobs": False,
         "delete_jobs": False,
         "non_tts_outstanding": non_tts_outstanding,
+        "image_outstanding": image_outstanding,
         "tts_outstanding": dict(tts_outstanding),
         "wildcard_tts_outstanding": wildcard_tts_outstanding,
         "active_owners": active_owners,
         "has_any_work": (
             non_tts_outstanding > 0
+            or image_outstanding > 0
             or wildcard_tts_outstanding > 0
             or any(tts_outstanding.values())
         ),
@@ -580,6 +586,7 @@ def _collect_auto_workload(db) -> dict:
         pending_jobs
         or delete_jobs
         or workload["non_tts_outstanding"] > 0
+        or workload["image_outstanding"] > 0
         or workload["wildcard_tts_outstanding"] > 0
         or any(workload["tts_outstanding"].values())
     )
@@ -717,6 +724,20 @@ def _desired_auto_stack_ids(
             _pick_stack_ids(
                 non_tts_candidates,
                 needed_count=min(1, len(non_tts_candidates)),
+                running_ids=running_ids,
+                active_owners=active_owners,
+                selected_ids=desired_ids,
+            )
+        )
+
+    if workload["image_outstanding"] > 0:
+        image_candidates = [
+            stack for stack in enabled_stacks if "image" in stack_capability_keys(stack)
+        ]
+        desired_ids.update(
+            _pick_stack_ids(
+                image_candidates,
+                needed_count=min(1, len(image_candidates)),
                 running_ids=running_ids,
                 active_owners=active_owners,
                 selected_ids=desired_ids,

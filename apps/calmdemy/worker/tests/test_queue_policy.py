@@ -21,8 +21,34 @@ from factory_v2.shared.queue_capabilities import capability_key_for_step
 class QueuePolicyTests(unittest.TestCase):
     def test_capability_key_mapping(self) -> None:
         self.assertEqual(capability_key_for_step("generate_course_plan"), "default")
+        self.assertEqual(capability_key_for_step("generate_course_thumbnail"), "image")
         self.assertEqual(capability_key_for_step("synthesize_course_audio_chunk", "qwen3-base"), "tts:qwen3-base")
         self.assertEqual(capability_key_for_step("synthesize_course_audio"), "tts:any")
+
+    def test_image_only_worker_supports_image_steps_but_not_default_steps(self) -> None:
+        plan = build_worker_capability_plan(
+            accept_non_tts_steps=False,
+            supported_tts_models=set(),
+            extra_capability_keys={"image"},
+        )
+        self.assertTrue(
+            supports_worker_payload(
+                {
+                    "step_name": "generate_course_thumbnail",
+                    "capability_key": "image",
+                },
+                plan,
+            )
+        )
+        self.assertFalse(
+            supports_worker_payload(
+                {
+                    "step_name": "generate_course_plan",
+                    "capability_key": "default",
+                },
+                plan,
+            )
+        )
 
     def test_legacy_payload_without_capability_key_is_supported_by_matching_worker(self) -> None:
         plan = build_worker_capability_plan(

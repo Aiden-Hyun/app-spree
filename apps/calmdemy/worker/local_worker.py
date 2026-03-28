@@ -67,16 +67,23 @@ def main() -> None:
         enable_dispatch = worker_dispatch_raw.lower() == "true"
     accept_non_tts_steps = os.getenv("WORKER_ACCEPT_NON_TTS", "true").lower() == "true"
     tts_models_raw = os.getenv("WORKER_TTS_MODELS", "").strip()
+    extra_capability_keys_raw = os.getenv("WORKER_EXTRA_CAPABILITY_KEYS", "").strip()
     supported_tts_models: set[str] | None = None
     if tts_models_raw:
         parsed = {item.strip().lower() for item in tts_models_raw.split(",") if item.strip()}
         supported_tts_models = None if "*" in parsed else parsed
+    extra_capability_keys = {
+        item.strip().lower()
+        for item in extra_capability_keys_raw.split(",")
+        if item.strip()
+    }
     max_step_retries = int(os.getenv("V2_MAX_STEP_RETRIES", "2"))
     claim_candidate_limit = int(os.getenv("V2_QUEUE_CLAIM_CANDIDATE_LIMIT", "200"))
     tts_per_job_soft_limit = int(os.getenv("V2_TTS_PER_JOB_SOFT_LIMIT", "2"))
     capability_keys = worker_capability_keys(
         accept_non_tts_steps=accept_non_tts_steps,
         supported_tts_models=supported_tts_models,
+        extra_capability_keys=extra_capability_keys,
     )
 
     db = init_firebase()
@@ -88,6 +95,7 @@ def main() -> None:
             "enable_dispatch": enable_dispatch,
             "accept_non_tts_steps": accept_non_tts_steps,
             "supported_tts_models": sorted(supported_tts_models) if supported_tts_models else ["*"],
+            "extra_capability_keys": sorted(extra_capability_keys),
             "capability_keys": capability_keys,
             "max_step_retries": max_step_retries,
             "claim_candidate_limit": claim_candidate_limit,
@@ -105,6 +113,7 @@ def main() -> None:
         can_dispatch=enable_dispatch,
         accept_non_tts_steps=accept_non_tts_steps,
         supported_tts_models=supported_tts_models,
+        extra_capability_keys=extra_capability_keys,
         max_step_retries=max_step_retries,
         claim_candidate_limit=claim_candidate_limit,
         tts_per_job_soft_limit=tts_per_job_soft_limit,

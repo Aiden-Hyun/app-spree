@@ -116,7 +116,11 @@ def start_worker(stack: dict) -> int:
         "true" if stack.get("acceptNonTtsSteps", True) else "false"
     )
     tts_models = stack.get("ttsModels") or []
+    extra_capability_keys = stack.get("extraCapabilityKeys") or []
     env["WORKER_TTS_MODELS"] = ",".join(str(model) for model in tts_models)
+    env["WORKER_EXTRA_CAPABILITY_KEYS"] = ",".join(
+        str(capability_key) for capability_key in extra_capability_keys
+    )
     env["V2_ENABLE_DISPATCH"] = env["WORKER_DISPATCH"]
     env.setdefault("PYTHONUNBUFFERED", "1")
 

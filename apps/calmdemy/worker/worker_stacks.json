@@ -6,7 +6,18 @@
     "enabled": true,
     "dispatch": true,
     "acceptNonTtsSteps": true,
-    "ttsModels": ["gemini-tts-flash", "gemini-tts-pro"]
+    "ttsModels": ["gemini-tts-flash", "gemini-tts-pro"],
+    "extraCapabilityKeys": []
+  },
+  {
+    "id": "local-image",
+    "role": "image",
+    "venv": ".venv",
+    "enabled": true,
+    "dispatch": false,
+    "acceptNonTtsSteps": false,
+    "ttsModels": [],
+    "extraCapabilityKeys": ["image"]
   },
   {
     "id": "local-tts-dms-1",
@@ -15,7 +26,8 @@
     "enabled": true,
     "dispatch": false,
     "acceptNonTtsSteps": false,
-    "ttsModels": ["dms"]
+    "ttsModels": ["dms"],
+    "extraCapabilityKeys": []
   },
   {
     "id": "local-tts-dms-2",
@@ -24,7 +36,8 @@
     "enabled": true,
     "dispatch": false,
     "acceptNonTtsSteps": false,
-    "ttsModels": ["dms"]
+    "ttsModels": ["dms"],
+    "extraCapabilityKeys": []
   },
   {
     "id": "local-tts-dms-3",
@@ -33,7 +46,8 @@
     "enabled": true,
     "dispatch": false,
     "acceptNonTtsSteps": false,
-    "ttsModels": ["dms"]
+    "ttsModels": ["dms"],
+    "extraCapabilityKeys": []
   },
   {
     "id": "local-tts-qwen",
@@ -43,6 +57,7 @@
     "enabled": true,
     "dispatch": false,
     "acceptNonTtsSteps": false,
-    "ttsModels": ["qwen3-base"]
+    "ttsModels": ["qwen3-base"],
+    "extraCapabilityKeys": []
   }
 ]
