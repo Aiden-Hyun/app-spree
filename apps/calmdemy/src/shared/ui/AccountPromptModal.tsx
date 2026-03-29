@@ -14,7 +14,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@core/providers/contexts/ThemeContext";
 import { useAuth, CredentialCollisionError } from "@core/providers/contexts/AuthContext";
-import { logAuthDebug } from "@core/providers/contexts/auth/helpers";
 import { Theme } from "@/theme";
 import { CredentialCollisionModal } from "./CredentialCollisionModal";
 import { AccountSwitchWarning } from "./AccountSwitchWarning";
@@ -45,37 +44,25 @@ export function AccountPromptModal({
   const [showSwitchWarning, setShowSwitchWarning] = useState(false);
 
   const handleGoogleLink = async () => {
-    logAuthDebug({
-      location: "AccountPromptModal.tsx:handleGoogleLink:entry",
-      message: "handleGoogleLink called",
-      hypothesisId: "A",
-    });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AccountPromptModal.tsx:handleGoogleLink:entry',message:'handleGoogleLink called',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     setIsLoading(true);
     setLoadingProvider("google");
     try {
       await upgradeAnonymousWithGoogle();
-      logAuthDebug({
-        location: "AccountPromptModal.tsx:handleGoogleLink:success",
-        message: "upgradeAnonymousWithGoogle succeeded - THIS SHOULD NOT HAPPEN for collision",
-        hypothesisId: "C",
-      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AccountPromptModal.tsx:handleGoogleLink:success',message:'upgradeAnonymousWithGoogle succeeded - THIS SHOULD NOT HAPPEN for collision',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       Alert.alert(
         "Account Secured!",
         "Your subscription is now linked to your Google account."
       );
       onClose();
     } catch (error: any) {
-      logAuthDebug({
-        location: "AccountPromptModal.tsx:handleGoogleLink:catch",
-        message: "Caught error",
-        data: {
-          errorType: error?.constructor?.name,
-          isCollisionError: error instanceof CredentialCollisionError,
-          errorMessage: error?.message,
-          errorCode: error?.code,
-        },
-        hypothesisId: "B,D",
-      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AccountPromptModal.tsx:handleGoogleLink:catch',message:'Caught error',data:{errorType:error?.constructor?.name,isCollisionError:error instanceof CredentialCollisionError,errorMessage:error?.message,errorCode:error?.code},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})}).catch(()=>{});
+      // #endregion
       if (error instanceof CredentialCollisionError) {
         setCollisionError(error);
       } else if (error.message !== "User cancelled") {

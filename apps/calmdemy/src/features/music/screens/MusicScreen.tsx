@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { AnimatedView } from "@shared/ui/AnimatedView";
@@ -61,29 +61,29 @@ export function MusicScreen() {
         </View>
       </AnimatedView>
 
-      <FlatList
+      <ScrollView
         horizontal
-        data={sounds}
-        keyExtractor={(sound) => sound.id}
-        renderItem={({ item: sound }) => (
-          <ContentCard
-            title={sound.title}
-            thumbnailUrl={sound.thumbnailUrl}
-            fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
-            fallbackColor={sound.color}
-            meta={sound.duration_minutes ? `${sound.duration_minutes} min` : undefined}
-            isFree={sound.isFree}
-            onPress={() => handleSoundPress(sound)}
-            animatePress={false}
-          />
-        )}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.cardsScroll}
-        ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={5}
-      />
+      >
+        {sounds.map((sound, index) => (
+          <AnimatedView
+            key={sound.id}
+            delay={baseDelay + 50 + index * 40}
+            duration={400}
+          >
+            <ContentCard
+              title={sound.title}
+              thumbnailUrl={sound.thumbnailUrl}
+              fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
+              fallbackColor={sound.color}
+              meta={sound.duration_minutes ? `${sound.duration_minutes} min` : undefined}
+              isFree={sound.isFree}
+              onPress={() => handleSoundPress(sound)}
+            />
+          </AnimatedView>
+        ))}
+      </ScrollView>
     </View>
   );
 
@@ -114,28 +114,28 @@ export function MusicScreen() {
         </View>
       </AnimatedView>
 
-      <FlatList
+      <ScrollView
         horizontal
-        data={sounds}
-        keyExtractor={(sound) => sound.id}
-        renderItem={({ item: sound }) => (
-          <ContentCard
-            title={sound.title}
-            thumbnailUrl={sound.thumbnailUrl}
-            fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
-            fallbackColor={sound.color}
-            isFree={sound.isFree}
-            onPress={() => handleSoundPress(sound)}
-            animatePress={false}
-          />
-        )}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.cardsScroll}
-        ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={5}
-      />
+      >
+        {sounds.map((sound, index) => (
+          <AnimatedView
+            key={sound.id}
+            delay={baseDelay + 50 + index * 40}
+            duration={400}
+          >
+            <ContentCard
+              title={sound.title}
+              thumbnailUrl={sound.thumbnailUrl}
+              fallbackIcon={`${sound.icon}-outline` as keyof typeof Ionicons.glyphMap}
+              fallbackColor={sound.color}
+              isFree={sound.isFree}
+              onPress={() => handleSoundPress(sound)}
+            />
+          </AnimatedView>
+        ))}
+      </ScrollView>
     </View>
   );
 
@@ -172,29 +172,29 @@ export function MusicScreen() {
                 </View>
               </AnimatedView>
 
-              <FlatList
+              <ScrollView
                 horizontal
-                data={albums}
-                keyExtractor={(album) => album.id}
-                renderItem={({ item: album }) => (
-                  <ContentCard
-                    title={album.title}
-                    thumbnailUrl={album.thumbnailUrl}
-                    fallbackIcon={getCategoryIcon(album.category)}
-                    fallbackColor={album.color}
-                    meta={`${album.trackCount} tracks`}
-                    isFree={true}
-                    onPress={() => handleAlbumPress(album)}
-                    animatePress={false}
-                  />
-                )}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cardsScroll}
-                ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
-                initialNumToRender={4}
-                maxToRenderPerBatch={4}
-                windowSize={5}
-              />
+            contentContainerStyle={styles.cardsScroll}
+              >
+                {albums.map((album, index) => (
+                  <AnimatedView
+                    key={album.id}
+                    delay={150 + index * 40}
+                    duration={400}
+                  >
+                <ContentCard
+                  title={album.title}
+                  thumbnailUrl={album.thumbnailUrl}
+                  fallbackIcon={getCategoryIcon(album.category)}
+                  fallbackColor={album.color}
+                  meta={`${album.trackCount} tracks`}
+                  isFree={true}
+                      onPress={() => handleAlbumPress(album)}
+                />
+                  </AnimatedView>
+                ))}
+              </ScrollView>
             </View>
 
             {/* White Noise Section */}
@@ -308,9 +308,7 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     cardsScroll: {
       paddingHorizontal: theme.spacing.lg,
-    },
-    cardSeparator: {
-      width: theme.spacing.md,
+      gap: theme.spacing.md,
     },
     loadingContainer: {
       flex: 1,

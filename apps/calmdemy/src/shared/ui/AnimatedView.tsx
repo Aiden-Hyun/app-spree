@@ -1,16 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, View, ViewStyle, StyleProp } from 'react-native';
+import { Animated, ViewStyle } from 'react-native';
 
 interface AnimatedViewProps {
   children: React.ReactNode;
   delay?: number;
   duration?: number;
   slideDistance?: number;
-  style?: StyleProp<ViewStyle>;
-  enabled?: boolean;
+  style?: ViewStyle;
 }
 
-function AnimatedViewContent({
+export function AnimatedView({
   children,
   delay = 0,
   duration = 400,
@@ -56,17 +55,6 @@ function AnimatedViewContent({
       {children}
     </Animated.View>
   );
-}
-
-export function AnimatedView({
-  enabled = true,
-  ...props
-}: AnimatedViewProps) {
-  if (!enabled) {
-    return <View style={props.style}>{props.children}</View>;
-  }
-
-  return <AnimatedViewContent {...props} />;
 }
 
 // Staggered list animation helper
@@ -131,3 +119,4 @@ export function FadeView({
     </Animated.View>
   );
 }
+

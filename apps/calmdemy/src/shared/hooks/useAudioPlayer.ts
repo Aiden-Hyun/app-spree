@@ -19,12 +19,6 @@ export interface AudioPlayerState {
   playbackRate: number;
 }
 
-interface UseAudioPlayerOptions {
-  statusUpdateIntervalMs?: number;
-}
-
-const DEFAULT_STATUS_UPDATE_INTERVAL_MS = 500;
-
 /**
  * Resolve a source (URL string or require() result) to an AudioSource
  */
@@ -46,15 +40,11 @@ function resolveAudioSource(
 /**
  * Custom hook that wraps expo-audio's useAudioPlayer with additional utilities
  */
-export function useAudioPlayer(
-  initialSource?: string | number | null,
-  options: UseAudioPlayerOptions = {}
-) {
+export function useAudioPlayer(initialSource?: string | number | null) {
   const [error, setError] = useState<string | null>(null);
   const [isLooping, setIsLooping] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(1.0);
   const hasLoadedRef = useRef(false);
-  const { statusUpdateIntervalMs = DEFAULT_STATUS_UPDATE_INTERVAL_MS } = options;
 
   // Configure audio mode on mount
   useEffect(() => {
@@ -85,7 +75,7 @@ export function useAudioPlayer(
 
   // Use expo-audio's hook with initial source
   const player = useExpoAudioPlayer(initialResolvedSource, {
-    updateInterval: statusUpdateIntervalMs,
+    updateInterval: 250,
   });
 
   // Get status from player

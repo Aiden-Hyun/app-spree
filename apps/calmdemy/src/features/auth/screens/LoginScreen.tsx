@@ -20,7 +20,6 @@ import { AnimatedPressable } from "@shared/ui/AnimatedPressable";
 import { AnimatedView } from "@shared/ui/AnimatedView";
 import { CredentialCollisionModal } from "@shared/ui/CredentialCollisionModal";
 import { AccountSwitchConfirmModal } from "@shared/ui/AccountSwitchConfirmModal";
-import { logAuthDebug } from "@core/providers/contexts/auth/helpers";
 import { router, useLocalSearchParams } from "expo-router";
 import { Theme } from "@/theme";
 
@@ -135,46 +134,31 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignIn = async () => {
-    logAuthDebug({
-      location: "login.tsx:handleGoogleSignIn:entry",
-      message: "Google sign-in button pressed",
-      data: { isAnonymous, isLinkMode, hasUser: !!user },
-      hypothesisId: "FIX",
-    });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:entry',message:'Google sign-in button pressed',data:{isAnonymous,isLinkMode,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+    // #endregion
     try {
       setGoogleLoading(true);
       
       // Only use upgrade (link) when user explicitly tapped "Link Account" (mode=link)
       // Otherwise, use regular sign-in which replaces the anonymous user
       if (isLinkMode && isAnonymous) {
-        logAuthDebug({
-          location: "login.tsx:handleGoogleSignIn:upgrading",
-          message: "Link mode - using upgradeAnonymousWithGoogle",
-          data: { userId: user?.uid },
-          hypothesisId: "FIX",
-        });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:upgrading',message:'Link mode - using upgradeAnonymousWithGoogle',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
         await upgradeAnonymousWithGoogle();
         router.replace('/home');
       } else {
-        logAuthDebug({
-          location: "login.tsx:handleGoogleSignIn:signIn",
-          message: "Sign-in mode - using signInWithGoogle",
-          hypothesisId: "FIX",
-        });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:signIn',message:'Sign-in mode - using signInWithGoogle',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
         await signInWithGoogle();
         router.replace('/home');
       }
     } catch (error: any) {
-      logAuthDebug({
-        location: "login.tsx:handleGoogleSignIn:catch",
-        message: "Caught error",
-        data: {
-          errorType: error?.constructor?.name,
-          isCollisionError: error instanceof CredentialCollisionError,
-          errorMessage: error?.message,
-        },
-        hypothesisId: "FIX",
-      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:catch',message:'Caught error',data:{errorType:error?.constructor?.name,isCollisionError:error instanceof CredentialCollisionError,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+      // #endregion
       if (error instanceof CredentialCollisionError) {
         setCollisionError(error);
       } else if (error.message && error.message !== "User cancelled") {
@@ -187,46 +171,31 @@ export default function LoginScreen() {
   };
 
   const handleAppleSignIn = async () => {
-    logAuthDebug({
-      location: "login.tsx:handleAppleSignIn:entry",
-      message: "Apple sign-in button pressed",
-      data: { isAnonymous, isLinkMode, hasUser: !!user },
-      hypothesisId: "FIX",
-    });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:entry',message:'Apple sign-in button pressed',data:{isAnonymous,isLinkMode,hasUser:!!user},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+    // #endregion
     try {
       setAppleLoading(true);
       
       // Only use upgrade (link) when user explicitly tapped "Link Account" (mode=link)
       // Otherwise, use regular sign-in which replaces the anonymous user
       if (isLinkMode && isAnonymous) {
-        logAuthDebug({
-          location: "login.tsx:handleAppleSignIn:upgrading",
-          message: "Link mode - using upgradeAnonymousWithApple",
-          data: { userId: user?.uid },
-          hypothesisId: "FIX",
-        });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:upgrading',message:'Link mode - using upgradeAnonymousWithApple',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
         await upgradeAnonymousWithApple();
         router.replace('/home');
       } else {
-        logAuthDebug({
-          location: "login.tsx:handleAppleSignIn:signIn",
-          message: "Sign-in mode - using signInWithApple",
-          hypothesisId: "FIX",
-        });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:signIn',message:'Sign-in mode - using signInWithApple',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+        // #endregion
         await signInWithApple();
         router.replace('/home');
       }
     } catch (error: any) {
-      logAuthDebug({
-        location: "login.tsx:handleAppleSignIn:catch",
-        message: "Caught error",
-        data: {
-          errorType: error?.constructor?.name,
-          isCollisionError: error instanceof CredentialCollisionError,
-          errorMessage: error?.message,
-        },
-        hypothesisId: "FIX",
-      });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:catch',message:'Caught error',data:{errorType:error?.constructor?.name,isCollisionError:error instanceof CredentialCollisionError,errorMessage:error?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
+      // #endregion
       if (error instanceof CredentialCollisionError) {
         setCollisionError(error);
       } else if (error.message && error.message !== "User cancelled") {
