@@ -22,6 +22,6 @@ export const env = {
   },
   revenuecat: {
     apiKey: getEnv('EXPO_PUBLIC_REVENUECAT_API_KEY'),
-    entitlementId: getEnv('EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID', 'Calmdemy Premium'),
+    entitlementId: getEnv('EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID', 'premium'),
   },
 };

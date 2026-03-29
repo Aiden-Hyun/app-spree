@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 
-export const PREMIUM_ENTITLEMENT_ID = 'Calmdemy Premium';
+export const PREMIUM_ENTITLEMENT_ID = 'premium';
 
 export interface PurchasesPackage {
   identifier: string;

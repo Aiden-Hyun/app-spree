@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { AnimatedPressable } from "./AnimatedPressable";
 import { useTheme } from "@core/providers/contexts/ThemeContext";
@@ -29,9 +30,10 @@ export interface ContentCardProps {
   darkMode?: boolean;
   // Content access from schema: true means free, false means subscription required.
   isFree?: boolean;
+  animatePress?: boolean;
 }
 
-export function ContentCard({
+function ContentCardComponent({
   title,
   thumbnailUrl,
   fallbackIcon = "musical-notes",
@@ -42,6 +44,7 @@ export function ContentCard({
   onPress,
   darkMode = false,
   isFree = true,
+  animatePress = true,
 }: ContentCardProps) {
   const { theme, isDark } = useTheme();
   const { isPremium: hasSubscription } = useSubscription();
@@ -77,11 +80,18 @@ export function ContentCard({
   return (
     <AnimatedPressable
       onPress={onPress}
+      animated={animatePress}
       style={[styles.card, { backgroundColor: cardBgColor }]}
     >
       <View style={styles.thumbnailContainer}>
         {thumbnailUrl ? (
-          <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} />
+          <Image
+            source={thumbnailUrl}
+            style={styles.thumbnail}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={120}
+          />
         ) : (
           <View
             style={[
@@ -118,6 +128,8 @@ export function ContentCard({
     </AnimatedPressable>
   );
 }
+
+export const ContentCard = React.memo(ContentCardComponent);
 
 // 50% larger than previous (140 → 210)
 const CARD_WIDTH = 190;

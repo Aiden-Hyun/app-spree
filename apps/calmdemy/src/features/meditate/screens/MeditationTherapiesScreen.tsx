@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
 } from "react-native";
@@ -26,6 +26,8 @@ const ALL_CATEGORY = {
   color: "#6B7280",
 };
 
+type TherapyCategory = typeof ALL_CATEGORY | Subject;
+
 export default function TherapiesScreen() {
   const router = useRouter();
   const { therapy: initialTherapy } = useLocalSearchParams<{
@@ -42,7 +44,10 @@ export default function TherapiesScreen() {
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   // Combine "All" with Firestore subjects for the filter pills
-  const therapyCategories = useMemo(() => [ALL_CATEGORY, ...subjects], [subjects]);
+  const therapyCategories = useMemo<TherapyCategory[]>(
+    () => [ALL_CATEGORY, ...subjects],
+    [subjects]
+  );
 
   useEffect(() => {
     async function loadData() {
@@ -75,6 +80,50 @@ export default function TherapiesScreen() {
       String(selectedTherapy || "").trim().toLowerCase(),
   );
 
+  const therapyHeader = (
+    <>
+      {selectedTherapyData && selectedTherapy !== "all" && (
+        <AnimatedView delay={0} duration={300}>
+          <View
+            style={[
+              styles.therapyInfoCard,
+              { backgroundColor: `${selectedTherapyData.color}15` },
+            ]}
+          >
+            <View
+              style={[
+                styles.therapyInfoIcon,
+                { backgroundColor: `${selectedTherapyData.color}25` },
+              ]}
+            >
+              <Ionicons
+                name={selectedTherapyData.icon as keyof typeof Ionicons.glyphMap}
+                size={28}
+                color={selectedTherapyData.color}
+              />
+            </View>
+            <View style={styles.therapyInfoContent}>
+              <Text style={styles.therapyInfoTitle}>
+                {selectedTherapyData.fullName}
+              </Text>
+              <Text style={styles.therapyInfoDescription}>
+                {(selectedTherapyData as Subject)?.description || ""}
+              </Text>
+            </View>
+          </View>
+        </AnimatedView>
+      )}
+
+      <AnimatedView delay={100} duration={400}>
+        <Text style={styles.sectionTitle}>
+          {selectedTherapy === "all"
+            ? "All Courses"
+            : `${selectedTherapyData?.label} Courses`}
+        </Text>
+      </AnimatedView>
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       {/* Header */}
@@ -95,14 +144,12 @@ export default function TherapiesScreen() {
 
       {/* Therapy Filter Pills */}
       <View style={styles.filterContainer}>
-        <ScrollView
+        <FlatList
           horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-        >
-          {therapyCategories.map((therapy) => (
+          data={therapyCategories}
+          keyExtractor={(therapy) => therapy.id}
+          renderItem={({ item: therapy }) => (
             <TouchableOpacity
-              key={therapy.id}
               style={[
                 styles.filterPill,
                 String(selectedTherapy || "").trim().toLowerCase() ===
@@ -110,7 +157,9 @@ export default function TherapiesScreen() {
                   backgroundColor: therapy.color,
                 },
               ]}
-              onPress={() => setSelectedTherapy(String(therapy.id || "").trim().toLowerCase())}
+              onPress={() =>
+                setSelectedTherapy(String(therapy.id || "").trim().toLowerCase())
+              }
             >
               <Ionicons
                 name={therapy.icon as keyof typeof Ionicons.glyphMap}
@@ -133,58 +182,17 @@ export default function TherapiesScreen() {
                 {therapy.label}
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+          ItemSeparatorComponent={() => <View style={styles.filterSeparator} />}
+          extraData={selectedTherapy}
+        />
       </View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Selected Therapy Info */}
-        {selectedTherapyData && selectedTherapy !== "all" && (
-          <AnimatedView delay={0} duration={300}>
-            <View
-              style={[
-                styles.therapyInfoCard,
-                { backgroundColor: `${selectedTherapyData.color}15` },
-              ]}
-            >
-              <View
-                style={[
-                  styles.therapyInfoIcon,
-                  { backgroundColor: `${selectedTherapyData.color}25` },
-                ]}
-              >
-                <Ionicons
-                  name={selectedTherapyData.icon as keyof typeof Ionicons.glyphMap}
-                  size={28}
-                  color={selectedTherapyData.color}
-                />
-              </View>
-              <View style={styles.therapyInfoContent}>
-                <Text style={styles.therapyInfoTitle}>
-                  {selectedTherapyData.fullName}
-                </Text>
-                <Text style={styles.therapyInfoDescription}>
-                  {(selectedTherapyData as Subject)?.description || ''}
-                </Text>
-              </View>
-            </View>
-          </AnimatedView>
-        )}
-
-        {/* Courses Section */}
-        <AnimatedView delay={100} duration={400}>
-          <Text style={styles.sectionTitle}>
-            {selectedTherapy === "all"
-              ? "All Courses"
-              : `${selectedTherapyData?.label} Courses`}
-          </Text>
-        </AnimatedView>
-
-        {loading ? (
+      {loading ? (
+        <View style={[styles.content, styles.contentContainer]}>
+          {therapyHeader}
           <View style={styles.skeletonContainer}>
             {[1, 2, 3].map((i) => (
               <View key={i} style={styles.skeletonCard}>
@@ -198,92 +206,98 @@ export default function TherapiesScreen() {
               </View>
             ))}
           </View>
-        ) : filteredCourses.length > 0 ? (
-          <View style={styles.coursesGrid}>
-            {filteredCourses.map((course, index) => (
-              <AnimatedView
-                key={course.id}
-                delay={150 + index * 50}
-                duration={400}
-              >
-                <AnimatedPressable
-                  onPress={() => router.push(`/course/${course.id}`)}
-                  style={styles.courseCard}
+        </View>
+      ) : (
+        <FlatList
+          style={styles.content}
+          data={filteredCourses}
+          keyExtractor={(course) => course.id}
+          renderItem={({ item: course }) => (
+            <AnimatedPressable
+              onPress={() => router.push(`/course/${course.id}`)}
+              style={styles.courseCard}
+              animated={false}
+            >
+              {course.thumbnailUrl ? (
+                <Image
+                  source={{ uri: course.thumbnailUrl }}
+                  style={styles.courseImage}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.courseImagePlaceholder,
+                    { backgroundColor: `${course.color}20` },
+                  ]}
                 >
-                  {course.thumbnailUrl ? (
-                    <Image
-                      source={{ uri: course.thumbnailUrl }}
-                      style={styles.courseImage}
-                    />
-                  ) : (
-                    <View
+                  <Ionicons name="school" size={24} color={course.color} />
+                </View>
+              )}
+              <View style={styles.courseInfo}>
+                {course.code && (
+                  <View
+                    style={[
+                      styles.courseCodeBadge,
+                      { backgroundColor: `${course.color}20` },
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.courseImagePlaceholder,
-                        { backgroundColor: `${course.color}20` },
+                        styles.courseCodeText,
+                        { color: course.color },
                       ]}
                     >
-                      <Ionicons name="school" size={24} color={course.color} />
-                    </View>
-                  )}
-                  <View style={styles.courseInfo}>
-                    {course.code && (
-                      <View
-                        style={[
-                          styles.courseCodeBadge,
-                          { backgroundColor: `${course.color}20` },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.courseCodeText,
-                            { color: course.color },
-                          ]}
-                        >
-                          {course.code}
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={styles.courseTitle}>{course.title}</Text>
-                    <View style={styles.courseMetaRow}>
-                      <View style={styles.courseMetaItem}>
-                        <Ionicons
-                          name="library-outline"
-                          size={12}
-                          color={theme.colors.textMuted}
-                        />
-                        <Text style={styles.courseMeta}>
-                          {course.sessionCount} sessions
-                        </Text>
-                      </View>
-                    </View>
+                      {course.code}
+                    </Text>
                   </View>
-                  <View style={styles.courseChevron}>
+                )}
+                <Text style={styles.courseTitle}>{course.title}</Text>
+                <View style={styles.courseMetaRow}>
+                  <View style={styles.courseMetaItem}>
                     <Ionicons
-                      name="chevron-forward"
-                      size={20}
+                      name="library-outline"
+                      size={12}
                       color={theme.colors.textMuted}
                     />
+                    <Text style={styles.courseMeta}>
+                      {course.sessionCount} sessions
+                    </Text>
                   </View>
-                </AnimatedPressable>
-              </AnimatedView>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="search-outline"
-              size={48}
-              color={theme.colors.textLight}
-            />
-            <Text style={styles.emptyTitle}>No courses yet</Text>
-            <Text style={styles.emptySubtitle}>
-              {selectedTherapy === "all"
-                ? "Courses will appear here once added."
-                : `No ${selectedTherapyData?.label} courses available yet.`}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+                </View>
+              </View>
+              <View style={styles.courseChevron}>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={theme.colors.textMuted}
+                />
+              </View>
+            </AnimatedPressable>
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.contentContainer}
+          ListHeaderComponent={therapyHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="search-outline"
+                size={48}
+                color={theme.colors.textLight}
+              />
+              <Text style={styles.emptyTitle}>No courses yet</Text>
+              <Text style={styles.emptySubtitle}>
+                {selectedTherapy === "all"
+                  ? "Courses will appear here once added."
+                  : `No ${selectedTherapyData?.label} courses available yet.`}
+              </Text>
+            </View>
+          }
+          ItemSeparatorComponent={() => <View style={styles.courseSeparator} />}
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -330,7 +344,9 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     filterScroll: {
       paddingHorizontal: theme.spacing.lg,
       paddingVertical: theme.spacing.md,
-      gap: theme.spacing.sm,
+    },
+    filterSeparator: {
+      width: theme.spacing.sm,
     },
     filterPill: {
       flexDirection: "row",
@@ -400,8 +416,8 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     skeletonCard: {
       marginBottom: theme.spacing.md,
     },
-    coursesGrid: {
-      gap: theme.spacing.sm,
+    courseSeparator: {
+      height: theme.spacing.sm,
     },
     courseCard: {
       flexDirection: "row",

@@ -1,8 +1,5 @@
 import { statusCodes } from "@react-native-google-signin/google-signin";
 
-const AUTH_DEBUG_URL =
-  "http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d";
-
 interface AuthDebugEvent {
   location: string;
   message: string;
@@ -18,18 +15,14 @@ export function logAuthDebug({
 }: AuthDebugEvent) {
   if (!__DEV__) return;
 
-  fetch(AUTH_DEBUG_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-      sessionId: "debug-session",
-      hypothesisId,
-    }),
-  }).catch(() => {});
+  console.debug("[auth-debug]", {
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+    sessionId: "debug-session",
+    hypothesisId,
+  });
 }
 
 export function isGoogleSignInCancelled(error: unknown): boolean {

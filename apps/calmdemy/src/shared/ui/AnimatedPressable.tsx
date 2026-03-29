@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Animated, Pressable, ViewStyle, StyleProp } from 'react-native';
+import { Animated, Pressable, View, ViewStyle, StyleProp } from 'react-native';
 
 interface AnimatedPressableProps {
   children: React.ReactNode;
@@ -9,16 +9,16 @@ interface AnimatedPressableProps {
   style?: StyleProp<ViewStyle>;
   scaleValue?: number;
   activeOpacity?: number;
+  animated?: boolean;
 }
 
-export function AnimatedPressable({
+function AnimatedPressableContent({
   children,
   onPress,
   onLongPress,
   disabled = false,
   style,
   scaleValue = 0.97,
-  activeOpacity = 0.9,
 }: AnimatedPressableProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -61,6 +61,37 @@ export function AnimatedPressable({
       </Animated.View>
     </Pressable>
   );
+}
+
+export function AnimatedPressable({
+  activeOpacity = 0.9,
+  animated = true,
+  ...props
+}: AnimatedPressableProps) {
+  if (!animated) {
+    return (
+      <Pressable
+        onPress={props.onPress}
+        onLongPress={props.onLongPress}
+        disabled={props.disabled}
+      >
+        {({ pressed }) => (
+          <View
+            style={[
+              props.style,
+              {
+                opacity: props.disabled ? 0.5 : pressed ? activeOpacity : 1,
+              },
+            ]}
+          >
+            {props.children}
+          </View>
+        )}
+      </Pressable>
+    );
+  }
+
+  return <AnimatedPressableContent activeOpacity={activeOpacity} animated={animated} {...props} />;
 }
 
 // Specialized button with bounce effect
@@ -113,4 +144,3 @@ export function BounceButton({
     </Pressable>
   );
 }
-
