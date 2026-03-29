@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import type {
+  NetInfoState,
+  NetInfoSubscription,
+} from '@react-native-community/netinfo';
 
 interface NetworkContextType {
   isConnected: boolean;
@@ -14,16 +18,20 @@ interface NetworkProviderProps {
 }
 
 // Dynamic import to handle cases where native module isn't available
-let Network: typeof import('expo-network') | null = null;
+let NetInfo: typeof import('@react-native-community/netinfo') | null = null;
 let networkModuleAvailable = false;
 
-// Try to load expo-network, but don't crash if it's not available
+// Try to load NetInfo, but don't crash if it's not available
 try {
-  Network = require('expo-network');
+  NetInfo = require('@react-native-community/netinfo');
   networkModuleAvailable = true;
 } catch (error) {
-  console.warn('expo-network native module not available. Network detection disabled.');
+  console.warn('NetInfo native module not available. Network detection disabled.');
   networkModuleAvailable = false;
+}
+
+function getConnectivity(state?: Pick<NetInfoState, 'isConnected'> | null): boolean {
+  return state?.isConnected ?? true;
 }
 
 export function NetworkProvider({ children }: NetworkProviderProps) {
@@ -33,15 +41,14 @@ export function NetworkProvider({ children }: NetworkProviderProps) {
 
   // Check network state
   const checkNetworkState = useCallback(async (): Promise<boolean> => {
-    if (!networkModuleAvailable || !Network) {
+    if (!networkModuleAvailable || !NetInfo) {
       // If module not available, assume connected
       return true;
     }
-    
+
     try {
-      const networkState = await Network.getNetworkStateAsync();
-      const connected = networkState.isConnected ?? true;
-      return connected;
+      const networkState = await NetInfo.fetch();
+      return getConnectivity(networkState);
     } catch (error) {
       // On error, assume connected to not block the user
       console.warn('Error checking network state:', error);
@@ -57,20 +64,34 @@ export function NetworkProvider({ children }: NetworkProviderProps) {
       return;
     }
 
-    // Get initial state
+    let isMounted = true;
+
+    const handleNetworkChange = (state: NetInfoState) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setIsConnected(getConnectivity(state));
+      setIsLoading(false);
+    };
+
+    const unsubscribe: NetInfoSubscription | undefined = NetInfo?.addEventListener(
+      handleNetworkChange
+    );
+
+    // Seed state immediately instead of waiting for the first subscription callback.
     checkNetworkState().then((connected) => {
+      if (!isMounted) {
+        return;
+      }
+
       setIsConnected(connected);
       setIsLoading(false);
     });
 
-    // Poll for network changes every 3 seconds
-    const interval = setInterval(async () => {
-      const connected = await checkNetworkState();
-      setIsConnected(connected);
-    }, 3000);
-
     return () => {
-      clearInterval(interval);
+      isMounted = false;
+      unsubscribe?.();
     };
   }, [checkNetworkState]);
 
