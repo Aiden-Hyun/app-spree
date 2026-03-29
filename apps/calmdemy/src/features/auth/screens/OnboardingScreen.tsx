@@ -1,18 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
+  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
-  ViewStyle,
+  useWindowDimensions,
   View,
+  ViewStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useTheme } from "@core/providers/contexts/ThemeContext";
 import { useAuth } from "@core/providers/contexts/AuthContext";
 import {
@@ -35,14 +42,6 @@ const COURSE_ITEMS = [
 ] as const;
 
 type OnboardingDestination = "/login" | "/(tabs)/home";
-type OnboardingStep = "free" | "courses" | "subscribe";
-
-const ONBOARDING_STEPS: readonly OnboardingStep[] = [
-  "free",
-  "courses",
-  "subscribe",
-];
-const ONBOARDING_LOG_PREFIX = "[Onboarding]";
 
 const pressableStyle = (
   baseStyle: StyleProp<ViewStyle>,
@@ -54,8 +53,8 @@ const pressableStyle = (
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ step?: string | string[] }>();
-  const pathname = usePathname();
+  const scrollRef = useRef<ScrollView>(null);
+  const { width } = useWindowDimensions();
   const { theme, isDark } = useTheme();
   const { user, loading: authLoading, signInAnonymously } = useAuth();
   const {
@@ -64,6 +63,7 @@ export default function OnboardingScreen() {
     isLoading: subscriptionLoading,
   } = useSubscription();
 
+  const [activeIndex, setActiveIndex] = useState(0);
   const [selectedPackage, setSelectedPackage] =
     useState<PurchasesPackage | null>(null);
   const [pendingPackage, setPendingPackage] =
@@ -73,43 +73,6 @@ export default function OnboardingScreen() {
     useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
-  const stepParam = Array.isArray(params.step) ? params.step[0] : params.step;
-  const currentStep: OnboardingStep = ONBOARDING_STEPS.includes(
-    stepParam as OnboardingStep
-  )
-    ? (stepParam as OnboardingStep)
-    : "free";
-  const step = ONBOARDING_STEPS.indexOf(currentStep);
-
-  useEffect(() => {
-    console.log(`${ONBOARDING_LOG_PREFIX} mount`);
-
-    return () => {
-      console.log(`${ONBOARDING_LOG_PREFIX} unmount`);
-    };
-  }, []);
-
-  useEffect(() => {
-    console.log(`${ONBOARDING_LOG_PREFIX} route snapshot`, {
-      pathname,
-      stepParam,
-      currentStep,
-      step,
-      authLoading,
-      userUid: user?.uid ?? null,
-      isAnonymous: user?.isAnonymous ?? null,
-      subscriptionLoading,
-    });
-  }, [
-    authLoading,
-    currentStep,
-    pathname,
-    step,
-    stepParam,
-    subscriptionLoading,
-    user?.isAnonymous,
-    user?.uid,
-  ]);
 
   const monthlyPackage =
     currentOffering?.monthly ||
@@ -154,31 +117,20 @@ export default function OnboardingScreen() {
     return savings > 0 ? savings : null;
   }, [annualPackage, monthlyPackage]);
 
-  const completeOnboarding = useCallback(async (target: OnboardingDestination) => {
-    console.log(`${ONBOARDING_LOG_PREFIX} completeOnboarding`, {
-      target,
-      currentStep,
-      userUid: user?.uid ?? null,
-      isAnonymous: user?.isAnonymous ?? null,
-    });
-    await markOnboardingSeen();
-    router.replace(target);
-  }, [currentStep, router, user?.isAnonymous, user?.uid]);
+  const completeOnboarding = useCallback(
+    async (target: OnboardingDestination) => {
+      await markOnboardingSeen();
+      router.replace(target);
+    },
+    [router]
+  );
 
   const executePurchase = useCallback(
     async (pkg: PurchasesPackage) => {
-      console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:start`, {
-        packageId: pkg.identifier,
-        currentStep,
-      });
       setIsPurchasing(true);
 
       try {
         const success = await purchasePackage(pkg);
-        console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:result`, {
-          packageId: pkg.identifier,
-          success,
-        });
         if (success) {
           await completeOnboarding("/(tabs)/home");
         }
@@ -190,14 +142,16 @@ export default function OnboardingScreen() {
   );
 
   useEffect(() => {
-    if (!pendingPackage || authLoading || !user || subscriptionLoading || isPurchasing) {
+    if (
+      !pendingPackage ||
+      authLoading ||
+      !user ||
+      subscriptionLoading ||
+      isPurchasing
+    ) {
       return;
     }
 
-    console.log(`${ONBOARDING_LOG_PREFIX} pending purchase resumed`, {
-      packageId: pendingPackage.identifier,
-      userUid: user.uid,
-    });
     const pkg = pendingPackage;
     setPendingPackage(null);
     void executePurchase(pkg);
@@ -210,59 +164,50 @@ export default function OnboardingScreen() {
     user,
   ]);
 
+  const goToPage = useCallback(
+    (index: number, animated = true) => {
+      const nextIndex = Math.max(0, Math.min(index, 2));
+      setActiveIndex(nextIndex);
+      scrollRef.current?.scrollTo({
+        x: nextIndex * width,
+        animated,
+      });
+    },
+    [width]
+  );
+
   const handleNext = useCallback(() => {
-    console.log(`${ONBOARDING_LOG_PREFIX} handleNext`, {
-      currentStep,
-      nextStep:
-        currentStep === "free"
-          ? "courses"
-          : currentStep === "courses"
-            ? "subscribe"
-            : null,
-    });
-
-    if (currentStep === "free") {
-      router.replace("/onboarding?step=courses");
-      return;
+    if (activeIndex < 2) {
+      goToPage(activeIndex + 1);
     }
+  }, [activeIndex, goToPage]);
 
-    if (currentStep === "courses") {
-      router.replace("/onboarding?step=subscribe");
-    }
-  }, [currentStep, router]);
+  const handlePagerEnd = useCallback(
+    (event: {
+      nativeEvent: { contentOffset: { x: number } };
+    }) => {
+      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+      setActiveIndex(Math.max(0, Math.min(nextIndex, 2)));
+    },
+    [width]
+  );
 
   const handleSignIn = useCallback(async () => {
-    console.log(`${ONBOARDING_LOG_PREFIX} handleSignIn`, {
-      currentStep,
-    });
     await completeOnboarding("/login");
   }, [completeOnboarding]);
 
   const handleSubscribe = useCallback(async () => {
-    console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe`, {
-      currentStep,
-      selectedPackageId: selectedPackage?.identifier ?? null,
-      isPurchasing,
-      hasUser: !!user,
-      isAnonymous: user?.isAnonymous ?? null,
-    });
-
     if (!selectedPackage || isPurchasing) {
       return;
     }
 
     if (!user) {
       try {
-        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:start`);
         setPendingPackage(selectedPackage);
         setIsPreparingGuestCheckout(true);
         await signInAnonymously();
-        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:success`);
       } catch (error: any) {
         setPendingPackage(null);
-        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:error`, {
-          message: error?.message ?? "unknown",
-        });
         Alert.alert(
           "Unable to start checkout",
           error?.message || "Please try again in a moment."
@@ -277,18 +222,9 @@ export default function OnboardingScreen() {
   }, [executePurchase, isPurchasing, selectedPackage, signInAnonymously, user]);
 
   const ctaBusy =
-    isPurchasing || isPreparingGuestCheckout || (subscriptionLoading && !currentOffering);
-
-  const renderDots = () => (
-    <View style={styles.dotsRow}>
-      {[0, 1, 2].map((index) => (
-        <View
-          key={index}
-          style={[styles.dot, index === step && styles.dotActive]}
-        />
-      ))}
-    </View>
-  );
+    isPurchasing ||
+    isPreparingGuestCheckout ||
+    (subscriptionLoading && !currentOffering);
 
   const renderFeatureList = (
     items: ReadonlyArray<{
@@ -318,10 +254,11 @@ export default function OnboardingScreen() {
 
     return (
       <Pressable
-        style={[
+        style={({ pressed }) => [
           styles.planCard,
           isSelected && styles.planCardSelected,
           !pkg && styles.planCardDisabled,
+          pressed && pkg && styles.buttonPressed,
         ]}
         onPress={() => pkg && setSelectedPackage(pkg)}
         disabled={!pkg}
@@ -354,168 +291,197 @@ export default function OnboardingScreen() {
     );
   };
 
-  const renderFreeContentStep = () => (
-    <>
-      <LinearGradient
-        colors={
-          isDark
-            ? [theme.colors.surface, theme.colors.background]
-            : [theme.colors.primaryLight, theme.colors.background]
-        }
-        style={styles.heroPanel}
-      >
-        <View style={styles.heroIconBubble}>
-          <Ionicons name="leaf" size={38} color="#fff" />
-        </View>
-        <Text style={styles.eyebrow}>Start free</Text>
-        <Text style={styles.title}>Free content to begin</Text>
-        <Text style={styles.body}>
-          Guided meditations, sleep stories, and white noise are available
-          without a subscription.
-        </Text>
-      </LinearGradient>
-
-      {renderFeatureList(FREE_CONTENT_ITEMS)}
-    </>
-  );
-
-  const renderCoursesStep = () => (
-    <>
-      <LinearGradient
-        colors={
-          isDark
-            ? [theme.colors.surfaceElevated, theme.colors.background]
-            : [theme.colors.secondaryLight, theme.colors.background]
-        }
-        style={styles.heroPanel}
-      >
-        <View style={[styles.heroIconBubble, { backgroundColor: theme.colors.secondary }]}>
-          <Ionicons name="school" size={38} color="#fff" />
-        </View>
-        <Text style={styles.eyebrow}>Go beyond meditation</Text>
-        <Text style={styles.title}>Psychology-based courses</Text>
-        <Text style={styles.body}>
-          Explore self-help courses inspired by CBT, ACT, and other practical
-          approaches to emotional wellbeing.
-        </Text>
-      </LinearGradient>
-
-      {renderFeatureList(COURSE_ITEMS)}
-    </>
-  );
-
-  const renderSubscribeStep = () => (
-    <>
-      <View style={styles.topBar}>
-        <View />
+  const renderHeaderAction = () => {
+    if (activeIndex === 2) {
+      return (
         <Pressable
           onPress={handleSignIn}
-          onPressIn={() =>
-            console.log(`${ONBOARDING_LOG_PREFIX} Sign In onPressIn`, {
-              currentStep,
-            })
-          }
           hitSlop={8}
-          style={pressableStyle(styles.signInButton, styles.buttonPressed)}
+          style={pressableStyle(styles.headerButton, styles.buttonPressed)}
         >
-          <Text style={styles.signInButtonText}>Sign In</Text>
+          <Text style={styles.headerButtonText}>Sign In</Text>
         </Pressable>
-      </View>
+      );
+    }
 
-      <LinearGradient
-        colors={
-          isDark
-            ? [theme.colors.primaryDark, theme.colors.background]
-            : [theme.colors.accentLight, theme.colors.background]
-        }
-        style={styles.heroPanel}
+    return (
+      <Pressable
+        onPress={handleNext}
+        hitSlop={8}
+        style={pressableStyle(styles.headerButton, styles.buttonPressed)}
       >
-        <View style={[styles.heroIconBubble, { backgroundColor: theme.colors.accent }]}>
-          <Ionicons name="sparkles" size={38} color="#fff" />
-        </View>
-        <Text style={styles.eyebrow}>Unlock full access</Text>
-        <Text style={styles.title}>Choose your subscription</Text>
-        <Text style={styles.body}>
-          Subscribe to access every course and the full premium library.
-        </Text>
-      </LinearGradient>
-
-      <View style={styles.planList}>
-        {renderPlanCard("Monthly", "Flexible access", monthlyPackage)}
-        {renderPlanCard(
-          "Yearly",
-          annualSavings ? `Best value · save ${annualSavings}%` : "Best value",
-          annualPackage,
-          annualSavings ? `Save ${annualSavings}%` : "Best value"
-        )}
-      </View>
-
-      {!monthlyPackage && !annualPackage ? (
-        <Text style={styles.subscriptionHint}>
-          Subscription plans are loading. If they do not appear, use Sign In and
-          try again from inside the app.
-        </Text>
-      ) : (
-        <Text style={styles.subscriptionHint}>
-          Full access includes all courses and the premium meditation, sleep,
-          and sound library.
-        </Text>
-      )}
-    </>
-  );
+        <Text style={styles.headerButtonText}>Next</Text>
+      </Pressable>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {step === 0 && renderFreeContentStep()}
-        {step === 1 && renderCoursesStep()}
-        {step === 2 && renderSubscribeStep()}
+    <View style={styles.safeArea}>
+      <View style={styles.header}>
+        <View style={styles.progressWrap}>
+          <Text style={styles.progressLabel}>{activeIndex + 1} / 3</Text>
+          <View style={styles.progressTrack}>
+            {[0, 1, 2].map((index) => (
+              <View
+                key={index}
+                style={[
+                  styles.progressSegment,
+                  index <= activeIndex && styles.progressSegmentActive,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+        {renderHeaderAction()}
+      </View>
 
-        <View style={styles.footer}>
-          {renderDots()}
-
-          {step < 2 ? (
-            <Pressable
-              onPress={handleNext}
-              onPressIn={() =>
-                console.log(`${ONBOARDING_LOG_PREFIX} Next onPressIn`, {
-                  currentStep,
-                })
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        onMomentumScrollEnd={handlePagerEnd}
+        scrollEventThrottle={16}
+      >
+        <View style={[styles.page, { width }]}>
+          <View style={styles.pageInner}>
+            <LinearGradient
+              colors={
+                isDark
+                  ? [theme.colors.surface, theme.colors.background]
+                  : [theme.colors.primaryLight, theme.colors.background]
               }
-              hitSlop={8}
-              style={pressableStyle(styles.primaryButton, styles.buttonPressed)}
+              style={styles.heroCard}
             >
-              <Text style={styles.primaryButtonText}>Next</Text>
-            </Pressable>
-          ) : (
+              <View style={styles.heroIconBubble}>
+                <Ionicons name="leaf" size={34} color="#fff" />
+              </View>
+              <Text style={styles.eyebrow}>Start free</Text>
+              <Text style={styles.title}>Free content to begin</Text>
+              <Text style={styles.body}>
+                Guided meditations, sleep stories, and white noise are available
+                without a subscription.
+              </Text>
+            </LinearGradient>
+
+            {renderFeatureList(FREE_CONTENT_ITEMS)}
+
+            <View style={styles.swipeHintRow}>
+              <Ionicons
+                name="swap-horizontal-outline"
+                size={16}
+                color={theme.colors.textLight}
+              />
+              <Text style={styles.swipeHintText}>Swipe to keep exploring</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.page, { width }]}>
+          <View style={styles.pageInner}>
+            <LinearGradient
+              colors={
+                isDark
+                  ? [theme.colors.surfaceElevated, theme.colors.background]
+                  : [theme.colors.secondaryLight, theme.colors.background]
+              }
+              style={styles.heroCard}
+            >
+              <View
+                style={[
+                  styles.heroIconBubble,
+                  { backgroundColor: theme.colors.secondary },
+                ]}
+              >
+                <Ionicons name="school" size={34} color="#fff" />
+              </View>
+              <Text style={styles.eyebrow}>Go beyond meditation</Text>
+              <Text style={styles.title}>Psychology-based courses</Text>
+              <Text style={styles.body}>
+                Explore self-help courses inspired by CBT, ACT, and other
+                practical approaches to emotional wellbeing.
+              </Text>
+            </LinearGradient>
+
+            {renderFeatureList(COURSE_ITEMS)}
+
+            <View style={styles.swipeHintRow}>
+              <Ionicons
+                name="swap-horizontal-outline"
+                size={16}
+                color={theme.colors.textLight}
+              />
+              <Text style={styles.swipeHintText}>Swipe for subscription</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.page, { width }]}>
+          <View style={styles.pageInner}>
+            <LinearGradient
+              colors={
+                isDark
+                  ? [theme.colors.primaryDark, theme.colors.background]
+                  : [theme.colors.accentLight, theme.colors.background]
+              }
+              style={styles.heroCardCompact}
+            >
+              <View
+                style={[
+                  styles.heroIconBubbleSmall,
+                  { backgroundColor: theme.colors.accent },
+                ]}
+              >
+                <Ionicons name="sparkles" size={28} color="#fff" />
+              </View>
+              <Text style={styles.eyebrow}>Unlock full access</Text>
+              <Text style={styles.titleCompact}>Choose your subscription</Text>
+              <Text style={styles.bodyCompact}>
+                Subscribe for all courses and the full premium library.
+              </Text>
+            </LinearGradient>
+
+            <View style={styles.planList}>
+              {renderPlanCard("Monthly", "Flexible access", monthlyPackage)}
+              {renderPlanCard(
+                "Yearly",
+                annualSavings
+                  ? `Best value · save ${annualSavings}%`
+                  : "Best value",
+                annualPackage,
+                annualSavings ? `Save ${annualSavings}%` : "Best value"
+              )}
+            </View>
+
+            <Text style={styles.subscriptionHint}>
+              {monthlyPackage || annualPackage
+                ? "Full access includes all courses and the premium meditation, sleep, and sound library."
+                : "Subscription plans are loading. If they do not appear, use Sign In and try again from inside the app."}
+            </Text>
+
             <Pressable
               onPress={handleSubscribe}
-              onPressIn={() =>
-                console.log(`${ONBOARDING_LOG_PREFIX} Subscribe onPressIn`, {
-                  currentStep,
-                  selectedPackageId: selectedPackage?.identifier ?? null,
-                })
-              }
-              hitSlop={8}
+              disabled={!selectedPackage || ctaBusy}
               style={({ pressed }) => [
-                styles.primaryButton,
+                styles.subscribeButton,
                 (!selectedPackage || ctaBusy) && styles.primaryButtonDisabled,
                 pressed && !ctaBusy && styles.buttonPressed,
               ]}
-              disabled={!selectedPackage || ctaBusy}
             >
               {ctaBusy ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryButtonText}>
+                <Text style={styles.subscribeButtonText}>
                   Continue with Subscription
                 </Text>
               )}
             </Pressable>
-          )}
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -524,60 +490,105 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     safeArea: {
       flex: 1,
       backgroundColor: theme.colors.background,
+      paddingTop: 24,
     },
-    container: {
-      flex: 1,
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.md,
-      paddingBottom: theme.spacing.lg,
-      justifyContent: "space-between",
-    },
-    topBar: {
+    header: {
       flexDirection: "row",
-      justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: theme.spacing.sm,
+      justifyContent: "space-between",
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.md,
+      gap: theme.spacing.md,
     },
-    signInButton: {
+    progressWrap: {
+      flex: 1,
+      gap: theme.spacing.sm,
+    },
+    progressLabel: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 13,
+      color: theme.colors.textLight,
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+    },
+    progressTrack: {
+      flexDirection: "row",
+      gap: theme.spacing.sm,
+    },
+    progressSegment: {
+      flex: 1,
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: theme.colors.gray[200],
+    },
+    progressSegmentActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    headerButton: {
+      minHeight: 42,
       paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.sm,
       borderRadius: theme.borderRadius.full,
+      alignItems: "center",
+      justifyContent: "center",
       backgroundColor: theme.colors.surface,
-      ...theme.shadows.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
-    buttonPressed: {
-      opacity: 0.9,
-      transform: [{ scale: 0.98 }],
-    },
-    signInButtonText: {
+    headerButtonText: {
       fontFamily: theme.fonts.ui.semiBold,
       fontSize: 14,
       color: theme.colors.text,
     },
-    heroPanel: {
+    page: {
+      flex: 1,
+    },
+    pageInner: {
+      flex: 1,
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.xxl,
+      gap: theme.spacing.lg,
+    },
+    heroCard: {
       borderRadius: theme.borderRadius.xxl,
       paddingHorizontal: theme.spacing.lg,
       paddingVertical: theme.spacing.xxl,
-      marginTop: theme.spacing.md,
-      marginBottom: theme.spacing.xl,
+      minHeight: 280,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: isDark ? theme.colors.border : `${theme.colors.primary}20`,
+    },
+    heroCardCompact: {
+      borderRadius: theme.borderRadius.xxl,
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.xl,
       alignItems: "center",
       borderWidth: 1,
       borderColor: isDark ? theme.colors.border : `${theme.colors.primary}20`,
     },
     heroIconBubble: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: 76,
+      height: 76,
+      borderRadius: 38,
       backgroundColor: theme.colors.primary,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: theme.spacing.lg,
       ...theme.shadows.md,
     },
+    heroIconBubbleSmall: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: theme.spacing.md,
+      ...theme.shadows.sm,
+    },
     eyebrow: {
       fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 13,
-      letterSpacing: 1.1,
+      fontSize: 12,
+      letterSpacing: 1.2,
       textTransform: "uppercase",
       color: theme.colors.textLight,
       marginBottom: theme.spacing.sm,
@@ -590,10 +601,26 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       textAlign: "center",
       marginBottom: theme.spacing.md,
     },
+    titleCompact: {
+      fontFamily: theme.fonts.display.bold,
+      fontSize: 28,
+      lineHeight: 34,
+      color: theme.colors.text,
+      textAlign: "center",
+      marginBottom: theme.spacing.sm,
+    },
     body: {
       fontFamily: theme.fonts.body.regular,
       fontSize: 16,
       lineHeight: 25,
+      color: theme.colors.textLight,
+      textAlign: "center",
+      maxWidth: 320,
+    },
+    bodyCompact: {
+      fontFamily: theme.fonts.body.regular,
+      fontSize: 15,
+      lineHeight: 23,
       color: theme.colors.textLight,
       textAlign: "center",
       maxWidth: 320,
@@ -623,6 +650,19 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       fontFamily: theme.fonts.ui.medium,
       fontSize: 15,
       color: theme.colors.text,
+    },
+    swipeHintRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: theme.spacing.sm,
+      marginTop: "auto",
+      paddingTop: theme.spacing.md,
+    },
+    swipeHintText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 14,
+      color: theme.colors.textLight,
     },
     planList: {
       gap: theme.spacing.md,
@@ -700,47 +740,32 @@ const createStyles = (theme: Theme, isDark: boolean) =>
       color: theme.colors.primaryDark,
     },
     subscriptionHint: {
-      marginTop: theme.spacing.md,
       fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
       lineHeight: 20,
       color: theme.colors.textLight,
       textAlign: "center",
     },
-    footer: {
-      paddingTop: theme.spacing.xl,
-      gap: theme.spacing.lg,
-    },
-    dotsRow: {
-      flexDirection: "row",
-      justifyContent: "center",
-      gap: theme.spacing.sm,
-    },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: theme.colors.gray[300],
-    },
-    dotActive: {
-      width: 24,
-      backgroundColor: theme.colors.primary,
-    },
-    primaryButton: {
+    subscribeButton: {
       minHeight: 56,
       borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.primary,
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: theme.spacing.lg,
+      marginTop: theme.spacing.sm,
       ...theme.shadows.md,
+    },
+    subscribeButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 16,
+      color: theme.colors.textOnPrimary,
     },
     primaryButtonDisabled: {
       opacity: 0.5,
     },
-    primaryButtonText: {
-      fontFamily: theme.fonts.ui.semiBold,
-      fontSize: 16,
-      color: theme.colors.textOnPrimary,
+    buttonPressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.98 }],
     },
   });
