@@ -50,6 +50,13 @@ function RootNavigator() {
             presentation: 'fullScreenModal',
           }} 
         />
+        <Stack.Screen
+          name="onboarding"
+          options={{
+            headerShown: false,
+            animation: "fade",
+          }}
+        />
         <Stack.Screen 
           name="meditation/[id]" 
           options={{ 
