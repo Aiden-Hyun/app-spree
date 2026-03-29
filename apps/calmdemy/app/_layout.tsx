@@ -5,6 +5,7 @@ import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { useFonts } from '@shared/hooks/useFonts';
 import { lightColors } from '@/theme';
 import { AppProviders } from '@core/providers/AppProviders';
+import { AppErrorBoundary } from '@shared/ui/AppErrorBoundary';
 import { initReactGrab } from '@/dev/reactGrab';
 
 function LoadingScreen() {
@@ -179,9 +180,11 @@ export default function RootLayout() {
   }
 
   return (
-    <AppProviders>
-      <RootNavigator />
-    </AppProviders>
+    <AppErrorBoundary>
+      <AppProviders>
+        <RootNavigator />
+      </AppProviders>
+    </AppErrorBoundary>
   );
 }
 

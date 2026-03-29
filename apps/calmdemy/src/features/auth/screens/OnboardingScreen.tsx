@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
 import { useTheme } from "@core/providers/contexts/ThemeContext";
 import { useAuth } from "@core/providers/contexts/AuthContext";
 import {
@@ -35,6 +35,14 @@ const COURSE_ITEMS = [
 ] as const;
 
 type OnboardingDestination = "/login" | "/(tabs)/home";
+type OnboardingStep = "free" | "courses" | "subscribe";
+
+const ONBOARDING_STEPS: readonly OnboardingStep[] = [
+  "free",
+  "courses",
+  "subscribe",
+];
+const ONBOARDING_LOG_PREFIX = "[Onboarding]";
 
 const pressableStyle = (
   baseStyle: StyleProp<ViewStyle>,
@@ -46,6 +54,8 @@ const pressableStyle = (
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ step?: string | string[] }>();
+  const pathname = usePathname();
   const { theme, isDark } = useTheme();
   const { user, loading: authLoading, signInAnonymously } = useAuth();
   const {
@@ -54,7 +64,6 @@ export default function OnboardingScreen() {
     isLoading: subscriptionLoading,
   } = useSubscription();
 
-  const [step, setStep] = useState(0);
   const [selectedPackage, setSelectedPackage] =
     useState<PurchasesPackage | null>(null);
   const [pendingPackage, setPendingPackage] =
@@ -64,6 +73,43 @@ export default function OnboardingScreen() {
     useState(false);
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const stepParam = Array.isArray(params.step) ? params.step[0] : params.step;
+  const currentStep: OnboardingStep = ONBOARDING_STEPS.includes(
+    stepParam as OnboardingStep
+  )
+    ? (stepParam as OnboardingStep)
+    : "free";
+  const step = ONBOARDING_STEPS.indexOf(currentStep);
+
+  useEffect(() => {
+    console.log(`${ONBOARDING_LOG_PREFIX} mount`);
+
+    return () => {
+      console.log(`${ONBOARDING_LOG_PREFIX} unmount`);
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log(`${ONBOARDING_LOG_PREFIX} route snapshot`, {
+      pathname,
+      stepParam,
+      currentStep,
+      step,
+      authLoading,
+      userUid: user?.uid ?? null,
+      isAnonymous: user?.isAnonymous ?? null,
+      subscriptionLoading,
+    });
+  }, [
+    authLoading,
+    currentStep,
+    pathname,
+    step,
+    stepParam,
+    subscriptionLoading,
+    user?.isAnonymous,
+    user?.uid,
+  ]);
 
   const monthlyPackage =
     currentOffering?.monthly ||
@@ -109,16 +155,30 @@ export default function OnboardingScreen() {
   }, [annualPackage, monthlyPackage]);
 
   const completeOnboarding = useCallback(async (target: OnboardingDestination) => {
+    console.log(`${ONBOARDING_LOG_PREFIX} completeOnboarding`, {
+      target,
+      currentStep,
+      userUid: user?.uid ?? null,
+      isAnonymous: user?.isAnonymous ?? null,
+    });
     await markOnboardingSeen();
     router.replace(target);
-  }, [router]);
+  }, [currentStep, router, user?.isAnonymous, user?.uid]);
 
   const executePurchase = useCallback(
     async (pkg: PurchasesPackage) => {
+      console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:start`, {
+        packageId: pkg.identifier,
+        currentStep,
+      });
       setIsPurchasing(true);
 
       try {
         const success = await purchasePackage(pkg);
+        console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:result`, {
+          packageId: pkg.identifier,
+          success,
+        });
         if (success) {
           await completeOnboarding("/(tabs)/home");
         }
@@ -134,6 +194,10 @@ export default function OnboardingScreen() {
       return;
     }
 
+    console.log(`${ONBOARDING_LOG_PREFIX} pending purchase resumed`, {
+      packageId: pendingPackage.identifier,
+      userUid: user.uid,
+    });
     const pkg = pendingPackage;
     setPendingPackage(null);
     void executePurchase(pkg);
@@ -147,25 +211,58 @@ export default function OnboardingScreen() {
   ]);
 
   const handleNext = useCallback(() => {
-    setStep((current) => Math.min(current + 1, 2));
-  }, []);
+    console.log(`${ONBOARDING_LOG_PREFIX} handleNext`, {
+      currentStep,
+      nextStep:
+        currentStep === "free"
+          ? "courses"
+          : currentStep === "courses"
+            ? "subscribe"
+            : null,
+    });
+
+    if (currentStep === "free") {
+      router.replace("/onboarding?step=courses");
+      return;
+    }
+
+    if (currentStep === "courses") {
+      router.replace("/onboarding?step=subscribe");
+    }
+  }, [currentStep, router]);
 
   const handleSignIn = useCallback(async () => {
+    console.log(`${ONBOARDING_LOG_PREFIX} handleSignIn`, {
+      currentStep,
+    });
     await completeOnboarding("/login");
   }, [completeOnboarding]);
 
   const handleSubscribe = useCallback(async () => {
+    console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe`, {
+      currentStep,
+      selectedPackageId: selectedPackage?.identifier ?? null,
+      isPurchasing,
+      hasUser: !!user,
+      isAnonymous: user?.isAnonymous ?? null,
+    });
+
     if (!selectedPackage || isPurchasing) {
       return;
     }
 
     if (!user) {
       try {
+        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:start`);
         setPendingPackage(selectedPackage);
         setIsPreparingGuestCheckout(true);
         await signInAnonymously();
+        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:success`);
       } catch (error: any) {
         setPendingPackage(null);
+        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:error`, {
+          message: error?.message ?? "unknown",
+        });
         Alert.alert(
           "Unable to start checkout",
           error?.message || "Please try again in a moment."
@@ -313,6 +410,11 @@ export default function OnboardingScreen() {
         <View />
         <Pressable
           onPress={handleSignIn}
+          onPressIn={() =>
+            console.log(`${ONBOARDING_LOG_PREFIX} Sign In onPressIn`, {
+              currentStep,
+            })
+          }
           hitSlop={8}
           style={pressableStyle(styles.signInButton, styles.buttonPressed)}
         >
@@ -375,6 +477,11 @@ export default function OnboardingScreen() {
           {step < 2 ? (
             <Pressable
               onPress={handleNext}
+              onPressIn={() =>
+                console.log(`${ONBOARDING_LOG_PREFIX} Next onPressIn`, {
+                  currentStep,
+                })
+              }
               hitSlop={8}
               style={pressableStyle(styles.primaryButton, styles.buttonPressed)}
             >
@@ -383,6 +490,12 @@ export default function OnboardingScreen() {
           ) : (
             <Pressable
               onPress={handleSubscribe}
+              onPressIn={() =>
+                console.log(`${ONBOARDING_LOG_PREFIX} Subscribe onPressIn`, {
+                  currentStep,
+                  selectedPackageId: selectedPackage?.identifier ?? null,
+                })
+              }
               hitSlop={8}
               style={({ pressed }) => [
                 styles.primaryButton,

@@ -23,15 +23,36 @@ export function OfflineNavigator({ children }: OfflineNavigatorProps) {
   const navigationReady = rootNavigationState?.key != null;
 
   useEffect(() => {
+    console.log('[OfflineNavigator] state snapshot', {
+      pathname,
+      isOffline,
+      isLoading,
+      navigationReady,
+      previousPath: previousPathRef.current,
+      hasNavigatedToOffline: hasNavigatedToOffline.current,
+    });
+  }, [isOffline, isLoading, navigationReady, pathname]);
+
+  useEffect(() => {
     // Don't do anything while loading initial network state or navigation isn't ready
     if (isLoading || !navigationReady) return;
 
     if (isOffline && !isOnDownloadsPage) {
+      console.log('[OfflineNavigator] redirecting to /downloads', {
+        from: pathname,
+      });
       // Store current path before navigating to downloads
       previousPathRef.current = pathname;
       hasNavigatedToOffline.current = true;
       router.replace('/downloads');
     } else if (!isOffline && hasNavigatedToOffline.current && isOnDownloadsPage) {
+      console.log('[OfflineNavigator] restoring previous route', {
+        from: pathname,
+        to:
+          previousPathRef.current && previousPathRef.current !== '/downloads'
+            ? previousPathRef.current
+            : '/(tabs)/home',
+      });
       // Connection restored - navigate back to previous page
       hasNavigatedToOffline.current = false;
       if (previousPathRef.current && previousPathRef.current !== '/downloads') {

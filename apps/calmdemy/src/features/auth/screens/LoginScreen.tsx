@@ -107,7 +107,7 @@ export default function LoginScreen() {
       if (isLinkMode && isAnonymous) {
         await upgradeAnonymousWithEmail(email, password);
         Alert.alert("Success", "Email linked to your account!");
-        router.replace('/home');
+        router.replace('/(tabs)/home');
         return;
       }
       
@@ -118,10 +118,10 @@ export default function LoginScreen() {
           "Success",
           "Account created! Please check your email to verify.",
         );
-        router.replace('/home');
+        router.replace('/(tabs)/home');
       } else {
         await signIn(email, password);
-        router.replace('/home');
+        router.replace('/(tabs)/home');
       }
     } catch (error: any) {
       // Handle collision in link mode
@@ -147,13 +147,13 @@ export default function LoginScreen() {
         fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:upgrading',message:'Link mode - using upgradeAnonymousWithGoogle',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
         // #endregion
         await upgradeAnonymousWithGoogle();
-        router.replace('/home');
+        router.replace('/(tabs)/home');
       } else {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleGoogleSignIn:signIn',message:'Sign-in mode - using signInWithGoogle',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
         // #endregion
         await signInWithGoogle();
-        router.replace('/home');
+        router.replace('/(tabs)/home');
       }
     } catch (error: any) {
       // #region agent log
@@ -184,13 +184,13 @@ export default function LoginScreen() {
         fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:upgrading',message:'Link mode - using upgradeAnonymousWithApple',data:{userId:user?.uid},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
         // #endregion
         await upgradeAnonymousWithApple();
-        router.replace('/home');
+        router.replace('/(tabs)/home');
       } else {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/abd8d170-6f53-45be-bd37-3634e6180c4d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login.tsx:handleAppleSignIn:signIn',message:'Sign-in mode - using signInWithApple',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'FIX'})}).catch(()=>{});
         // #endregion
         await signInWithApple();
-        router.replace('/home');
+        router.replace('/(tabs)/home');
       }
     } catch (error: any) {
       // #region agent log
@@ -217,7 +217,7 @@ export default function LoginScreen() {
     try {
       await signInAnonymously();
       // Navigate to main app after successful anonymous sign-in
-      router.replace('/home');
+      router.replace('/(tabs)/home');
     } catch (error: any) {
       Alert.alert("Error", error.message);
     }
@@ -235,7 +235,7 @@ export default function LoginScreen() {
       await signInWithPendingCredential(collisionError.pendingCredential);
       setCollisionError(null);
       setShowSwitchConfirm(false);
-      router.replace('/home');
+      router.replace('/(tabs)/home');
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to sign in");
     }
