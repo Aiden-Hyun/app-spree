@@ -42,6 +42,7 @@ const COURSE_ITEMS = [
 ] as const;
 
 type OnboardingDestination = "/login" | "/(tabs)/home";
+const ONBOARDING_LOG_PREFIX = "[Onboarding:last]";
 
 const pressableStyle = (
   baseStyle: StyleProp<ViewStyle>,
@@ -117,8 +118,42 @@ export default function OnboardingScreen() {
     return savings > 0 ? savings : null;
   }, [annualPackage, monthlyPackage]);
 
+  const ctaBusy =
+    isPurchasing ||
+    isPreparingGuestCheckout ||
+    (subscriptionLoading && !currentOffering);
+
+  useEffect(() => {
+    if (activeIndex !== 2) {
+      return;
+    }
+
+    console.log(`${ONBOARDING_LOG_PREFIX} state snapshot`, {
+      activeIndex,
+      selectedPackageId: selectedPackage?.identifier ?? null,
+      ctaBusy,
+      isPurchasing,
+      isPreparingGuestCheckout,
+      subscriptionLoading,
+      hasUser: !!user,
+      isAnonymous: user?.isAnonymous ?? null,
+      userUid: user?.uid ?? null,
+    });
+  }, [
+    activeIndex,
+    ctaBusy,
+    isPreparingGuestCheckout,
+    isPurchasing,
+    selectedPackage?.identifier,
+    subscriptionLoading,
+    user,
+  ]);
+
   const completeOnboarding = useCallback(
     async (target: OnboardingDestination) => {
+      console.log(`${ONBOARDING_LOG_PREFIX} completeOnboarding`, {
+        target,
+      });
       await markOnboardingSeen();
       router.replace(target);
     },
@@ -127,10 +162,17 @@ export default function OnboardingScreen() {
 
   const executePurchase = useCallback(
     async (pkg: PurchasesPackage) => {
+      console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:start`, {
+        packageId: pkg.identifier,
+      });
       setIsPurchasing(true);
 
       try {
         const success = await purchasePackage(pkg);
+        console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:result`, {
+          packageId: pkg.identifier,
+          success,
+        });
         if (success) {
           await completeOnboarding("/(tabs)/home");
         }
@@ -154,6 +196,10 @@ export default function OnboardingScreen() {
 
     const pkg = pendingPackage;
     setPendingPackage(null);
+    console.log(`${ONBOARDING_LOG_PREFIX} pending purchase resumed`, {
+      packageId: pkg.identifier,
+      userUid: user.uid,
+    });
     void executePurchase(pkg);
   }, [
     authLoading,
@@ -187,27 +233,51 @@ export default function OnboardingScreen() {
       nativeEvent: { contentOffset: { x: number } };
     }) => {
       const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+      console.log(`${ONBOARDING_LOG_PREFIX} pager end`, {
+        nextIndex,
+        offsetX: event.nativeEvent.contentOffset.x,
+      });
       setActiveIndex(Math.max(0, Math.min(nextIndex, 2)));
     },
     [width]
   );
 
   const handleSignIn = useCallback(async () => {
+    console.log(`${ONBOARDING_LOG_PREFIX} handleSignIn`);
     await completeOnboarding("/login");
   }, [completeOnboarding]);
 
   const handleSubscribe = useCallback(async () => {
+    console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:start`, {
+      selectedPackageId: selectedPackage?.identifier ?? null,
+      isPurchasing,
+      ctaBusy:
+        isPurchasing ||
+        isPreparingGuestCheckout ||
+        (subscriptionLoading && !currentOffering),
+      hasUser: !!user,
+      isAnonymous: user?.isAnonymous ?? null,
+    });
+
     if (!selectedPackage || isPurchasing) {
+      console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:blocked`, {
+        reason: !selectedPackage ? "no_selected_package" : "already_purchasing",
+      });
       return;
     }
 
     if (!user) {
       try {
+        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:start`);
         setPendingPackage(selectedPackage);
         setIsPreparingGuestCheckout(true);
         await signInAnonymously();
+        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:success`);
       } catch (error: any) {
         setPendingPackage(null);
+        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:error`, {
+          message: error?.message ?? "unknown",
+        });
         Alert.alert(
           "Unable to start checkout",
           error?.message || "Please try again in a moment."
@@ -220,11 +290,6 @@ export default function OnboardingScreen() {
 
     await executePurchase(selectedPackage);
   }, [executePurchase, isPurchasing, selectedPackage, signInAnonymously, user]);
-
-  const ctaBusy =
-    isPurchasing ||
-    isPreparingGuestCheckout ||
-    (subscriptionLoading && !currentOffering);
 
   const renderFeatureList = (
     items: ReadonlyArray<{
@@ -254,13 +319,29 @@ export default function OnboardingScreen() {
 
     return (
       <Pressable
+        onPressIn={() =>
+          console.log(`${ONBOARDING_LOG_PREFIX} plan pressIn`, {
+            title,
+            packageId: pkg?.identifier ?? null,
+            isSelected,
+            activeIndex,
+          })
+        }
         style={({ pressed }) => [
           styles.planCard,
           isSelected && styles.planCardSelected,
           !pkg && styles.planCardDisabled,
           pressed && pkg && styles.buttonPressed,
         ]}
-        onPress={() => pkg && setSelectedPackage(pkg)}
+        onPress={() => {
+          console.log(`${ONBOARDING_LOG_PREFIX} plan press`, {
+            title,
+            packageId: pkg?.identifier ?? null,
+          });
+          if (pkg) {
+            setSelectedPackage(pkg);
+          }
+        }}
         disabled={!pkg}
       >
         <View style={styles.planTopRow}>
@@ -295,6 +376,11 @@ export default function OnboardingScreen() {
     if (activeIndex === 2) {
       return (
         <Pressable
+          onPressIn={() =>
+            console.log(`${ONBOARDING_LOG_PREFIX} signIn pressIn`, {
+              activeIndex,
+            })
+          }
           onPress={handleSignIn}
           hitSlop={8}
           style={pressableStyle(styles.headerButton, styles.buttonPressed)}
@@ -462,6 +548,12 @@ export default function OnboardingScreen() {
             </Text>
 
             <Pressable
+              onPressIn={() =>
+                console.log(`${ONBOARDING_LOG_PREFIX} subscribe pressIn`, {
+                  selectedPackageId: selectedPackage?.identifier ?? null,
+                  ctaBusy,
+                })
+              }
               onPress={handleSubscribe}
               disabled={!selectedPackage || ctaBusy}
               style={({ pressed }) => [
