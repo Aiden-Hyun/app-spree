@@ -20,12 +20,13 @@ import { AnimatedPressable } from "@shared/ui/AnimatedPressable";
 import { AnimatedView } from "@shared/ui/AnimatedView";
 import { CredentialCollisionModal } from "@shared/ui/CredentialCollisionModal";
 import { AccountSwitchConfirmModal } from "@shared/ui/AccountSwitchConfirmModal";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { Theme } from "@/theme";
 
 export default function LoginScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isLinkMode = mode === 'link'; // true when user tapped "Link Account" from Settings
+  const navigation = useNavigation();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -208,18 +209,25 @@ export default function LoginScreen() {
   };
 
   const handleSkipLogin = async () => {
-    // If user is already signed in (anonymous or otherwise), just go back
-    if (user) {
-      router.back();
-      return;
+    // If not signed in, create an anonymous session first
+    if (!user) {
+      try {
+        await signInAnonymously();
+      } catch (error: any) {
+        Alert.alert("Error", error.message);
+        return;
+      }
     }
 
-    try {
-      await signInAnonymously();
-      // Navigate to main app after successful anonymous sign-in
+    // Prefer going back when history exists; otherwise fall back to home
+    const canGoBack = typeof (navigation as any)?.canGoBack === "function"
+      ? (navigation as any).canGoBack()
+      : false;
+
+    if (canGoBack) {
+      (navigation as any).goBack();
+    } else {
       router.replace('/(tabs)/home');
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
     }
   };
 
