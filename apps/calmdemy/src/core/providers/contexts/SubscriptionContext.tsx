@@ -280,8 +280,10 @@ export function SubscriptionProvider({
       Alert.alert("Not Available", "In-app purchases are not available yet. Please rebuild the app.");
       return false;
     }
+    // Do not touch isLoading here — purchase busy state is owned by the caller
+    // (OnboardingScreen's isPurchasing). Setting isLoading during a purchase
+    // can race with syncIdentity and leave isLoading stuck true after a cancel.
     try {
-      setIsLoading(true);
       const { customerInfo: newInfo } = await Purchases.purchasePackage(pkg);
       setCustomerInfo(newInfo);
       const hasPremium = typeof newInfo.entitlements.active[PREMIUM_ENTITLEMENT_ID] !== "undefined";
@@ -296,8 +298,6 @@ export function SubscriptionProvider({
         );
       }
       return false;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 

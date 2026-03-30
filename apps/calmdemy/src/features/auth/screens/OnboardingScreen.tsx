@@ -42,7 +42,6 @@ const COURSE_ITEMS = [
 ] as const;
 
 type OnboardingDestination = "/login" | "/(tabs)/home";
-const ONBOARDING_LOG_PREFIX = "[Onboarding:last]";
 
 const pressableStyle = (
   baseStyle: StyleProp<ViewStyle>,
@@ -118,42 +117,15 @@ export default function OnboardingScreen() {
     return savings > 0 ? savings : null;
   }, [annualPackage, monthlyPackage]);
 
-  const ctaBusy =
-    isPurchasing ||
-    isPreparingGuestCheckout ||
-    (subscriptionLoading && !currentOffering);
-
-  useEffect(() => {
-    if (activeIndex !== 2) {
-      return;
-    }
-
-    console.log(`${ONBOARDING_LOG_PREFIX} state snapshot`, {
-      activeIndex,
-      selectedPackageId: selectedPackage?.identifier ?? null,
-      ctaBusy,
-      isPurchasing,
-      isPreparingGuestCheckout,
-      subscriptionLoading,
-      hasUser: !!user,
-      isAnonymous: user?.isAnonymous ?? null,
-      userUid: user?.uid ?? null,
-    });
-  }, [
-    activeIndex,
-    ctaBusy,
-    isPreparingGuestCheckout,
-    isPurchasing,
-    selectedPackage?.identifier,
-    subscriptionLoading,
-    user,
-  ]);
+  // subscriptionLoading is intentionally excluded here — when currentOffering is
+  // absent the button is already disabled via !selectedPackage, and including
+  // subscriptionLoading caused the CTA to stay disabled after a cancelled
+  // purchase if isLoading was left true by an identity sync race.
+  const ctaBusy = isPurchasing || isPreparingGuestCheckout;
+  const isLoadingPackages = subscriptionLoading && !currentOffering;
 
   const completeOnboarding = useCallback(
     async (target: OnboardingDestination) => {
-      console.log(`${ONBOARDING_LOG_PREFIX} completeOnboarding`, {
-        target,
-      });
       await markOnboardingSeen();
       router.replace(target);
     },
@@ -161,21 +133,15 @@ export default function OnboardingScreen() {
   );
 
   const executePurchase = useCallback(
-    async (pkg: PurchasesPackage) => {
-      console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:start`, {
-        packageId: pkg.identifier,
-      });
+    async (pkg: PurchasesPackage): Promise<boolean> => {
       setIsPurchasing(true);
 
       try {
         const success = await purchasePackage(pkg);
-        console.log(`${ONBOARDING_LOG_PREFIX} executePurchase:result`, {
-          packageId: pkg.identifier,
-          success,
-        });
         if (success) {
           await completeOnboarding("/(tabs)/home");
         }
+        return success;
       } finally {
         setIsPurchasing(false);
       }
@@ -196,10 +162,6 @@ export default function OnboardingScreen() {
 
     const pkg = pendingPackage;
     setPendingPackage(null);
-    console.log(`${ONBOARDING_LOG_PREFIX} pending purchase resumed`, {
-      packageId: pkg.identifier,
-      userUid: user.uid,
-    });
     void executePurchase(pkg);
   }, [
     authLoading,
@@ -214,10 +176,12 @@ export default function OnboardingScreen() {
     (index: number, animated = true) => {
       const nextIndex = Math.max(0, Math.min(index, 2));
       setActiveIndex(nextIndex);
-      scrollRef.current?.scrollTo({
-        x: nextIndex * width,
-        animated,
-      });
+      if (nextIndex < 2) {
+        scrollRef.current?.scrollTo({
+          x: nextIndex * width,
+          animated,
+        });
+      }
     },
     [width]
   );
@@ -233,51 +197,27 @@ export default function OnboardingScreen() {
       nativeEvent: { contentOffset: { x: number } };
     }) => {
       const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-      console.log(`${ONBOARDING_LOG_PREFIX} pager end`, {
-        nextIndex,
-        offsetX: event.nativeEvent.contentOffset.x,
-      });
       setActiveIndex(Math.max(0, Math.min(nextIndex, 2)));
     },
     [width]
   );
 
   const handleSignIn = useCallback(async () => {
-    console.log(`${ONBOARDING_LOG_PREFIX} handleSignIn`);
     await completeOnboarding("/login");
   }, [completeOnboarding]);
 
   const handleSubscribe = useCallback(async () => {
-    console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:start`, {
-      selectedPackageId: selectedPackage?.identifier ?? null,
-      isPurchasing,
-      ctaBusy:
-        isPurchasing ||
-        isPreparingGuestCheckout ||
-        (subscriptionLoading && !currentOffering),
-      hasUser: !!user,
-      isAnonymous: user?.isAnonymous ?? null,
-    });
-
     if (!selectedPackage || isPurchasing) {
-      console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:blocked`, {
-        reason: !selectedPackage ? "no_selected_package" : "already_purchasing",
-      });
       return;
     }
 
     if (!user) {
       try {
-        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:start`);
         setPendingPackage(selectedPackage);
         setIsPreparingGuestCheckout(true);
         await signInAnonymously();
-        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:success`);
       } catch (error: any) {
         setPendingPackage(null);
-        console.log(`${ONBOARDING_LOG_PREFIX} handleSubscribe:signInAnonymously:error`, {
-          message: error?.message ?? "unknown",
-        });
         Alert.alert(
           "Unable to start checkout",
           error?.message || "Please try again in a moment."
@@ -288,7 +228,12 @@ export default function OnboardingScreen() {
       return;
     }
 
-    await executePurchase(selectedPackage);
+    const success = await executePurchase(selectedPackage);
+    if (!success) {
+      // User cancelled or purchase failed; ensure state is fully reset for retries
+      setPendingPackage(null);
+      setIsPreparingGuestCheckout(false);
+    }
   }, [executePurchase, isPurchasing, selectedPackage, signInAnonymously, user]);
 
   const renderFeatureList = (
@@ -319,29 +264,13 @@ export default function OnboardingScreen() {
 
     return (
       <Pressable
-        onPressIn={() =>
-          console.log(`${ONBOARDING_LOG_PREFIX} plan pressIn`, {
-            title,
-            packageId: pkg?.identifier ?? null,
-            isSelected,
-            activeIndex,
-          })
-        }
         style={({ pressed }) => [
           styles.planCard,
           isSelected && styles.planCardSelected,
           !pkg && styles.planCardDisabled,
           pressed && pkg && styles.buttonPressed,
         ]}
-        onPress={() => {
-          console.log(`${ONBOARDING_LOG_PREFIX} plan press`, {
-            title,
-            packageId: pkg?.identifier ?? null,
-          });
-          if (pkg) {
-            setSelectedPackage(pkg);
-          }
-        }}
+        onPress={() => pkg && setSelectedPackage(pkg)}
         disabled={!pkg}
       >
         <View style={styles.planTopRow}>
@@ -376,11 +305,6 @@ export default function OnboardingScreen() {
     if (activeIndex === 2) {
       return (
         <Pressable
-          onPressIn={() =>
-            console.log(`${ONBOARDING_LOG_PREFIX} signIn pressIn`, {
-              activeIndex,
-            })
-          }
           onPress={handleSignIn}
           hitSlop={8}
           style={pressableStyle(styles.headerButton, styles.buttonPressed)}
@@ -400,6 +324,72 @@ export default function OnboardingScreen() {
       </Pressable>
     );
   };
+
+  const renderSubscribePage = () => (
+    <ScrollView
+      style={styles.subscribePage}
+      contentContainerStyle={styles.subscribePageContent}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      <LinearGradient
+        colors={
+          isDark
+            ? [theme.colors.primaryDark, theme.colors.background]
+            : [theme.colors.accentLight, theme.colors.background]
+        }
+        style={styles.heroCardCompact}
+      >
+        <View
+          style={[
+            styles.heroIconBubbleSmall,
+            { backgroundColor: theme.colors.accent },
+          ]}
+        >
+          <Ionicons name="sparkles" size={28} color="#fff" />
+        </View>
+        <Text style={styles.eyebrow}>Unlock full access</Text>
+        <Text style={styles.titleCompact}>Choose your subscription</Text>
+        <Text style={styles.bodyCompact}>
+          Subscribe for all courses and the full premium library.
+        </Text>
+      </LinearGradient>
+
+      <View style={styles.planList}>
+        {renderPlanCard("Monthly", "Flexible access", monthlyPackage)}
+        {renderPlanCard(
+          "Yearly",
+          annualSavings ? `Best value · save ${annualSavings}%` : "Best value",
+          annualPackage,
+          annualSavings ? `Save ${annualSavings}%` : "Best value"
+        )}
+      </View>
+
+      <Text style={styles.subscriptionHint}>
+        {monthlyPackage || annualPackage
+          ? "Full access includes all courses and the premium meditation, sleep, and sound library."
+          : "Subscription plans are loading. If they do not appear, use Sign In and try again from inside the app."}
+      </Text>
+
+      <Pressable
+        onPress={handleSubscribe}
+        disabled={!selectedPackage || ctaBusy}
+        style={({ pressed }) => [
+          styles.subscribeButton,
+          (!selectedPackage || ctaBusy) && styles.primaryButtonDisabled,
+          pressed && !ctaBusy && styles.buttonPressed,
+        ]}
+      >
+        {ctaBusy || isLoadingPackages ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.subscribeButtonText}>
+            Continue with Subscription
+          </Text>
+        )}
+      </Pressable>
+    </ScrollView>
+  );
 
   return (
     <View style={styles.safeArea}>
@@ -421,158 +411,96 @@ export default function OnboardingScreen() {
         {renderHeaderAction()}
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        onMomentumScrollEnd={handlePagerEnd}
-        scrollEventThrottle={16}
-      >
-        <View style={[styles.page, { width }]}>
-          <View style={styles.pageInner}>
-            <LinearGradient
-              colors={
-                isDark
-                  ? [theme.colors.surface, theme.colors.background]
-                  : [theme.colors.primaryLight, theme.colors.background]
-              }
-              style={styles.heroCard}
-            >
-              <View style={styles.heroIconBubble}>
-                <Ionicons name="leaf" size={34} color="#fff" />
-              </View>
-              <Text style={styles.eyebrow}>Start free</Text>
-              <Text style={styles.title}>Free content to begin</Text>
-              <Text style={styles.body}>
-                Guided meditations, sleep stories, and white noise are available
-                without a subscription.
-              </Text>
-            </LinearGradient>
-
-            {renderFeatureList(FREE_CONTENT_ITEMS)}
-
-            <View style={styles.swipeHintRow}>
-              <Ionicons
-                name="swap-horizontal-outline"
-                size={16}
-                color={theme.colors.textLight}
-              />
-              <Text style={styles.swipeHintText}>Swipe to keep exploring</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={[styles.page, { width }]}>
-          <View style={styles.pageInner}>
-            <LinearGradient
-              colors={
-                isDark
-                  ? [theme.colors.surfaceElevated, theme.colors.background]
-                  : [theme.colors.secondaryLight, theme.colors.background]
-              }
-              style={styles.heroCard}
-            >
-              <View
-                style={[
-                  styles.heroIconBubble,
-                  { backgroundColor: theme.colors.secondary },
-                ]}
+      {activeIndex < 2 ? (
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          decelerationRate="fast"
+          directionalLockEnabled
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          onMomentumScrollEnd={handlePagerEnd}
+          scrollEventThrottle={16}
+        >
+          <View style={[styles.page, { width }]}>
+            <View style={styles.pageInner}>
+              <LinearGradient
+                colors={
+                  isDark
+                    ? [theme.colors.surface, theme.colors.background]
+                    : [theme.colors.primaryLight, theme.colors.background]
+                }
+                style={styles.heroCard}
               >
-                <Ionicons name="school" size={34} color="#fff" />
-              </View>
-              <Text style={styles.eyebrow}>Go beyond meditation</Text>
-              <Text style={styles.title}>Psychology-based courses</Text>
-              <Text style={styles.body}>
-                Explore self-help courses inspired by CBT, ACT, and other
-                practical approaches to emotional wellbeing.
-              </Text>
-            </LinearGradient>
-
-            {renderFeatureList(COURSE_ITEMS)}
-
-            <View style={styles.swipeHintRow}>
-              <Ionicons
-                name="swap-horizontal-outline"
-                size={16}
-                color={theme.colors.textLight}
-              />
-              <Text style={styles.swipeHintText}>Swipe for subscription</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={[styles.page, { width }]}>
-          <View style={styles.pageInner}>
-            <LinearGradient
-              colors={
-                isDark
-                  ? [theme.colors.primaryDark, theme.colors.background]
-                  : [theme.colors.accentLight, theme.colors.background]
-              }
-              style={styles.heroCardCompact}
-            >
-              <View
-                style={[
-                  styles.heroIconBubbleSmall,
-                  { backgroundColor: theme.colors.accent },
-                ]}
-              >
-                <Ionicons name="sparkles" size={28} color="#fff" />
-              </View>
-              <Text style={styles.eyebrow}>Unlock full access</Text>
-              <Text style={styles.titleCompact}>Choose your subscription</Text>
-              <Text style={styles.bodyCompact}>
-                Subscribe for all courses and the full premium library.
-              </Text>
-            </LinearGradient>
-
-            <View style={styles.planList}>
-              {renderPlanCard("Monthly", "Flexible access", monthlyPackage)}
-              {renderPlanCard(
-                "Yearly",
-                annualSavings
-                  ? `Best value · save ${annualSavings}%`
-                  : "Best value",
-                annualPackage,
-                annualSavings ? `Save ${annualSavings}%` : "Best value"
-              )}
-            </View>
-
-            <Text style={styles.subscriptionHint}>
-              {monthlyPackage || annualPackage
-                ? "Full access includes all courses and the premium meditation, sleep, and sound library."
-                : "Subscription plans are loading. If they do not appear, use Sign In and try again from inside the app."}
-            </Text>
-
-            <Pressable
-              onPressIn={() =>
-                console.log(`${ONBOARDING_LOG_PREFIX} subscribe pressIn`, {
-                  selectedPackageId: selectedPackage?.identifier ?? null,
-                  ctaBusy,
-                })
-              }
-              onPress={handleSubscribe}
-              disabled={!selectedPackage || ctaBusy}
-              style={({ pressed }) => [
-                styles.subscribeButton,
-                (!selectedPackage || ctaBusy) && styles.primaryButtonDisabled,
-                pressed && !ctaBusy && styles.buttonPressed,
-              ]}
-            >
-              {ctaBusy ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.subscribeButtonText}>
-                  Continue with Subscription
+                <View style={styles.heroIconBubble}>
+                  <Ionicons name="leaf" size={34} color="#fff" />
+                </View>
+                <Text style={styles.eyebrow}>Start free</Text>
+                <Text style={styles.title}>Free content to begin</Text>
+                <Text style={styles.body}>
+                  Guided meditations, sleep stories, and white noise are available
+                  without a subscription.
                 </Text>
-              )}
-            </Pressable>
+              </LinearGradient>
+
+              {renderFeatureList(FREE_CONTENT_ITEMS)}
+
+              <View style={styles.swipeHintRow}>
+                <Ionicons
+                  name="swap-horizontal-outline"
+                  size={16}
+                  color={theme.colors.textLight}
+                />
+                <Text style={styles.swipeHintText}>Swipe to keep exploring</Text>
+              </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+
+          <View style={[styles.page, { width }]}>
+            <View style={styles.pageInner}>
+              <LinearGradient
+                colors={
+                  isDark
+                    ? [theme.colors.surfaceElevated, theme.colors.background]
+                    : [theme.colors.secondaryLight, theme.colors.background]
+                }
+                style={styles.heroCard}
+              >
+                <View
+                  style={[
+                    styles.heroIconBubble,
+                    { backgroundColor: theme.colors.secondary },
+                  ]}
+                >
+                  <Ionicons name="school" size={34} color="#fff" />
+                </View>
+                <Text style={styles.eyebrow}>Go beyond meditation</Text>
+                <Text style={styles.title}>Psychology-based courses</Text>
+                <Text style={styles.body}>
+                  Explore self-help courses inspired by CBT, ACT, and other
+                  practical approaches to emotional wellbeing.
+                </Text>
+              </LinearGradient>
+
+              {renderFeatureList(COURSE_ITEMS)}
+
+              <View style={styles.swipeHintRow}>
+                <Ionicons
+                  name="swap-horizontal-outline"
+                  size={16}
+                  color={theme.colors.textLight}
+                />
+                <Text style={styles.swipeHintText}>Swipe again for plans</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.page, { width }]} />
+        </ScrollView>
+      ) : (
+        renderSubscribePage()
+      )}
     </View>
   );
 }
@@ -636,6 +564,14 @@ const createStyles = (theme: Theme, isDark: boolean) =>
     },
     pageInner: {
       flex: 1,
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.xxl,
+      gap: theme.spacing.lg,
+    },
+    subscribePage: {
+      flex: 1,
+    },
+    subscribePageContent: {
       paddingHorizontal: theme.spacing.lg,
       paddingBottom: theme.spacing.xxl,
       gap: theme.spacing.lg,
