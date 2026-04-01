@@ -8,6 +8,27 @@ import { AppProviders } from '@core/providers/AppProviders';
 import { AppErrorBoundary } from '@shared/ui/AppErrorBoundary';
 import { initReactGrab } from '@/dev/reactGrab';
 
+// ─── Global JS error handler ───────────────────────────────────────────────
+// Intercepts unhandled JS exceptions before they propagate to the native
+// crash reporter, so we can see the message + stack in the device console.
+console.log('[Startup] _layout module loaded');
+try {
+  const g = global as any;
+  if (g.ErrorUtils) {
+    const prev = g.ErrorUtils.getGlobalHandler();
+    g.ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
+      console.error(
+        `[GlobalError] ${isFatal ? 'FATAL' : 'non-fatal'} — ${error?.message ?? 'unknown'}`
+      );
+      console.error(`[GlobalError] Stack: ${error?.stack ?? '(no stack)'}`);
+      prev?.(error, isFatal);
+    });
+    console.log('[Startup] Global error handler installed');
+  }
+} catch (e) {
+  console.warn('[Startup] Could not install global error handler:', e);
+}
+
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
@@ -161,24 +182,34 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  console.log('[Startup] RootLayout render');
   const { fontsLoaded, fontError } = useFonts();
 
   useEffect(() => {
+    console.log('[Startup] RootLayout mounted');
     initReactGrab();
   }, []);
 
   // Log font errors for debugging
   useEffect(() => {
     if (fontError) {
-      console.error('Font loading error:', fontError);
+      console.error('[Startup] Font loading error:', fontError);
     }
   }, [fontError]);
 
+  useEffect(() => {
+    if (fontsLoaded) {
+      console.log('[Startup] Fonts loaded successfully');
+    }
+  }, [fontsLoaded]);
+
   // Show loading screen while fonts are loading
   if (!fontsLoaded && !fontError) {
+    console.log('[Startup] Waiting for fonts...');
     return <LoadingScreen />;
   }
 
+  console.log('[Startup] Rendering AppErrorBoundary + AppProviders');
   return (
     <AppErrorBoundary>
       <AppProviders>

@@ -23,32 +23,42 @@ import { createAccountActions } from "@core/providers/contexts/auth/actions/acco
 export { CredentialCollisionError } from "@core/providers/contexts/auth/types";
 
 // Configure Google Sign In
+console.log('[Startup] AuthContext module loaded — configuring GoogleSignin');
 if (!env.google.webClientId && !env.google.iosClientId) {
-  console.warn("Google Sign-In client IDs missing; check environment variables");
+  console.warn("[Startup] Google Sign-In client IDs missing; check environment variables");
 }
-GoogleSignin.configure({
-  webClientId: env.google.webClientId,
-  iosClientId: env.google.iosClientId,
-});
+try {
+  GoogleSignin.configure({
+    webClientId: env.google.webClientId,
+    iosClientId: env.google.iosClientId,
+  });
+  console.log('[Startup] GoogleSignin.configure() succeeded');
+} catch (e) {
+  console.error('[Startup] GoogleSignin.configure() threw:', e);
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  console.log('[Startup] AuthProvider rendering');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAppleSignInAvailable, setIsAppleSignInAvailable] = useState(false);
 
   useEffect(() => {
+    console.log('[Startup] AuthProvider mounted — checking Apple auth availability');
     let isMounted = true;
 
     if (Platform.OS === "ios") {
       AppleAuthentication.isAvailableAsync()
         .then((available) => {
+          console.log('[Startup] Apple auth available:', available);
           if (isMounted) {
             setIsAppleSignInAvailable(available);
           }
         })
-        .catch(() => {
+        .catch((e) => {
+          console.warn('[Startup] Apple auth availability check failed:', e);
           if (isMounted) {
             setIsAppleSignInAvailable(false);
           }
@@ -61,12 +71,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
+    console.log('[Startup] Subscribing to Firebase onAuthStateChanged');
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+        console.log('[Startup] onAuthStateChanged fired — user:', nextUser ? nextUser.uid : 'null');
+        setUser(nextUser);
+        setLoading(false);
+      });
+      console.log('[Startup] Firebase auth subscription active');
+      return unsubscribe;
+    } catch (e) {
+      console.error('[Startup] onAuthStateChanged threw:', e);
       setLoading(false);
-    });
-
-    return unsubscribe;
+    }
   }, []);
 
   const requireAuthenticatedUser = useCallback((): User => {

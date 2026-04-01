@@ -21,7 +21,9 @@
       "buildNumber": "5",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -47,7 +49,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.1012641376582-q3b2a8q3k1qlvgqokaq229aujeat7hme"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

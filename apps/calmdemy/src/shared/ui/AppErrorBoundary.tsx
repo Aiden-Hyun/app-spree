@@ -28,7 +28,9 @@ export class AppErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("App crashed in React tree:", error, errorInfo);
+    console.error('[AppErrorBoundary] Caught error:', error?.message);
+    console.error('[AppErrorBoundary] Stack:', error?.stack);
+    console.error('[AppErrorBoundary] Component stack:', errorInfo?.componentStack);
   }
 
   private handleRetry = () => {
