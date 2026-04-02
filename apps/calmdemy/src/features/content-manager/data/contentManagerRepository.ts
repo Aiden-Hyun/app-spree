@@ -56,7 +56,7 @@ function withCommonSummaryFields(
   collection: ContentManagerCollection,
   item: {
     id: string;
-    title: string;
+    title?: string;
     description?: string;
     code?: string;
     durationMinutes?: number;
@@ -69,7 +69,7 @@ function withCommonSummaryFields(
     id: item.id,
     collection,
     typeLabel: CONTENT_MANAGER_COLLECTION_LABELS[collection],
-    title: item.title,
+    title: item.title || item.id,
     description: item.description,
     identifier: item.code || item.id,
     code: item.code,

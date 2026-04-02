@@ -12,7 +12,9 @@ function compareAlphabetically(
   left: ContentManagerItemSummary,
   right: ContentManagerItemSummary
 ): number {
-  const titleCompare = left.title.localeCompare(right.title, undefined, {
+  const leftTitle = left.title || '';
+  const rightTitle = right.title || '';
+  const titleCompare = leftTitle.localeCompare(rightTitle, undefined, {
     sensitivity: 'base',
   });
   if (titleCompare !== 0) return titleCompare;
