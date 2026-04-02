@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -11,8 +12,17 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Unsubscribe } from 'firebase/firestore';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { Theme } from '@/theme';
+import {
+  getLatestCompletedCourseJobForCourseId,
+  getLatestCompletedJobForContentId,
+  requestContentThumbnailGeneration,
+  requestCourseThumbnailGeneration,
+  subscribeToJob,
+} from '@features/admin/data/adminRepository';
+import { JOB_STATUS_LABELS, JobStatus } from '@features/admin/types';
 import { ContentManagerFilterPills } from '../components/ContentManagerFilterPills';
 import { ContentManagerResultCard } from '../components/ContentManagerResultCard';
 import {
@@ -22,6 +32,7 @@ import {
 import {
   CONTENT_MANAGER_COLLECTION_LABELS,
   CONTENT_MANAGER_COLLECTIONS,
+  ContentManagerItemSummary,
 } from '../types';
 
 const TYPE_OPTIONS = [
@@ -38,6 +49,11 @@ const ACCESS_OPTIONS = [
   { id: 'premium', label: 'Premium' },
 ] as const;
 
+const THUMBNAIL_OPTIONS = [
+  { id: 'all', label: 'All' },
+  { id: 'missing_or_web', label: 'Missing / Web URL' },
+] as const;
+
 export default function ContentManagerScreen() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -52,8 +68,163 @@ export default function ContentManagerScreen() {
     setAccess,
     setQuery,
     setType,
+    setThumbnail,
   } = useContentManagerCatalog();
   const { openCount } = useContentManagerReportsSummary();
+
+  // Track regeneration status per content item
+  const [regenStatus, setRegenStatus] = useState<
+    Map<string, { jobId?: string; status: JobStatus | 'no_job' | 'error' | 'unsupported'; label: string; completedAt?: string }>
+  >(new Map());
+  const [submittingIds, setSubmittingIds] = useState<Set<string>>(new Set());
+  const unsubscribesRef = useRef<Map<string, Unsubscribe>>(new Map());
+  const dismissTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Clean up all subscriptions and timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const unsub of unsubscribesRef.current.values()) unsub();
+      for (const timer of dismissTimersRef.current.values()) clearTimeout(timer);
+    };
+  }, []);
+
+  const setStatusWithAutoDismiss = useCallback(
+    (contentId: string, entry: { jobId?: string; status: 'no_job' | 'error' | 'unsupported'; label: string }) => {
+      // Clear any existing subscription/timer
+      unsubscribesRef.current.get(contentId)?.();
+      unsubscribesRef.current.delete(contentId);
+      const existingTimer = dismissTimersRef.current.get(contentId);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      setRegenStatus((prev) => {
+        const next = new Map(prev);
+        next.set(contentId, entry);
+        return next;
+      });
+
+      const timer = setTimeout(() => {
+        setRegenStatus((prev) => {
+          const next = new Map(prev);
+          next.delete(contentId);
+          return next;
+        });
+        dismissTimersRef.current.delete(contentId);
+      }, 8_000);
+      dismissTimersRef.current.set(contentId, timer);
+    },
+    []
+  );
+
+  const startWatchingJob = useCallback((contentId: string, jobId: string) => {
+    // Cancel any existing subscription for this content item
+    unsubscribesRef.current.get(contentId)?.();
+    const existingTimer = dismissTimersRef.current.get(contentId);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    setRegenStatus((prev) => {
+      const next = new Map(prev);
+      next.set(contentId, { jobId, status: 'pending', label: 'Queued' });
+      return next;
+    });
+
+    const unsub = subscribeToJob(jobId, (updatedJob) => {
+      if (!updatedJob) return;
+
+      const status = updatedJob.status;
+      const isTerminal = status === 'completed' || status === 'failed';
+      let completedAt: string | undefined;
+
+      if (status === 'completed' && updatedJob.runEndedAt?.toDate) {
+        completedAt = updatedJob.runEndedAt.toDate().toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+        });
+      }
+
+      const label =
+        status === 'completed' && completedAt
+          ? `Finished at ${completedAt}`
+          : status === 'failed'
+            ? updatedJob.error || 'Failed'
+            : status === 'pending'
+              ? 'Queued'
+              : JOB_STATUS_LABELS[status] || status;
+
+      setRegenStatus((prev) => {
+        const next = new Map(prev);
+        next.set(contentId, { jobId, status, label, completedAt });
+        return next;
+      });
+
+      if (isTerminal) {
+        // Unsubscribe once terminal
+        unsubscribesRef.current.get(contentId)?.();
+        unsubscribesRef.current.delete(contentId);
+
+        // Auto-dismiss after 15 seconds
+        const timer = setTimeout(() => {
+          setRegenStatus((prev) => {
+            const next = new Map(prev);
+            next.delete(contentId);
+            return next;
+          });
+          dismissTimersRef.current.delete(contentId);
+        }, 15_000);
+        dismissTimersRef.current.set(contentId, timer);
+      }
+    });
+
+    unsubscribesRef.current.set(contentId, unsub);
+  }, []);
+
+  const handleRegenerate = useCallback(async (item: ContentManagerItemSummary) => {
+    if (item.collection === 'course_sessions') {
+      setStatusWithAutoDismiss(item.id, {
+        status: 'unsupported',
+        label: 'Regenerate the parent course instead',
+      });
+      return;
+    }
+
+    setSubmittingIds((prev) => new Set(prev).add(item.id));
+    try {
+      let job;
+      if (item.collection === 'courses') {
+        job = await getLatestCompletedCourseJobForCourseId(item.id);
+      } else {
+        job = await getLatestCompletedJobForContentId(item.id);
+      }
+
+      if (!job) {
+        setStatusWithAutoDismiss(item.id, {
+          status: 'no_job',
+          label: 'No factory job found — only factory-created content supported',
+        });
+        return;
+      }
+
+      if (item.collection === 'courses') {
+        await requestCourseThumbnailGeneration(job);
+      } else {
+        await requestContentThumbnailGeneration(job);
+      }
+      startWatchingJob(item.id, job.id);
+    } catch (regenerateError) {
+      setStatusWithAutoDismiss(item.id, {
+        status: 'error',
+        label:
+          regenerateError instanceof Error
+            ? regenerateError.message
+            : 'Failed to request regeneration',
+      });
+    } finally {
+      setSubmittingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }, [startWatchingJob, setStatusWithAutoDismiss]);
 
   return (
     <View style={styles.screen}>
@@ -63,6 +234,10 @@ export default function ContentManagerScreen() {
         renderItem={({ item }) => (
           <ContentManagerResultCard
             item={item}
+            showRegenerate={filters.thumbnail === 'missing_or_web'}
+            isSubmitting={submittingIds.has(item.id)}
+            regenerationStatus={regenStatus.get(item.id)}
+            onRegenerate={() => handleRegenerate(item)}
             onPress={() =>
               router.push({
                 pathname: '/admin/content/[collection]/[id]',
@@ -155,6 +330,13 @@ export default function ContentManagerScreen() {
               options={ACCESS_OPTIONS}
               selectedId={filters.access}
               onChange={setAccess}
+            />
+
+            <ContentManagerFilterPills
+              label="Thumbnail"
+              options={THUMBNAIL_OPTIONS}
+              selectedId={filters.thumbnail}
+              onChange={setThumbnail}
             />
 
             {error ? (

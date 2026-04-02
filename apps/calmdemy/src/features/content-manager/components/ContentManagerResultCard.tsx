@@ -1,13 +1,25 @@
 import React, { useMemo } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { Theme } from '@/theme';
-import { ContentManagerItemSummary } from '../types';
+import { JobStatus } from '@features/admin/types';
+import { ContentManagerItemSummary, isWebStockThumbnail } from '../types';
+
+export interface RegenerationStatusInfo {
+  jobId?: string;
+  status: JobStatus | 'no_job' | 'error' | 'unsupported';
+  label: string;
+  completedAt?: string;
+}
 
 interface Props {
   item: ContentManagerItemSummary;
   onPress: () => void;
+  showRegenerate?: boolean;
+  isSubmitting?: boolean;
+  regenerationStatus?: RegenerationStatusInfo;
+  onRegenerate?: () => void;
 }
 
 function formatDuration(durationMinutes?: number): string | null {
@@ -34,10 +46,50 @@ function iconForCollection(collection: ContentManagerItemSummary['collection']) 
   }
 }
 
-export function ContentManagerResultCard({ item, onPress }: Props) {
+function statusIcon(status: RegenerationStatusInfo['status']): keyof typeof Ionicons.glyphMap {
+  switch (status) {
+    case 'pending':
+      return 'time-outline';
+    case 'image_generating':
+      return 'sparkles-outline';
+    case 'completed':
+      return 'checkmark-circle-outline';
+    case 'failed':
+    case 'error':
+      return 'alert-circle-outline';
+    case 'no_job':
+      return 'help-circle-outline';
+    case 'unsupported':
+      return 'information-circle-outline';
+    default:
+      return 'ellipsis-horizontal';
+  }
+}
+
+function isErrorStatus(status: RegenerationStatusInfo['status']): boolean {
+  return status === 'failed' || status === 'error' || status === 'no_job' || status === 'unsupported';
+}
+
+function isActiveStatus(status: RegenerationStatusInfo['status']): boolean {
+  return status === 'pending' || status === 'image_generating';
+}
+
+export function ContentManagerResultCard({
+  item,
+  onPress,
+  showRegenerate,
+  isSubmitting,
+  regenerationStatus,
+  onRegenerate,
+}: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const durationLabel = formatDuration(item.durationMinutes);
+  const thumbnailStatus = !item.thumbnailUrl
+    ? 'missing'
+    : isWebStockThumbnail(item.thumbnailUrl)
+      ? 'web'
+      : null;
 
   return (
     <Pressable
@@ -62,6 +114,20 @@ export function ContentManagerResultCard({ item, onPress }: Props) {
           <Text style={styles.title} numberOfLines={1}>
             {item.title}
           </Text>
+          {showRegenerate && thumbnailStatus ? (
+            <View
+              style={[
+                styles.thumbnailBadge,
+                thumbnailStatus === 'missing'
+                  ? styles.thumbnailMissingBadge
+                  : styles.thumbnailWebBadge,
+              ]}
+            >
+              <Text style={styles.thumbnailBadgeText}>
+                {thumbnailStatus === 'missing' ? 'No Image' : 'Web URL'}
+              </Text>
+            </View>
+          ) : null}
           <View
             style={[
               styles.accessBadge,
@@ -97,6 +163,80 @@ export function ContentManagerResultCard({ item, onPress }: Props) {
         ) : (
           <Text style={styles.descriptionMuted}>No description</Text>
         )}
+
+        {showRegenerate ? (
+          regenerationStatus ? (
+            <View
+              style={[
+                styles.statusPill,
+                regenerationStatus.status === 'completed'
+                  ? styles.statusPillSuccess
+                  : isErrorStatus(regenerationStatus.status)
+                    ? styles.statusPillError
+                    : styles.statusPillActive,
+              ]}
+            >
+              {isActiveStatus(regenerationStatus.status) ? (
+                <ActivityIndicator
+                  size={12}
+                  color={
+                    regenerationStatus.status === 'pending'
+                      ? theme.colors.textMuted
+                      : theme.colors.primary
+                  }
+                />
+              ) : (
+                <Ionicons
+                  name={statusIcon(regenerationStatus.status)}
+                  size={14}
+                  color={
+                    regenerationStatus.status === 'completed'
+                      ? theme.colors.success
+                      : isErrorStatus(regenerationStatus.status)
+                        ? theme.colors.error
+                        : theme.colors.textMuted
+                  }
+                />
+              )}
+              <Text
+                style={[
+                  styles.statusPillText,
+                  regenerationStatus.status === 'completed' && {
+                    color: theme.colors.success,
+                  },
+                  isErrorStatus(regenerationStatus.status) && {
+                    color: theme.colors.error,
+                  },
+                ]}
+                numberOfLines={2}
+              >
+                {regenerationStatus.label}
+              </Text>
+            </View>
+          ) : onRegenerate ? (
+            <Pressable
+              testID={`content-manager-regenerate-${item.collection}-${item.id}`}
+              onPress={(e) => {
+                e.stopPropagation();
+                onRegenerate();
+              }}
+              disabled={isSubmitting}
+              style={({ pressed }) => [
+                styles.regenerateButton,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
+              ) : (
+                <>
+                  <Ionicons name="image-outline" size={14} color={theme.colors.textOnPrimary} />
+                  <Text style={styles.regenerateButtonText}>Regenerate Image</Text>
+                </>
+              )}
+            </Pressable>
+          ) : null
+        ) : null}
       </View>
     </Pressable>
   );
@@ -200,5 +340,67 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.fonts.ui.regular,
       fontSize: 13,
       color: theme.colors.textMuted,
+    },
+    thumbnailBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: theme.borderRadius.full,
+    },
+    thumbnailMissingBadge: {
+      backgroundColor: `${theme.colors.error}20`,
+    },
+    thumbnailWebBadge: {
+      backgroundColor: `${theme.colors.warning}20`,
+    },
+    thumbnailBadgeText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 10,
+      color: theme.colors.text,
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
+    },
+    regenerateButton: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.primary,
+    },
+    regenerateButtonText: {
+      fontFamily: theme.fonts.ui.semiBold,
+      fontSize: 12,
+      color: theme.colors.textOnPrimary,
+    },
+    statusPill: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: theme.borderRadius.full,
+      borderWidth: 1,
+    },
+    statusPillActive: {
+      backgroundColor: `${theme.colors.primary}10`,
+      borderColor: `${theme.colors.primary}30`,
+    },
+    statusPillSuccess: {
+      backgroundColor: `${theme.colors.success}12`,
+      borderColor: `${theme.colors.success}30`,
+    },
+    statusPillError: {
+      backgroundColor: `${theme.colors.error}12`,
+      borderColor: `${theme.colors.error}30`,
+    },
+    statusPillText: {
+      fontFamily: theme.fonts.ui.medium,
+      fontSize: 12,
+      color: theme.colors.textSecondary,
     },
   });

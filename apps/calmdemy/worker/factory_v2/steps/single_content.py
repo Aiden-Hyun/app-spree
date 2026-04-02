@@ -140,9 +140,17 @@ def execute_generate_image(ctx: StepContext) -> StepResult:
     content_type = job_data.get("contentType", "guided_meditation")
     content_job_id = _content_job_id(ctx.job)
 
+    force_regenerate = bool(
+        runtime.get("thumbnail_generation_requested")
+        or job_data.get("thumbnailGenerationRequested")
+    )
+
     image_prompt = runtime.get("image_prompt") or job_data.get("imagePrompt")
-    if not image_prompt:
-        image_prompt = build_image_prompt(job_data, title, topic, content_type)
+    if not image_prompt or force_regenerate:
+        image_prompt = build_image_prompt(
+            job_data, title, topic, content_type,
+            ignore_saved_prompt=force_regenerate,
+        )
 
     local_image_path = generate_image(image_prompt)
     image_path, thumbnail_url = upload_image(
@@ -151,6 +159,7 @@ def execute_generate_image(ctx: StepContext) -> StepResult:
             **job_data,
             "_factoryContentJobId": content_job_id,
             "_factoryStepName": ctx.step_name,
+            "_factoryOverwriteExistingAsset": force_regenerate,
         },
     )
 
@@ -169,6 +178,7 @@ def execute_generate_image(ctx: StepContext) -> StepResult:
             "imagePath": image_path,
             "thumbnailUrl": thumbnail_url,
             "imageModel": config.IMAGE_MODEL_ID,
+            "thumbnailGenerationRequested": False,
             "jobRunId": ctx.run_id,
         },
     )

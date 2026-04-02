@@ -1,6 +1,7 @@
 import {
   ContentManagerFilterState,
   ContentManagerItemSummary,
+  isMissingOrWebThumbnail,
 } from '../types';
 
 function normalizeSearchValue(value?: string): string {
@@ -55,6 +56,9 @@ export function filterContentManagerItems(
       return false;
     }
     if (filters.access !== 'all' && item.access !== filters.access) {
+      return false;
+    }
+    if (filters.thumbnail === 'missing_or_web' && !isMissingOrWebThumbnail(item.thumbnailUrl)) {
       return false;
     }
     return true;

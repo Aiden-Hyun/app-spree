@@ -183,6 +183,7 @@ export function normalizeCourseSessionSummary(
     description: session.description,
     code: session.code,
     durationMinutes: session.duration_minutes,
+    thumbnailUrl: course?.thumbnailUrl,
     access: session.isFree === true ? 'free' : 'premium',
     previewRoute: {
       pathname: '/course/session/[id]',

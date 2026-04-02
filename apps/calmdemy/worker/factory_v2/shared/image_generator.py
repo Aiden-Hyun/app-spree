@@ -45,8 +45,8 @@ def _model_generation_defaults(model_id: str | None = None) -> dict[str, object]
     model_lower = _normalize_model_id(model_id).lower()
     if "sd-turbo" in model_lower or "sdxl-turbo" in model_lower:
         return {
-            "preferred_width": 512,
-            "preferred_height": 512,
+            "preferred_width": 384,
+            "preferred_height": 384,
             "num_inference_steps": 1,
             "guidance_scale": 0.0,
             "supports_negative_prompt": False,
@@ -335,8 +335,8 @@ def _generate_image_diffusers(
             raise RuntimeError("Image generation did not return a PIL image")
 
         tmp_dir = tempfile.mkdtemp(prefix="calmdemy_img_")
-        output_path = os.path.join(tmp_dir, "thumbnail.png")
-        image.save(output_path, format="PNG", optimize=True)
+        output_path = os.path.join(tmp_dir, "thumbnail.jpg")
+        image.save(output_path, format="JPEG", quality=85)
         return output_path
     finally:
         if result is not None:

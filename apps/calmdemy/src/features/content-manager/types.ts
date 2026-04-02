@@ -27,10 +27,13 @@ export interface ContentPreviewRoute {
   };
 }
 
+export type ContentManagerThumbnailFilter = 'all' | 'missing_or_web';
+
 export interface ContentManagerFilterState {
   query: string;
   type: ContentManagerTypeFilter;
   access: 'all' | ContentManagerAccess;
+  thumbnail: ContentManagerThumbnailFilter;
 }
 
 export interface ContentManagerItemSummary {
@@ -190,6 +193,7 @@ export const CONTENT_MANAGER_DEFAULT_FILTERS: ContentManagerFilterState = {
   query: '',
   type: 'all',
   access: 'all',
+  thumbnail: 'all',
 };
 
 export const CONTENT_MANAGER_DEFAULT_REPORT_FILTERS: ContentManagerReportsFilterState = {
@@ -213,6 +217,30 @@ export const CONTENT_MANAGER_REPORT_CATEGORY_LABELS: Record<ReportCategory, stri
   inappropriate: 'Inappropriate',
   other: 'Other',
 };
+
+/**
+ * Returns true if the thumbnail URL is from a free stock image site (unsplash,
+ * pexels, pixabay, etc.) rather than a generated/uploaded image hosted on
+ * Firebase Storage or similar owned infrastructure.
+ */
+export function isWebStockThumbnail(url: string | undefined): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('unsplash.com') ||
+    lower.includes('pexels.com') ||
+    lower.includes('pixabay.com') ||
+    lower.includes('stocksnap.io') ||
+    lower.includes('freepik.com')
+  );
+}
+
+/**
+ * Returns true if the item has no thumbnail or uses a free stock web image.
+ */
+export function isMissingOrWebThumbnail(thumbnailUrl: string | undefined): boolean {
+  return !thumbnailUrl || isWebStockThumbnail(thumbnailUrl);
+}
 
 export function isContentManagerCollection(
   value: string | string[] | undefined

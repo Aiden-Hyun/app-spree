@@ -42,8 +42,8 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 # Image generation
 IMAGE_BACKEND = os.getenv("IMAGE_BACKEND", "diffusers").strip().lower()
 IMAGE_MODEL_ID = os.getenv("IMAGE_MODEL_ID", "stabilityai/sd-turbo")
-IMAGE_WIDTH = int(os.getenv("IMAGE_WIDTH", "512"))
-IMAGE_HEIGHT = int(os.getenv("IMAGE_HEIGHT", "512"))
+IMAGE_WIDTH = int(os.getenv("IMAGE_WIDTH", "384"))
+IMAGE_HEIGHT = int(os.getenv("IMAGE_HEIGHT", "384"))
 IMAGE_STEPS = int(os.getenv("IMAGE_STEPS", "10"))
 IMAGE_GUIDANCE = float(os.getenv("IMAGE_GUIDANCE", "3.5"))
 IMAGE_PIPELINE_CACHE_ENABLED = (

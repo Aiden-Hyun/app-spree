@@ -135,6 +135,62 @@ class Orchestrator:
         return bool(script_approval.get("enabled") and script_approval.get("awaitingApproval"))
 
     @staticmethod
+    def _single_thumbnail_generation_requested(job: dict) -> bool:
+        """Check if a single-content (non-course) job has thumbnail regeneration requested."""
+        if job.get("job_type") == "course":
+            return False
+        runtime = dict(job.get("runtime") or {})
+        if isinstance(runtime.get("thumbnail_generation_requested"), bool):
+            return bool(runtime.get("thumbnail_generation_requested"))
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+        return bool(payload.get("thumbnailGenerationRequested"))
+
+    _SINGLE_CONTENT_COLLECTION_MAP: dict[str, str] = {
+        "guided_meditation": "guided_meditations",
+        "sleep_meditation": "sleep_meditations",
+        "bedtime_story": "bedtime_stories",
+        "emergency_meditation": "emergency_meditations",
+    }
+
+    def _update_published_content_thumbnail(self, job: dict, run_id: str) -> None:
+        """Update the published content document's thumbnail after a thumbnail-only run."""
+        if not hasattr(self.job_repo, "db"):
+            return
+        runtime = dict(job.get("runtime") or {})
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+
+        thumbnail_url = str(runtime.get("thumbnail_url") or "").strip()
+        if not thumbnail_url:
+            return
+
+        published_content_id = str(
+            runtime.get("published_content_id") or payload.get("publishedContentId") or ""
+        ).strip()
+        content_type = str(payload.get("contentType") or "guided_meditation")
+
+        collection_name = self._SINGLE_CONTENT_COLLECTION_MAP.get(content_type)
+        if not collection_name or not published_content_id:
+            return
+
+        thumbnail_field = "thumbnail_url" if content_type == "bedtime_story" else "thumbnailUrl"
+        self.job_repo.db.collection(collection_name).document(published_content_id).update({
+            thumbnail_field: thumbnail_url,
+        })
+
+        content_job_id = self._content_job_id(job)
+        if content_job_id:
+            self.job_repo.patch_compat_content_job_for_run(content_job_id, run_id, {
+                "status": "completed",
+                "thumbnailUrl": thumbnail_url,
+                "thumbnailGenerationRequested": False,
+                "jobRunId": run_id,
+                "lastRunStatus": "completed",
+                "runEndedAt": fs.SERVER_TIMESTAMP,
+            })
+
+    @staticmethod
     def _subject_plan_approval(job: dict) -> dict:
         runtime = dict(job.get("runtime") or {})
         plan_approval = runtime.get("subject_plan_approval")
@@ -781,6 +837,13 @@ class Orchestrator:
                 self._complete_course_publish_run(job, job_id, run_id)
                 return
         elif step_name == "generate_script" and self._single_script_approval_awaiting(job):
+            self.job_repo.mark_completed(job_id, run_id)
+            self.run_repo.mark_completed(run_id)
+            self._finalize_completed_job(job_id, run_id)
+            return
+
+        if step_name == "generate_image" and self._single_thumbnail_generation_requested(job):
+            self._update_published_content_thumbnail(job, run_id)
             self.job_repo.mark_completed(job_id, run_id)
             self.run_repo.mark_completed(run_id)
             self._finalize_completed_job(job_id, run_id)

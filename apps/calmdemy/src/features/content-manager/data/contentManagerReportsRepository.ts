@@ -9,6 +9,7 @@ import {
 import {
   getLatestCompletedCourseJobForCourseId,
   getLatestCompletedCourseJobForCourseSessionId,
+  getLatestCompletedJobForContentId,
 } from '@features/admin/data/adminRepository';
 import { db } from '@/firebase';
 import {
@@ -240,6 +241,37 @@ export async function getContentManagerRepairActionAvailability(
         canRegenerateScriptAndAudio: false,
         canGenerateThumbnail: false,
         message: 'No supporting course job found for this course.',
+      };
+    }
+
+    return {
+      job,
+      canOpenFactoryJob: true,
+      canRegenerateAudioOnly: false,
+      canRegenerateScriptAndAudio: false,
+      canGenerateThumbnail: true,
+    };
+  }
+
+  // Single content types: guided_meditations, sleep_meditations, bedtime_stories, emergency_meditations
+  const singleContentCollections = [
+    'guided_meditations',
+    'sleep_meditations',
+    'bedtime_stories',
+    'emergency_meditations',
+  ] as const;
+
+  if (singleContentCollections.includes(item.collection as any)) {
+    const job = await getLatestCompletedJobForContentId(item.id);
+
+    if (!job) {
+      return {
+        job: null,
+        canOpenFactoryJob: false,
+        canRegenerateAudioOnly: false,
+        canRegenerateScriptAndAudio: false,
+        canGenerateThumbnail: false,
+        message: 'No supporting factory job found for this content.',
       };
     }
 

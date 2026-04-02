@@ -1581,6 +1581,65 @@ export async function requestCourseThumbnailGeneration(job: ContentJob): Promise
   });
 }
 
+// ==================== CONTENT THUMBNAIL GENERATION ====================
+
+export async function getLatestCompletedJobForContentId(
+  contentId: string
+): Promise<ContentJob | null> {
+  const normalizedId = String(contentId || '').trim();
+  if (!normalizedId) return null;
+  try {
+    const snapshot = await getDocs(
+      query(
+        jobsCollection,
+        where('publishedContentId', '==', normalizedId),
+        limit(10)
+      )
+    );
+    const jobs = snapshot.docs
+      .map((d) => toContentJob(d.id, d.data() as Record<string, any>))
+      .filter((job) => job.status === 'completed');
+    return sortJobsNewestFirst(jobs)[0] || null;
+  } catch (error) {
+    console.error('Error fetching job by published content id:', error);
+    return null;
+  }
+}
+
+export async function requestContentThumbnailGeneration(job: ContentJob): Promise<void> {
+  if (job.contentType === 'course') {
+    return requestCourseThumbnailGeneration(job);
+  }
+
+  const supportedTypes = [
+    'guided_meditation',
+    'sleep_meditation',
+    'bedtime_story',
+    'emergency_meditation',
+  ];
+  if (!supportedTypes.includes(job.contentType)) {
+    throw new Error(`Thumbnail generation is not supported for ${job.contentType} jobs.`);
+  }
+
+  if (!job.publishedContentId) {
+    throw new Error('This job has not published any content yet.');
+  }
+
+  await updateDoc(doc(jobsCollection, job.id), {
+    status: 'pending',
+    error: null,
+    errorCode: null,
+    failedStage: null,
+    startedAt: null,
+    completedAt: null,
+    runEndedAt: null,
+    lastRunStatus: null,
+    thumbnailGenerationRequested: true,
+    ...freshDispatchResetFields({ preserveTiming: true }),
+    updatedAt: serverTimestamp(),
+  });
+}
+
 // ==================== FACTORY METRICS ====================
 
 export function subscribeToFactoryMetrics(

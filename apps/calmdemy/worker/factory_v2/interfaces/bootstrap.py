@@ -152,14 +152,17 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
                     else "launch_subject_children"
                 )
         else:
-            script_approval = content_job.get("scriptApproval") or {}
-            if (
-                isinstance(script_approval, dict)
-                and script_approval.get("enabled")
-                and bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
-                and not bool(script_approval.get("awaitingApproval"))
-            ):
-                first_step = "format_script"
+            if bool(content_job.get("thumbnailGenerationRequested")):
+                first_step = "generate_image"
+            else:
+                script_approval = content_job.get("scriptApproval") or {}
+                if (
+                    isinstance(script_approval, dict)
+                    and script_approval.get("enabled")
+                    and bool(script_approval.get("scriptApprovedAt") or script_approval.get("scriptApprovedBy"))
+                    and not bool(script_approval.get("awaitingApproval"))
+                ):
+                    first_step = "format_script"
     if status == "publishing":
         trigger = "manual_publish"
         first_step = "publish_course" if is_course else "publish_content"

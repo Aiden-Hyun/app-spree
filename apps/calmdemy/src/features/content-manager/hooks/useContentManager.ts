@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
+  requestContentThumbnailGeneration,
   requestCourseThumbnailGeneration,
   regenerateCourseSessions,
 } from '@features/admin/data/adminRepository';
@@ -114,6 +115,10 @@ export function useContentManagerCatalog() {
     setFilters((current) => ({ ...current, access }));
   }, []);
 
+  const setThumbnail = useCallback((thumbnail: ContentManagerFilterState['thumbnail']) => {
+    setFilters((current) => ({ ...current, thumbnail }));
+  }, []);
+
   return {
     items,
     filteredItems,
@@ -125,6 +130,7 @@ export function useContentManagerCatalog() {
     setQuery,
     setType,
     setAccess,
+    setThumbnail,
   };
 }
 
@@ -539,7 +545,11 @@ export function useContentManagerDetail(
 
       try {
         if (action === 'thumbnail') {
-          await requestCourseThumbnailGeneration(repairAvailability.job);
+          if (repairAvailability.job.contentType === 'course') {
+            await requestCourseThumbnailGeneration(repairAvailability.job);
+          } else {
+            await requestContentThumbnailGeneration(repairAvailability.job);
+          }
           setRepairMessage('Thumbnail generation requested.');
         } else {
           const sessionCode = repairAvailability.sessionCode || item.code;

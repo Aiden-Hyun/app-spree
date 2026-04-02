@@ -170,7 +170,7 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
     content_type = job_data.get("contentType", "guided_meditation")
 
     base_path = IMAGE_STORAGE_PATHS.get(content_type, "images/generated")
-    filename = f"{_asset_stem(job_data, default_label='image')}.png"
+    filename = f"{_asset_stem(job_data, default_label='image')}.jpg"
     storage_path = f"{base_path}/{filename}"
 
     logger.info("Uploading image", extra={"storage_path": storage_path})
@@ -195,7 +195,7 @@ def upload_image(image_path: str, job_data: dict) -> tuple[str, str]:
         }
         blob.upload_from_filename(
             image_path,
-            content_type="image/png",
+            content_type="image/jpeg",
         )
         blob.cache_control = "public, max-age=31536000"
         blob.patch()
