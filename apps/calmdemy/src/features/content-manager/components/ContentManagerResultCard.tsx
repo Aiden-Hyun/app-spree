@@ -41,6 +41,24 @@ function iconForCollection(collection: ContentManagerItemSummary['collection']) 
       return 'school-outline';
     case 'course_sessions':
       return 'reader-outline';
+    case 'albums':
+      return 'disc-outline';
+    case 'sleep_sounds':
+      return 'cloudy-night-outline';
+    case 'background_sounds':
+      return 'volume-low-outline';
+    case 'white_noise':
+      return 'radio-outline';
+    case 'music':
+      return 'musical-notes-outline';
+    case 'asmr':
+      return 'headset-outline';
+    case 'series':
+      return 'library-outline';
+    case 'breathing_exercises':
+      return 'fitness-outline';
+    case 'meditation_programs':
+      return 'calendar-outline';
     default:
       return 'document-text-outline';
   }

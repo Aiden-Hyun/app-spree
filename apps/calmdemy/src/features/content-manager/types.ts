@@ -8,7 +8,16 @@ export type ContentManagerCollection =
   | 'bedtime_stories'
   | 'emergency_meditations'
   | 'courses'
-  | 'course_sessions';
+  | 'course_sessions'
+  | 'albums'
+  | 'sleep_sounds'
+  | 'background_sounds'
+  | 'white_noise'
+  | 'music'
+  | 'asmr'
+  | 'series'
+  | 'breathing_exercises'
+  | 'meditation_programs';
 
 export type ContentManagerAccess = 'free' | 'premium';
 
@@ -21,7 +30,12 @@ export interface ContentPreviewRoute {
     | '/sleep/[id]'
     | '/emergency/[id]'
     | '/course/[id]'
-    | '/course/session/[id]';
+    | '/course/session/[id]'
+    | '/album/[id]'
+    | '/sleep-sounds'
+    | '/music/[id]'
+    | '/series/[id]'
+    | '/breathing';
   params: Record<string, string> & {
     id: string;
   };
@@ -178,6 +192,15 @@ export const CONTENT_MANAGER_COLLECTION_LABELS: Record<ContentManagerCollection,
   emergency_meditations: 'Emergency Meditation',
   courses: 'Course',
   course_sessions: 'Course Session',
+  albums: 'Album',
+  sleep_sounds: 'Sleep Sound',
+  background_sounds: 'Background Sound',
+  white_noise: 'White Noise',
+  music: 'Music',
+  asmr: 'ASMR',
+  series: 'Series',
+  breathing_exercises: 'Breathing Exercise',
+  meditation_programs: 'Meditation Program',
 };
 
 export const CONTENT_MANAGER_COLLECTIONS: ContentManagerCollection[] = [
@@ -187,6 +210,15 @@ export const CONTENT_MANAGER_COLLECTIONS: ContentManagerCollection[] = [
   'emergency_meditations',
   'courses',
   'course_sessions',
+  'albums',
+  'sleep_sounds',
+  'background_sounds',
+  'white_noise',
+  'music',
+  'asmr',
+  'series',
+  'breathing_exercises',
+  'meditation_programs',
 ];
 
 export const CONTENT_MANAGER_DEFAULT_FILTERS: ContentManagerFilterState = {

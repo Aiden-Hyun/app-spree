@@ -90,7 +90,7 @@ def bootstrap_from_content_job(db, content_job_id: str, content_job: dict | None
     if status == "pending" and is_course:
         # Resume the course at the earliest missing step instead of re-running
         # the whole pipeline when plan/scripts/approvals already exist.
-        if bool(content_job.get("thumbnailGenerationRequested")) and content_job.get("coursePlan"):
+        if bool(content_job.get("thumbnailGenerationRequested")) and (content_job.get("coursePlan") or content_job.get("publishedContentId")):
             first_step = "generate_course_thumbnail"
         else:
             regeneration = content_job.get("courseRegeneration") or {}

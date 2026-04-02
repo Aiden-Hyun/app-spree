@@ -31,6 +31,12 @@ IMAGE_STORAGE_PATHS = {
     "emergency_meditation": "images/meditate/emergency",
     "course_session": "images/meditate/courses",
     "course": "images/meditate/courses",
+    "album": "images/music/albums",
+    "sleep_sound": "images/sleep/sounds",
+    "white_noise": "images/music/white_noise",
+    "music": "images/music/tracks",
+    "asmr": "images/music/asmr",
+    "series": "images/sleep/series",
 }
 
 

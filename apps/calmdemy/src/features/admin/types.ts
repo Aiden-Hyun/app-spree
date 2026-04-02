@@ -71,7 +71,13 @@ export type FactoryContentType =
   | 'emergency_meditation'
   | 'course_session'
   | 'course'
-  | 'full_subject';
+  | 'full_subject'
+  | 'album'
+  | 'sleep_sound'
+  | 'white_noise'
+  | 'music'
+  | 'asmr'
+  | 'series';
 
 export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   guided_meditation: 'Guided Meditation',
@@ -81,6 +87,12 @@ export const CONTENT_TYPE_LABELS: Record<FactoryContentType, string> = {
   course_session: 'Course Session',
   course: 'Full Course (9 audio)',
   full_subject: 'Full Subject',
+  album: 'Album',
+  sleep_sound: 'Sleep Sound',
+  white_noise: 'White Noise',
+  music: 'Music',
+  asmr: 'ASMR',
+  series: 'Series',
 };
 
 // ==================== COURSE REGENERATION ====================

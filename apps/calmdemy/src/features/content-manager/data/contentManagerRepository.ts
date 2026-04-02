@@ -10,15 +10,35 @@ import {
   getEmergencyMeditations,
   getMeditationById,
   getMeditations,
+  getPrograms,
+  getBreathingExercises,
 } from '@features/meditate/data/meditateRepository';
 import {
+  FirestoreAlbum,
+  FirestoreBackgroundSound,
+  FirestoreMusicItem,
+  FirestoreSleepSound,
+  getAlbumById,
+  getAlbums,
+  getAsmr,
+  getBackgroundSoundById,
+  getBackgroundSounds,
+  getMusic,
+  getSleepSoundById,
+  getSleepSounds,
+  getWhiteNoise,
+} from '@features/music/data/musicRepository';
+import {
+  FirestoreSeries,
   FirestoreSleepMeditation,
   getBedtimeStories,
   getBedtimeStoryById,
+  getSeriesById,
+  getSeries,
   getSleepMeditationById,
   getSleepMeditations,
 } from '@features/sleep/data/sleepRepository';
-import { BedtimeStory } from '@/types';
+import { BedtimeStory, BreathingExercise, MeditationProgram } from '@/types';
 import { GuidedMeditation } from '@/types';
 import {
   buildEditableValues,
@@ -332,6 +352,116 @@ function normalizeCourseSessionDetail(
   };
 }
 
+// ==================== ALBUM ====================
+
+export function normalizeAlbumSummary(album: FirestoreAlbum): ContentManagerItemSummary {
+  return withCommonSummaryFields('albums', {
+    id: album.id,
+    title: album.title,
+    description: album.description,
+    durationMinutes: album.totalDuration,
+    thumbnailUrl: album.thumbnailUrl,
+    access: 'free',
+    previewRoute: { pathname: '/album/[id]', params: { id: album.id } },
+  });
+}
+
+// ==================== SLEEP SOUND ====================
+
+export function normalizeSleepSoundSummary(sound: FirestoreSleepSound): ContentManagerItemSummary {
+  return withCommonSummaryFields('sleep_sounds', {
+    id: sound.id,
+    title: sound.title,
+    description: sound.description,
+    thumbnailUrl: sound.thumbnailUrl,
+    access: 'free',
+    previewRoute: { pathname: '/sleep-sounds', params: { id: sound.id } },
+  });
+}
+
+// ==================== BACKGROUND SOUND ====================
+
+export function normalizeBackgroundSoundSummary(
+  sound: FirestoreBackgroundSound
+): ContentManagerItemSummary {
+  return withCommonSummaryFields('background_sounds', {
+    id: sound.id,
+    title: sound.title,
+    access: 'free',
+    previewRoute: { pathname: '/sleep-sounds', params: { id: sound.id } },
+  });
+}
+
+// ==================== WHITE NOISE / MUSIC / ASMR ====================
+
+function normalizeMusicItemSummary(
+  collection: 'white_noise' | 'music' | 'asmr',
+  item: FirestoreMusicItem
+): ContentManagerItemSummary {
+  return withCommonSummaryFields(collection, {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    durationMinutes: item.duration_minutes,
+    thumbnailUrl: item.thumbnailUrl,
+    access: 'free',
+    previewRoute: { pathname: '/music/[id]', params: { id: item.id } },
+  });
+}
+
+// ==================== SERIES ====================
+
+export function normalizeSeriesSummary(s: FirestoreSeries): ContentManagerItemSummary {
+  return withCommonSummaryFields('series', {
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    durationMinutes: s.totalDuration,
+    thumbnailUrl: s.thumbnailUrl,
+    access: 'free',
+    previewRoute: { pathname: '/series/[id]', params: { id: s.id } },
+  });
+}
+
+// ==================== BREATHING EXERCISE ====================
+
+export function normalizeBreathingExerciseSummary(
+  exercise: BreathingExercise
+): ContentManagerItemSummary {
+  return withCommonSummaryFields('breathing_exercises', {
+    id: exercise.id,
+    title: exercise.name,
+    description: exercise.description,
+    durationMinutes: exercise.duration_minutes,
+    access: 'free',
+    previewRoute: { pathname: '/breathing', params: { id: exercise.id } },
+  });
+}
+
+// ==================== MEDITATION PROGRAM ====================
+
+export function normalizeMeditationProgramSummary(
+  program: MeditationProgram
+): ContentManagerItemSummary {
+  return withCommonSummaryFields('meditation_programs', {
+    id: program.id,
+    title: program.title,
+    description: program.description,
+    access: 'free',
+    previewRoute: { pathname: '/meditation/[id]', params: { id: program.id } },
+  });
+}
+
+// ==================== FETCH ALL ====================
+
+async function safeGet<T>(fn: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await fn();
+  } catch {
+    return [];
+  }
+}
+
 export async function getContentManagerItems(): Promise<ContentManagerItemSummary[]> {
   const [
     meditations,
@@ -340,6 +470,15 @@ export async function getContentManagerItems(): Promise<ContentManagerItemSummar
     emergencyMeditations,
     courses,
     courseSessions,
+    albums,
+    sleepSounds,
+    backgroundSounds,
+    whiteNoise,
+    musicItems,
+    asmrItems,
+    seriesList,
+    breathingExercises,
+    meditationPrograms,
   ] = await Promise.all([
     getMeditations(),
     getSleepMeditations(),
@@ -347,6 +486,15 @@ export async function getContentManagerItems(): Promise<ContentManagerItemSummar
     getEmergencyMeditations(),
     getCourses(),
     getCourseSessions(),
+    safeGet(getAlbums),
+    safeGet(getSleepSounds),
+    safeGet(getBackgroundSounds),
+    safeGet(getWhiteNoise),
+    safeGet(getMusic),
+    safeGet(getAsmr),
+    safeGet(getSeries),
+    safeGet(getBreathingExercises),
+    safeGet(getPrograms),
   ]);
 
   const coursesById = new Map(courses.map((course) => [course.id, course]));
@@ -360,6 +508,15 @@ export async function getContentManagerItems(): Promise<ContentManagerItemSummar
     ...courseSessions.map((session) =>
       normalizeCourseSessionSummary(session, coursesById.get(session.courseId))
     ),
+    ...albums.map(normalizeAlbumSummary),
+    ...sleepSounds.map(normalizeSleepSoundSummary),
+    ...backgroundSounds.map(normalizeBackgroundSoundSummary),
+    ...whiteNoise.map((item) => normalizeMusicItemSummary('white_noise', item)),
+    ...musicItems.map((item) => normalizeMusicItemSummary('music', item)),
+    ...asmrItems.map((item) => normalizeMusicItemSummary('asmr', item)),
+    ...seriesList.map(normalizeSeriesSummary),
+    ...breathingExercises.map(normalizeBreathingExerciseSummary),
+    ...meditationPrograms.map(normalizeMeditationProgramSummary),
   ];
 }
 
@@ -393,6 +550,145 @@ export async function getContentManagerItemDetail(
       if (!session) return null;
       const course = session.courseId ? await getCourseById(session.courseId) : null;
       return normalizeCourseSessionDetail(session, course);
+    }
+    case 'albums': {
+      const album = await getAlbumById(id);
+      if (!album) return null;
+      return {
+        ...normalizeAlbumSummary(album),
+        metadata: appendMetadata([
+          { label: 'Artist', value: album.artist },
+          { label: 'Category', value: album.category },
+          { label: 'Track Count', value: album.trackCount },
+          { label: 'Color', value: album.color, monospace: true },
+        ]),
+        relations: (album.tracks || []).map((track, i) => ({
+          label: `Track ${i + 1}`,
+          collection: 'albums' as ContentManagerCollection,
+          id: album.id,
+          title: track.title,
+        })),
+        editableFields: getContentManagerEditFields('albums'),
+        editableValues: buildEditableValues('albums', album as unknown as Record<string, unknown>),
+      };
+    }
+    case 'sleep_sounds': {
+      const sound = await getSleepSoundById(id);
+      if (!sound) return null;
+      return {
+        ...normalizeSleepSoundSummary(sound),
+        metadata: appendMetadata([
+          { label: 'Category', value: sound.category },
+          { label: 'Icon', value: sound.icon },
+          { label: 'Color', value: sound.color, monospace: true },
+          { label: 'Audio Path', value: sound.audioPath, monospace: true },
+        ]),
+        relations: [],
+        editableFields: getContentManagerEditFields('sleep_sounds'),
+        editableValues: buildEditableValues('sleep_sounds', sound as unknown as Record<string, unknown>),
+      };
+    }
+    case 'background_sounds': {
+      const sound = await getBackgroundSoundById(id);
+      if (!sound) return null;
+      return {
+        ...normalizeBackgroundSoundSummary(sound),
+        metadata: appendMetadata([
+          { label: 'Category', value: sound.category },
+          { label: 'Icon', value: sound.icon },
+          { label: 'Color', value: sound.color, monospace: true },
+          { label: 'Audio Path', value: sound.audioPath, monospace: true },
+        ]),
+        relations: [],
+        editableFields: getContentManagerEditFields('background_sounds'),
+        editableValues: buildEditableValues('background_sounds', sound as unknown as Record<string, unknown>),
+      };
+    }
+    case 'white_noise':
+    case 'music':
+    case 'asmr': {
+      // All three share FirestoreMusicItem shape — resolved via collection-specific getById
+      const getById =
+        collection === 'white_noise'
+          ? async (itemId: string) => (await getWhiteNoise()).find((i) => i.id === itemId) || null
+          : collection === 'music'
+            ? async (itemId: string) => (await getMusic()).find((i) => i.id === itemId) || null
+            : async (itemId: string) => (await getAsmr()).find((i) => i.id === itemId) || null;
+      const item = await getById(id);
+      if (!item) return null;
+      return {
+        ...normalizeMusicItemSummary(collection, item),
+        metadata: appendMetadata([
+          { label: 'Category', value: item.category },
+          { label: 'Icon', value: item.icon },
+          { label: 'Color', value: item.color, monospace: true },
+          { label: 'Audio Path', value: item.audioPath, monospace: true },
+        ]),
+        relations: [],
+        editableFields: getContentManagerEditFields(collection),
+        editableValues: buildEditableValues(collection, item as unknown as Record<string, unknown>),
+      };
+    }
+    case 'series': {
+      const s = await getSeriesById(id);
+      if (!s) return null;
+      return {
+        ...normalizeSeriesSummary(s),
+        metadata: appendMetadata([
+          { label: 'Narrator', value: s.narrator },
+          { label: 'Category', value: s.category },
+          { label: 'Chapter Count', value: s.chapterCount },
+          { label: 'Color', value: s.color, monospace: true },
+        ]),
+        relations: (s.chapters || []).map((ch, i) => ({
+          label: `Chapter ${i + 1}`,
+          collection: 'series' as ContentManagerCollection,
+          id: s.id,
+          title: ch.title,
+        })),
+        editableFields: getContentManagerEditFields('series'),
+        editableValues: buildEditableValues('series', s as unknown as Record<string, unknown>),
+      };
+    }
+    case 'breathing_exercises': {
+      const exercises = await getBreathingExercises();
+      const exercise = exercises.find((e) => e.id === id) || null;
+      if (!exercise) return null;
+      return {
+        ...normalizeBreathingExerciseSummary(exercise),
+        metadata: appendMetadata([
+          { label: 'Difficulty', value: exercise.difficulty_level },
+          { label: 'Benefits', value: exercise.benefits?.join(', ') },
+          { label: 'Inhale', value: `${exercise.pattern.inhale_duration}s` },
+          { label: 'Hold', value: exercise.pattern.hold_duration ? `${exercise.pattern.hold_duration}s` : undefined },
+          { label: 'Exhale', value: `${exercise.pattern.exhale_duration}s` },
+          { label: 'Cycles', value: exercise.pattern.cycles },
+        ]),
+        relations: [],
+        editableFields: getContentManagerEditFields('breathing_exercises'),
+        editableValues: buildEditableValues('breathing_exercises', exercise as unknown as Record<string, unknown>),
+      };
+    }
+    case 'meditation_programs': {
+      const programs = await getPrograms();
+      const program = programs.find((p) => p.id === id) || null;
+      if (!program) return null;
+      return {
+        ...normalizeMeditationProgramSummary(program),
+        metadata: appendMetadata([
+          { label: 'Difficulty', value: program.difficulty_level },
+          { label: 'Duration (days)', value: program.duration_days },
+          { label: 'Active', value: program.is_active ? 'Yes' : 'No' },
+        ]),
+        relations: (program.sessions || []).map((session, i) => ({
+          label: `Session ${i + 1}`,
+          collection: 'guided_meditations' as ContentManagerCollection,
+          id: session.id,
+          title: session.title,
+        })),
+        editableFields: getContentManagerEditFields('meditation_programs'),
+        editableValues: buildEditableValues('meditation_programs', program as unknown as Record<string, unknown>),
+      };
     }
     default:
       return null;

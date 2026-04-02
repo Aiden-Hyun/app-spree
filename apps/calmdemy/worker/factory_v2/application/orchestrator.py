@@ -151,6 +151,12 @@ class Orchestrator:
         "sleep_meditation": "sleep_meditations",
         "bedtime_story": "bedtime_stories",
         "emergency_meditation": "emergency_meditations",
+        "album": "albums",
+        "sleep_sound": "sleep_sounds",
+        "white_noise": "white_noise",
+        "music": "music",
+        "asmr": "asmr",
+        "series": "series",
     }
 
     def _update_published_content_thumbnail(self, job: dict, run_id: str) -> None:
@@ -178,6 +184,45 @@ class Orchestrator:
         self.job_repo.db.collection(collection_name).document(published_content_id).update({
             thumbnail_field: thumbnail_url,
         })
+
+        content_job_id = self._content_job_id(job)
+        if content_job_id:
+            self.job_repo.patch_compat_content_job_for_run(content_job_id, run_id, {
+                "status": "completed",
+                "thumbnailUrl": thumbnail_url,
+                "thumbnailGenerationRequested": False,
+                "jobRunId": run_id,
+                "lastRunStatus": "completed",
+                "runEndedAt": fs.SERVER_TIMESTAMP,
+            })
+
+    def _update_published_course_thumbnail(self, job: dict, run_id: str) -> None:
+        """Update the published course document's thumbnail after a thumbnail-only run."""
+        if not hasattr(self.job_repo, "db"):
+            return
+        runtime = dict(job.get("runtime") or {})
+        request = job.get("request") or {}
+        payload = request.get("content_job") or request.get("job_data") or {}
+
+        thumbnail_url = str(runtime.get("thumbnail_url") or "").strip()
+        if not thumbnail_url:
+            return
+
+        # Update the course document if we know which one it is
+        published_content_id = str(
+            runtime.get("published_content_id") or payload.get("publishedContentId") or ""
+        ).strip()
+        course_id = str(
+            runtime.get("course_id") or payload.get("courseId") or published_content_id
+        ).strip()
+
+        if course_id:
+            try:
+                self.job_repo.db.collection("courses").document(course_id).update({
+                    "thumbnailUrl": thumbnail_url,
+                })
+            except Exception:
+                pass  # Course doc may not exist for jobs that haven't published yet
 
         content_job_id = self._content_job_id(job)
         if content_job_id:
@@ -784,6 +829,7 @@ class Orchestrator:
                     self._ensure_step_enqueued(job, job_id, run_id, "publish_course")
                     return
                 if self._course_thumbnail_generation_requested(job):
+                    self._update_published_course_thumbnail(job, run_id)
                     self.job_repo.mark_completed(job_id, run_id)
                     self.run_repo.mark_completed(run_id)
                     return

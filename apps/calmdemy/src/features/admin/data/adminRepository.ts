@@ -21,6 +21,7 @@ import {
   ActiveJobWorker,
   ContentJob,
   CourseRegenerationMode,
+  FactoryContentType,
   FactoryJob,
   FactoryJobRun,
   CreateJobInput,
@@ -1616,6 +1617,12 @@ export async function requestContentThumbnailGeneration(job: ContentJob): Promis
     'sleep_meditation',
     'bedtime_story',
     'emergency_meditation',
+    'album',
+    'sleep_sound',
+    'white_noise',
+    'music',
+    'asmr',
+    'series',
   ];
   if (!supportedTypes.includes(job.contentType)) {
     throw new Error(`Thumbnail generation is not supported for ${job.contentType} jobs.`);
@@ -1638,6 +1645,70 @@ export async function requestContentThumbnailGeneration(job: ContentJob): Promis
     ...freshDispatchResetFields({ preserveTiming: true }),
     updatedAt: serverTimestamp(),
   });
+}
+
+const COLLECTION_TO_CONTENT_TYPE: Record<string, FactoryContentType> = {
+  guided_meditations: 'guided_meditation',
+  sleep_meditations: 'sleep_meditation',
+  bedtime_stories: 'bedtime_story',
+  emergency_meditations: 'emergency_meditation',
+  courses: 'course',
+  course_sessions: 'course_session',
+  albums: 'album',
+  sleep_sounds: 'sleep_sound',
+  white_noise: 'white_noise',
+  music: 'music',
+  asmr: 'asmr',
+  series: 'series',
+};
+
+/**
+ * Create a minimal factory job for content that was seeded (not factory-created)
+ * so we can generate a thumbnail for it. The job starts at the `generate_image`
+ * step and writes the result back to the content document.
+ */
+export async function createThumbnailOnlyJob(opts: {
+  contentId: string;
+  collection: string;
+  title: string;
+  description?: string;
+}): Promise<string> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+
+  const contentType = COLLECTION_TO_CONTENT_TYPE[opts.collection];
+  if (!contentType || contentType === 'course_session' || contentType === 'full_subject') {
+    throw new Error(`Thumbnail-only jobs are not supported for ${opts.collection}.`);
+  }
+
+  const jobData: Record<string, any> = {
+    status: 'pending',
+    contentType,
+    params: { topic: opts.title },
+    title: opts.title,
+    publishedContentId: opts.contentId,
+    thumbnailGenerationRequested: true,
+    autoPublish: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    createdBy: userId,
+    // Minimal fields so the worker can bootstrap
+    llmBackend: 'lmstudio',
+    ttsBackend: 'dms',
+    llmModel: 'lmstudio-local',
+    ttsModel: '',
+    ttsVoice: '',
+    generatedTitle: opts.title,
+    // Store description in params for image prompt context, not as generatedScript
+    // (generatedScript triggers script validation in format_script which would fail)
+  };
+
+  if (opts.description) {
+    jobData.params.description = opts.description;
+  }
+
+  const docRef = await addDoc(jobsCollection, jobData);
+  return docRef.id;
 }
 
 // ==================== FACTORY METRICS ====================

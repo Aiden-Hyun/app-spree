@@ -16,6 +16,7 @@ import { Unsubscribe } from 'firebase/firestore';
 import { useTheme } from '@core/providers/contexts/ThemeContext';
 import { Theme } from '@/theme';
 import {
+  createThumbnailOnlyJob,
   getLatestCompletedCourseJobForCourseId,
   getLatestCompletedJobForContentId,
   requestContentThumbnailGeneration,
@@ -177,38 +178,54 @@ export default function ContentManagerScreen() {
     unsubscribesRef.current.set(contentId, unsub);
   }, []);
 
+  const NO_THUMBNAIL_COLLECTIONS = ['course_sessions', 'background_sounds', 'breathing_exercises', 'meditation_programs'];
+
   const handleRegenerate = useCallback(async (item: ContentManagerItemSummary) => {
-    if (item.collection === 'course_sessions') {
+    if (NO_THUMBNAIL_COLLECTIONS.includes(item.collection)) {
       setStatusWithAutoDismiss(item.id, {
         status: 'unsupported',
-        label: 'Regenerate the parent course instead',
+        label: item.collection === 'course_sessions'
+          ? 'Regenerate the parent course instead'
+          : 'This content type does not support thumbnails',
       });
       return;
     }
 
     setSubmittingIds((prev) => new Set(prev).add(item.id));
     try {
-      let job;
-      if (item.collection === 'courses') {
-        job = await getLatestCompletedCourseJobForCourseId(item.id);
-      } else {
-        job = await getLatestCompletedJobForContentId(item.id);
-      }
-
-      if (!job) {
-        setStatusWithAutoDismiss(item.id, {
-          status: 'no_job',
-          label: 'No factory job found — only factory-created content supported',
-        });
-        return;
-      }
+      let jobId: string;
 
       if (item.collection === 'courses') {
-        await requestCourseThumbnailGeneration(job);
+        const job = await getLatestCompletedCourseJobForCourseId(item.id);
+        if (job) {
+          await requestCourseThumbnailGeneration(job);
+          jobId = job.id;
+        } else {
+          // Course with no factory job — create a thumbnail-only job
+          jobId = await createThumbnailOnlyJob({
+            contentId: item.id,
+            collection: item.collection,
+            title: item.title,
+            description: item.description,
+          });
+        }
       } else {
-        await requestContentThumbnailGeneration(job);
+        const job = await getLatestCompletedJobForContentId(item.id);
+        if (job) {
+          await requestContentThumbnailGeneration(job);
+          jobId = job.id;
+        } else {
+          // Seeded content with no factory job — create a thumbnail-only job
+          jobId = await createThumbnailOnlyJob({
+            contentId: item.id,
+            collection: item.collection,
+            title: item.title,
+            description: item.description,
+          });
+        }
       }
-      startWatchingJob(item.id, job.id);
+
+      startWatchingJob(item.id, jobId);
     } catch (regenerateError) {
       setStatusWithAutoDismiss(item.id, {
         status: 'error',

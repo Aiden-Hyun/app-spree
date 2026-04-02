@@ -253,12 +253,18 @@ export async function getContentManagerRepairActionAvailability(
     };
   }
 
-  // Single content types: guided_meditations, sleep_meditations, bedtime_stories, emergency_meditations
+  // All non-course content types that support thumbnail generation
   const singleContentCollections = [
     'guided_meditations',
     'sleep_meditations',
     'bedtime_stories',
     'emergency_meditations',
+    'albums',
+    'sleep_sounds',
+    'white_noise',
+    'music',
+    'asmr',
+    'series',
   ] as const;
 
   if (singleContentCollections.includes(item.collection as any)) {
