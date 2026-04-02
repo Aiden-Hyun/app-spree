@@ -1,8 +1,16 @@
 import {
+  ContentManagerCollection,
   ContentManagerFilterState,
   ContentManagerItemSummary,
   isMissingOrWebThumbnail,
 } from '../types';
+
+/** Collections that don't have a thumbnailUrl field — exclude from thumbnail filter. */
+const NO_THUMBNAIL_COLLECTIONS: Set<ContentManagerCollection> = new Set([
+  'background_sounds',
+  'breathing_exercises',
+  'meditation_programs',
+]);
 
 function normalizeSearchValue(value?: string): string {
   return String(value || '').trim().toLowerCase();
@@ -60,8 +68,13 @@ export function filterContentManagerItems(
     if (filters.access !== 'all' && item.access !== filters.access) {
       return false;
     }
-    if (filters.thumbnail === 'missing_or_web' && !isMissingOrWebThumbnail(item.thumbnailUrl)) {
-      return false;
+    if (filters.thumbnail === 'missing_or_web') {
+      if (NO_THUMBNAIL_COLLECTIONS.has(item.collection)) {
+        return false;
+      }
+      if (!isMissingOrWebThumbnail(item.thumbnailUrl)) {
+        return false;
+      }
     }
     return true;
   });
