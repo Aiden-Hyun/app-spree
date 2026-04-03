@@ -19,17 +19,86 @@ import {
 import { APPLE_SCOPES } from "@core/providers/contexts/auth/actions/constants";
 import { isCredentialInUseError } from "@core/providers/contexts/auth/actions/utils";
 
+/**
+ * ============================================================
+ * credentialActions.ts — Credential Acquisition & Account Linking
+ *                        (Factory Method + Dependency Injection)
+ * ============================================================
+ *
+ * Architectural Role:
+ *   This is the most complex of the three action factories. It owns two
+ *   responsibilities:
+ *   1. **Credential acquisition** — getGoogleCredential / getAppleCredential
+ *      talk to native OAuth SDKs and return Firebase-compatible AuthCredentials.
+ *   2. **Account linking** — upgradeAnonymous*, linkProvider, linkAnonymousAccount
+ *      attach credentials to existing Firebase users, handling the collision
+ *      case where the credential already belongs to another account.
+ *
+ * Design Patterns:
+ *   - Factory Method: createCredentialActions is a factory that takes its
+ *     dependencies as an argument and returns a bundle of closures. This is
+ *     Dependency Injection via closures — the factory doesn't import or
+ *     instantiate its deps; they're handed in from the AuthProvider.
+ *   - Strategy Pattern: getGoogleCredential and getAppleCredential are
+ *     interchangeable credential-acquisition strategies. linkProvider uses
+ *     a providerType discriminant to select which strategy to invoke.
+ *   - Typed Exception: Every collision path throws a CredentialCollisionError
+ *     instead of a raw Error, enabling type-safe recovery in the UI.
+ *
+ * Key Dependencies:
+ *   - GoogleSignin (native Google OAuth flow)
+ *   - expo-apple-authentication (native Apple Sign-In)
+ *   - firebase/auth (linkWithCredential, signInWithCredential)
+ *
+ * Consumed By:
+ *   AuthContext.tsx (constructs this factory with useMemo), sessionActions.ts
+ *   (receives getGoogleCredential/getAppleCredential as injected deps)
+ * ============================================================
+ */
+
+/**
+ * Dependencies injected into the credential action factory.
+ * This interface defines the "ports" this module needs — following the
+ * Dependency Inversion Principle (SOLID "D"), it depends on abstractions
+ * (function signatures) rather than concrete implementations.
+ */
 interface CredentialActionDeps {
   isAppleSignInAvailable: boolean;
   requireAuthenticatedUser: () => User;
   requireAnonymousUser: () => User;
 }
 
+/**
+ * Factory function that constructs the credential action bundle.
+ *
+ * This follows the Factory Method pattern combined with Dependency Injection
+ * via closures: the caller passes in the deps this module needs, and gets
+ * back an object of action functions that close over those deps. This makes
+ * the actions testable (you can pass mock deps) and ensures each factory
+ * receives only the dependencies it actually needs (Interface Segregation).
+ *
+ * @param deps - The minimal set of capabilities this factory requires
+ * @returns An object of credential-related action functions
+ */
 export function createCredentialActions({
   isAppleSignInAvailable,
   requireAuthenticatedUser,
   requireAnonymousUser,
 }: CredentialActionDeps) {
+  /**
+   * Acquires a Google OAuth credential via the native sign-in flow.
+   *
+   * This is one of the two credential-acquisition Strategies. The flow:
+   * 1. Check Google Play Services availability (Android-specific prerequisite)
+   * 2. Launch the native Google sign-in sheet
+   * 3. Extract the idToken from the result
+   * 4. Wrap it in a Firebase-compatible GoogleAuthProvider.credential
+   *
+   * Returns null (not throw) on user cancellation — this is intentional.
+   * Cancellation is a normal user action, not an error, so we use a
+   * null return as a "soft abort" signal. Callers check for null and
+   * gracefully bail out. Actual errors (network, config) still throw.
+   */
   const getGoogleCredential = async (): Promise<AuthCredential | null> => {
     try {
       logAuthDebug({
@@ -70,7 +139,21 @@ export function createCredentialActions({
     }
   };
 
+  /**
+   * Acquires an Apple OAuth credential via the native sign-in flow.
+   *
+   * The second credential-acquisition Strategy, symmetric with getGoogleCredential.
+   * Uses Expo's AppleAuthentication SDK to launch the native Apple sign-in sheet,
+   * then wraps the identity token in a Firebase OAuthProvider credential.
+   *
+   * Gatekeeper pattern: the availability check at the top is a precondition guard —
+   * if Apple Sign-In isn't available on this device (Android, old iOS), we fail
+   * fast with a clear error rather than letting the native SDK throw an opaque one.
+   *
+   * @returns A Firebase AuthCredential, or null if the user cancelled
+   */
   const getAppleCredential = async (): Promise<AuthCredential | null> => {
+    // Gatekeeper: fail fast if Apple Sign-In is unavailable on this platform
     if (!isAppleSignInAvailable) {
       throw new Error("Apple Sign In is not available on this device");
     }
@@ -95,11 +178,33 @@ export function createCredentialActions({
     }
   };
 
+  /**
+   * Links an externally-acquired credential to the current anonymous user.
+   *
+   * This is the low-level linking primitive — it trusts the caller to have
+   * already acquired the credential and validated the user is anonymous.
+   * The higher-level upgradeAnonymousWithGoogle/Apple/Email methods handle
+   * the full flow including credential acquisition and collision detection.
+   */
   const linkAnonymousAccount = async (credential: AuthCredential) => {
     const currentUser = requireAnonymousUser();
     await linkWithCredential(currentUser, credential);
   };
 
+  /**
+   * Upgrades an anonymous user to a Google-authenticated account.
+   *
+   * This is a Composite operation that orchestrates two sub-operations:
+   * 1. Acquire a Google credential (via getGoogleCredential)
+   * 2. Link it to the current anonymous user (via linkWithCredential)
+   *
+   * The critical complexity is collision handling: if the Google account
+   * is already linked to a different Firebase user, Firebase throws
+   * "auth/credential-already-in-use". We catch this and throw a
+   * CredentialCollisionError — a domain-specific Typed Exception that
+   * carries the pending credential and email, enabling the UI to offer
+   * a "sign in to your existing account and merge" recovery flow.
+   */
   const upgradeAnonymousWithGoogle = async (): Promise<void> => {
     const currentUser = requireAnonymousUser();
 
@@ -131,6 +236,9 @@ export function createCredentialActions({
       throw new Error("User cancelled");
     }
 
+    // --- Phase 2: Attempt to link credential to anonymous user ---
+    // This is where collisions surface. Firebase's linkWithCredential will
+    // reject if the credential is already associated with another account.
     try {
       logAuthDebug({
         location: "AuthContext.tsx:upgradeAnonymousWithGoogle:beforeLink",
@@ -163,6 +271,9 @@ export function createCredentialActions({
         hypothesisId: "B",
       });
 
+      // --- Collision detection: convert Firebase error into a typed domain exception ---
+      // The CredentialCollisionError carries the credential + email so the UI
+      // can offer a recovery flow: "Sign in to your existing account, then link."
       if (error?.code === "auth/credential-already-in-use") {
         const googleUser = await GoogleSignin.getCurrentUser();
         const email = googleUser?.user?.email || null;
@@ -173,6 +284,16 @@ export function createCredentialActions({
     }
   };
 
+  /**
+   * Upgrades an anonymous user to an Apple-authenticated account.
+   *
+   * Structurally mirrors upgradeAnonymousWithGoogle — same two-phase pattern
+   * (acquire credential → link to anonymous user) with the same collision
+   * detection. The main difference is that Apple credential acquisition is
+   * inline here rather than delegated to getAppleCredential, because the
+   * upgrade flow needs to capture the email from the Apple response for
+   * the collision error — data that getAppleCredential doesn't expose.
+   */
   const upgradeAnonymousWithApple = async (): Promise<void> => {
     const currentUser = requireAnonymousUser();
 
@@ -214,6 +335,14 @@ export function createCredentialActions({
     }
   };
 
+  /**
+   * Upgrades an anonymous user to an email/password account.
+   *
+   * The simplest of the three upgrade paths — no native OAuth SDK involved.
+   * EmailAuthProvider.credential constructs the credential synchronously from
+   * the email and password, then linkWithCredential attaches it to the
+   * anonymous user. Same collision detection pattern as the OAuth variants.
+   */
   const upgradeAnonymousWithEmail = async (
     email: string,
     password: string
@@ -231,10 +360,31 @@ export function createCredentialActions({
     }
   };
 
+  /**
+   * Signs in with a credential that was previously captured during a collision.
+   *
+   * This is the second half of the collision recovery flow: after the user
+   * re-authenticates with their existing account, the UI calls this method
+   * with the pendingCredential from the CredentialCollisionError to complete
+   * the originally-intended sign-in. This is the Retry pattern applied to
+   * auth — store the failed intent, resolve the blocker, then retry.
+   */
   const signInWithPendingCredential = async (credential: AuthCredential) => {
     await signInWithCredential(auth, credential);
   };
 
+  /**
+   * Links an additional auth provider to an already-authenticated (non-anonymous) user.
+   *
+   * This uses the Strategy pattern with a providerType discriminant to select
+   * the correct credential-acquisition path: Google → getGoogleCredential,
+   * Apple → getAppleCredential, password → EmailAuthProvider.credential.
+   * Once the credential is acquired, the same linkWithCredential call handles
+   * all three cases uniformly — a classic example of polymorphic dispatch.
+   *
+   * @param providerType - Which provider to link ("google.com", "apple.com", or "password")
+   * @param emailPassword - Required when providerType is "password"
+   */
   const linkProvider = async (
     providerType: "google.com" | "apple.com" | "password",
     emailPassword?: { email: string; password: string }
